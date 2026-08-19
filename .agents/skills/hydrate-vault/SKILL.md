@@ -86,6 +86,13 @@ write candidate evidence into the engine checkout.
    failures. Report warnings without concealing them. If the package is not
    installed, use `scripts/validate_vault.py` as the compatibility entry point.
 10. Show the Git diff. Do not touch `resumes/`, `directions/`, or rendering files.
+11. For first-time hydration, give a compact handoff instead of starting a broad
+    career interview: report source and fact counts, contradictions or ambiguous
+    claims, and whether the evidence supports a first draft. If it does, explain
+    that outcomes, scale, leadership, authority, and chronology will be tested
+    against the chosen direction after the initial draft, then ask which career
+    direction or role the user wants to pursue. Do not ask generic improvement
+    questions during this handoff.
 
 ## Import rules
 

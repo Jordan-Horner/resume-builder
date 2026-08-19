@@ -917,6 +917,58 @@ def test_project_report_tracks_current_and_stale_builds(
     assert stale["next_action"]["route"] == "compile"
 
 
+def test_project_report_routes_progressive_onboarding_before_first_baseline() -> None:
+    empty_vault = {"valid": False, "registered_sources": 0, "facts": 0}
+    registered_vault = {"valid": False, "registered_sources": 1, "facts": 0}
+    hydrated_vault = {"valid": True, "registered_sources": 1, "facts": 3}
+    evaluations = {"unsealed": 0, "uncovered_baselines": []}
+
+    assert (
+        project_report._next_action(empty_vault, [], [], [], evaluations, ["empty"])["route"]
+        == "needs-sources"
+    )
+    assert (
+        project_report._next_action(registered_vault, [], [], [], evaluations, ["facts"])["route"]
+        == "needs-hydration"
+    )
+    direction_action = project_report._next_action(hydrated_vault, [], [], [], evaluations, [])
+    assert direction_action["route"] == "needs-direction"
+    onboarding = project_report._onboarding_status(direction_action, hydrated_vault)
+    assert onboarding["active"] is True
+    assert "Choose a target direction first" in onboarding["message"]
+    assert (
+        project_report._next_action(
+            hydrated_vault,
+            [{"slug": "support-operations"}],
+            [],
+            [],
+            evaluations,
+            [],
+        )["route"]
+        == "build-baseline"
+    )
+
+
+def test_initial_draft_readiness_requires_role_and_experience_evidence() -> None:
+    assert (
+        project_report._initial_draft_readiness(
+            {
+                "facts": 2,
+                "types": {"role": 1, "responsibility": 1},
+            }
+        )["ready"]
+        is True
+    )
+    missing_role = project_report._initial_draft_readiness(
+        {
+            "facts": 2,
+            "types": {"role": 0, "responsibility": 2},
+        }
+    )
+    assert missing_role["ready"] is False
+    assert "no supported role chronology" in missing_role["reasons"]
+
+
 def test_mint_command_creates_audited_pdf(tmp_path: Path, run_main, monkeypatch) -> None:
     vault, resume = project(tmp_path)
     assert run_main(compilation.main, resume, "--vault-root", vault) == 0

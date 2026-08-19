@@ -422,17 +422,39 @@ def _target_records(
 
 def _next_action(
     vault: dict[str, Any],
+    directions: list[dict[str, Any]],
     resumes: list[dict[str, Any]],
     targets: list[dict[str, Any]],
     evaluations: dict[str, Any],
     errors: list[str],
 ) -> dict[str, str]:
+    registered_sources = int(vault.get("registered_sources", 0))
+    facts = int(vault.get("facts", 0))
+    if not registered_sources and not facts:
+        return {
+            "route": "needs-sources",
+            "message": "Add a resume, LinkedIn export, career note, or other source material.",
+        }
+    if registered_sources and not facts:
+        return {
+            "route": "needs-hydration",
+            "message": "Source registration is complete; finish reviewed career-fact hydration.",
+        }
     if not vault.get("valid"):
         return {"route": "fix-vault", "message": "Resolve the vault validation errors."}
-    if not vault.get("registered_sources") or not vault.get("facts"):
-        return {"route": "hydrate", "message": "Register and hydrate source career material."}
+    readiness = _initial_draft_readiness(vault)
+    if not readiness["ready"]:
+        return {
+            "route": "needs-hydration",
+            "message": "Hydrate enough role and experience evidence for a safe first draft.",
+        }
     if errors:
         return {"route": "fix-project", "message": "Resolve invalid project records."}
+    if not directions:
+        return {
+            "route": "needs-direction",
+            "message": "Choose the target career direction before building the first draft.",
+        }
     baselines = [record for record in resumes if record["kind"] == "baseline"]
     if not baselines:
         return {"route": "build-baseline", "message": "Build the first directional baseline."}
@@ -536,6 +558,57 @@ def _next_action(
     }
 
 
+def _initial_draft_readiness(vault: dict[str, Any]) -> dict[str, object]:
+    """Require role chronology and usable experience evidence when typed counts exist."""
+    facts = int(vault.get("facts", 0))
+    raw_types = vault.get("types")
+    if not isinstance(raw_types, dict):
+        return {"ready": facts > 0, "reasons": [] if facts else ["no canonical facts"]}
+    roles = int(raw_types.get("role", 0))
+    evidence = sum(
+        int(raw_types.get(kind, 0))
+        for kind in ("accomplishment", "incident", "leadership", "project", "responsibility")
+    )
+    reasons = []
+    if roles == 0:
+        reasons.append("no supported role chronology")
+    if evidence == 0:
+        reasons.append("no usable experience evidence")
+    return {"ready": not reasons, "reasons": reasons}
+
+
+def _onboarding_status(
+    next_action: dict[str, str],
+    vault: dict[str, Any],
+) -> dict[str, object]:
+    """Describe the progressive first-run stage without storing duplicate state."""
+    route = next_action["route"]
+    messages = {
+        "needs-sources": (
+            "I don't have any resume material yet. Attach one or more resume files, give me "
+            "the exact folder path where they are stored, paste resume text, provide a "
+            "LinkedIn export, or start from career notes."
+        ),
+        "needs-hydration": (
+            "I registered your source material, but career-fact extraction is not finished. "
+            "I will review the imported evidence before asking you for anything else."
+        ),
+        "needs-direction": (
+            "I imported your resume and found enough information to build from it. Some "
+            "experience may be undersold, particularly around outcomes, scale, and leadership. "
+            "Choose a target direction first; after I build the initial draft, I'll ask only "
+            "the questions most likely to strengthen it."
+        ),
+        "build-baseline": "Your evidence and direction are ready for the first resume draft.",
+    }
+    return {
+        "stage": route,
+        "active": route in messages,
+        "message": messages.get(route, next_action["message"]),
+        "initial_draft_readiness": _initial_draft_readiness(vault),
+    }
+
+
 def project_report(vault_root: Path, *, strict: bool = False) -> dict[str, Any]:
     """Collect a read-only project state report with deterministic next action."""
     resolved_vault = vault_root.expanduser().resolve()
@@ -591,7 +664,22 @@ def project_report(vault_root: Path, *, strict: bool = False) -> dict[str, Any]:
         "feedback": feedback,
         "errors": errors,
     }
-    result["next_action"] = _next_action(vault, resumes, targets, evaluations, errors)
+    result["next_action"] = _next_action(
+        vault,
+        directions,
+        resumes,
+        targets,
+        evaluations,
+        errors,
+    )
+    result["onboarding"] = _onboarding_status(result["next_action"], vault)
+    result["status"] = (
+        "getting-started"
+        if result["onboarding"]["active"]
+        else "valid"
+        if result["valid"]
+        else "invalid"
+    )
     return result
 
 
@@ -611,7 +699,7 @@ def format_summary(result: dict[str, Any]) -> str:
     }
 
     lines = [
-        f"Project: {'VALID' if result['valid'] else 'INVALID'}",
+        f"Project: {str(result.get('status', 'valid' if result['valid'] else 'invalid')).upper()}",
         (
             f"Vault: {vault.get('facts', 0)} facts, "
             f"{vault.get('registered_sources', 0)} sources, "
@@ -638,6 +726,7 @@ def format_summary(result: dict[str, Any]) -> str:
             f"({result['evaluations']['sealed']} sealed, "
             f"{result['evaluations']['unsealed']} unsealed)"
         ),
+        f"Onboarding: {result['onboarding']['stage']}",
         f"Next: {result['next_action']['message']}",
     ]
     lines.extend(f"  error: {error}" for error in result["errors"])
@@ -657,7 +746,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps({"error": str(exc)}, indent=2), file=sys.stderr)
         return 2
     print(format_summary(result) if args.summary else json.dumps(result, indent=2))
-    return 0 if result["valid"] else 1
+    return 0 if result["valid"] or result["onboarding"]["active"] else 1
 
 
 if __name__ == "__main__":

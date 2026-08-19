@@ -154,3 +154,16 @@ profile or renumbering stable IDs. Use
 `.agents/skills/research-role/SKILL.md` for that research workflow; this contract
 defines the stored profile, while the research skill defines how market
 evidence is collected and classified.
+
+Write a proposed initial profile to
+`build/direction-drafts/<slug>.md`. Preview and validate it without changing the
+role database:
+
+```bash
+resume-builder direction create build/direction-drafts/<slug>.md
+```
+
+After the user accepts the role shape, apply it atomically with `--apply`. This
+creation path refuses an initial profile that is not both `draft` and
+`provisional`, refuses files outside the private workspace's draft directory,
+and never overwrites an existing canonical direction.

@@ -14,6 +14,13 @@ Start a new profile as `draft` and `provisional`. Unsourced assumptions remain
 `needs-review`; later role research adds sources and raises maturity without
 replacing the file or its stable concept IDs.
 
+Write the proposed profile under `build/direction-drafts/<slug>.md`, preview it
+with `resume-builder direction create build/direction-drafts/<slug>.md`, and
+apply it only after review with the same command plus `--apply`. Creation is
+atomic, refuses paths outside the private workspace, never overwrites an
+existing profile, and requires every initial profile to remain `draft` and
+`provisional`.
+
 Concept `terms` are retrieval and discoverability signals, not sentences or
 labels to copy into a resume. Use the optional `essential_terms` list only for a
 small number of exact phrases that truly must appear. Direction audit scores

@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 
 import yaml
 
+from .atomic import atomic_write_text
 from .compilation import compile_markdown
 from .evidence import audit_claims, claim_blocks
 from .layout import VaultLayout
@@ -267,6 +268,28 @@ def profile_paths(project_root: Path, requested: list[Path]) -> list[Path]:
         for path in sorted(directory.glob("*.md"))
         if path.name != "README.md" and not path.name.endswith(".template.md")
     ]
+
+
+def preview_direction_creation(
+    draft: Path,
+    project_root: Path,
+) -> tuple[Path, str, dict[str, Any]]:
+    """Validate one initial private direction draft and resolve its canonical target."""
+    source = contained_project_path(
+        draft,
+        project_root,
+        "build/direction-drafts",
+        "direction draft",
+    )
+    if source.suffix != ".md":
+        raise ValueError("direction draft must use a .md extension")
+    profile, _ = parse_direction(source)
+    if profile["status"] != "draft" or profile["maturity"] != "provisional":
+        raise ValueError("a new direction must begin as draft and provisional")
+    target = project_root / "directions" / f"{profile['slug']}.md"
+    if target.exists():
+        raise ValueError(f"direction already exists: {target.relative_to(project_root)}")
+    return target, source.read_text(encoding="utf-8"), profile
 
 
 def normalize_phrase(value: str) -> str:
@@ -591,6 +614,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     audit_parser.add_argument("profile", type=Path)
     audit_parser.add_argument("resume", type=Path)
     audit_parser.add_argument("--vault-root", type=Path, default=Path("vault"))
+    create_parser = subparsers.add_parser(
+        "create",
+        help="Preview or apply a validated initial direction draft",
+    )
+    create_parser.add_argument("draft", type=Path)
+    create_parser.add_argument("--vault-root", type=Path, default=Path("vault"))
+    create_parser.add_argument("--apply", action="store_true")
     args = parser.parse_args(argv)
     try:
         vault_root = args.vault_root.expanduser().resolve()
@@ -619,7 +649,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "count": len(validated),
                 "warnings": warnings,
             }
-        else:
+        elif args.action == "audit":
             profile_path = project_direction_path(args.profile, project_root)
             resume_path = contained_project_path(args.resume, project_root, "resumes", "resume")
             profile, _ = parse_direction(profile_path)
@@ -641,6 +671,22 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "resume": resume_path.relative_to(project_root).as_posix(),
                 "grounding": grounding,
                 **audit,
+            }
+        else:
+            target, content, profile = preview_direction_creation(
+                args.draft,
+                project_root,
+            )
+            if args.apply:
+                atomic_write_text(target, content)
+            result = {
+                "valid": True,
+                "applied": args.apply,
+                "draft": args.draft.resolve().relative_to(project_root).as_posix(),
+                "target": target.relative_to(project_root).as_posix(),
+                "slug": profile["slug"],
+                "status": profile["status"],
+                "maturity": profile["maturity"],
             }
     except (OSError, ValueError) as exc:
         print(json.dumps({"error": str(exc)}, indent=2), file=sys.stderr)

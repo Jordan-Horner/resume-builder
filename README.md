@@ -193,12 +193,15 @@ The underlying workflow is:
    recover text.
 3. Review and apply the skill's versioned canonical change plan.
 4. Commit the approved vault changes.
-5. Add new memories through reviewed change plans as they surface.
-6. Ask the agent to build a directional baseline, tailor a resume to a job, or
+5. Review the compact import handoff. The agent reports what was captured and
+   any contradictions, then asks for the target direction; it does not begin a
+   generic resume-strengthening interview.
+6. Add new memories through reviewed change plans as they surface.
+7. Ask the agent to build a directional baseline, tailor a resume to a job, or
    update an existing resume with the `build-resume` skill.
    If the role shape is missing or stale, use `research-role` first to research
    an anchor opportunity and similar roles, then update `directions/`.
-7. For a fresh baseline or substantial rewrite, the builder first creates a
+8. For a fresh baseline or substantial rewrite, the builder first creates a
    versioned, compiler-enforced synthesis plan under `resumes/plans/` that
    groups vault facts into career stories,
    assigns every proposed bullet a distinct job, preserves progression,
@@ -215,42 +218,42 @@ The underlying workflow is:
    recent and target-critical roles receive enough
    distinct evidence to make a complete argument without relying on a fixed
    bullet count.
-8. When deciding whether an opening deserves more effort, invoke `screen-job`
+9. When deciding whether an opening deserves more effort, invoke `screen-job`
    for a one-page, read-only review of the company, employment setup, pay,
    closest resume, ATS visibility, career direction, and any questions that
    could materially improve the match.
-9. After choosing to pursue a real opening, capture it under `targets/` and
+10. After choosing to pursue a real opening, capture it under `targets/` and
    invoke `match-job` to distinguish exact retrieval from actual evidence. A
    tailored resume remains separate from its directional baseline, and the
    match report compares both.
-10. Run `resume-builder verify <resume>` as the normal handoff into review. It
+11. Run `resume-builder verify <resume>` as the normal handoff into review. It
    compiles the draft, runs the direction and optional target checks, writes a
    compact verification receipt, and freezes the cold-read package and reviewer
    decisions file. An unchanged rerun reuses those hash-pinned results.
-11. Review the draft through `critique-resume`. Every new or changed narrative
+12. Review the draft through `critique-resume`. Every new or changed narrative
    block requires an explicit career-professional decision. Complete the
    generated decisions file and run `resume-builder review finalize`; the
    command constructs and validates the version 4 record—or version 5 when
    accepted feedback rules apply—without manual hash assembly.
-12. If an authorized end-to-end run receives a single clear wording-only repair,
+13. If an authorized end-to-end run receives a single clear wording-only repair,
    run `resume-builder review apply-repairs`, re-verify, and send the changed
    block through a fresh independent review without pausing for another wording
    approval. Missing facts, changed authority, and strategic choices still
    require user input.
-13. When the user directly rejects or requests a change to visible resume
+14. When the user directly rejects or requests a change to visible resume
    wording, record it as a temporary feedback session before editing. Repeated
    corrections update that session, so only the latest interpretation guides
    the next attempt. Resolve accepted rules and open sessions before drafting;
    check both after, never during, the independent cold review.
-14. After the user accepts the reviewed preview, promote each intended session
+15. After the user accepts the reviewed preview, promote each intended session
    by ID with that preview. Unchanged effective guidance preserves the preview
    for minting. Close cosmetic feedback without memory and route factual changes
    through hydration.
-15. Route material findings to the right source: rebuild from existing evidence,
+16. Route material findings to the right source: rebuild from existing evidence,
    hydrate a missing career fact, or adjust the direction profile.
-16. Rebuild after the routed change and re-run critique only when the content or
+17. Rebuild after the routed change and re-run critique only when the content or
    direction changed materially.
-17. Publish the continuous web preview after review, then mint the final PDF only
+18. Publish the continuous web preview after review, then mint the final PDF only
    when the resume is ready and explicitly approved.
 
 Example requests:
@@ -267,8 +270,8 @@ The agent reads the vault before asking questions, proposes evidence-backed
 directions when the target is unclear, and reports material additions,
 removals, and rewrites before replacing approved content. If the vault already
 contains canonical facts but `resumes/` is empty, the agent will move directly
-to choosing the first directional baseline instead of asking for the source
-resumes again.
+to choosing or creating the first direction before building a baseline instead
+of asking for the source resumes again.
 
 For a new directional baseline, the builder does not reconstruct one imported
 resume. It selects the strongest relevant evidence from the complete vault,

@@ -3,6 +3,8 @@ from __future__ import annotations
 import subprocess
 import sys
 
+from resume_builder import cli
+
 
 def test_module_cli_lists_commands() -> None:
     result = subprocess.run(
@@ -26,3 +28,14 @@ def test_module_cli_lists_commands() -> None:
     assert "match" in result.stdout
     assert "review" in result.stdout
     assert "feedback" in result.stdout
+    assert "workspace" in result.stdout
+
+
+def test_cli_handles_interrupted_command_without_traceback(monkeypatch, capsys) -> None:
+    def interrupted(_arguments):
+        raise KeyboardInterrupt
+
+    monkeypatch.setitem(cli.COMMANDS, "init", (interrupted, "Interrupted test"))
+
+    assert cli.main(["init"]) == 130
+    assert "Canceled." in capsys.readouterr().err

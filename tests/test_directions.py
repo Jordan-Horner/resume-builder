@@ -145,6 +145,39 @@ def test_direction_validate_and_audit_commands(tmp_path: Path, run_main) -> None
     assert run_main(directions.main, "audit", profile, resume, "--vault-root", vault) == 1
 
 
+def test_direction_create_previews_then_applies_initial_private_draft(
+    tmp_path: Path, run_main
+) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    draft = tmp_path / "build" / "direction-drafts" / "support-operations.md"
+    draft.parent.mkdir(parents=True)
+    draft.write_text(
+        direction_markdown().replace("status: approved", "status: draft"),
+        encoding="utf-8",
+    )
+    target = tmp_path / "directions" / "support-operations.md"
+
+    assert run_main(directions.main, "create", draft, "--vault-root", vault) == 0
+    assert not target.exists()
+    assert run_main(directions.main, "create", draft, "--vault-root", vault, "--apply") == 0
+    assert target.read_text(encoding="utf-8") == draft.read_text(encoding="utf-8")
+    profile, _ = directions.parse_direction(target)
+    assert profile["status"] == "draft"
+    assert profile["maturity"] == "provisional"
+
+
+def test_direction_create_rejects_approved_initial_profile(tmp_path: Path, run_main) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    draft = tmp_path / "build" / "direction-drafts" / "support-operations.md"
+    draft.parent.mkdir(parents=True)
+    draft.write_text(direction_markdown(), encoding="utf-8")
+
+    assert run_main(directions.main, "create", draft, "--vault-root", vault, "--apply") == 2
+    assert not (tmp_path / "directions" / "support-operations.md").exists()
+
+
 def test_direction_validation_reports_unknown_vault_theme_as_candidate_gap(
     tmp_path: Path, run_main
 ) -> None:

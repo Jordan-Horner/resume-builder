@@ -60,8 +60,12 @@ Git tools do not. Never write candidate data into same-named engine folders.
      version before editing.
    For a directional baseline, run `resume-builder direction validate` when a
    profile exists. If it does not, collect the compact direction intake defined
-   by the direction contract and create a `draft`, `provisional` profile. Do not
-   substitute unsourced model knowledge for missing role-shape information.
+   by the direction contract, write the proposed profile under
+   `build/direction-drafts/<slug>.md`, preview it with `resume-builder direction
+   create build/direction-drafts/<slug>.md`, and apply it only after review with
+   the same command plus `--apply`. Every new profile must begin as `draft` and
+   `provisional`. Do not substitute unsourced model knowledge for missing
+   role-shape information.
    When the user wants a researched market target, route profile creation or
    refresh through `research-role` before synthesis.
 5. Ask only unresolved questions that materially change the output. Prefer one

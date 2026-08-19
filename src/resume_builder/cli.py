@@ -84,7 +84,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Dispatch a subcommand without mutating process-global arguments."""
     arguments = list(sys.argv[1:] if argv is None else argv)
     if not arguments and sys.stdin.isatty() and sys.stdout.isatty():
-        return workspace.main([])
+        try:
+            return workspace.main([])
+        except KeyboardInterrupt:
+            print("\nSetup canceled. No workspace changes were applied.", file=sys.stderr)
+            return 130
     if not arguments or arguments[0] in {"-h", "--help"}:
         command_parser = parser()
         command_parser.print_help()
@@ -105,7 +109,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             os.chdir(active_workspace)
     if command == "report" and "--summary" not in forwarded:
         forwarded = [*forwarded, "--summary"]
-    return handler(forwarded)
+    try:
+        return handler(forwarded)
+    except KeyboardInterrupt:
+        print("\nCanceled.", file=sys.stderr)
+        return 130
 
 
 if __name__ == "__main__":

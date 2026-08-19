@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from resume_builder import project_report
 from resume_builder.workspace import (
     CommandResult,
     WorkspaceError,
@@ -137,6 +138,18 @@ def test_initialize_workspace_never_seeds_the_fictional_example(tmp_path: Path) 
     )
     assert "Phoenix Wright" not in visible_text
     assert "Wright Anything Agency" not in visible_text
+
+
+def test_fresh_workspace_report_is_getting_started_not_an_operational_failure(
+    tmp_path: Path, run_main
+) -> None:
+    target = tmp_path / "workspace"
+    initialize_workspace(target)
+
+    assert run_main(project_report.main, "--vault-root", target / "vault", "--strict") == 0
+    result = project_report.project_report(target / "vault", strict=True)
+    assert result["status"] == "getting-started"
+    assert result["onboarding"]["stage"] == "needs-sources"
 
 
 def test_initialize_refuses_unignored_parent_repository(tmp_path: Path) -> None:

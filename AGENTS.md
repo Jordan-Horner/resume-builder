@@ -93,9 +93,11 @@ indexes. The scripts under
     registration is complete but hydration is unfinished, then continue with
     the reviewed `hydrate-vault` change-plan workflow.
   - **Canonical facts but no generated resumes:** explain that the career vault
-    is ready and ask which directional baseline to build first. When the user is
-    unsure, suggest two or three directions supported by the vault. Do not ask
-    for source resumes again.
+    is ready. If no direction profile exists, ask which career direction or role
+    the user wants to pursue before building. When the user is unsure, suggest
+    two or three candidate-evidence-fit options supported by the vault; do not
+    present them as researched market demand. Do not ask for source resumes
+    again.
   - **Existing generated resumes:** determine whether the user wants a new
     directional baseline, a job-tailored resume, or an update to an existing
     resume.
@@ -138,6 +140,11 @@ indexes. The scripts under
   canonical facts.
 - Ask only pointed questions that materially affect the result. When the target
   is vague, propose evidence-backed directions from the vault.
+- After successful first hydration, do not launch a broad improvement
+  interview. Say that enough evidence exists to build when it does, note that
+  the target-aware critique may later ask about material gaps in outcomes,
+  scale, leadership, authority, or chronology, and ask for the target direction.
+  The first draft should precede optional strengthening questions.
 - Follow the build-resume direction contract. A missing profile starts as
   `draft` and `provisional`; do not turn model assumptions into supposed market
   requirements. Use `research-role` for current market research. Preserve stable
