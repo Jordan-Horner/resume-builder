@@ -10,9 +10,26 @@ from resume_builder.workspace import (
     CommandResult,
     WorkspaceError,
     connect_existing_workspace,
+    default_github_repository,
     discover_workspace,
     initialize_workspace,
 )
+
+
+def test_default_github_repository_uses_authenticated_owner(tmp_path: Path) -> None:
+    def runner(arguments: tuple[str, ...] | list[str], cwd: Path) -> CommandResult:
+        assert tuple(arguments) == ("gh", "api", "user", "--jq", ".login")
+        assert cwd == tmp_path.resolve()
+        return CommandResult(0, "example-owner\n")
+
+    assert default_github_repository(runner=runner, cwd=tmp_path) == "example-owner/resume-vault"
+
+
+def test_default_github_repository_requires_authenticated_owner(tmp_path: Path) -> None:
+    def runner(arguments: tuple[str, ...] | list[str], cwd: Path) -> CommandResult:
+        return CommandResult(1, stderr="not authenticated")
+
+    assert default_github_repository(runner=runner, cwd=tmp_path) is None
 
 
 def _configure_git(path: Path) -> None:

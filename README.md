@@ -135,7 +135,9 @@ then asks how to protect it:
 
 1. **Local Git plus a private GitHub backup (recommended).** The engine creates
    the GitHub repository as private, verifies that GitHub reports `PRIVATE`, and
-   only then pushes the first workspace checkpoint.
+   only then pushes the first workspace checkpoint. The default repository is
+   `<authenticated-owner>/resume-vault`; an explicit `OWNER/NAME` can override
+   it.
 2. **Local Git only.** Nothing is uploaded, but the engine warns that local Git
    cannot protect against device loss.
 3. **Existing private workspace.** Connect an existing private Git repository
@@ -148,6 +150,15 @@ Connect an existing workspace non-interactively with:
 ```bash
 resume-builder init --existing --workspace /exact/path/to/private-workspace
 ```
+
+Create the conventional private GitHub backup non-interactively with:
+
+```bash
+resume-builder init --storage github
+```
+
+This uses the authenticated GitHub owner's `resume-vault` repository. Pass
+`--github-repo OWNER/NAME` only when a different private name is intentional.
 
 The existing directory must already be an independent Git repository and must
 contain `vault/vault.json`. When it sits inside another repository, the parent

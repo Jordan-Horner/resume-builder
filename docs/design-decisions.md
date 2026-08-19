@@ -67,6 +67,14 @@ This preserves one visible project folder and separate history without making
 private workspace configuration part of the engine repository. Advanced users
 may manage that private repository with their preferred Git workflow.
 
+## Why `resume-vault` is the default private repository name
+
+The private workspace has one stable purpose regardless of who installs the
+engine: it is the user's career vault and resume history. Onboarding therefore
+defaults to `<authenticated-owner>/resume-vault`. Users can override the full
+`OWNER/NAME`, but the engine does not generate project-specific or numbered
+vault names that make backups harder to recognize later.
+
 ## Known tradeoffs
 
 - The workflow has more ceremony than a one-shot generator.

@@ -21,7 +21,9 @@ from .layout import VaultLayout
 WORKSPACE_CONFIG = ".resume-builder.json"
 WORKSPACE_VERSION = 1
 DEFAULT_WORKSPACE = Path("workspace")
+DEFAULT_VAULT_REPOSITORY_NAME = "resume-vault"
 GITHUB_REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
+GITHUB_OWNER = re.compile(r"[A-Za-z0-9-]+")
 
 
 class WorkspaceError(RuntimeError):
@@ -68,6 +70,19 @@ def _require_success(result: CommandResult, action: str) -> None:
         return
     detail = result.stderr.strip() or result.stdout.strip() or "unknown error"
     raise WorkspaceError(f"{action} failed: {detail}")
+
+
+def default_github_repository(
+    *,
+    runner: Runner = run_command,
+    cwd: Path | None = None,
+) -> str | None:
+    """Return the authenticated owner's conventional private vault repository."""
+    result = runner(("gh", "api", "user", "--jq", ".login"), (cwd or Path.cwd()).resolve())
+    owner = result.stdout.strip()
+    if result.returncode != 0 or GITHUB_OWNER.fullmatch(owner) is None:
+        return None
+    return f"{owner}/{DEFAULT_VAULT_REPOSITORY_NAME}"
 
 
 def _is_git_repository(path: Path, runner: Runner) -> bool:
@@ -234,7 +249,7 @@ def initialize_workspace(
     if backup not in {"local", "github"}:
         raise WorkspaceError(f"unsupported backup mode: {backup}")
     if backup == "github" and not github_repository:
-        raise WorkspaceError("--github-repo OWNER/NAME is required for GitHub backup")
+        raise WorkspaceError("GitHub backup requires authentication or --github-repo OWNER/NAME")
     if bool(git_name) != bool(git_email):
         raise WorkspaceError("Git name and email must be provided together")
 
@@ -389,8 +404,11 @@ def _interactive_options(
         return target, "existing", None, None, None
     if choice != "1":
         raise WorkspaceError("choice must be 1, 2, or 3")
-    repository = input("Private GitHub repository (OWNER/NAME): ").strip()
-    if not repository or "/" not in repository:
+    default_repository = default_github_repository()
+    suggestion = default_repository or f"OWNER/{DEFAULT_VAULT_REPOSITORY_NAME}"
+    entered_repository = input(f"Private GitHub repository [{suggestion}]: ").strip()
+    repository = entered_repository or default_repository
+    if repository is None or "/" not in repository:
         raise WorkspaceError("enter a GitHub repository as OWNER/NAME")
     confirmation = input(
         f"Create {repository} as PRIVATE, verify it, then push the initial vault? [y/N]: "
@@ -426,6 +444,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         target = args.workspace
         backup = "existing" if args.existing else args.storage or "local"
         repository = args.github_repo
+        if backup == "github" and repository is None:
+            repository = default_github_repository()
         git_name = args.git_name
         git_email = args.git_email
     try:
