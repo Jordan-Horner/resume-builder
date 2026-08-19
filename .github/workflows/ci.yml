@@ -65,11 +65,11 @@ jobs:
           test -z "$(find /tmp/resume-builder-clean-workspace/vault/sources/normalized \
             -type f -print -quit)"
           test -z "$(find /tmp/resume-builder-clean-workspace/resumes/baselines \
-            -type f -name '*.md' -print -quit)"
+            -type f ! -name '.gitkeep' -print -quit)"
           test -z "$(find /tmp/resume-builder-clean-workspace/resumes/plans \
-            -type f -print -quit)"
+            -type f ! -name '.gitkeep' -print -quit)"
           test -z "$(find /tmp/resume-builder-clean-workspace/resumes/tailored \
-            -type f -print -quit)"
+            -type f ! -name '.gitkeep' -print -quit)"
           test -z "$(find /tmp/resume-builder-clean-workspace/directions \
             -type f ! -name README.md -print -quit)"
           test -z "$(find /tmp/resume-builder-clean-workspace/targets \
