@@ -1,0 +1,4 @@
+interface:
+  display_name: "Hydrate Vault"
+  short_description: "Import career history into a résumé vault"
+  default_prompt: "Use $hydrate-vault to import my existing résumé materials into the career vault."

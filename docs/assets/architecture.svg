@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="520" viewBox="0 0 1400 520" role="img" aria-labelledby="title desc">
+  <title id="title">Resume Builder architecture</title>
+  <desc id="desc">A pipeline from source documents to canonical facts, evidence planning, verified resume drafts, independent review, web preview, and audited PDF output.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f5fbfc"/>
+      <stop offset="1" stop-color="#eef4fa"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="7" stdDeviation="8" flood-color="#17324d" flood-opacity="0.12"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#52728c"/>
+    </marker>
+    <style>
+      .label { font: 700 20px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #10263a; }
+      .detail { font: 15px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #4f6678; }
+      .step { font: 700 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 1px; fill: #087f8c; }
+      .card { fill: #fff; stroke: #d6e3ec; stroke-width: 1.5; rx: 18; filter: url(#shadow); }
+      .flow { fill: none; stroke: #52728c; stroke-width: 3; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1400" height="520" rx="28" fill="url(#background)"/>
+  <text x="70" y="72" class="label" font-size="30">Evidence in. Audited resume out.</text>
+  <text x="70" y="105" class="detail">Deterministic integrity checks surround the places where human judgment matters.</text>
+
+  <path class="flow" d="M238 260 H278"/>
+  <path class="flow" d="M448 260 H488"/>
+  <path class="flow" d="M658 260 H698"/>
+  <path class="flow" d="M868 260 H908"/>
+  <path class="flow" d="M1078 260 H1118"/>
+
+  <g transform="translate(68 164)">
+    <rect class="card" width="170" height="192"/>
+    <text x="22" y="38" class="step">01 · INGEST</text>
+    <text x="22" y="77" class="label">Sources</text>
+    <text x="22" y="108" class="detail">Resumes</text>
+    <text x="22" y="132" class="detail">Career notes</text>
+    <text x="22" y="156" class="detail">LinkedIn exports</text>
+  </g>
+  <g transform="translate(278 164)">
+    <rect class="card" width="170" height="192"/>
+    <text x="22" y="38" class="step">02 · GROUND</text>
+    <text x="22" y="77" class="label">Fact vault</text>
+    <text x="22" y="108" class="detail">Atomic claims</text>
+    <text x="22" y="132" class="detail">Provenance</text>
+    <text x="22" y="156" class="detail">Conflict status</text>
+  </g>
+  <g transform="translate(488 164)">
+    <rect class="card" width="170" height="192"/>
+    <text x="22" y="38" class="step">03 · PLAN</text>
+    <text x="22" y="77" class="label">Synthesis</text>
+    <text x="22" y="108" class="detail">Role direction</text>
+    <text x="22" y="132" class="detail">Story selection</text>
+    <text x="22" y="156" class="detail">Evidence map</text>
+  </g>
+  <g transform="translate(698 164)">
+    <rect class="card" width="170" height="192"/>
+    <text x="22" y="38" class="step">04 · VERIFY</text>
+    <text x="22" y="77" class="label">Draft</text>
+    <text x="22" y="108" class="detail">Claim checks</text>
+    <text x="22" y="132" class="detail">Regression audit</text>
+    <text x="22" y="156" class="detail">Frozen inputs</text>
+  </g>
+  <g transform="translate(908 164)">
+    <rect class="card" width="170" height="192"/>
+    <text x="22" y="38" class="step">05 · REVIEW</text>
+    <text x="22" y="77" class="label">Cold read</text>
+    <text x="22" y="108" class="detail">Natural language</text>
+    <text x="22" y="132" class="detail">Hiring argument</text>
+    <text x="22" y="156" class="detail">Hash-pinned record</text>
+  </g>
+  <g transform="translate(1118 164)">
+    <rect class="card" width="214" height="192"/>
+    <text x="22" y="38" class="step">06 · PUBLISH</text>
+    <text x="22" y="77" class="label">Preview + PDF</text>
+    <text x="22" y="108" class="detail">Reviewed HTML</text>
+    <text x="22" y="132" class="detail">Page-budget gate</text>
+    <text x="22" y="156" class="detail">Extraction audit</text>
+  </g>
+
+  <rect x="68" y="408" width="1264" height="54" rx="14" fill="#10263a"/>
+  <text x="700" y="441" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="16" fill="#fff">Git history preserves every source, fact, plan, resume, and decision. Generated build artifacts remain replaceable.</text>
+</svg>

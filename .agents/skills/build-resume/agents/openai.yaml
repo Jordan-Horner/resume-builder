@@ -1,0 +1,4 @@
+interface:
+  display_name: "Build Resume"
+  short_description: "Build evidence-grounded directional resumes"
+  default_prompt: "Use $build-resume to create or update a focused resume from my career vault."

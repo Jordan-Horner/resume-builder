@@ -1,0 +1,316 @@
+<!doctype html>
+<!-- ATS-safe Resume Builder template adapted from the career-ops CV template. -->
+<html lang="{{LANG}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{TITLE}}</title>
+  <style>
+    :root {
+      --ink: #172033;
+      --text: #18212b;
+      --muted: #46515d;
+      --line: #d7e0e4;
+      --accent: #087f8c;
+      --accent-dark: #087f8c;
+      --secondary: #245f8f;
+      --tag-bg: #f0f7f8;
+      --font: "Liberation Sans", "Helvetica Neue", Arial, "DejaVu Sans", sans-serif;
+    }
+
+    @page {
+      size: {{PAGE_SIZE}};
+      margin: 0.58in;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-variant-ligatures: none;
+      font-feature-settings: "liga" 0, "clig" 0, "dlig" 0;
+    }
+
+    html {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    body {
+      background: #fff;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 10.5px;
+      line-height: 1.48;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .page {
+      margin: 0 auto;
+      max-width: {{PAGE_WIDTH}};
+      width: 100%;
+    }
+
+    .draft-notice {
+      display: none;
+    }
+
+    .header {
+      margin-bottom: 15px;
+    }
+
+    .name {
+      color: var(--ink);
+      font-size: 27px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.08;
+    }
+
+    .headline {
+      color: var(--secondary);
+      font-size: 11.5px;
+      font-weight: 600;
+      margin-top: 4px;
+    }
+
+    .header-rule {
+      background: linear-gradient(90deg, var(--accent), var(--secondary));
+      border-radius: 1px;
+      height: 2px;
+      margin: 8px 0 8px;
+    }
+
+    .contact {
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      font-size: 9.8px;
+      gap: 4px 10px;
+    }
+
+    .contact-item + .contact-item::before {
+      color: #b7bac0;
+      content: "|";
+      margin-right: 10px;
+    }
+
+    .section {
+      margin-bottom: 13px;
+    }
+
+    .section-title {
+      border-bottom: 1.3px solid var(--line);
+      color: var(--accent-dark);
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.055em;
+      line-height: 1.2;
+      margin-bottom: 7px;
+      padding-bottom: 3px;
+      text-transform: uppercase;
+    }
+
+    .summary {
+      line-height: 1.62;
+    }
+
+    .competencies {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px 6px;
+    }
+
+    .competency {
+      background: var(--tag-bg);
+      border: 1px solid hsl(187 34% 86%);
+      border-radius: 3px;
+      color: var(--accent-dark);
+      font-size: 9.5px;
+      font-weight: 600;
+      padding: 3px 7px;
+    }
+
+    .job {
+      margin-bottom: 11px;
+    }
+
+    .job-header,
+    .education-header,
+    .certification {
+      align-items: baseline;
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+    }
+
+    .company,
+    .project-name,
+    .education-org {
+      color: var(--secondary);
+      font-size: 11.5px;
+      font-weight: 700;
+    }
+
+    .dates,
+    .year {
+      color: var(--muted);
+      font-size: 9.7px;
+      white-space: nowrap;
+    }
+
+    .role {
+      color: var(--ink);
+      font-size: 10.5px;
+      font-weight: 700;
+      margin: 1px 0 3px;
+    }
+
+    .location {
+      color: var(--muted);
+      font-size: 9.5px;
+      margin-bottom: 3px;
+    }
+
+    ul {
+      margin-top: 3px;
+      padding-left: 17px;
+    }
+
+    li {
+      line-height: 1.5;
+      margin-bottom: 2.5px;
+      padding-left: 1px;
+    }
+
+    .project,
+    .education,
+    .certification,
+    .skill-group {
+      margin-bottom: 6px;
+    }
+
+    .project-meta,
+    .education-description {
+      color: var(--muted);
+      font-size: 9.5px;
+      margin-top: 1px;
+    }
+
+    .project-description {
+      margin-top: 2px;
+    }
+
+    .education-title,
+    .certification-title,
+    .skill-label {
+      color: var(--ink);
+      font-weight: 700;
+    }
+
+    .certification-org {
+      color: var(--secondary);
+    }
+
+    .skills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px 15px;
+    }
+
+    .skill-group {
+      color: var(--text);
+      font-size: 9.8px;
+    }
+
+    .header,
+    .competency,
+    .job,
+    .education,
+    .certification,
+    .skill-group {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .section-title,
+    .job-header,
+    .role,
+    .project-name {
+      break-after: avoid;
+      page-break-after: avoid;
+    }
+
+    @media screen {
+      body {
+        background: #eef0f3;
+        padding: 24px;
+      }
+
+      .page {
+        background: #fff;
+        box-shadow: 0 6px 28px rgb(24 29 38 / 12%);
+        min-height: {{PAGE_MIN_HEIGHT}};
+        padding: 0.58in;
+      }
+
+      .draft-notice {
+        background: #e8f5f6;
+        border: 1px solid #9bcbd0;
+        border-radius: 4px;
+        color: #075f69;
+        display: block;
+        font-size: 12px;
+        font-weight: 700;
+        margin: 0 auto 12px;
+        max-width: {{PAGE_WIDTH}};
+        padding: 8px 12px;
+        text-align: center;
+      }
+
+      .preview-mode {
+        display: block;
+        font-size: 10px;
+        font-weight: 500;
+        margin-top: 2px;
+      }
+    }
+
+    @media print {
+      .draft-notice {
+        display: none;
+      }
+
+      .page {
+        padding-right: 0.12in;
+      }
+    }
+  </style>
+</head>
+<body>
+  <aside class="draft-notice" role="status">
+    {{PREVIEW_NOTICE}}
+    <span class="preview-mode">Continuous web preview · PDF pagination is checked during minting</span>
+  </aside>
+  <main class="page">
+    <header class="header" {{HEADER_EVIDENCE}}>
+      <h1 class="name">{{NAME}}</h1>
+      <div class="headline">{{HEADLINE}}</div>
+      <div class="header-rule"></div>
+      <div class="contact">{{CONTACT}}</div>
+    </header>
+    {{SUMMARY_SECTION}}
+    {{COMPETENCIES_SECTION}}
+    {{EXPERIENCE_SECTION}}
+    {{PROJECTS_SECTION}}
+    {{EDUCATION_SECTION}}
+    {{CERTIFICATIONS_SECTION}}
+    {{SKILLS_SECTION}}
+  </main>
+</body>
+</html>

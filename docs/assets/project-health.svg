@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">Resume Builder project health report</title>
+  <desc id="desc">A terminal-style project report showing a valid evidence vault, directions, resumes, targets, regression cases, and the next deterministic action.</desc>
+  <defs>
+    <filter id="shadow"><feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#07131e" flood-opacity="0.28"/></filter>
+    <style>
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 22px; fill: #d9e6ef; }
+      .muted { fill: #7f98aa; }
+      .green { fill: #57d38c; }
+      .teal { fill: #58d8df; }
+      .yellow { fill: #f4cf66; }
+      .label { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #10263a; }
+    </style>
+  </defs>
+  <rect width="1200" height="720" rx="28" fill="#eef5f8"/>
+  <text x="70" y="66" class="label" font-size="29" font-weight="700">One command explains the project’s current state.</text>
+  <text x="70" y="100" class="label" font-size="17" fill="#526b7c">Live counts, stale artifacts, and the next valid action—not a manually maintained dashboard.</text>
+  <g transform="translate(70 138)" filter="url(#shadow)">
+    <rect width="1060" height="520" rx="18" fill="#0f2231"/>
+    <rect width="1060" height="54" rx="18" fill="#173246"/>
+    <rect y="36" width="1060" height="18" fill="#173246"/>
+    <circle cx="28" cy="27" r="7" fill="#ff6b68"/><circle cx="53" cy="27" r="7" fill="#f5c451"/><circle cx="78" cy="27" r="7" fill="#57c784"/>
+    <text x="530" y="34" text-anchor="middle" class="mono muted" font-size="16">resume-builder report --strict</text>
+    <text x="34" y="95" class="mono muted">$</text><text x="60" y="95" class="mono">resume-builder report --strict</text>
+    <text x="34" y="142" class="mono">Project:</text><text x="167" y="142" class="mono green">VALID</text>
+    <text x="34" y="184" class="mono">Vault:</text><text x="167" y="184" class="mono">94 facts · 62 sources</text><text x="510" y="184" class="mono yellow">1 documented warning</text>
+    <text x="34" y="226" class="mono">Directions:</text><text x="192" y="226" class="mono teal">5 role profiles</text>
+    <text x="34" y="268" class="mono">Resumes:</text><text x="167" y="268" class="mono">5 baselines · 2 tailored</text>
+    <text x="34" y="310" class="mono">Targets:</text><text x="167" y="310" class="mono">3 captured postings</text>
+    <text x="34" y="352" class="mono">Regression:</text><text x="192" y="352" class="mono">3 reproducible cases</text>
+    <line x1="34" y1="386" x2="1026" y2="386" stroke="#28475c"/>
+    <text x="34" y="433" class="mono teal">Next valid action</text>
+    <text x="34" y="475" class="mono">Verify the changed resume and freeze new review inputs.</text>
+  </g>
+</svg>

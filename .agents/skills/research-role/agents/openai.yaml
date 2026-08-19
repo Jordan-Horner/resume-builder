@@ -1,0 +1,4 @@
+interface:
+  display_name: "Research Role"
+  short_description: "Research roles and update the role database"
+  default_prompt: "Use $research-role to research a target role and add or update its role profile."

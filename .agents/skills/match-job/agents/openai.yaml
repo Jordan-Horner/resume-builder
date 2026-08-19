@@ -1,0 +1,4 @@
+interface:
+  display_name: "Match Job"
+  short_description: "Match a resume to a real job posting"
+  default_prompt: "Use $match-job to compare my resume with this real job posting using cited evidence and exact retrieval checks."

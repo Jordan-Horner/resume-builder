@@ -1,0 +1,15 @@
+include AGENTS.md
+include CHANGELOG.md
+include CONTRIBUTING.md
+include SECURITY.md
+graft .agents
+graft .github
+graft directions
+graft docs
+graft evals
+graft examples
+graft templates
+global-exclude .DS_Store
+global-exclude *.py[cod]
+global-exclude __pycache__
+prune examples/phoenix-wright/workspace/build

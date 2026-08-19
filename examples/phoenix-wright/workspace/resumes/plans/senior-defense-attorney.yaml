@@ -1,0 +1,397 @@
+version: 6
+resume: resumes/baselines/senior-defense-attorney.md
+direction: directions/senior-defense-attorney.md
+target_argument: Phoenix is a senior defense attorney whose strongest evidence combines complex criminal-defense work, evidence reconstruction, ethical judgment, mentorship, and effective advocacy in unfamiliar court systems, with a transparent return from disbarment.
+summary_job: Lead with complex defense work and evidence reconstruction, establish the reinstated senior-practice position, and connect mentorship and international advocacy without letting the disbarment dominate the opening.
+summary_fact_ids:
+  - SKILL-001
+  - SKILL-002
+  - SKILL-003
+  - CERT-001
+  - WAA-004
+  - WAA-013
+  - WAA-015
+progression:
+  - FCO-001
+  - WAA-001
+  - BBC-001
+  - WAA-003
+target_mode: direct
+page_budget:
+  max_pages: 2
+  source: direction-default
+stories:
+  - id: return-to-practice
+    section: experience
+    role_ids: [WAA-003]
+    fact_ids: [WAA-012]
+    primary_job: career-return
+    priority: 5
+    importance: core
+    rationale: Lead the most recent role with concrete evidence of reinstatement and renewed courtroom practice.
+    claim_focus: Credible return to active defense work
+    core_fact_ids: [WAA-012]
+    claim:
+      subject: candidate
+      action: returned
+      object: to courtroom practice
+      scope: after regaining his attorney badge
+      outcome: led his first case after reinstatement
+      composition: single-fact
+      relationship: One fact supports the return, reinstatement context, and first-case outcome.
+      evidence:
+        action: [WAA-012]
+        object: [WAA-012]
+        scope: [WAA-012]
+        outcome: [WAA-012]
+  - id: khurain-first-defense
+    section: experience
+    role_ids: [WAA-003]
+    fact_ids: [WAA-013]
+    primary_job: international-advocacy
+    priority: 5
+    importance: core
+    rationale: Demonstrate successful advocacy under unfamiliar institutional conditions.
+    claim_focus: Evidence challenge producing a historic result in a court without an active defense bar
+    core_fact_ids: [WAA-013]
+    claim:
+      subject: candidate
+      action: volunteered to defend and challenged evidence
+      object: a local guide
+      scope: in a court system that had gone roughly twenty years without a defense attorney
+      outcome: proved another person committed the crime and secured the first not-guilty result under the twenty-three-year-old Defense Culpability Act
+      composition: single-fact
+      relationship: One case fact supports the client, court context, and result.
+      evidence:
+        action: [WAA-013]
+        object: [WAA-013]
+        scope: [WAA-013]
+        outcome: [WAA-013]
+  - id: culpability-act-defense
+    section: experience
+    role_ids: [WAA-003]
+    fact_ids: [WAA-014]
+    primary_job: high-stakes-defense
+    priority: 5
+    importance: core
+    rationale: Add distinct proof of advocacy where the legal system placed the defense at personal risk.
+    claim_focus: High-stakes defense under the Defense Culpability Act
+    core_fact_ids: [WAA-014]
+    claim:
+      subject: candidate
+      action: defended
+      object: Maya Fey
+      scope: under a system that exposed defense participants to the client punishment
+      outcome: obtained a not-guilty result
+      composition: single-fact
+      relationship: One case fact supports the defense action, unusual stakes, and result.
+      evidence:
+        action: [WAA-014]
+        object: [WAA-014]
+        scope: [WAA-014]
+        outcome: [WAA-014]
+  - id: apollo-co-counsel
+    section: experience
+    role_ids: [WAA-003]
+    fact_ids: [WAA-015]
+    primary_job: mentorship
+    priority: 4
+    importance: core
+    rationale: Show senior contribution while preserving Apollo's ownership of the decisive trial.
+    claim_focus: Mentorship through a supporting co-counsel role
+    core_fact_ids: [WAA-015]
+    claim:
+      subject: candidate
+      action: supported
+      object: Apollo Justice as co-counsel
+      scope: in the final Khura'in matter
+      outcome: null
+      composition: single-fact
+      relationship: One fact supports the co-counsel role and collaborator-credit boundary.
+      evidence:
+        action: [WAA-015]
+        object: [WAA-015]
+        scope: [WAA-015]
+        outcome: []
+  - id: edgeworth-defense
+    section: experience
+    role_ids: [WAA-001]
+    fact_ids: [WAA-004]
+    primary_job: complex-defense
+    priority: 5
+    importance: core
+    rationale: Anchor the independent-practice period with a complex linked proceeding and clear result.
+    claim_focus: Two related defenses resolved through reconstruction of a fifteen-year-old incident
+    core_fact_ids: [WAA-004]
+    claim:
+      subject: candidate
+      action: defended
+      object: Miles Edgeworth in the Robert Hammond murder trial and a separate DL-6 trial
+      scope: using testimonial, documentary, and physical evidence to reconstruct the fifteen-year-old incident
+      outcome: obtained two not-guilty verdicts and identified Manfred von Karma as Gregory Edgeworth's killer
+      composition: single-fact
+      relationship: One fact expressly links the defense, verdict, and contribution to the older proceeding.
+      evidence:
+        action: [WAA-004]
+        object: [WAA-004]
+        scope: [WAA-004]
+        outcome: [WAA-004]
+  - id: ethical-conflict
+    section: experience
+    role_ids: [WAA-001]
+    fact_ids: [WAA-005]
+    primary_job: professional-ethics
+    priority: 4
+    importance: core
+    rationale: Prevent an all-acquittals narrative and demonstrate ethical complexity.
+    claim_focus: Culpable-client matter handled without false exoneration language
+    core_fact_ids: [WAA-005]
+    claim:
+      subject: candidate
+      action: handled
+      object: a defense involving a culpable client
+      scope: null
+      outcome: the client culpability was exposed
+      composition: single-fact
+      relationship: One incident fact supports both the ethical conflict and its resolution.
+      evidence:
+        action: [WAA-005]
+        object: [WAA-005]
+        scope: []
+        outcome: [WAA-005]
+  - id: wrongful-conviction-retrial
+    section: experience
+    role_ids: [WAA-001]
+    fact_ids: [WAA-006]
+    primary_job: evidence-analysis
+    priority: 4
+    importance: core
+    rationale: Show a distinct retrial outcome rather than another generic defense claim.
+    claim_focus: Wrongful-conviction reversal through retrial
+    core_fact_ids: [WAA-006]
+    claim:
+      subject: candidate
+      action: led
+      object: Maggey Byrde's retrial
+      scope: null
+      outcome: overturned the earlier wrongful conviction
+      composition: single-fact
+      relationship: One fact supports the retrial leadership and resulting reversal.
+      evidence:
+        action: [WAA-006]
+        object: [WAA-006]
+        scope: []
+        outcome: [WAA-006]
+  - id: shared-defense
+    section: experience
+    role_ids: [WAA-001]
+    fact_ids: [WAA-007]
+    primary_job: collaboration
+    priority: 3
+    importance: supporting
+    rationale: Useful collaborator evidence if the two-page budget permits it.
+    claim_focus: Shared defense with explicit collaborator credit
+    core_fact_ids: [WAA-007]
+    claim:
+      subject: candidate
+      action: resumed
+      object: the lead defense
+      scope: after Miles Edgeworth temporarily handled the matter
+      outcome: contributed to clearing Iris
+      composition: single-fact
+      relationship: One story fact supports the sequence, collaborator role, and qualified outcome.
+      evidence:
+        action: [WAA-007]
+        object: [WAA-007]
+        scope: [WAA-007]
+        outcome: [WAA-007]
+  - id: professional-setback
+    section: experience
+    role_ids: [WAA-001]
+    fact_ids: [WAA-008]
+    primary_job: professional-accountability
+    priority: 5
+    importance: core
+    rationale: Keep the adverse event explicit so the later return remains credible.
+    claim_focus: Accurate account of the forged-evidence incident and disbarment
+    core_fact_ids: [WAA-008]
+    claim:
+      subject: candidate
+      action: presented
+      object: a forged diary page without knowing it was forged
+      scope: null
+      outcome: lost his license and remained out of legal practice for seven years
+      composition: single-fact
+      relationship: One incident fact supports the unknowing presentation, disbarment, and duration.
+      evidence:
+        action: [WAA-008]
+        object: [WAA-008]
+        scope: []
+        outcome: [WAA-008]
+  - id: long-running-investigation
+    section: experience
+    role_ids: [BBC-001]
+    fact_ids: [BBC-002]
+    primary_job: case-investigation
+    priority: 3
+    importance: core
+    rationale: Explain purposeful professional activity during the license interruption without inflating the club role.
+    claim_focus: Continued investigation during the seven-year interruption
+    core_fact_ids: [BBC-002]
+    claim:
+      subject: candidate
+      action: investigated
+      object: the circumstances behind the forged evidence and disbarment
+      scope: null
+      outcome: null
+      composition: single-fact
+      relationship: One project fact supports the investigation and its employment-period context.
+      evidence:
+        action: [BBC-002]
+        object: [BBC-002]
+        scope: []
+        outcome: []
+  - id: first-trial
+    section: experience
+    role_ids: [FCO-001]
+    fact_ids: [FCO-002]
+    primary_job: early-career-proof
+    priority: 3
+    importance: core
+    rationale: Establish the entry point and mentor relationship in one compact result.
+    claim_focus: First lead defense resolved through witness cross-examination
+    core_fact_ids: [FCO-002]
+    claim:
+      subject: candidate
+      action: cross-examined
+      object: the prosecution witness in his first murder trial
+      scope: with Mia Fey as co-counsel
+      outcome: exposed the witness as the actual killer and obtained a not-guilty verdict for Larry Butz
+      composition: single-fact
+      relationship: One accomplishment fact supports the role, mentor context, and verdict.
+      evidence:
+        action: [FCO-002]
+        object: [FCO-002]
+        scope: [FCO-002]
+        outcome: [FCO-002]
+  - id: practice-continuity
+    section: experience
+    role_ids: [FCO-001]
+    fact_ids: [FCO-003]
+    primary_job: practice-continuity
+    priority: 2
+    importance: supporting
+    rationale: Preserve early responsibility growth if space permits.
+    claim_focus: Continued active matters after the loss of a mentor
+    core_fact_ids: [FCO-003]
+    claim:
+      subject: candidate
+      action: continued
+      object: the office's active defense work
+      scope: after Mia Fey's death
+      outcome: defended Maya Fey and later represented himself in the same matter
+      composition: single-fact
+      relationship: One leadership fact supports the continuity, chronology, and matter scope.
+      evidence:
+        action: [FCO-003]
+        object: [FCO-003]
+        scope: [FCO-003]
+        outcome: [FCO-003]
+concept_fit:
+  - concept_id: complex-defense
+    status: demonstrated
+    fact_ids: [WAA-004, WAA-005]
+    rationale: Independent-practice cases show complex defense work and ethical constraints.
+  - concept_id: evidence-analysis
+    status: demonstrated
+    fact_ids: [WAA-004, WAA-006]
+    rationale: Linked-proceeding reconstruction and a wrongful-conviction retrial directly demonstrate evidence analysis.
+  - concept_id: practice-leadership
+    status: demonstrated
+    fact_ids: [FCO-003, WAA-015]
+    rationale: Practice continuity and later co-counsel mentorship support careful leadership positioning.
+  - concept_id: mentorship
+    status: demonstrated
+    fact_ids: [WAA-015]
+    rationale: The confirmed senior-role fact supports a mentoring co-counsel contribution without relying on the unresolved interim title.
+  - concept_id: cross-border-advocacy
+    status: demonstrated
+    fact_ids: [WAA-013, WAA-014]
+    rationale: Two confirmed Khura'in matters demonstrate advocacy under an unfamiliar and unusually risky court system.
+  - concept_id: professional-accountability
+    status: demonstrated
+    fact_ids: [WAA-008, WAA-012, BBC-002]
+    rationale: The plan shows the adverse event, continued investigation, and reinstated return rather than hiding the interruption.
+reviewer_risks:
+  - id: disbarment-credibility
+    concern: A disbarment can overwhelm the positive career argument if it is hidden or euphemized.
+    status: partial
+    fact_ids: [WAA-008, WAA-012]
+    planning_action: State the unknowing presentation and seven-year interruption accurately, then lead the recent role with the confirmed return to practice.
+  - id: collaborator-credit
+    concern: Shared matters could make the resume overstate Phoenix's ownership of results.
+    status: resolved
+    fact_ids: [WAA-007, WAA-015]
+    planning_action: Use qualified contribution language and name the temporary lead or decisive lead where relevant.
+  - id: credential-specificity
+    concern: A legal reader may expect a named bar jurisdiction even though canon does not provide one.
+    status: resolved
+    fact_ids: [CERT-001]
+    planning_action: Show the supported attorney-badge reinstatement and do not invent a real-world jurisdiction.
+presentation:
+  competencies: omit
+  competencies_job: Education and attorney status provide more useful legal-resume scan value than labels already demonstrated in the summary and experience.
+  compressed_role_ids: [FCO-001, BBC-001]
+role_arcs:
+  - role_ids: [WAA-003]
+    emphasis: lead
+    arc_focus: Reinstated senior practice combining credible return, international advocacy, and mentorship.
+    required_dimensions: [career-return, international-advocacy, high-stakes-defense, mentorship]
+    required_story_ids: [khurain-first-defense, return-to-practice, culpability-act-defense, apollo-co-counsel]
+    optional_story_ids: []
+    selection_rationale: This is the highest-scope and most recent phase, so it carries the complete top-level hiring argument.
+    omitted_signals:
+      - signal: additional-domestic-casework
+        fact_ids: [WAA-016]
+        reason: The fact remains needs-review and cannot support visible prose.
+  - role_ids: [WAA-001]
+    emphasis: supporting
+    arc_focus: Independent-practice proof across complex defense, retrial work, ethical judgment, and the documented setback.
+    required_dimensions: [complex-defense, professional-ethics, evidence-analysis, professional-accountability]
+    required_story_ids: [edgeworth-defense, ethical-conflict, wrongful-conviction-retrial, professional-setback]
+    optional_story_ids: [shared-defense]
+    selection_rationale: These stories establish the depth that makes the later senior return believable while keeping each bullet's job distinct.
+    omitted_signals: []
+  - role_ids: [BBC-001]
+    emphasis: compressed
+    arc_focus: Preserve the seven-year interruption and continued investigation without presenting poker as legal achievement.
+    required_dimensions: [case-investigation]
+    required_story_ids: [long-running-investigation]
+    optional_story_ids: []
+    selection_rationale: One bullet explains purposeful activity during the interruption; more detail would distract from the legal direction.
+    omitted_signals:
+      - signal: poker-performance
+        fact_ids: [BBC-001]
+        reason: The role remains visible for chronology, but poker performance is not relevant evidence for the target.
+  - role_ids: [FCO-001]
+    emphasis: compressed
+    arc_focus: Establish the mentored entry point and first courtroom result.
+    required_dimensions: [early-career-proof]
+    required_story_ids: [first-trial]
+    optional_story_ids: [practice-continuity]
+    selection_rationale: The early role needs enough proof to show progression but should not compete with later independent and senior practice.
+    omitted_signals: []
+exclusions:
+  - fact_id: WAA-002
+    reason: The exact formal role title remains needs-review and cannot appear in visible resume content.
+  - fact_id: WAA-009
+    reason: Confirmed mentorship evidence is scoped to the unresolved interim role and is therefore withheld from visible placement.
+  - fact_id: WAA-010
+    reason: The exact jurist-system authority remains needs-review.
+  - fact_id: WAA-011
+    reason: Confirmed recruitment evidence is scoped to the unresolved interim role and is therefore withheld from visible placement.
+  - fact_id: WAA-016
+    reason: The precise special-episode outcome remains needs-review.
+gaps:
+  - The canon does not name a real-world bar jurisdiction or identify the law degree as a J.D. or LL.B.; the resume must not invent either value.
+  - The formal agency title during the license interruption must be confirmed before the Apollo and Athena recruitment facts can be placed in visible experience.

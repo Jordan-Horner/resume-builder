@@ -1,0 +1,17 @@
+{
+  "workspace_version": 1,
+  "vault": {
+    "path": "vault"
+  },
+  "paths": {
+    "resumes": "resumes",
+    "directions": "directions",
+    "targets": "targets",
+    "editorial": "editorial",
+    "build": "build"
+  },
+  "git": {
+    "backup": "local",
+    "auto_checkpoint": false
+  }
+}

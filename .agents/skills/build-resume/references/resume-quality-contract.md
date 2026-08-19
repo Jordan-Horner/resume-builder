@@ -1,0 +1,276 @@
+# Resume quality and iteration contract
+
+Use this contract to judge and improve resumes. It defines transferable resume
+advice, not preferred sentences, templates, or wording to copy. Generate fresh
+language from canonical facts and the selected direction every time.
+
+## What a strong resume must accomplish
+
+A strong resume makes a credible case for a specific audience. It should make
+the candidate's direction, strongest evidence, career progression, and relevant
+technical depth apparent during a short scan. Optimize the whole argument, not
+isolated keyword coverage or prose polish.
+
+Review seven dimensions:
+
+1. **Direction:** The target and candidate value are clear without overstating
+   seniority, ownership, or domain experience.
+2. **Proof:** Important claims are supported by confirmed outcomes, scope,
+   stakes, or concrete work rather than adjectives and duty lists.
+3. **Progression:** Promotions, expanded responsibility, leadership, and
+   increasing complexity remain visible.
+4. **Specificity and context independence:** Tools, systems, users,
+   environments, and constraints are connected to work performed, not
+   deposited as an unexplained keyword list. The description remains
+   understandable to a reader who has no access to the candidate's internal
+   project, team, or company context.
+5. **Prioritization:** Recent and directionally relevant evidence receives the
+   most space. Older or less relevant experience is compressed before stronger
+   evidence is cut.
+6. **Credibility:** Every factual claim is canonical, accurately scoped, and
+   expressed with the supported level of certainty.
+7. **Scanability:** Hierarchy, dates, titles, bullets, density, and page breaks
+   help a reviewer find the case quickly without making the document feel empty
+   or mechanically decorated.
+
+## Natural voice test
+
+Specificity is not enough. Before prose can be approved, a separate
+career-professional pass must read every narrative block and ask:
+
+1. Does the sentence make one main point that is clear on the first reading?
+2. Are the actor, action, and reader-relevant purpose concrete, or are they
+   buried under abstract process nouns?
+3. Are several clauses, qualifiers, or parallel lists compressed into one line
+   merely to preserve every available detail?
+4. Would a capable manager plausibly use this language when explaining the work
+   aloud, or does it sound like a framework describing itself?
+5. Does each specialist term add target-role meaning that a broader phrase
+   would lose?
+
+Read each block in its visible resume context before treating it as finished.
+Compare it with its section and adjacent heading, then with the blocks directly
+before and after it. If removing the opening words loses no supported scope,
+authority, chronology, contrast, uncertainty, or necessary qualification, the
+opening is redundant and should be removed. A role title repeated directly under
+the same role heading is a common example, but the rule applies to any visible
+context and does not ban a phrase such as "As ...". Preserve the wording when it
+clarifies a real distinction—for example, acting authority that is not conveyed
+by the formal title.
+
+Revise prose that passes factual grounding but fails this reading test. Prefer
+the smallest clear account of the work and let a separate bullet carry a
+distinct safeguard, outcome, or capability. Do not enforce a banned-word list,
+replace terms mechanically, or confuse casual language with natural language.
+The problem is clause structure and meaning, not the presence of any single
+word.
+
+## Contribution-first bullet test
+
+Strong resume guidance consistently favors concise accomplishment statements:
+the candidate's action, the project or problem, and the supported result or
+reader-relevant value. Apply that structure as an evidence test, not a formula
+that forces every bullet to contain a number or outcome.
+
+The opening verb should answer “What did this person contribute?” `Used`,
+`utilized`, and `leveraged` usually answer only “What tool was present?” and are
+low-information openings. Replace them only when the facts support a more
+specific action such as diagnosing, resolving, automating, documenting, or
+building. When no stronger contribution or target-relevant result is supported,
+omit the story. Never substitute an impressive verb that increases authorship,
+authority, scope, or impact.
+
+For each bullet, verify:
+
+1. **Action:** the verb states the candidate's exact supported contribution.
+2. **Object or problem:** the reader can tell what changed, was solved, or was
+   delivered without internal context.
+3. **Value:** a supported result, beneficiary, scale, stakes, or purpose earns
+   the detail's place. Do not invent an outcome merely to complete a formula.
+4. **Relevance:** the whole statement helps answer the target employer's needs;
+   accurate but generic tool use may remain in Skills instead.
+
+Treat 3–4 concise bullets as a common scanability reference, not a quota. A role
+may need more when it carries several distinct, well-supported reasons to hire,
+or fewer when additional stories would be weak, repetitive, or unresolved.
+
+Apply an evidence-pressure check before review: identify the bullet's one hiring
+message, then remove every supporting detail that does not materially strengthen
+its proof, scope, outcome, or differentiation. A fact omitted from a bullet is
+not lost; it remains in the vault and may support another resume. Do not split
+every leftover fact into a new bullet merely to preserve coverage.
+
+Apply the same selection inside a canonical fact. Atomic facts preserve
+provenance; they are not sentence specifications. A cited fact may contain many
+systems, actions, constraints, or examples while contributing only one of them
+to the visible claim. If a bullet enumerates both the work stages and the
+technical surfaces, require a specific reason each list changes the hiring read.
+Do not use a technology list as a generic badge of being hands-on when the
+visible action already proves hands-on work. In a leadership or ownership
+bullet, select the stakes, decision, coordination, or outcome that best supports
+that job; reserve independently valuable technical breadth for a distinct story
+or the skills inventory.
+Treat leadership and technical depth as separate bullet jobs. A leadership,
+ownership, coordination, customer, or outcome claim fails the information-budget
+test when it carries a raw technology or system inventory merely to signal
+hands-on credibility. Preserve that breadth in a distinct technical-depth story
+when it is decision-relevant.
+
+Direction coverage is necessary but not sufficient. A resume can contain every
+desired term and still be weak if it lacks proof, progression, or prioritization.
+Direction vocabulary is a retrieval and discoverability signal, not a preferred
+voice. Do not copy concept labels or repeat target terms to make an audit look
+stronger.
+
+## Evidence hierarchy
+
+Prefer the strongest available canonical evidence in this order:
+
+1. confirmed outcome or change, quantified when a verified number exists;
+2. qualitative outcome with a clear before-and-after or beneficiary;
+3. meaningful scale, stakes, complexity, or operating conditions;
+4. demonstrated ownership, leadership, or cross-functional influence;
+5. concrete technical action tied to a real problem;
+6. responsibility or tool familiarity without a demonstrated result.
+
+Do not invent a higher evidence tier. A precise qualitative result is stronger
+than an uncertain metric. If an older artifact suggests valuable scale, impact,
+or progression that the vault does not support, record it as an evidence
+opportunity and route it through reviewed hydration. Do not copy the claim into
+the resume and do not silently forget it.
+
+## Experience structure
+
+- Keep separate roles when they show a promotion, material scope change, or
+  movement into leadership. Consolidate only when the career story remains
+  equally clear.
+- Give the greatest detail to recent, relevant, high-evidence work. Compress
+  early experience into shorter entries or an additional-experience treatment
+  before stripping proof from recent roles.
+- Order each role's bullets as a short argument: lead with the strongest
+  directionally relevant proof, then add distinct evidence of scope, technical
+  execution, collaboration, and durable improvement where supported. Each
+  bullet must advance the case rather than restate a duty or quality already
+  demonstrated.
+- Judge bullet count through role-arc completeness, not a universal minimum or
+  maximum. A recent, promoted, target-critical, or high-scope role should show
+  each distinct supported reason to hire that materially advances the target
+  argument. If an overload edit removes a separate leadership, outcome,
+  technical, customer, or team-enablement signal, reconsider it as its own
+  story instead of silently losing it.
+- Connect technologies to the problems they helped solve. Retain a concise
+  skills inventory for retrieval and ATS matching, but do not rely on it to
+  establish competence.
+- Apply a cold-reader context test to every summary claim, experience bullet,
+  and project description. Assume the reviewer sees only the resume. An
+  internal project, system, team, workflow, or process name may identify the
+  work, but it must not carry the sentence's meaning. Explain enough of the
+  operational problem, function, audience, scale, or value for the work to be
+  understood without private context. Lead with that reader-relevant meaning,
+  not with the internal name or the fact that something was built.
+- Preserve names that add real decision value, such as recognized products,
+  technologies, public projects, or portfolio artifacts. When a useful name is
+  unfamiliar, pair it immediately with a functional description. Do not solve
+  ambiguity by stripping away supported technical precision or replacing it
+  with a generic claim.
+- Preserve accurate chronology and use consistent date precision. Never hide a
+  gap, overlap, contract relationship, or title transition through formatting.
+
+## Summary and positioning
+
+The summary should perform a specific job for this resume: connect the selected
+evidence into the most useful supported argument for the target audience. Its
+structure should follow that evidence rather than a stock title-plus-years
+formula. Avoid generic praise, unsupported leadership framing, exhaustive
+keyword lists, repeated direction vocabulary, and claims that are not
+demonstrated later in the document.
+
+Calibrate specificity to the section, evidence, and intended audience. Choose
+the clearest supported wording that preserves decision-relevant meaning. Keep
+specialist terminology when it demonstrates a differentiating capability, is
+material to the target role, or would lose meaningful precision if simplified.
+Otherwise translate internal diagnostic, architectural, or process language
+into a clear functional description. This is not a plain-language mandate: do
+not ban terms, mechanically replace synonyms, or automatically prefer broader
+wording. The summary will normally carry the operating pattern and reader
+relevance; experience bullets may carry exact failure modes, architecture,
+tools, and confirmed diagnoses when those details earn their space.
+
+Apply a top-third scan heuristic after drafting. Using only the headline,
+summary, optional competencies, and first current-role bullet, verify that a
+reviewer can identify the intended role, the strongest relevant operating
+pattern, and at least one differentiating proof point or outcome. Treat this as
+a human clarity test, not a stopwatch, keyword quota, or deterministic ATS
+gate. If the top third answers a low-value concern while the largest credible
+reviewer objection remains unanswered, rebalance the evidence rather than
+adding generic reassurance.
+
+Competencies are optional. Include them only when they make supported strengths
+easier to scan than the summary, experience, and technical-skills sections
+already do. Never copy direction concept labels mechanically, consume space
+needed for stronger proof, or create the appearance of evidence through labels
+alone.
+
+## Page and information budget
+
+Treat page count as an information budget, not a goal by itself. Use space in
+this order:
+
+1. directionally relevant recent proof;
+2. visible progression and high-value scope;
+3. differentiating technical or operational evidence;
+4. required education, certifications, and skills;
+5. compressed early or adjacent experience.
+
+Do not solve overflow by deleting the strongest evidence first. Do not fill
+unused space with low-value duties, decorative components, or redundant skills.
+Rebalance section density, consolidate low-priority material, or seek better
+evidence. Allocate enough space for the lead role to make a complete argument;
+compress older roles before reducing that role to an arbitrary bullet count.
+
+## Iteration loop
+
+Resume quality should improve as the vault grows:
+
+1. Compare the current baseline with its Git history and identify gains and
+   regressions in the seven quality dimensions.
+2. Preserve strong supported evidence and intentional manual improvements.
+3. Convert missing impact, scale, chronology, promotion, and technical context
+   into a short evidence-opportunity list.
+4. Hydrate confirmed answers into canonical facts through a separate reviewed
+   change; never edit the vault as a side effect of generation.
+5. Rebuild from the expanded vault and direction rather than copying old prose.
+6. Audit direction coverage, factual grounding, page quality, and regression
+   risk again.
+7. Run the separate narrative-block critique; do not let the writer approve its
+   own prose. Revise rejected blocks and repeat the review because their hashes
+   changed.
+8. Use application and interview outcomes to improve direction profiles without
+   changing historical facts.
+
+The objective is not to preserve every sentence. Preserve verified information,
+career meaning, and successful positioning while allowing the writing and
+selection to improve continuously.
+
+## Research basis
+
+This contract's contribution-first and scanability rules synthesize current
+guidance from established career centers rather than treating an action-verb
+list as a writing system:
+
+- [Yale Office of Career Strategy: Writing Impactful Resume Bullets](https://ocs.yale.edu/resources/writing-impactful-resume-bullets/)
+  recommends Action + Project + Result, with the action describing the
+  candidate's own contribution.
+- [Yale Office of Career Strategy: Resume Formatting and Common Errors](https://ocs.yale.edu/resources/resume-formatting/)
+  recommends concise, action-driven bullets and uses 3–4 bullets of 1–2 lines
+  as a general experience guideline.
+- [UC Berkeley Career Engagement: Resumes](https://www.career.berkeley.edu/prepare-for-success/resumes/)
+  emphasizes employer relevance, outcomes, concise phrases, and strong action
+  verbs.
+- [Columbia Career Education: Resume Checklist](https://www.careereducation.columbia.edu/sites/default/files/Resume%20Checklist.pdf)
+  checks whether bullets explain what the candidate did, how, and why or with
+  what measurable impact.
+
+These are editorial heuristics, not permission to fabricate a result, number,
+causal link, authorship level, or universal bullet count. Canonical evidence and
+the target-specific career argument remain controlling.

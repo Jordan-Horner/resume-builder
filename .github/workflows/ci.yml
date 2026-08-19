@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.14"]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+      - name: Install PDF browser
+        run: python -m playwright install --with-deps chromium
+      - name: Test
+        run: pytest
+      - name: Lint and format
+        run: ruff check src tests .agents/skills/hydrate-vault/scripts && ruff format --check src tests .agents/skills/hydrate-vault/scripts
+      - name: Type check
+        run: mypy src
+      - name: Build package
+        run: python -m build
+      - name: Validate clean first-run workspace
+        run: |
+          resume-builder init --workspace workspace --storage local \
+            --git-name "CI User" --git-email "ci@example.invalid"
+          test -z "$(find workspace/vault/facts -type f -name '*.md' -print -quit)"
+          test -z "$(find workspace/resumes/baselines -type f -name '*.md' -print -quit)"
+      - name: Validate fictional demonstration
+        run: |
+          export RESUME_BUILDER_WORKSPACE="$PWD/examples/phoenix-wright/workspace"
+          resume-builder validate --strict
+          resume-builder direction validate
+          resume-builder synthesis resumes/plans/senior-defense-attorney.yaml
+          resume-builder verify resumes/baselines/senior-defense-attorney.md

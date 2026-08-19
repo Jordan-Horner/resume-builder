@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">Resume Builder review gate</title>
+  <desc id="desc">A review receipt showing separate evidence, language, role fit, career verdict, and user approval statuses.</desc>
+  <defs>
+    <filter id="shadow"><feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#142b3c" flood-opacity="0.16"/></filter>
+    <style>
+      .ui { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #12293b; }
+      .small { font-size: 17px; fill: #5b7181; }
+      .tag { font-size: 15px; font-weight: 700; }
+    </style>
+  </defs>
+  <rect width="1200" height="720" rx="28" fill="#f1f6f9"/>
+  <text x="70" y="66" class="ui" font-size="29" font-weight="700">Approval is a set of independent states.</text>
+  <text x="70" y="100" class="ui small">A passing evidence check cannot impersonate language review or user approval.</text>
+  <g transform="translate(70 145)" filter="url(#shadow)">
+    <rect width="1060" height="500" rx="20" fill="#fff" stroke="#d9e4eb"/>
+    <text x="38" y="52" class="ui" font-size="23" font-weight="700">Verification receipt</text>
+    <text x="38" y="82" class="ui small">resumes/tailored/fictional-incident-operations.md</text>
+    <line x1="38" y1="108" x2="1022" y2="108" stroke="#dce6ec"/>
+    <g transform="translate(38 137)">
+      <rect width="984" height="57" rx="12" fill="#e9f8f3"/>
+      <text x="20" y="35" class="ui" font-size="18" font-weight="650">Evidence integrity</text>
+      <rect x="774" y="13" width="188" height="32" rx="16" fill="#bfead8"/>
+      <text x="868" y="35" text-anchor="middle" class="ui tag" fill="#17634c">CLAIM-CHECKED</text>
+    </g>
+    <g transform="translate(38 208)">
+      <rect width="984" height="57" rx="12" fill="#edf8fa"/>
+      <text x="20" y="35" class="ui" font-size="18" font-weight="650">Career language</text>
+      <rect x="801" y="13" width="161" height="32" rx="16" fill="#c6edf1"/>
+      <text x="881" y="35" text-anchor="middle" class="ui tag" fill="#0b6570">APPROVED</text>
+    </g>
+    <g transform="translate(38 279)">
+      <rect width="984" height="57" rx="12" fill="#eef2fb"/>
+      <text x="20" y="35" class="ui" font-size="18" font-weight="650">Role fit</text>
+      <rect x="790" y="13" width="172" height="32" rx="16" fill="#d6def5"/>
+      <text x="876" y="35" text-anchor="middle" class="ui tag" fill="#304c8a">COMPELLING</text>
+    </g>
+    <g transform="translate(38 350)">
+      <rect width="984" height="57" rx="12" fill="#f5f2fb"/>
+      <text x="20" y="35" class="ui" font-size="18" font-weight="650">Career verdict</text>
+      <rect x="752" y="13" width="210" height="32" rx="16" fill="#e6daf6"/>
+      <text x="857" y="35" text-anchor="middle" class="ui tag" fill="#61428d">READY TO MINT</text>
+    </g>
+    <g transform="translate(38 421)">
+      <rect width="984" height="57" rx="12" fill="#fff8e6"/>
+      <text x="20" y="35" class="ui" font-size="18" font-weight="650">User approval</text>
+      <rect x="760" y="13" width="202" height="32" rx="16" fill="#f7e2a8"/>
+      <text x="861" y="35" text-anchor="middle" class="ui tag" fill="#765a0c">PENDING REVIEW</text>
+    </g>
+  </g>
+</svg>

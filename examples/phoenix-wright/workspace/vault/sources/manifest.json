@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "id": "SRC-3aba7a92ce43",
+      "sha256": "3aba7a92ce43f3010b79d0e065ca5ed30d9bc5def3b7fc5cc633f9eb76499417",
+      "format": "md",
+      "filenames": [
+        "phoenix-wright-career-inventory.md"
+      ],
+      "snapshot": "sources/normalized/SRC-3aba7a92ce43.md",
+      "snapshot_sha256": "b7c8862e71768497cad3c1d2e89f949f77c7a8d49379b8a14522b0daf707ac12",
+      "extracted_characters": 15604,
+      "extraction_status": "ok",
+      "imported_at": "2026-08-19T11:30:00+00:00"
+    },
+    {
+      "id": "SRC-c277288099e5",
+      "sha256": "c277288099e5ec96e271301b3b0a1b9a62dd13fc25ca6c6a60079f0421aea9fa",
+      "format": "md",
+      "filenames": [
+        "phoenix-wright-canon-research.md"
+      ],
+      "snapshot": "sources/normalized/SRC-c277288099e5.md",
+      "snapshot_sha256": "f61e17903ba131110bc413171ceb3baa883de82e097ad91f4c46f4abb888afdf",
+      "extracted_characters": 5330,
+      "extraction_status": "ok",
+      "imported_at": "2026-08-19T11:58:29+00:00"
+    }
+  ]
+}

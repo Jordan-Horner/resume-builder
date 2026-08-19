@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "id": "ER-1a718e518488",
+  "status": "active",
+  "identity": {
+    "subject_key": "legal-demo-completeness",
+    "kind": "presentation",
+    "scope": {
+      "level": "resume",
+      "fact_ids": [],
+      "resume": "resumes/baselines/senior-defense-attorney.md",
+      "story_id": null,
+      "direction": null,
+      "section": null
+    }
+  },
+  "strength": "preference",
+  "current_revision": 1,
+  "revisions": [
+    {
+      "revision": 1,
+      "accepted_at": "2026-08-19T12:09:20.959795+00:00",
+      "source_session": "FB-1a718e518488",
+      "source_session_revision": 1,
+      "summary": "Make the fictional fixture read like a professionally complete legal resume.",
+      "instruction": "Use canon-supported education, attorney status, dates, office names, and concrete legal methods so fans recognize the history and lawyers recognize a usable resume-building workflow.",
+      "must_preserve": [
+        "Canon accuracy and collaborator credit",
+        "Transparent treatment of the disbarment",
+        "Evidence-grounded claims only"
+      ],
+      "must_avoid": [
+        "Inventing a real-world bar jurisdiction",
+        "Inventing a J.D. or LL.B. credential",
+        "Replacing legal work with repeated verdict-only bullets"
+      ],
+      "preferred_examples": []
+    }
+  ],
+  "retired_at": null,
+  "retirement_reason": null
+}

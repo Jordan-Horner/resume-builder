@@ -1,0 +1,6 @@
+{
+  "schema_version": 2,
+  "facts_path": "facts",
+  "employment_path": "employment",
+  "sources_manifest": "sources/manifest.json"
+}

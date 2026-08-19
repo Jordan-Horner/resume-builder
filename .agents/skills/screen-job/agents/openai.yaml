@@ -1,0 +1,4 @@
+interface:
+  display_name: "Screen Job"
+  short_description: "Quickly research and triage a real job"
+  default_prompt: "Use $screen-job to research this job and tell me whether it is worth pursuing before tailoring my resume."
