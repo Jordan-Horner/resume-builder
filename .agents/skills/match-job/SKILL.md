@@ -9,6 +9,14 @@ Evaluate a resume against a specific opportunity without pretending that one
 universal ATS score predicts the employer's decision. Separate exact retrieval,
 semantic evidence, and career-professional judgment.
 
+## Workspace boundary
+
+Run `resume-builder workspace show` before direct file access. Treat its
+absolute `workspace` value as the root of all private target, resume, vault,
+direction, and build paths. CLI commands resolve the workspace automatically;
+file and Git tools do not. Never preserve a real posting or candidate content
+in the engine checkout.
+
 ## Workflow
 
 1. Read the repository `AGENTS.md` and the

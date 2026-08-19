@@ -8,6 +8,13 @@ description: Quickly research and triage one real job posting before deciding wh
 Help the user decide whether an opportunity deserves more time. Keep the screen
 read-only, concise, candid, and decision-oriented.
 
+## Workspace boundary
+
+Run `resume-builder workspace show` before direct file access. Treat its
+absolute `workspace` value as the root of any private vault, resume, target,
+direction, or build path. Keep real posting content and candidate analysis out
+of the engine checkout.
+
 Read [the screen contract](references/screen-contract.md) before every screen.
 
 ## Workflow

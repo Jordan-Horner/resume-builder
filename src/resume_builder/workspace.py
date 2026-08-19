@@ -24,6 +24,15 @@ DEFAULT_WORKSPACE = Path("workspace")
 DEFAULT_VAULT_REPOSITORY_NAME = "resume-vault"
 GITHUB_REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 GITHUB_OWNER = re.compile(r"[A-Za-z0-9-]+")
+GITHUB_REMOTES = (
+    re.compile(
+        r"https?://github\.com/(?P<repository>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?/?$"
+    ),
+    re.compile(r"git@github\.com:(?P<repository>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?$"),
+    re.compile(
+        r"ssh://git@github\.com/(?P<repository>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?/?$"
+    ),
+)
 
 
 class WorkspaceError(RuntimeError):
@@ -83,6 +92,49 @@ def default_github_repository(
     if result.returncode != 0 or GITHUB_OWNER.fullmatch(owner) is None:
         return None
     return f"{owner}/{DEFAULT_VAULT_REPOSITORY_NAME}"
+
+
+def github_repository_from_remote(remote: str) -> str | None:
+    """Return OWNER/NAME for a supported GitHub remote URL."""
+    value = remote.strip()
+    for pattern in GITHUB_REMOTES:
+        match = pattern.fullmatch(value)
+        if match is not None:
+            return match.group("repository")
+    return None
+
+
+def _origin_remote(root: Path, runner: Runner) -> str | None:
+    result = runner(("git", "remote", "get-url", "origin"), root)
+    if result.returncode != 0 or not result.stdout.strip():
+        return None
+    return result.stdout.strip()
+
+
+def _remote_privacy(
+    root: Path,
+    *,
+    runner: Runner,
+) -> tuple[str, str | None, str | None]:
+    """Classify an existing workspace origin without pushing or changing it."""
+    remote = _origin_remote(root, runner)
+    if remote is None:
+        return "local", None, None
+    repository = github_repository_from_remote(remote)
+    if repository is None:
+        return "unverified", remote, None
+    visibility = runner(
+        ("gh", "repo", "view", repository, "--json", "visibility", "--jq", ".visibility"),
+        root,
+    )
+    if visibility.returncode != 0:
+        return "unverified", remote, repository
+    normalized = visibility.stdout.strip().upper()
+    if normalized == "PRIVATE":
+        return "github", remote, repository
+    if normalized == "PUBLIC":
+        return "public", remote, repository
+    return "unverified", remote, repository
 
 
 def _is_git_repository(path: Path, runner: Runner) -> bool:
@@ -316,6 +368,7 @@ def initialize_workspace(
 def connect_existing_workspace(
     target: Path,
     *,
+    allow_unverified_remote: bool = False,
     runner: Runner = run_command,
 ) -> WorkspaceInitResult:
     """Connect an existing private Git workspace without rewriting its data."""
@@ -330,18 +383,28 @@ def connect_existing_workspace(
     if not (resolved / "vault" / "vault.json").is_file():
         raise WorkspaceError(f"existing workspace does not contain vault/vault.json: {resolved}")
 
+    backup, remote, github_repository = _remote_privacy(resolved, runner=runner)
+    if backup == "public":
+        raise WorkspaceError(
+            f"existing workspace origin is PUBLIC ({remote}); disconnect it or make it private "
+            "before connecting"
+        )
+    if backup == "unverified" and not allow_unverified_remote:
+        raise WorkspaceError(
+            f"existing workspace origin privacy could not be verified ({remote}); "
+            "verify it is private or rerun with --allow-unverified-remote"
+        )
+
     config_path = resolved / WORKSPACE_CONFIG
     if config_path.is_file():
-        data = json.loads(config_path.read_text(encoding="utf-8"))
-        configured_backup = str(data.get("git", {}).get("backup", "local"))
+        json.loads(config_path.read_text(encoding="utf-8"))
     else:
-        configured_backup = "local"
         atomic_write_json(
             config_path,
-            _workspace_configuration(configured_backup, None),
+            _workspace_configuration(backup, github_repository),
         )
     committed = runner(("git", "rev-parse", "--verify", "HEAD"), resolved).returncode == 0
-    return WorkspaceInitResult(resolved, False, committed, configured_backup)
+    return WorkspaceInitResult(resolved, False, committed, backup, github_repository)
 
 
 def discover_workspace(start: Path | None = None) -> Path | None:
@@ -365,6 +428,49 @@ def discover_workspace(start: Path | None = None) -> Path | None:
         if (directory / "vault" / "vault.json").is_file():
             return directory
     return None
+
+
+def workspace_status(
+    root: Path | None = None,
+    *,
+    runner: Runner = run_command,
+) -> dict[str, object]:
+    """Describe the resolved private workspace and its actual backup boundary."""
+    resolved = root.expanduser().resolve() if root is not None else discover_workspace()
+    if resolved is None:
+        raise WorkspaceError("no Resume Builder workspace could be discovered")
+    if (
+        not (resolved / WORKSPACE_CONFIG).is_file()
+        and not (resolved / "vault" / "vault.json").is_file()
+    ):
+        raise WorkspaceError(f"configured workspace does not exist: {resolved}")
+    if not _is_git_repository(resolved, runner):
+        raise WorkspaceError(f"workspace is not an independent Git repository: {resolved}")
+    backup, remote, repository = _remote_privacy(resolved, runner=runner)
+    return {
+        "workspace": str(resolved),
+        "independent_git": True,
+        "backup": backup,
+        "origin": remote,
+        "github_repository": repository,
+        "privacy_verified": backup in {"local", "github"},
+    }
+
+
+def status_main(argv: Sequence[str] | None = None) -> int:
+    """Print the resolved private workspace and remote privacy state."""
+    parser = argparse.ArgumentParser(prog="resume-builder workspace")
+    subparsers = parser.add_subparsers(dest="action", required=True)
+    show = subparsers.add_parser("show", help="Show the active private workspace")
+    show.add_argument("--workspace", type=Path)
+    args = parser.parse_args(argv)
+    try:
+        result = workspace_status(args.workspace)
+    except (OSError, ValueError, WorkspaceError, json.JSONDecodeError) as exc:
+        print(json.dumps({"error": str(exc)}, indent=2), file=sys.stderr)
+        return 1
+    print(json.dumps(result, indent=2))
+    return 0
 
 
 def _interactive_identity() -> tuple[str | None, str | None]:
@@ -432,10 +538,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="connect an existing private Git workspace without rewriting its data",
     )
+    parser.add_argument(
+        "--allow-unverified-remote",
+        action="store_true",
+        help="connect an existing non-GitHub or unverifiable origin after checking it manually",
+    )
     args = parser.parse_args(argv)
 
     if args.existing and (args.storage is not None or args.github_repo is not None):
         parser.error("--existing cannot be combined with --storage or --github-repo")
+    if args.allow_unverified_remote and not args.existing:
+        parser.error("--allow-unverified-remote requires --existing")
 
     interactive = args.storage is None and sys.stdin.isatty() and sys.stdout.isatty()
     if interactive:
@@ -450,7 +563,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         git_email = args.git_email
     try:
         if backup == "existing":
-            result = connect_existing_workspace(target)
+            result = connect_existing_workspace(
+                target,
+                allow_unverified_remote=args.allow_unverified_remote,
+            )
         else:
             result = initialize_workspace(
                 target,
@@ -472,6 +588,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("Configure Git user.name and user.email, then create a checkpoint.")
     if result.backup == "github":
         print(f"Private GitHub backup verified: {result.github_repository}")
+    elif result.backup == "unverified":
+        print("Backup: remote privacy unverified. Resume Builder will not push automatically.")
     else:
         print("Backup: local only. A private remote is recommended to prevent data loss.")
     return 0

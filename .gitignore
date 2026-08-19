@@ -2,6 +2,14 @@
 /workspace/
 /build/
 /dist/
+/vault/
+/resumes/
+/targets/
+/editorial/
+/career/
+/evals/cases/
+/directions/*.md
+!/directions/README.md
 /.coverage
 /.mypy_cache/
 /.pytest_cache/

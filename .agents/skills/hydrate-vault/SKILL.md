@@ -8,6 +8,14 @@ description: Import existing resumes, CVs, LinkedIn exports, work-history docume
 Populate `vault/` with source-grounded career facts while leaving `resumes/`
 untouched.
 
+## Workspace boundary
+
+Run `resume-builder workspace show` before direct file access. Treat its
+absolute `workspace` value as the root of every `vault/`, `resumes/`,
+`directions/`, `targets/`, `editorial/`, and `build/` path in this skill. CLI
+commands resolve these paths automatically; file and Git tools do not. Never
+write candidate evidence into the engine checkout.
+
 ## Workflow
 
 1. Read the repository `AGENTS.md`, `vault/vault.json`, the matching

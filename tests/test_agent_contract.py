@@ -44,6 +44,26 @@ def test_agents_file_routes_empty_and_hydrated_startup_states() -> None:
     assert "Never search the user's home directory" in normalized_agents
 
 
+def test_agents_and_skills_resolve_the_private_workspace_before_file_access() -> None:
+    agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    normalized_agents = " ".join(agents.split())
+
+    assert "resume-builder workspace show" in agents
+    assert "Shell tools, file readers, patch tools, and Git commands do not" in normalized_agents
+    assert "Never create candidate files" in normalized_agents
+    for skill in (
+        HYDRATE_SKILL,
+        BUILD_SKILL,
+        CRITIQUE_SKILL,
+        RESEARCH_SKILL,
+        MATCH_SKILL,
+        SCREEN_SKILL,
+    ):
+        text = (skill / "SKILL.md").read_text(encoding="utf-8")
+        assert "resume-builder workspace show" in text
+        assert "engine" in text
+
+
 def test_skill_metadata_and_interface_match() -> None:
     skill_text = (HYDRATE_SKILL / "SKILL.md").read_text(encoding="utf-8")
     _, frontmatter, _ = skill_text.split("---", 2)

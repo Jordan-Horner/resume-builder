@@ -62,6 +62,24 @@ versioned change plan. Only `plan apply` writes approved facts and employment
 indexes. The scripts under
 `.agents/skills/hydrate-vault/scripts/` are compatibility entry points.
 
+## Private workspace boundary
+
+- The engine checkout and private career workspace are separate repositories.
+  Before directly reading or writing candidate data, run
+  `resume-builder workspace show` and use its absolute `workspace` value as the
+  root for `vault/`, `resumes/`, `directions/`, `targets/`, `editorial/`,
+  `evals/`, `templates/`, and `build/`.
+- CLI subcommands discover the workspace automatically and interpret their
+  documented relative paths from that workspace. Shell tools, file readers,
+  patch tools, and Git commands do not; give them workspace-rooted paths or set
+  their working directory to the resolved workspace.
+- Never create candidate files in same-named directories at the engine root.
+  The engine's `directions/`, `templates/`, and `evals/` content is reusable
+  documentation or fictional test material, not the user's private database.
+- Before staging private changes, verify that Git's top level is the resolved
+  workspace. Before staging engine changes, verify that no candidate-data path
+  is present. Never stage from an ambiguous parent directory.
+
 ## User routing
 
 - Before routing the request, inspect `vault/vault.json`, the configured source

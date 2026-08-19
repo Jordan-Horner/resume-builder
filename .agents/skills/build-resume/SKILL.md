@@ -9,6 +9,14 @@ Guide the user from a hydrated career vault to a focused, versioned resume
 without asking them to repeat known information or silently losing approved
 work.
 
+## Workspace boundary
+
+Run `resume-builder workspace show` before direct file access. Treat its
+absolute `workspace` value as the root of every `vault/`, `resumes/`,
+`directions/`, `targets/`, `editorial/`, `evals/`, `templates/`, and `build/`
+path in this skill. CLI commands resolve these paths automatically; file and
+Git tools do not. Never write candidate data into same-named engine folders.
+
 ## Workflow
 
 1. Read the repository `AGENTS.md`,

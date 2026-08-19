@@ -34,6 +34,7 @@ COMMANDS: dict[str, Command] = {
         workspace.main,
         "Create a private Git workspace with an optional private GitHub backup",
     ),
+    "workspace": (workspace.status_main, "Show the active private workspace and backup state"),
     "hydrate": (
         source_import.main,
         "Preview or apply source-document registration",

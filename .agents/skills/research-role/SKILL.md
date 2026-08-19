@@ -8,6 +8,13 @@ description: Research a job role, role family, or anchor job posting and add or 
 Turn current market evidence into a durable, portable role profile under
 `directions/`. Keep role expectations separate from candidate evidence.
 
+## Workspace boundary
+
+Run `resume-builder workspace show` before direct file access. Write the role
+profile under the returned workspace's `directions/` directory, never the
+engine's documentation directory. Treat any vault, target, resume, and build
+path as relative to that same private workspace.
+
 ## Workflow
 
 1. Read the repository `AGENTS.md`, the existing profile when present, its Git

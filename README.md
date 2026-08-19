@@ -141,7 +141,9 @@ then asks how to protect it:
 2. **Local Git only.** Nothing is uploaded, but the engine warns that local Git
    cannot protect against device loss.
 3. **Existing private workspace.** Connect an existing private Git repository
-   without rewriting its vault or Git history.
+   without rewriting its vault or Git history. GitHub origins must verify as
+   `PRIVATE`; other or temporarily unverifiable origins require an explicit
+   acknowledgement and are never described as verified backups.
 
 No remote is created without explicit confirmation. Automated and
 non-interactive runs never open a prompt and default to local-only storage.
@@ -150,6 +152,16 @@ Connect an existing workspace non-interactively with:
 ```bash
 resume-builder init --existing --workspace /exact/path/to/private-workspace
 ```
+
+Inspect the active boundary at any time with:
+
+```bash
+resume-builder workspace show
+```
+
+This reports the resolved private workspace, independent-Git status, origin,
+and whether its backup privacy was verified. Resume Builder never pushes while
+inspecting or connecting an existing workspace.
 
 Create the conventional private GitHub backup non-interactively with:
 

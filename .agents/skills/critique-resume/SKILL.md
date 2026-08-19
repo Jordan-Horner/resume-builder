@@ -12,6 +12,14 @@ clear professional opinion, separate objective failures from judgment calls,
 identify the few changes most likely to improve the candidate's interview case,
 and ask pointed questions only when the answers could add material evidence.
 
+## Workspace boundary
+
+Run `resume-builder workspace show` before direct file access. Treat its
+absolute `workspace` value as the root of every private resume, vault,
+direction, target, review, feedback, and build path. CLI commands resolve the
+workspace automatically; file and Git tools do not. Never write review content
+or candidate evidence into the engine checkout.
+
 ## Professional stance
 
 - Be candid and decisive. Do not hide the recommendation behind a balanced list
