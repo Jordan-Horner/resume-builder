@@ -304,7 +304,10 @@ def test_critique_answers_route_through_hydration_before_final_use() -> None:
     assert "contains no `revise` decision" in normalized_agents
     assert "fresh reviewer context" in normalized_agents
     assert "empty approval cannot silently dismiss" in normalized_agents
-    assert "Each material critique finding has one next-action route" in readme
+    assert (
+        "If a draft is weak, the agent checks your saved career evidence and imported sources"
+        in " ".join(readme.split())
+    )
 
 
 def test_build_resume_references_define_evidence_and_regression_contracts() -> None:

@@ -8,12 +8,15 @@ changes.
 
 ### Added
 
+- Apache License 2.0 for public use, modification, and distribution
+- A human-first README with agent-led setup, explicit privacy choices, support
+  routes, and visible fictional output
 - Conversational feedback memory with scoped, review-pinned promotion
 - Cached verification receipts and continuous reviewed HTML previews
 - Version 6 synthesis planning with page budgets, structured claims, and role
   arcs
 - Lightweight job-screening workflow
-- Portfolio architecture, design-decision, demo, and release documentation
+- Architecture rationale and a short demo recording plan
 - Private-workspace onboarding with local Git, verified private GitHub backup,
   and existing-workspace connection paths
 - An opt-in Phoenix Wright demonstration fixture that is excluded from the
@@ -30,6 +33,10 @@ changes.
 
 - Resume plans and prose no longer rely on unresolved workflow-adoption and
   false-positive-escalation claims
+
+### Removed
+
+- Obsolete public-migration checklist and duplicated portfolio case-study draft
 
 ## 0.12.0 — 2026-08-19
 

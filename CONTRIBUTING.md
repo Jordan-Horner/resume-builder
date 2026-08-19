@@ -1,8 +1,9 @@
 # Contributing
 
-Resume Builder currently develops inside a private career vault. Contributions
-should target the reusable engine, tests, schemas, templates, or documentation
-and must never introduce personal career material.
+Resume Builder separates its reusable engine from every user's private career
+workspace. Contributions should target the engine, tests, schemas, templates,
+agent workflows, fictional fixtures, or documentation. They must never introduce
+real career material.
 
 ## Development setup
 
@@ -17,24 +18,32 @@ python -m playwright install chromium
 
 ```bash
 pytest
-ruff check src tests .agents/skills/hydrate-vault/scripts
-ruff format --check src tests .agents/skills/hydrate-vault/scripts
+ruff check src tests scripts .agents/skills/hydrate-vault/scripts
+ruff format --check src tests scripts .agents/skills/hydrate-vault/scripts
 mypy src
 python -m build
-resume-builder validate --strict
-resume-builder direction validate
-resume-builder match validate
-resume-builder eval validate
+python scripts/audit_distribution.py
 ```
 
 Use focused commits. Update tests for behavior changes and documentation for
 new commands, schemas, workflow states, or release gates.
 
+The complete test suite installs Chromium through Playwright. A pull request
+should pass the same test, lint, format, type, build, distribution, and fictional
+fixture checks defined in `.github/workflows/ci.yml`.
+
 ## Data and privacy rules
 
 - Use fictional fixtures in tests and examples.
-- Never commit resumes, source documents, contact details, credentials,
-  identity documents, or confidential employer artifacts.
+- Never commit real resumes, source documents, contact details, credentials,
+  identity documents, private job-search information, or confidential employer
+  artifacts.
 - Never use role research or job-posting text as candidate evidence.
 - Preserve atomic fact IDs and provenance through validated change plans.
 - Report security and privacy concerns privately as described in `SECURITY.md`.
+
+Do not place sensitive material in a public issue or pull request, even when the
+material is later deleted. Git history preserves earlier versions.
+
+Unless explicitly stated otherwise, contributions accepted into this project are
+licensed under the Apache License 2.0.

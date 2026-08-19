@@ -5,10 +5,13 @@ should be treated as confidential data, not merely application source code.
 
 ## Reporting
 
-Do not open a public issue containing candidate data, source snapshots,
-credentials, private job-search information, or confidential employer
-material. Report a vulnerability privately to the repository owner with a
-minimal reproduction that uses fictional data.
+Use GitHub's private vulnerability reporting for this repository when it is
+available. If it is unavailable, open a public issue containing only a request
+for a private contact channel. Do not describe the vulnerability there.
+
+Never include candidate data, source snapshots, credentials, private job-search
+information, or confidential employer material in a public issue, pull request,
+or reproduction. Demonstrate the problem with fictional data whenever possible.
 
 ## Security model
 
@@ -22,6 +25,6 @@ minimal reproduction that uses fictional data.
 
 ## Supported versions
 
-Until a public release exists, security fixes apply to the current main branch.
-The eventual public repository should publish a supported-version table with
-each release.
+Resume Builder has not published its first public release. Security fixes
+currently apply to the latest commit on `main`. This section will identify
+supported release lines when public versions are tagged.

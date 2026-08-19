@@ -7,6 +7,7 @@ name = "resume-builder"
 version = "0.12.0"
 description = "Git-first career vault tooling"
 readme = "README.md"
+license = "Apache-2.0"
 requires-python = ">=3.10"
 dependencies = [
   "playwright==1.62.0",
