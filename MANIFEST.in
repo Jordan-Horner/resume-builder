@@ -9,6 +9,7 @@ graft docs
 graft evals
 graft examples
 graft templates
+graft scripts
 global-exclude .DS_Store
 global-exclude *.py[cod]
 global-exclude __pycache__

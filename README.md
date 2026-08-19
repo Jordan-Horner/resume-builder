@@ -119,6 +119,19 @@ python -m playwright install chromium
 This installs PDF and DOCX support, a pinned Chromium renderer, and the
 `resume-builder` command.
 
+There are two supported distribution shapes:
+
+- A source checkout is the complete agent-assisted product. It includes the
+  reusable skills, tests, documentation, and approved fictional demonstration.
+- A wheel installation is intentionally CLI-only. It contains the Python
+  engine and blank workspace scaffolding, but no agent skills, demonstration
+  vault, resume, target, or user workspace. Use a source checkout when you want
+  the conversational import, build, critique, and hydration workflows.
+
+CI builds both the wheel and source archive, audits their contents, installs the
+wheel into a clean environment, and initializes an empty local workspace from
+that installed artifact.
+
 ## Initial workflow
 
 Run the command with no arguments in a terminal, or invoke initialization

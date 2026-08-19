@@ -9,6 +9,16 @@ permissions:
   contents: read
 
 jobs:
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -27,17 +37,45 @@ jobs:
       - name: Test
         run: pytest
       - name: Lint and format
-        run: ruff check src tests .agents/skills/hydrate-vault/scripts && ruff format --check src tests .agents/skills/hydrate-vault/scripts
+        run: ruff check src tests scripts .agents/skills/hydrate-vault/scripts && ruff format --check src tests scripts .agents/skills/hydrate-vault/scripts
       - name: Type check
         run: mypy src
       - name: Build package
+        if: matrix.python-version == '3.14'
         run: python -m build
-      - name: Validate clean first-run workspace
+      - name: Audit package boundary
+        if: matrix.python-version == '3.14'
+        run: python scripts/audit_distribution.py
+      - name: Install wheel in a clean environment
+        if: matrix.python-version == '3.14'
         run: |
-          resume-builder init --workspace workspace --storage local \
+          python -m venv /tmp/resume-builder-wheel
+          /tmp/resume-builder-wheel/bin/python -m pip install dist/*.whl
+          /tmp/resume-builder-wheel/bin/resume-builder --help
+      - name: Validate wheel-installed first-run workspace
+        if: matrix.python-version == '3.14'
+        run: |
+          /tmp/resume-builder-wheel/bin/resume-builder init \
+            --workspace /tmp/resume-builder-clean-workspace --storage local \
             --git-name "CI User" --git-email "ci@example.invalid"
-          test -z "$(find workspace/vault/facts -type f -name '*.md' -print -quit)"
-          test -z "$(find workspace/resumes/baselines -type f -name '*.md' -print -quit)"
+          RESUME_BUILDER_WORKSPACE=/tmp/resume-builder-clean-workspace \
+            /tmp/resume-builder-wheel/bin/resume-builder report --strict
+          test -z "$(find /tmp/resume-builder-clean-workspace/vault/facts \
+            -type f -name '*.md' -print -quit)"
+          test -z "$(find /tmp/resume-builder-clean-workspace/vault/sources/normalized \
+            -type f -print -quit)"
+          test -z "$(find /tmp/resume-builder-clean-workspace/resumes/baselines \
+            -type f -name '*.md' -print -quit)"
+          test -z "$(find /tmp/resume-builder-clean-workspace/resumes/plans \
+            -type f -print -quit)"
+          test -z "$(find /tmp/resume-builder-clean-workspace/resumes/tailored \
+            -type f -print -quit)"
+          test -z "$(find /tmp/resume-builder-clean-workspace/directions \
+            -type f ! -name README.md -print -quit)"
+          test -z "$(find /tmp/resume-builder-clean-workspace/targets \
+            -type f ! -name README.md -print -quit)"
+          test -z "$(find /tmp/resume-builder-clean-workspace/editorial \
+            -type f -name '*.json' -print -quit)"
       - name: Validate fictional demonstration
         run: |
           export RESUME_BUILDER_WORKSPACE="$PWD/examples/phoenix-wright/workspace"

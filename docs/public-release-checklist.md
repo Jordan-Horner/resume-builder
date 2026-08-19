@@ -37,6 +37,30 @@ as the source history for the eventual portfolio repository.
 - Publish only after reviewing the resulting repository in a browser while
   signed out.
 
+## Repeatable release checks
+
+Build from a clean checkout, then run:
+
+```bash
+python -m build
+python scripts/audit_distribution.py
+```
+
+For the final private-to-public export, create an untracked text file containing
+private names, email addresses, employer names, source paths, and any other
+known identifiers, one per line, then run:
+
+```bash
+python scripts/audit_distribution.py --denylist-file /exact/private/denylist.txt
+```
+
+The audit rejects runtime workspace paths from both archives, restricts the
+wheel to the CLI package and package metadata, requires blank workspace
+scaffolding, requires the approved fictional demo in the source archive, and
+scans text members against the optional private denylist. CI separately scans
+Git history for credential-shaped secrets. The denylist is deliberately not
+committed because its contents are private.
+
 ## Never export
 
 - `vault/`
