@@ -26,6 +26,19 @@
       "extracted_characters": 5330,
       "extraction_status": "ok",
       "imported_at": "2026-08-19T11:58:29+00:00"
+    },
+    {
+      "id": "SRC-f953554da1da",
+      "sha256": "f953554da1dad57b49b813914b058d63c9c28e716dbbfa76fa1171b252ed029d",
+      "format": "md",
+      "filenames": [
+        "phoenix-wright-career-inventory.md"
+      ],
+      "snapshot": "sources/normalized/SRC-f953554da1da.md",
+      "snapshot_sha256": "0101bf027e6cd50141bd22557e8c237c254d0e4a2ee627e9b1f161ded30b0874",
+      "extracted_characters": 15754,
+      "extraction_status": "ok",
+      "imported_at": "2026-08-19T14:12:33+00:00"
     }
   ]
 }

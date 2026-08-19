@@ -4,7 +4,7 @@ organization: Wright Anything Agency
 slug: wright-anything-agency
 status: confirmed
 sources:
-  - SRC-3aba7a92ce43
+  - SRC-f953554da1da
 fact_ids:
   - WAA-001
   - WAA-002

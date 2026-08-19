@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+FIXTURE_ROOT = Path(__file__).parents[1] / "examples" / "phoenix-wright"
+SOURCE_ID = re.compile(r"SRC-[0-9a-f]{12}")
 
 
 def _run(workspace: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
@@ -21,7 +27,7 @@ def _run(workspace: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
 
 
 def test_phoenix_fixture_validates_compiles_and_prepares_review(tmp_path: Path) -> None:
-    fixture = Path(__file__).parents[1] / "examples" / "phoenix-wright" / "workspace"
+    fixture = FIXTURE_ROOT / "workspace"
     workspace = tmp_path / "workspace"
     shutil.copytree(fixture, workspace)
 
@@ -46,3 +52,91 @@ def test_phoenix_fixture_validates_compiles_and_prepares_review(tmp_path: Path) 
     assert verification.returncode == 0, verification.stderr or verification.stdout
     assert (workspace / "build" / "senior-defense-attorney.verify.json").is_file()
     assert (workspace / "build" / "reviews" / "senior-defense-attorney.cold.json").is_file()
+
+
+def test_phoenix_fixture_sources_are_locked_and_preserved() -> None:
+    lock = json.loads((FIXTURE_ROOT / "bootstrap" / "source-lock.json").read_text())
+    manifest = json.loads(
+        (FIXTURE_ROOT / "workspace" / "vault" / "sources" / "manifest.json").read_text()
+    )
+    manifest_by_id = {source["id"]: source for source in manifest["sources"]}
+
+    reproducible_ids: set[str] = set()
+    for source in lock["sources"]:
+        path = FIXTURE_ROOT / source["path"]
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        assert digest == source["sha256"]
+        assert source["source_id"] == f"SRC-{digest[:12]}"
+        assert manifest_by_id[source["source_id"]]["sha256"] == digest
+        reproducible_ids.add(source["source_id"])
+
+    preserved_ids: set[str] = set()
+    for source in lock["preserved_snapshots"]:
+        snapshot = FIXTURE_ROOT / source["snapshot"]
+        assert hashlib.sha256(snapshot.read_bytes()).hexdigest() == source["snapshot_sha256"]
+        assert manifest_by_id[source["source_id"]]["sha256"] == source["sha256"]
+        preserved_ids.add(source["source_id"])
+
+    assert set(manifest_by_id) == reproducible_ids | preserved_ids
+
+    canonical = [
+        *(FIXTURE_ROOT / "workspace" / "vault" / "facts").rglob("*.md"),
+        *(FIXTURE_ROOT / "workspace" / "vault" / "employment").glob("*.md"),
+    ]
+    cited_ids = {
+        source_id
+        for path in canonical
+        for source_id in SOURCE_ID.findall(path.read_text(encoding="utf-8"))
+    }
+    assert cited_ids <= reproducible_ids
+
+
+def test_phoenix_fixture_rebuilds_from_locked_sources(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    initialization = _run(
+        tmp_path,
+        "init",
+        "--workspace",
+        str(workspace),
+        "--storage",
+        "local",
+        "--git-name",
+        "Fixture Test",
+        "--git-email",
+        "fixture@example.invalid",
+    )
+    assert initialization.returncode == 0, initialization.stderr or initialization.stdout
+
+    lock = json.loads((FIXTURE_ROOT / "bootstrap" / "source-lock.json").read_text())
+    sources = [str(FIXTURE_ROOT / source["path"]) for source in lock["sources"]]
+    registration = _run(workspace, "hydrate", *sources, "--apply")
+    assert registration.returncode == 0, registration.stderr or registration.stdout
+    registration_result = json.loads(registration.stdout)
+    assert registration_result["added"] == len(sources)
+
+    plan = FIXTURE_ROOT / "bootstrap" / "hydration-plan.json"
+    validation = _run(workspace, "plan", "validate", str(plan))
+    assert validation.returncode == 0, validation.stderr or validation.stdout
+    preview = _run(workspace, "plan", "preview", str(plan))
+    assert preview.returncode == 0, preview.stderr or preview.stdout
+    application = _run(workspace, "plan", "apply", str(plan))
+    assert application.returncode == 0, application.stderr or application.stdout
+
+    strict = _run(workspace, "validate", "--strict")
+    assert strict.returncode == 0, strict.stderr or strict.stdout
+
+    plan_data = json.loads(plan.read_text(encoding="utf-8"))
+    approved_vault = FIXTURE_ROOT / "workspace" / "vault"
+    for write in plan_data["writes"]:
+        relative = Path(write["path"])
+        assert (workspace / "vault" / relative).read_text(encoding="utf-8") == write["content"]
+        assert (approved_vault / relative).read_text(encoding="utf-8") == write["content"]
+
+    manifest = workspace / "vault" / "sources" / "manifest.json"
+    manifest_before = hashlib.sha256(manifest.read_bytes()).hexdigest()
+    repeated = _run(workspace, "hydrate", *sources, "--apply")
+    assert repeated.returncode == 0, repeated.stderr or repeated.stdout
+    repeated_result = json.loads(repeated.stdout)
+    assert repeated_result["added"] == 0
+    assert repeated_result["unchanged_exact_duplicates"] == len(sources)
+    assert hashlib.sha256(manifest.read_bytes()).hexdigest() == manifest_before

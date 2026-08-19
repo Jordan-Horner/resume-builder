@@ -4,7 +4,7 @@ organization: Borscht Bowl Club
 slug: borscht-bowl-club
 status: confirmed
 sources:
-  - SRC-3aba7a92ce43
+  - SRC-f953554da1da
 fact_ids:
   - BBC-001
   - BBC-002

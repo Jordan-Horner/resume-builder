@@ -45,3 +45,26 @@ a fresh independent review before publishing a preview or minting a PDF.
 
 The original research inputs are retained under `source-material/`; the
 registered normalized snapshots live inside the example vault.
+
+## Rebuild the canonical vault
+
+The files under `source-material/` are immutable fixture inputs. Their exact
+hashes and deterministic source IDs are pinned in
+`bootstrap/source-lock.json`. Do not edit an existing input in place: add a
+clearly named new source or addendum and update the lock and reviewed hydration
+plan together. This restriction applies to the packaged demonstration, not to
+user vaults, where revised resumes are registered additively as new evidence.
+
+To prove that the approved canonical facts do not depend on a prebuilt vault,
+start with a blank disposable workspace, register the two locked sources, and
+apply `bootstrap/hydration-plan.json` through `resume-builder plan validate`,
+`preview`, and `apply`. The test suite performs that complete reconstruction,
+compares every canonical fact, employment index, and hydration-report entry
+with the approved fixture, then reimports the sources and requires zero new
+registrations.
+
+The approved workspace also retains the historical `SRC-3aba7a92ce43`
+normalized snapshot. Its original raw bytes were never committed, so it is
+preserved for audit history but is not used as bootstrap evidence. Canonical
+facts cite the current, approved, reproducible inventory source
+`SRC-f953554da1da` instead.

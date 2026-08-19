@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "path": "source-material/phoenix-wright-career-inventory.md",
+      "sha256": "f953554da1dad57b49b813914b058d63c9c28e716dbbfa76fa1171b252ed029d",
+      "source_id": "SRC-f953554da1da"
+    },
+    {
+      "path": "source-material/phoenix-wright-canon-research.md",
+      "sha256": "c277288099e5ec96e271301b3b0a1b9a62dd13fc25ca6c6a60079f0421aea9fa",
+      "source_id": "SRC-c277288099e5"
+    }
+  ],
+  "preserved_snapshots": [
+    {
+      "source_id": "SRC-3aba7a92ce43",
+      "sha256": "3aba7a92ce43f3010b79d0e065ca5ed30d9bc5def3b7fc5cc633f9eb76499417",
+      "snapshot": "workspace/vault/sources/normalized/SRC-3aba7a92ce43.md",
+      "snapshot_sha256": "b7c8862e71768497cad3c1d2e89f949f77c7a8d49379b8a14522b0daf707ac12",
+      "note": "The original raw bytes were never committed; the normalized evidence remains preserved additively."
+    }
+  ]
+}

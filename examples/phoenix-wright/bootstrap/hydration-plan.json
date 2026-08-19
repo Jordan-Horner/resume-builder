@@ -1,0 +1,161 @@
+{
+  "version": 1,
+  "rationale": "Reconstruct the approved Phoenix Wright canonical vault from the exact source inputs pinned in source-lock.json.",
+  "writes": [
+    {
+      "path": "employment/borscht-bowl-club.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\norganization: Borscht Bowl Club\nslug: borscht-bowl-club\nstatus: confirmed\nsources:\n  - SRC-f953554da1da\nfact_ids:\n  - BBC-001\n  - BBC-002\n---\n\n# Borscht Bowl Club\n"
+    },
+    {
+      "path": "employment/fey-co-law-offices.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\norganization: Fey & Co. Law Offices\nslug: fey-co-law-offices\nstatus: confirmed\nsources:\n  - SRC-f953554da1da\nfact_ids:\n  - FCO-001\n  - FCO-002\n  - FCO-003\n---\n\n# Fey & Co. Law Offices\n"
+    },
+    {
+      "path": "employment/wright-anything-agency.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\norganization: Wright Anything Agency\nslug: wright-anything-agency\nstatus: confirmed\nsources:\n  - SRC-f953554da1da\nfact_ids:\n  - WAA-001\n  - WAA-002\n  - WAA-003\n  - WAA-004\n  - WAA-005\n  - WAA-006\n  - WAA-007\n  - WAA-008\n  - WAA-009\n  - WAA-010\n  - WAA-011\n  - WAA-012\n  - WAA-013\n  - WAA-014\n  - WAA-015\n  - WAA-016\n---\n\n# Wright Anything Agency\n"
+    },
+    {
+      "path": "facts/certifications/CERT-001.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: CERT-001\ntitle: Attorney Credential Reinstatement\ntype: accomplishment\nstatus: confirmed\ncategory: certifications\nsources:\n  - SRC-c277288099e5\nthemes:\n  - bar-status\n  - career-return\n---\n\n# Attorney Credential Reinstatement\n\nHeld an attorney's badge as proof of defense-attorney status, lost it after disbarment in 2019, and regained it upon reinstatement in July 2027. The canon sources do not name a real-world bar jurisdiction.\n"
+    },
+    {
+      "path": "facts/education/EDU-001.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: EDU-001\ntitle: Law Degree and Art Studies\ntype: accomplishment\nstatus: confirmed\ncategory: education\nsources:\n  - SRC-c277288099e5\nthemes:\n  - legal-education\n  - education\n---\n\n# Law Degree and Art Studies\n\nAttended Ivy University, initially studied art, later studied law, and received a law degree before beginning practice. The canon sources do not identify the degree as a J.D., LL.B., or another real-world credential.\n"
+    },
+    {
+      "path": "facts/employment/borscht-bowl-club/BBC-001.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: BBC-001\ntitle: Pianist and Poker Player\ntype: role\nstatus: confirmed\ncategory: employment\norganization: borscht-bowl-club\nsources:\n  - SRC-f953554da1da\n  - SRC-c277288099e5\nthemes:\n  - career-interruption\n  - client-facing-work\n---\n\n# Pianist and Poker Player\n\nWorked at the Borscht Bowl Club as a pianist and poker player during the 2019-2027 period in which he was not licensed to practice law.\n"
+    },
+    {
+      "path": "facts/employment/borscht-bowl-club/BBC-002.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: BBC-002\ntitle: Long-running disbarment investigation\ntype: project\nstatus: confirmed\ncategory: employment\norganization: borscht-bowl-club\nscope: role\nrole_ids:\n  - BBC-001\nsources:\n  - SRC-f953554da1da\nthemes:\n  - investigation\n  - professional-accountability\n---\n\n# Long-running disbarment investigation\n\nContinued investigating the circumstances behind the forged evidence and his disbarment while working at the club.\n"
+    },
+    {
+      "path": "facts/employment/fey-co-law-offices/FCO-001.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: FCO-001\ntitle: Rookie Defense Attorney\ntype: role\nstatus: confirmed\ncategory: employment\norganization: fey-co-law-offices\nsources:\n  - SRC-f953554da1da\n  - SRC-c277288099e5\nthemes:\n  - criminal-defense\n  - early-career\n---\n\n# Rookie Defense Attorney\n\nBegan courtroom practice under defense attorney Mia Fey at Fey & Co. Law Offices in 2016.\n"
+    },
+    {
+      "path": "facts/employment/fey-co-law-offices/FCO-002.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: FCO-002\ntitle: First murder-trial defense\ntype: accomplishment\nstatus: confirmed\ncategory: employment\norganization: fey-co-law-offices\nscope: role\nrole_ids:\n  - FCO-001\nsources:\n  - SRC-f953554da1da\n  - SRC-c277288099e5\nthemes:\n  - courtroom-advocacy\n  - client-defense\n  - cross-examination\n---\n\n# First murder-trial defense\n\nServed as lead defense attorney for Larry Butz in his first murder trial, cross-examined the prosecution's witness, exposed that witness as the actual killer, and obtained a not-guilty verdict.\n"
+    },
+    {
+      "path": "facts/employment/fey-co-law-offices/FCO-003.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: FCO-003\ntitle: Practice continuity after mentor's death\ntype: leadership\nstatus: confirmed\ncategory: employment\norganization: fey-co-law-offices\nscope: role\nrole_ids:\n  - FCO-001\nsources:\n  - SRC-f953554da1da\nthemes:\n  - practice-continuity\n  - client-advocacy\n---\n\n# Practice continuity after mentor's death\n\nContinued the office's active defense work after Mia Fey's death, defending Maya Fey and later representing himself during the same matter.\n"
+    },
+    {
+      "path": "facts/employment/wright-anything-agency/WAA-001.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: WAA-001\ntitle: Defense Attorney and Head of Wright & Co. Law Offices\ntype: role\nstatus: confirmed\ncategory: employment\norganization: wright-anything-agency\nsources:\n  - SRC-f953554da1da\n  - SRC-c277288099e5\nthemes:\n  - criminal-defense\n  - practice-leadership\n---\n\n# Defense Attorney and Head of Wright & Co. Law Offices\n\nInherited Mia Fey's firm, operated it as Wright & Co. Law Offices, and led defense matters from 2016 until his 2019 disbarment.\n"
+    },
+    {
+      "path": "facts/employment/wright-anything-agency/WAA-002.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: WAA-002\ntitle: Agency Head and Case Investigator\ntype: role\nstatus: needs-review\ncategory: employment\norganization: wright-anything-agency\nsources:\n  - SRC-f953554da1da\nthemes:\n  - investigation\n  - practice-rebuilding\n---\n\n# Agency Head and Case Investigator\n\nDuring a seven-year license interruption, remained associated with the reorganized agency, investigated the forged-evidence matter, and prepared a return to legal practice. The exact formal title is not established by the approved source.\n"
+    },
+    {
+      "path": "facts/employment/wright-anything-agency/WAA-003.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: WAA-003\ntitle: Senior Defense Attorney\ntype: role\nstatus: confirmed\ncategory: employment\norganization: wright-anything-agency\nsources:\n  - SRC-f953554da1da\n  - SRC-c277288099e5\nthemes:\n  - criminal-defense\n  - mentorship\n  - international-advocacy\n---\n\n# Senior Defense Attorney\n\nRegained his attorney's badge in July 2027 and returned to active practice as the Wright Anything Agency's senior practicing attorney during the 2027-2028 story period.\n"
+    },
+    {
+      "path": "facts/employment/wright-anything-agency/WAA-004.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: WAA-004\ntitle: Defense of Miles Edgeworth and DL-6 reconstruction\ntype: accomplishment\nstatus: confirmed\ncategory: employment\norganization: wright-anything-agency\nscope: role\nrole_ids:\n  - WAA-001\nsources:\n  - SRC-f953554da1da\n  - SRC-c277288099e5\nthemes:\n  - courtroom-advocacy\n  - case-reconstruction\n  - evidence-analysis\n---\n\n# Defense of Miles Edgeworth and DL-6 reconstruction\n\nDefended Miles Edgeworth against the Robert Hammond murder charge and obtained a not-guilty verdict after establishing Yanni Yogi's responsibility. In a separate DL-6 trial convened after Edgeworth confessed to killing his father, reconstructed the fifteen-year-old incident using testimonial, documentary, and physical evidence, identified Manfred von Karma as Gregory Edgeworth's killer, and obtained a second not-guilty verdict for Edgeworth.\n"
+    },
+    {
+      "path": "facts/employment/wright-anything-agency/WAA-005.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: WAA-005\ntitle: Culpable-client ethical conflict\ntype: incident\nstatus: confirmed\ncategory: employment\norganization: wright-anything-agency\nscope: role\nrole_ids:\n  - WAA-001\nsources:\n  - SRC-f953554da1da\nthemes:\n  - professional-ethics\n  - client-advocacy\n---\n\n# Culpable-client ethical conflict\n\nHandled the defense in Farewell, My Turnabout, where the client's culpability was exposed; the matter is retained as ethical-complexity evidence rather than represented as an exoneration.\n"
+    },
+    {
+      "path": "facts/employment/wright-anything-agency/WAA-006.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: WAA-006\ntitle: Wrongful-conviction retrial\ntype: accomplishment\nstatus: confirmed\ncategory: employment\norganization: wright-anything-agency\nscope: role\nrole_ids:\n  - WAA-001\nsources:\n  - SRC-f953554da1da\nthemes:\n  - appeals\n  - evidence-analysis\n---\n\n# Wrongful-conviction retrial\n\nLed Maggey Byrde's retrial in Recipe for Turnabout and overturned the earlier wrongful conviction.\n"
+    },
+    {
+      "path": "facts/employment/wright-anything-agency/WAA-007.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: WAA-007\ntitle: Shared defense in Bridge to the Turnabout\ntype: story\nstatus: confirmed\ncategory: employment\norganization: wright-anything-agency\nscope: role\nrole_ids:\n  - WAA-001\nsources:\n  - SRC-f953554da1da\nthemes:\n  - collaboration\n  - courtroom-advocacy\n---\n\n# Shared defense in Bridge to the Turnabout\n\nResumed the lead defense after Miles Edgeworth temporarily handled the matter and contributed to clearing Iris, with collaborator credit preserved.\n"
+    },
+    {
+      "path": "facts/employment/wright-anything-agency/WAA-008.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: WAA-008\ntitle: Unknowing presentation of forged evidence and disbarment\ntype: incident\nstatus: confirmed\ncategory: employment\norganization: wright-anything-agency\nscope: role\nrole_ids:\n  - WAA-001\nsources:\n  - SRC-f953554da1da\n  - SRC-c277288099e5\nthemes:\n  - professional-accountability\n  - career-interruption\n---\n\n# Unknowing presentation of forged evidence and disbarment\n\nPresented a forged diary page without knowing it was forged in April 2019, lost his license after the evidence was exposed, and remained out of legal practice until reinstatement in July 2027.\n"
+    },
+    {
+      "path": "facts/employment/wright-anything-agency/WAA-009.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: WAA-009\ntitle: Apollo Justice recruitment and mentorship\ntype: leadership\nstatus: confirmed\ncategory: employment\norganization: wright-anything-agency\nscope: role\nrole_ids:\n  - WAA-002\nsources:\n  - SRC-f953554da1da\nthemes:\n  - mentorship\n  - practice-rebuilding\n---\n\n# Apollo Justice recruitment and mentorship\n\nBrought Apollo Justice into the reorganized Wright Anything Agency as its practicing defense attorney and mentored him without taking credit for Apollo-led case results.\n"
+    },
+    {
+      "path": "facts/employment/wright-anything-agency/WAA-010.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: WAA-010\ntitle: Simulated jurist-system trial organization\ntype: project\nstatus: needs-review\ncategory: employment\norganization: wright-anything-agency\nscope: role\nrole_ids:\n  - WAA-002\nsources:\n  - SRC-f953554da1da\nthemes:\n  - legal-process\n  - case-investigation\n---\n\n# Simulated jurist-system trial organization\n\nParticipated in organizing a simulated jurist-system trial connected to Vera Misham's defense and the investigation of the forgery. The exact extent of his formal authority requires primary-source verification.\n"
+    },
+    {
+      "path": "facts/employment/wright-anything-agency/WAA-011.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: WAA-011\ntitle: Athena Cykes recruitment\ntype: leadership\nstatus: confirmed\ncategory: employment\norganization: wright-anything-agency\nscope: role\nrole_ids:\n  - WAA-002\nsources:\n  - SRC-f953554da1da\nthemes:\n  - mentorship\n  - talent-development\n---\n\n# Athena Cykes recruitment\n\nMet Athena Cykes while she was studying law in Europe, encouraged her legal career, and later recruited her to the agency.\n"
+    },
+    {
+      "path": "facts/employment/wright-anything-agency/WAA-012.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: WAA-012\ntitle: Return to courtroom practice\ntype: accomplishment\nstatus: confirmed\ncategory: employment\norganization: wright-anything-agency\nscope: role\nrole_ids:\n  - WAA-003\nsources:\n  - SRC-f953554da1da\nthemes:\n  - career-return\n  - criminal-defense\n---\n\n# Return to courtroom practice\n\nRegained his attorney's badge and led Turnabout Reclaimed, identified in the approved source as his first case after reinstatement.\n"
+    },
+    {
+      "path": "facts/employment/wright-anything-agency/WAA-013.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: WAA-013\ntitle: Defense in a court without an active defense bar\ntype: accomplishment\nstatus: confirmed\ncategory: employment\norganization: wright-anything-agency\nscope: role\nrole_ids:\n  - WAA-003\nsources:\n  - SRC-f953554da1da\n  - SRC-c277288099e5\nthemes:\n  - international-advocacy\n  - client-defense\n  - evidence-analysis\n---\n\n# Defense in a court without an active defense bar\n\nVolunteered to represent local guide Ahlbi Ur'gaid in a Khura'inese court that had gone roughly twenty years without a defense attorney, challenged inconsistencies in the Divination Seance, proved another person committed the crime, and obtained the country's first not-guilty verdict since enactment of the Defense Culpability Act twenty-three years earlier.\n"
+    },
+    {
+      "path": "facts/employment/wright-anything-agency/WAA-014.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: WAA-014\ntitle: Defense under the Defense Culpability Act\ntype: accomplishment\nstatus: confirmed\ncategory: employment\norganization: wright-anything-agency\nscope: role\nrole_ids:\n  - WAA-003\nsources:\n  - SRC-f953554da1da\nthemes:\n  - international-advocacy\n  - high-stakes-defense\n---\n\n# Defense under the Defense Culpability Act\n\nDefended Maya Fey under a system that exposed defense participants to their client's punishment if convicted and obtained a not-guilty result.\n"
+    },
+    {
+      "path": "facts/employment/wright-anything-agency/WAA-015.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: WAA-015\ntitle: Co-counsel support for Apollo Justice\ntype: leadership\nstatus: confirmed\ncategory: employment\norganization: wright-anything-agency\nscope: role\nrole_ids:\n  - WAA-003\nsources:\n  - SRC-f953554da1da\nthemes:\n  - mentorship\n  - collaboration\n---\n\n# Co-counsel support for Apollo Justice\n\nSupported Apollo Justice as co-counsel in the final Khura'in matter while preserving Apollo's ownership of the decisive trial.\n"
+    },
+    {
+      "path": "facts/employment/wright-anything-agency/WAA-016.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: WAA-016\ntitle: Turnabout Time Traveler defense\ntype: accomplishment\nstatus: needs-review\ncategory: employment\norganization: wright-anything-agency\nscope: role\nrole_ids:\n  - WAA-003\nsources:\n  - SRC-f953554da1da\nthemes:\n  - courtroom-advocacy\n  - criminal-defense\n---\n\n# Turnabout Time Traveler defense\n\nLed the domestic defense in the special episode Turnabout Time Traveler; the precise outcome wording remains pending primary-source verification.\n"
+    },
+    {
+      "path": "facts/profile/PROFILE-001.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: PROFILE-001\ntitle: Fictional candidate identity\ntype: responsibility\nstatus: confirmed\ncategory: profile\nsources:\n  - SRC-f953554da1da\nthemes:\n  - identity\n  - fictional-fixture\n---\n\n# Fictional candidate identity\n\nPhoenix Wright is a fictional defense attorney from Capcom's Ace Attorney game series. This fixture contains no real person's contact information.\n"
+    },
+    {
+      "path": "facts/skills/SKILL-001.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: SKILL-001\ntitle: Criminal defense and courtroom advocacy\ntype: responsibility\nstatus: confirmed\ncategory: skills\nsources:\n  - SRC-f953554da1da\nthemes:\n  - courtroom-advocacy\n  - criminal-defense\n---\n\n# Criminal defense and courtroom advocacy\n\nLed criminal-defense matters through investigation, witness examination, evidence challenges, and courtroom argument.\n"
+    },
+    {
+      "path": "facts/skills/SKILL-002.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: SKILL-002\ntitle: Case investigation and evidence reconstruction\ntype: responsibility\nstatus: confirmed\ncategory: skills\nsources:\n  - SRC-f953554da1da\nthemes:\n  - investigation\n  - evidence-analysis\n---\n\n# Case investigation and evidence reconstruction\n\nInvestigated crime scenes and records, tested conflicting accounts, and reconstructed case events with assistants and co-counsel.\n"
+    },
+    {
+      "path": "facts/skills/SKILL-003.md",
+      "expected_sha256": null,
+      "content": "---\nschema_version: 2\nid: SKILL-003\ntitle: Attorney mentorship\ntype: leadership\nstatus: confirmed\ncategory: skills\nsources:\n  - SRC-f953554da1da\nthemes:\n  - mentorship\n  - practice-leadership\n---\n\n# Attorney mentorship\n\nMentored Apollo Justice and recruited Athena Cykes while preserving their ownership of the cases they personally led.\n"
+    },
+    {
+      "path": "hydration-report.md",
+      "expected_sha256": null,
+      "content": "# Phoenix Wright Fixture Hydration Report\n\nStatus: approved fictional fixture supplemented with canon research on 2026-08-19.\n\n- Reproducible source inputs: 2\n- Preserved historical source snapshots: 1\n- Canonical facts: 27\n- Employment organizations: 3\n- Confirmed facts: 24\n- Needs-review facts: 3\n- Conflicts: none\n- Resume-safe year ranges: added from localized game chronology\n- Education: Ivy University law degree and prior art study confirmed; exact credential label and graduation date remain unspecified\n- Attorney status: reinstatement in July 2027 confirmed; real-world jurisdiction remains unspecified\n- Resume files changed during hydration: none\n\nThe historical `SRC-3aba7a92ce43` snapshot is retained additively, but its original raw bytes were never committed. Canonical facts now cite the current approved inventory `SRC-f953554da1da`, whose exact input hash is locked so the fixture can be rebuilt from public inputs.\n\nNeeds-review items: the formal title during the disbarment period, the exact authority exercised in the simulated jurist-system trial, and the precise outcome wording for Turnabout Time Traveler.\n"
+    }
+  ]
+}
