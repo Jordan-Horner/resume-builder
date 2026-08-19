@@ -121,8 +121,9 @@ This installs PDF and DOCX support, a pinned Chromium renderer, and the
 
 There are two supported distribution shapes:
 
-- A source checkout is the complete agent-assisted product. It includes the
-  reusable skills, tests, documentation, and approved fictional demonstration.
+- A source checkout is the complete agent-assisted product for Codex and Claude
+  Code. It includes the reusable skills, tests, documentation, and approved
+  fictional demonstration.
 - A wheel installation is intentionally CLI-only. It contains the Python
   engine and blank workspace scaffolding, but no agent skills, demonstration
   vault, resume, target, or user workspace. Use a source checkout when you want
@@ -359,7 +360,10 @@ history-free export containing the engine, schema, and empty vault only.
 ## Directory contract
 
 ```text
-.agents/skills/                Hydration, role research, critique, and build workflows
+AGENTS.md                      Canonical cross-agent repository instructions
+CLAUDE.md                      Claude Code import of AGENTS.md
+.agents/skills/                Canonical hydration, research, critique, and build skills
+.claude/skills/                Thin Claude Code discovery adapters
 vault/                         Private career vault, schema versioned
   vault.json                   Machine-readable schema declaration
   facts/                       One Markdown file per canonical fact
@@ -499,5 +503,7 @@ that the new resume gained relevant facts from other sources. A separate
 seven-dimension editorial review can then judge whether the result is on par or
 better; deterministic checks do not pretend to prove semantic quality.
 
-See `AGENTS.md` for project instructions, setup commands, and non-negotiable
-editing rules used by Codex.
+See `AGENTS.md` for the canonical project instructions, setup commands, and
+non-negotiable editing rules used by supported coding agents. Codex reads that
+file directly. Claude Code reads `CLAUDE.md`, which imports `AGENTS.md`, and
+discovers matching skills through the adapters under `.claude/skills/`.

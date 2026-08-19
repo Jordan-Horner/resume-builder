@@ -108,7 +108,29 @@ def audit_sdist(path: Path, denylist: tuple[bytes, ...]) -> None:
         roots = {_safe_parts(name)[0] for name in names if _safe_parts(name)}
         if len(roots) != 1 or not next(iter(roots)).startswith("resume_builder-"):
             raise ValueError("source archive must have one versioned resume_builder root")
+        root = next(iter(roots))
+        scoped_names = {PurePosixPath(*_safe_parts(name)[1:]).as_posix() for name in names}
         _check_private_roots(names, strip_first=True)
+        if not {"AGENTS.md", "CLAUDE.md"} <= scoped_names:
+            raise ValueError("source archive is missing cross-agent instruction entry points")
+        canonical_skills = {
+            parts[3]
+            for name in names
+            if (parts := _safe_parts(name))[0] == root
+            and len(parts) == 5
+            and parts[1:3] == (".agents", "skills")
+            and parts[4] == "SKILL.md"
+        }
+        claude_skills = {
+            parts[3]
+            for name in names
+            if (parts := _safe_parts(name))[0] == root
+            and len(parts) == 5
+            and parts[1:3] == (".claude", "skills")
+            and parts[4] == "SKILL.md"
+        }
+        if not canonical_skills or claude_skills != canonical_skills:
+            raise ValueError("source archive has incomplete Claude skill adapters")
         if not any("/examples/phoenix-wright/workspace/" in name for name in names):
             raise ValueError("source archive is missing the approved fictional demonstration")
         for member in files:

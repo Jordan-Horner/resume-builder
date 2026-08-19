@@ -11,6 +11,10 @@ This repository is independent from any job-search system. Other tools may
 consume the vault later, but this project owns career-fact capture, resume
 sources, and their Git history.
 
+`AGENTS.md` and `.agents/skills/` are the canonical agent instructions. Claude
+Code compatibility is provided by `CLAUDE.md` and thin discovery adapters under
+`.claude/skills/`; never maintain a second copy of a substantive workflow there.
+
 ## Setup and commands
 
 Python 3.10 or newer is required. Install the project for development with:

@@ -49,6 +49,10 @@ def test_distribution_audit_accepts_cli_wheel_and_fictional_source(tmp_path: Pat
     _sdist(
         sdist,
         {
+            "resume_builder-0.12.0/AGENTS.md": b"# Instructions",
+            "resume_builder-0.12.0/CLAUDE.md": b"@AGENTS.md",
+            "resume_builder-0.12.0/.agents/skills/example/SKILL.md": b"canonical",
+            "resume_builder-0.12.0/.claude/skills/example/SKILL.md": b"adapter",
             "resume_builder-0.12.0/src/resume_builder/cli.py": b"# cli",
             "resume_builder-0.12.0/examples/phoenix-wright/workspace/README.md": b"fictional",
         },
