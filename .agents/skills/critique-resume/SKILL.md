@@ -116,7 +116,15 @@ or candidate evidence into the engine checkout.
    would materially improve the resume. When the fact is independently valuable
    but its role period is unnecessary, route it to `rebuild` as a project or
    other truthful employer-level presentation instead of forcing a question.
-7. Limit the critique to the findings that would change the hiring read. For
+7. Classify each weakness in this order before deciding to question the user:
+   existing evidence expressed poorly is `rebuild`; a claim present in a
+   registered source but absent from canonical facts is `hydrate` without a
+   question; a targeting problem is `direction`; a material fact absent from
+   both evidence layers is a targeted question; and a gap that is not worth the
+   user's time is recorded as `accept-gap` without a question. Do not mistake
+   poor wording for missing experience; after accepting a gap, choose the
+   appropriate normal next-action route for the resume.
+8. Limit the critique to the findings that would change the hiring read. For
    each material or worthwhile finding, state the evidence, give a direct
    recommendation, name the expected improvement and tradeoff, and classify it
    by its next action:
@@ -129,7 +137,7 @@ or candidate evidence into the engine checkout.
      the direction profile before rebuilding;
    - `mint`: no material content change is needed and a final PDF may be minted
      when the user explicitly wants it.
-8. Return both a prioritized readiness verdict and a separate hiring read. Use
+9. Return both a prioritized readiness verdict and a separate hiring read. Use
    `compelling`, `credible but not yet differentiated`, or `weak or misaligned`
    for the hiring read, relative to the declared target and available evidence.
    Use these readiness verdicts:
@@ -163,17 +171,28 @@ or candidate evidence into the engine checkout.
    pinned accepted rule or open revision after all cold language decisions are fixed. A ready verdict
    requires approved language and approved feedback compliance. Never expose
    the rules to the provisional cold reviewer.
-9. Ask no more than five targeted questions. Each question must name the gap it
-   resolves, such as outcome, scale, ownership, chronology, stakeholder, or
-   technical depth. Do not ask broad prompts like "tell me more about the job."
-10. Do not edit the resume unless the user asks. A request to finish, preview,
+10. Ask no more than five targeted questions before producing the next draft.
+    Rank them by expected resume value, not document order. Before showing them,
+    create `build/reviews/<resume-slug>.questions.json`, preview it with
+    `resume-builder review question-plan`, then record the exact question set
+    with `--apply`. Use one stable `gap_key` for the underlying missing fact so
+    later reviews cannot evade deduplication by rephrasing the prompt. A
+    previously recorded `asked`, `answered`, `unknown`, `declined`, or
+    `accept-gap` entry is not a new question. Additional rounds are allowed only
+    for a distinct material ambiguity discovered after new evidence changes the
+    draft; never continue an open-ended interview. Each question must name the
+    gap it resolves, such as outcome, scale, ownership, chronology, stakeholder,
+    or technical depth. Do not ask broad prompts like "tell me more about the
+    job." Explicitly allow "I don't know," "skip this," or "build with the
+    evidence we have" without pressure to manufacture a metric.
+11. Do not edit the resume unless the user asks. A request to finish, preview,
    or mint an identified resume authorizes necessary wording-only repairs that
    the reviewer provides during that workflow; apply them without another
    pause, then perform a fresh independent review. If broader revision is
    authorized, follow each finding route. A user answer that supplies or clarifies a career
    fact must be registered and applied through `hydrate-vault` before it appears
    in a final baseline or minted resume. Then rebuild through `build-resume`.
-11. Re-run critique after a material content or direction change. Do not repeat
+12. Re-run critique after a material content or direction change. Do not repeat
     the full critique for contact, date, or formatting-only changes that do not
     alter a narrative-block hash. Any prose change requires a new block review.
     Do not mint a PDF; the mint step is separate and explicit.

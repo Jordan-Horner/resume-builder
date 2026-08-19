@@ -13,6 +13,13 @@ meaning is unchanged. Cosmetic or one-off corrections
 close without creating a durable rule; factual corrections route through vault
 hydration.
 
+`evidence-questions.json` is a private question ledger created only when a
+career-professional review finds a material fact that is absent from canonical
+facts and registered source snapshots. It records stable gap keys and resolution
+states so later reviews do not repeat or rephrase answered, unknown, declined,
+or accepted gaps. It never stores the user's conversational answer; factual
+answers belong in narrowly scoped, registered career-note sources.
+
 The builder resolves only rules relevant to a synthesis plan's facts, story,
 resume, direction, and section. A prior sentence may be retained as an example,
 but it is not mandatory wording unless the user explicitly requested that exact

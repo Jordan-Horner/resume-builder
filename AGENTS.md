@@ -138,6 +138,13 @@ indexes. The scripts under
   snapshots may reveal incomplete hydration but must not become direct resume
   wording. Route a discovered claim through `hydrate-vault`, then rebuild from
   canonical facts.
+- Before asking critique questions, validate and record a prioritized set of no
+  more than five with `resume-builder review question-plan ... --apply`. Reuse a
+  stable gap key so rewording cannot repeat an asked, answered, unknown,
+  declined, or accepted gap. Treat “I don't know,” “skip this,” and “build with
+  the evidence we have” as complete answers, not invitations to press for a
+  metric. Save only an approved factual answer and its narrow question context
+  as a career-note source; never hydrate the full conversation.
 - Ask only pointed questions that materially affect the result. When the target
   is vague, propose evidence-backed directions from the vault.
 - After successful first hydration, do not launch a broad improvement

@@ -15,6 +15,7 @@ from typing import Any
 from . import __version__
 from .atomic import atomic_write_json, atomic_write_text
 from .compilation import compile_markdown
+from .evidence_questions import question_plan, resolve_question
 from .feedback_memory import RULE_ID, SESSION_ID, manifest_guidance_freshness
 from .layout import contained_path
 from .synthesis import load_synthesis_plan, role_arc_payloads
@@ -1626,6 +1627,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     repair_parser.add_argument("decisions", type=Path)
     repair_parser.add_argument("--project-root", type=Path, default=Path("."))
+    question_parser = subparsers.add_parser(
+        "question-plan", help="Validate or record one focused evidence-question round"
+    )
+    question_parser.add_argument("plan", type=Path)
+    question_parser.add_argument("--apply", action="store_true")
+    question_parser.add_argument("--project-root", type=Path, default=Path("."))
+    resolve_parser = subparsers.add_parser(
+        "question-resolve", help="Resolve one previously recorded evidence gap"
+    )
+    resolve_parser.add_argument("resume", type=Path)
+    resolve_parser.add_argument("gap_key")
+    resolve_parser.add_argument(
+        "--status", required=True, choices=("answered", "unknown", "declined", "accept-gap")
+    )
+    resolve_parser.add_argument("--source-id")
+    resolve_parser.add_argument("--project-root", type=Path, default=Path("."))
     args = parser.parse_args(argv)
     project_root = args.project_root.expanduser().resolve()
     try:
@@ -1677,6 +1694,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         elif args.action == "apply-repairs":
             result = apply_review_repairs(args.decisions, project_root)
+        elif args.action == "question-plan":
+            result = question_plan(args.plan, project_root, apply=args.apply)
+        elif args.action == "question-resolve":
+            result = resolve_question(
+                project_root,
+                resume=args.resume,
+                gap_key=args.gap_key,
+                status=args.status,
+                source_id=args.source_id,
+            )
         else:
             record = load_review_record(args.record, project_root)
             reasons = review_freshness(record)

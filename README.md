@@ -291,6 +291,10 @@ resume-builder plan preview build/hydration-plan.json
 resume-builder compile resumes/baselines/support-operations.md
 resume-builder verify resumes/baselines/support-operations.md
 resume-builder review package resumes/baselines/support-operations.md
+resume-builder review question-plan build/reviews/support-operations.questions.json
+resume-builder review question-plan build/reviews/support-operations.questions.json --apply
+resume-builder review question-resolve resumes/baselines/support-operations.md <gap-key> \
+  --status <unknown|declined|accept-gap>
 resume-builder review apply-repairs build/reviews/support-operations.decisions.json
 resume-builder review finalize build/reviews/support-operations.decisions.json
 resume-builder review validate build/reviews/support-operations.json
@@ -450,7 +454,11 @@ an employer decision; its output is explicitly a resume-only match.
 Each material critique finding has one next-action route: `rebuild`, `hydrate`,
 `direction`, or `mint`. Critique searches canonical facts and registered
 snapshots before asking the user; any reusable answer becomes a canonical fact
-before final use.
+before final use. When hydration is genuinely needed, the reviewer ranks at
+most five focused questions by expected resume value and records stable gap keys
+before asking. Unknown, declined, and accepted gaps are not rephrased in later
+rounds. A factual answer is saved as a narrow career note and hydrated; the
+conversation itself is never treated as source evidence.
 
 Direction profiles provide the separate target for a resume: titles, audience,
 positioning, weighted concepts, vocabulary, evidence themes, exclusions, and

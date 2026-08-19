@@ -212,6 +212,10 @@ def test_critique_skill_owns_mandatory_editorial_approval_and_is_non_mutating() 
     assert "Do not infer a role assignment" in skill_text
     assert "Ready to mint" in contract
     assert "no more than five targeted questions" in skill_text
+    assert "resume-builder review question-plan" in normalized_skill
+    assert "stable `gap_key`" in normalized_skill
+    assert "build with the evidence we have" in normalized_skill
+    assert "never continue an open-ended interview" in normalized_skill
     assert all(route in contract for route in ("`rebuild`", "`hydrate`", "`direction`", "`mint`"))
     assert "one primary route" in contract
     assert "material content or direction change" in skill_text
@@ -288,6 +292,8 @@ def test_critique_answers_route_through_hydration_before_final_use() -> None:
     assert "do not leave reusable career facts only in conversation history" in normalized_hydrate
     assert "answer is absent from" in normalized_hydrate
     assert "do not ask again" in normalized_hydrate
+    assert "never copy the surrounding conversation" in normalized_hydrate
+    assert "question-resolve" in normalized_hydrate
     assert "registered career-note source" in normalized_agents
     assert "search canonical facts first" in normalized_agents
     assert (

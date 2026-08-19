@@ -232,6 +232,49 @@ A useful question states the evidence gap and narrows the requested memory:
 Do not imply that every bullet requires a metric. A specific operational
 outcome or technical constraint can be stronger and more credible.
 
+Rank a question set by expected improvement to the hiring read. Ask no more
+than five questions before rebuilding. The user may answer, say they do not
+know, decline, accept the gap, or ask to build with current evidence. Unknown
+and declined answers are final for that stable gap key; do not disguise the same
+gap with new wording in a later round. A later round is justified only by a
+distinct material ambiguity revealed by newly hydrated evidence.
+
+Before presenting a question set, write a version 1 plan under
+`build/reviews/<resume-slug>.questions.json`:
+
+```json
+{
+  "version": 1,
+  "resume": "resumes/baselines/incident-management.md",
+  "questions": [
+    {
+      "gap_key": "example-role.incident-response.scale",
+      "gap": "scale",
+      "subject": "Incident response leadership",
+      "priority": 1,
+      "question": "How many teams or engineers did you coordinate during these incidents?",
+      "expected_value": "Clarifies the scope of a target-critical leadership story.",
+      "evidence_searched": {
+        "canonical_facts": true,
+        "registered_sources": true,
+        "notes": "No participant count appears in the relevant facts or snapshots."
+      }
+    }
+  ]
+}
+```
+
+Run `resume-builder review question-plan <plan>` to preview it and repeat with
+`--apply` immediately before asking the returned `askable` questions. The
+private `editorial/evidence-questions.json` ledger remembers stable gaps without
+storing conversational answers. Resolve unknown, declined, or accepted gaps
+with `resume-builder review question-resolve <resume> <gap-key> --status
+<unknown|declined|accept-gap>`. For a factual answer, first preserve only the
+question context and the user's approved factual statement as a career note,
+register it and apply its canonical fact through hydration, then resolve with
+`--status answered --source-id SRC-...`. Never save the whole conversation as
+evidence.
+
 ## Output shape
 
 Return:
