@@ -597,6 +597,31 @@ def test_v3_persists_fit_risks_and_presentation_strategy(tmp_path: Path) -> None
     assert result["presentation"]["competencies"] == "omit"
 
 
+def test_reviewer_risk_can_cite_intentionally_excluded_evidence(tmp_path: Path) -> None:
+    vault, path = project(tmp_path)
+    add_fact(
+        vault / "facts" / "profile" / "FACT-003.md",
+        "FACT-003",
+        "incident",
+    )
+    upgrade_to_v3(path)
+    text = path.read_text(encoding="utf-8")
+    text = text.replace(
+        "fact_ids: [FACT-001]\n    planning_action: Lead the role with the outcome story.",
+        "fact_ids: [FACT-003, FACT-001]\n    planning_action: Omit the adverse fact and lead with the outcome story.",
+    )
+    text = text.replace(
+        "exclusions: []",
+        "exclusions:\n  - fact_id: FACT-003\n    reason: The adverse fact does not advance the target argument.",
+    )
+    path.write_text(text, encoding="utf-8")
+
+    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+
+    assert plan.reviewer_risks[0].fact_ids == ("FACT-003", "FACT-001")
+    assert plan.exclusions[0][0] == "FACT-003"
+
+
 def test_v3_requires_every_direction_concept_classification(tmp_path: Path) -> None:
     vault, path = project(tmp_path)
     upgrade_to_v3(path)

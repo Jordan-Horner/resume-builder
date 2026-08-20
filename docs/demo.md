@@ -12,6 +12,8 @@ resume-builder validate --strict
 resume-builder direction validate
 resume-builder synthesis resumes/plans/senior-defense-attorney.yaml
 resume-builder verify resumes/baselines/senior-defense-attorney.md
+resume-builder review selection-finalize build/reviews/senior-defense-attorney.selection.decisions.json
+resume-builder verify resumes/baselines/senior-defense-attorney.md
 ```
 
 ## 60-second recording script
@@ -35,9 +37,9 @@ Markdown bullet and its hidden evidence comment.
 
 **34–46 seconds — Verification and review**
 
-Run the project report and verification command. Show the frozen cold-read
-package and explain that every narrative block receives an independent,
-hash-pinned language decision.
+Run the project report and verification command. Show the frozen selection case
+and its approval, then the separate cold-read package. Explain that every
+narrative block receives an independent, hash-pinned language decision.
 
 **46–60 seconds — Output**
 

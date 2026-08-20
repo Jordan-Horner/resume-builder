@@ -50,6 +50,17 @@ or candidate evidence into the engine checkout.
    `--target` and `--baseline` when applicable. Inspect its compact build,
    direction, match, and prose-preflight results. Verification establishes
    structural and factual validity; it does not establish editorial quality.
+   If verification reports a strategy-approval requirement, stop the language
+   review. Show the grouped structural losses to the user and obtain explicit
+   approval before a new cold-review cycle exists. A reviewer cannot authorize
+   deletion merely by calling a selected story weak.
+   If verification returns `selection_case`, do not review prose. Give only that
+   case and the selection standard to a fresh strategy reviewer. Require a
+   decision for the whole argument, every selected and omitted story, and every
+   role arc. Finalize the result with `review selection-finalize`. A
+   `strategy-revise` result returns the complete argument to `build-resume`; a
+   `needs-user-decision` result pauses for the exact material tradeoff. Rerun
+   verification after approval to obtain the cold language inputs.
    It produces separate hash-pinned review inputs and reuses them on an
    unchanged rerun. Run `compile`, `direction audit`, `match`, or `review
    package` directly only when diagnosing one of those stages. The lower-level
@@ -163,7 +174,13 @@ or candidate evidence into the engine checkout.
    `revise` decision. After the provisional decisions are fixed and the main
    reviewer confirms the replacement stays inside the cited evidence and story
    boundary, the builder runs `resume-builder review apply-repairs` and starts
-   a fresh review. Leave `repair` as `null` when the issue requires hydration,
+   a bounded repair review. Review changed or still-unresolved blocks only; the
+   generated decisions preserve unchanged approvals and finalization rejects
+   attempts to reopen them. Only one automatic repair attempt is allowed for a
+   block in the current selection cycle. If that repair is rejected, route to a
+   user wording decision, hydration, or an explicit grouped strategy change—do
+   not ask successive reviewers until one approves and do not remove the story.
+   Leave `repair` as `null` when the issue requires hydration,
    changes authority or chronology, removes a distinct claim, or has multiple
    materially different solutions.
    When effective feedback guidance is present, decisions version 3 also requires
@@ -195,6 +212,9 @@ or candidate evidence into the engine checkout.
 12. Re-run critique after a material content or direction change. Do not repeat
     the full critique for contact, date, or formatting-only changes that do not
     alter a narrative-block hash. Any prose change requires a new block review.
+    During a wording-repair handoff, this means the changed blocks; unchanged
+    hash-pinned approvals remain closed. A user-approved strategy proposal starts
+    a new complete cycle because the document's hiring argument changed.
     Do not mint a PDF; the mint step is separate and explicit.
 
 ## Guardrails
@@ -214,6 +234,13 @@ or candidate evidence into the engine checkout.
 - Never infer approval from factual grounding, exact target retrieval,
   specificity, or the whole-resume verdict. Every current narrative block needs
   its own hash-pinned decision.
+- Never improve the verdict by deleting a rejected block, story, role, or
+  evidence relationship. A language decision routes a fix; it does not amend
+  the frozen selection. Structural losses require a separate grouped proposal
+  and exact user approval before another review cycle.
+- Do not run an unbounded reviewer loop. Use one authoritative cold review and
+  one automatic wording-repair attempt per rejected block. Preserve unchanged
+  approvals across that repair.
 - Never invent a missing metric, outcome, responsibility, title, chronology,
   or tool. Record it as an evidence opportunity.
 - Do not fail a structurally valid build merely because an editorial choice is

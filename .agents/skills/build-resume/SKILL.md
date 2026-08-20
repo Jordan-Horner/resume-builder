@@ -204,10 +204,21 @@ Git tools do not. Never write candidate data into same-named engine folders.
    `resume-builder verify` on the completed Markdown as the normal review
    handoff. Pass `--target` and `--baseline` for a tailored resume. Verification
    compiles the draft, runs the direction and optional match checks, writes a
-   compact hash-pinned receipt, and creates the cold-read package plus reviewer
-   decisions file. An unchanged rerun must use the cached receipt rather than
+   compact hash-pinned receipt, and first creates a non-prose selection case plus
+   reviewer decisions file. An unchanged rerun must use the cached receipt rather than
    regenerate review inputs. Use `resume-builder compile` directly only for a
    low-level diagnostic. Compilation does not publish HTML.
+   Verification also compares the draft's non-prose selection with the last
+   ready review. If it stops with a grouped strategy proposal, do not send the
+   smaller draft to another reviewer. Show the user the roles, stories,
+   evidence, required dimensions, or summary support that would be lost. Run
+   `resume-builder review strategy-approve <proposal> --reason "..."` only
+   after the user explicitly accepts that exact tradeoff, then verify again.
+   Give the generated `.selection.package.json` to a fresh strategy reviewer.
+   It must judge the complete hiring argument, every selected and omitted story,
+   and every role arc. A risk does not justify adverse visible content by itself.
+   Finalize the decisions with `resume-builder review selection-finalize`; only
+   an approved current selection unlocks the cold language-review inputs.
    Compilation never creates a PDF. Never maintain the generated JSON or manifest
    separately or hand-edit generated HTML. Read compiler
    warnings and resolve weak grounding or provisional evidence before presenting
@@ -240,7 +251,9 @@ Git tools do not. Never write candidate data into same-named engine folders.
     score or copy its concept labels into the resume.
 12. End the builder pass and invoke `critique-resume` after every new resume or
     change to its headline, summary, competencies, bullets, project narrative,
-    or education description. Use the frozen review inputs produced by
+    or education description. First complete the independent selection review
+    produced by verification. Use the frozen language inputs produced by the
+    next verification run only after that gate is approved.
     `resume-builder verify`; run `resume-builder review package <resume>` only
     when diagnosing that lower-level stage. Give an independent reviewer only
     the generated `.cold.json` target and block inventory for provisional
@@ -270,11 +283,14 @@ Git tools do not. Never write candidate data into same-named engine folders.
     evidence-safe wording repair. Record that replacement as `wording-only` in
     the version 2 or 3 decisions file, run `resume-builder review apply-repairs`,
     verify the changed resume, and send every changed block to a fresh
-    independent reviewer. Repeat until the language review is approved or the
-    remaining issue requires a new fact, changed authority, a direction
-    decision, or a genuine choice between materially different presentations.
-    A repair suggestion never carries approval forward and never bypasses the
-    new block hash or evidence checks.
+    independent reviewer. The repair handoff carries unchanged approved blocks
+    forward and the reviewer evaluates only changed or still-unresolved blocks.
+    Permit one automatic repair attempt per block in that selection cycle. If
+    the repaired block is rejected again, stop and ask for a user wording
+    decision, hydrate missing evidence, or propose a grouped strategy change as
+    appropriate; do not recruit another reviewer or delete the story to obtain
+    approval. A repair suggestion never carries approval forward for the
+    changed block and never bypasses its new hash or evidence checks.
     If the user rejects the revised wording, update the same temporary feedback
     session before another edit. When the user explicitly accepts the reviewed
     preview or asks to mint it, run `resume-builder feedback accept FB-<session>
@@ -296,6 +312,10 @@ Git tools do not. Never write candidate data into same-named engine folders.
   owned, and led.
 - Never overwrite a directional baseline with a job-specific resume.
 - Never silently remove approved resume content during an update.
+- Never respond to a reviewer rejection by removing, demoting, moving, or
+  weakening a selected story in the same language-review cycle. Resolve wording
+  inside the frozen selection. Structural change requires the grouped proposal
+  and exact user approval enforced by `verify`.
 - Never self-approve builder prose. Only a fresh version 4 or 5 record produced by
   the separate `critique-resume` pass can approve narrative blocks.
 - Apply reviewer-proposed repairs automatically only when the user has already
@@ -303,6 +323,10 @@ Git tools do not. Never write candidate data into same-named engine folders.
   explicitly classified as `wording-only`. Do not auto-apply a suggestion that
   adds facts, changes ownership or authority, moves chronology, removes a
   distinct hiring claim, or selects among materially different strategies.
+- Use one authoritative cold review and at most one automatic wording repair per
+  block per selection cycle. Carry unchanged approvals forward; do not let a
+  sequence of fresh reviewers reopen unrelated blocks or turn approval into an
+  optimization target.
 - Treat a version 4, 5, or 6 story's `fact_ids` as available evidence, not mandatory
   sentence content. Preserve `core_fact_ids`; report optional facts left unused.
 - Treat version 5 and 6 `role_arcs` as story-allocation decisions, not fixed bullet

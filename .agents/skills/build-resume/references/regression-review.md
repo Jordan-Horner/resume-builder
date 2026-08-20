@@ -57,6 +57,15 @@ information remains preserved in the vault or baseline.
 
 - Obtain confirmation before removing or weakening approved content from an
   existing resume.
+- A ready review writes a durable selection seal under `resumes/selections/`.
+  On a later build, `resume-builder verify` compares the selected roles,
+  stories, evidence, required dimensions, and summary support with that seal.
+  If any are removed, moved, demoted, or weakened, it writes one grouped
+  `build/revisions/<slug>.strategy.json` proposal and stops before language
+  review. Show the complete proposal and use `resume-builder review
+  strategy-approve <proposal> --reason "..."` only after explicit user
+  approval. Do not interpret a reviewer finding, page limit, or passing score as
+  approval of the strategy change.
 - Never remove content merely to make a diff smaller or satisfy a page target;
   show the tradeoff first.
 - Never treat omission from a tailored resume as deletion from its baseline or
@@ -65,6 +74,9 @@ information remains preserved in the vault or baseline.
   the vault; surface the discrepancy for hydration or review.
 - Preserve manual wording unless the change is intentional and disclosed.
 - Keep baseline and tailored resume histories independent.
+- Do not create a quality score for selection preservation. The gate protects
+  concrete predecessor content and exact approved tradeoffs, not a number that
+  prose or deletion can optimize.
 
 ## Completion summary
 

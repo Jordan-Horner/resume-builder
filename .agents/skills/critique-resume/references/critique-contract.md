@@ -62,6 +62,16 @@ version. Cleaner sentences are not an improvement if the edit silently removed
 a different supported hiring claim. Route that loss to `rebuild`; do not add a
 generic responsibility merely to increase the count.
 
+### Pre-language selection gate
+
+Before judging prose, review the generated `.selection.package.json` in a fresh
+context. Judge the complete target argument, every selected and omitted story,
+every intentional exclusion, and every role arc. Use only `approved`,
+`strategy-revise`, or `needs-user-decision`; do not score or draft repairs.
+A reviewer risk alone never justifies harmful visible content. Reviewing omitted
+options prevents deletion from gaming the verdict. Only a current `approved`
+selection record permits the narrative gate.
+
 ### Narrative-block language gate
 
 Compilation produces a draft; it never approves prose. Use `resume-builder
@@ -82,6 +92,9 @@ and education description, decide `approved` or `revise` using these questions:
 4. Would a capable manager plausibly say it aloud when explaining the work?
 5. Does technical language earn its place through precision or target-role
    value?
+6. Does the resume consistently use implied first person for the candidate,
+   avoiding `he`, `she`, `his`, `her`, or reflexive third-person narration when
+   those pronouns refer to the candidate rather than another person?
 
 Judge the block where the candidate and employer will see it, not as an isolated
 string. Use the context supplied by the cold-read package and apply all four tests:
@@ -380,14 +393,29 @@ unless the rejected block has one clear replacement that changes wording only:
 When the user has already authorized revision, preview, or minting, the main
 workflow validates that replacement against the evidence appendix, runs
 `resume-builder review apply-repairs`, re-verifies the resume, and submits the
-changed block to a fresh independent reviewer without pausing for approval of
-the wording. The repair command pins the exact old block and resume hash,
-preserves evidence comments, rejects multiline or structural changes, and
-never carries the old approval forward. Leave `repair` null and pause only when
+changed block to a bounded independent repair review without pausing for
+approval of the wording. Unchanged approved blocks are carried forward and
+cannot be reopened during that repair. The repair command pins the exact old
+block and resume hash, preserves evidence comments, rejects multiline or
+structural changes, and permits only one automatic repair attempt for a block
+in the current selection cycle. It never carries the changed block's old
+approval forward. If the repair is rejected, stop the automatic reviewer loop
+and route to a user wording decision, hydration, or an explicit strategy
+change. Leave `repair` null and pause when
 the issue needs a new fact, changes ownership, authority, chronology, or
 substantive meaning, removes a distinct hiring claim, or presents materially
 different strategic choices. Version 1 decisions remain finalizable but cannot
 drive automatic repairs.
+
+A ready review also writes a durable non-prose selection seal. Later
+verification compares roles, used stories, evidence assignments, required
+dimensions, and summary support with that predecessor. Any removal, movement,
+demotion, or evidence loss creates one grouped strategy proposal and blocks the
+new language-review package until the user explicitly approves the exact
+tradeoff with `resume-builder review strategy-approve`. Reviewer criticism,
+page pressure, and a cleaner score are not strategy approval. Do not replace
+this concrete change gate with a quality score that can be optimized by
+shrinking the document.
 When the compiled build uses accepted rules or open feedback revisions, the generated decisions
 file uses version 3. It retains version 2 wording repairs and adds a separate
 `feedback_review` populated from the evidence appendix. Complete the cold

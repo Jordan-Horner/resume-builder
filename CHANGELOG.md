@@ -8,6 +8,8 @@ changes.
 
 ### Added
 
+- A prose-preflight advisory for possible third-person candidate narration, with
+  an explicit implied-first-person requirement in the reviewer standards
 - Apache License 2.0 for public use, modification, and distribution
 - A human-first README with agent-led setup, explicit privacy choices, support
   routes, and visible fictional output
@@ -21,6 +23,10 @@ changes.
   and existing-workspace connection paths
 - An opt-in Phoenix Wright demonstration fixture that is excluded from the
   installed wheel
+- Durable reviewed-selection seals and exact, grouped approvals for structural
+  resume changes
+- A pre-language Resume Assurance Case that independently reviews the complete
+  story selection, omitted alternatives, and role arcs without numeric scoring
 
 ### Changed
 
@@ -28,6 +34,8 @@ changes.
   compliance
 - PDF minting enforces the synthesis plan’s resolved page budget
 - Evidence checks apply authorship and authority to structured action evidence
+- Wording-repair reviews carry unchanged approvals forward and allow one
+  automatic repair attempt per block and selection cycle
 
 ### Fixed
 

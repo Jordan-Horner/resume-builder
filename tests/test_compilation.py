@@ -13,6 +13,9 @@ from resume_builder import (
     previewing,
     project_report,
     review_records,
+    selection_guard,
+    selection_review,
+    synthesis,
     verification,
 )
 
@@ -261,6 +264,74 @@ gaps: []
     return vault, resume
 
 
+def approve_selection_review(tmp_path: Path, resume: Path) -> Path:
+    """Approve the complete non-prose strategy before language review."""
+    plan = synthesis.load_synthesis_plan(
+        tmp_path / "resumes" / "plans" / f"{resume.stem}.yaml", tmp_path, tmp_path / "vault"
+    )
+    manifest_path = tmp_path / "build" / f"{resume.stem}.manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    selected = selection_guard.build_selection(plan, manifest["synthesis"])
+    selection_review.build_selection_review_package(
+        tmp_path, resume, plan, selected, manifest=manifest_path
+    )
+    paths = selection_review.selection_review_paths(tmp_path, resume)
+    decisions = json.loads(paths["decisions"].read_text(encoding="utf-8"))
+    decisions["reviewer"]["context"] = "Fresh reviewer saw only the selection case."
+    decisions["argument"] = {"decision": "approved", "note": "Complete target argument."}
+    for item in decisions["stories"]:
+        item["decision"] = "approved"
+        item["note"] = "Selected or omitted appropriately."
+    for item in decisions["exclusions"]:
+        item["decision"] = "approved"
+        item["note"] = "Intentional exclusion is appropriate."
+    for item in decisions["role_arcs"]:
+        item["decision"] = "approved"
+        item["note"] = "Role retains a distinct hiring contribution."
+    decisions["verdict"] = "approved"
+    paths["decisions"].write_text(json.dumps(decisions), encoding="utf-8")
+    selection_review.finalize_selection_review(paths["decisions"], tmp_path)
+    return paths["record"]
+
+
+def build_language_package(resume: Path, tmp_path: Path) -> Path:
+    approve_selection_review(tmp_path, resume)
+    return review_records.build_review_package(resume, tmp_path)
+
+
+def complete_selection_decisions(
+    tmp_path: Path,
+    resume: Path,
+    *,
+    story_decision: str = "approved",
+) -> Path:
+    """Fill the generated selection decision contract for focused gate tests."""
+    paths = selection_review.selection_review_paths(tmp_path, resume)
+    decisions = json.loads(paths["decisions"].read_text(encoding="utf-8"))
+    decisions["reviewer"]["context"] = "Reviewer received only the frozen selection case."
+    decisions["argument"] = {"decision": "approved", "note": "Argument is coherent."}
+    for item in decisions["stories"]:
+        item["decision"] = story_decision
+        item["note"] = (
+            "Rebuild the complete evidence selection."
+            if story_decision != "approved"
+            else "Appropriate selection decision."
+        )
+    for item in decisions["exclusions"]:
+        item["decision"] = story_decision
+        item["note"] = (
+            "Rebuild the complete evidence selection."
+            if story_decision != "approved"
+            else "Appropriate intentional exclusion."
+        )
+    for item in decisions["role_arcs"]:
+        item["decision"] = "approved"
+        item["note"] = "Role contribution is intact."
+    decisions["verdict"] = "changes-required" if story_decision == "strategy-revise" else "approved"
+    paths["decisions"].write_text(json.dumps(decisions), encoding="utf-8")
+    return paths["decisions"]
+
+
 def write_approved_review(tmp_path: Path, resume: Path) -> Path:
     """Create the complete editorial approval required by mint tests."""
     plan = tmp_path / "resumes" / "plans" / "support-operations.yaml"
@@ -268,7 +339,7 @@ def write_approved_review(tmp_path: Path, resume: Path) -> Path:
     review = tmp_path / "build" / "reviews" / "support-operations.json"
     review.parent.mkdir(parents=True, exist_ok=True)
     build_manifest = tmp_path / "build" / "support-operations.manifest.json"
-    package = review_records.build_review_package(resume, tmp_path)
+    package = build_language_package(resume, tmp_path)
     cold_read = tmp_path / "build" / "reviews" / "support-operations.cold.json"
     evidence = json.loads(build_manifest.read_text(encoding="utf-8"))["evidence"]
     review.write_text(
@@ -451,6 +522,15 @@ def test_preview_requires_review_then_publishes_html_for_final_approval(
     assert preview_manifest["output"]["path"] == "build/support-operations.html"
 
 
+def test_preview_cannot_bypass_a_missing_selection_review(tmp_path: Path, run_main) -> None:
+    vault, resume = project(tmp_path)
+    assert run_main(compilation.main, resume, "--vault-root", vault) == 0
+    write_approved_review(tmp_path, resume)
+    selection_review.selection_review_paths(tmp_path, resume)["record"].unlink()
+
+    assert run_main(previewing.main, resume, "--vault-root", vault) == 2
+
+
 def test_compile_preserves_published_preview_but_marks_it_stale(tmp_path: Path, run_main) -> None:
     vault, resume = project(tmp_path)
     assert run_main(compilation.main, resume, "--vault-root", vault) == 0
@@ -503,7 +583,7 @@ def test_review_package_separates_cold_read_and_rejects_changed_build_output(
     vault, resume = project(tmp_path)
     assert run_main(compilation.main, resume, "--vault-root", vault) == 0
 
-    package_path = review_records.build_review_package(resume, tmp_path)
+    package_path = build_language_package(resume, tmp_path)
     cold_path = tmp_path / "build" / "reviews" / "support-operations.cold.json"
     cold = json.loads(cold_path.read_text(encoding="utf-8"))
     package = json.loads(package_path.read_text(encoding="utf-8"))
@@ -539,10 +619,12 @@ def test_review_wording_repair_applies_exact_block_and_preserves_evidence(
     vault, resume = project(tmp_path)
     assert run_main(compilation.main, resume, "--vault-root", vault) == 0
     capsys.readouterr()
-    review_records.build_review_package(resume, tmp_path)
+    build_language_package(resume, tmp_path)
     decisions_path = tmp_path / "build" / "reviews" / "support-operations.decisions.json"
     decisions = json.loads(decisions_path.read_text(encoding="utf-8"))
     assert decisions["version"] == 2
+    for block in decisions["language_review"]["blocks"]:
+        block["decision"] = "approved"
     target = next(
         block
         for block in decisions["language_review"]["blocks"]
@@ -580,11 +662,39 @@ def test_review_wording_repair_applies_exact_block_and_preserves_evidence(
         "Reduced processing time with a repeatable troubleshooting workflow."
     )
 
+    compilation.build_resume(resume, vault_root=vault)
+    build_language_package(resume, tmp_path)
+    next_decisions = json.loads(decisions_path.read_text(encoding="utf-8"))
+    changed = next(
+        block
+        for block in next_decisions["language_review"]["blocks"]
+        if block["id"] == "experience[0].bullets[0]"
+    )
+    unchanged = next(
+        block
+        for block in next_decisions["language_review"]["blocks"]
+        if block["id"] == "candidate.headline"
+    )
+    assert changed["decision"] is None
+    assert unchanged["decision"] == "approved"
+
+    changed["decision"] = "approved"
+    unchanged["decision"] = "revise"
+    unchanged["note"] = "A second reviewer tried to reopen this unchanged block."
+    next_decisions["reviewer"]["context"] = "Repair reviewer received the changed block."
+    next_decisions["verdict"] = "needs-revision"
+    next_decisions["hiring_read"] = "credible-but-not-yet-differentiated"
+    next_decisions["next_action"] = {"route": "rebuild", "summary": "Reopen headline."}
+    next_decisions["language_review"]["status"] = "changes-required"
+    decisions_path.write_text(json.dumps(next_decisions), encoding="utf-8")
+    with pytest.raises(ValueError, match="cannot reopen unchanged approved block"):
+        review_records.finalize_review_record(decisions_path, tmp_path)
+
 
 def test_review_wording_repair_rejects_unstructured_or_stale_changes(tmp_path: Path) -> None:
     vault, resume = project(tmp_path)
     compilation.build_resume(resume, vault_root=vault)
-    review_records.build_review_package(resume, tmp_path)
+    build_language_package(resume, tmp_path)
     decisions_path = tmp_path / "build" / "reviews" / "support-operations.decisions.json"
     decisions = json.loads(decisions_path.read_text(encoding="utf-8"))
     block = decisions["language_review"]["blocks"][0]
@@ -647,7 +757,7 @@ def test_applicable_feedback_memory_requires_post_cold_review_compliance(
     )
     session = feedback_memory.record_feedback(feedback_plan, tmp_path)
     compilation.build_resume(resume, vault_root=vault)
-    review_records.build_review_package(resume, tmp_path)
+    build_language_package(resume, tmp_path)
     decisions_path = tmp_path / "build" / "reviews" / "support-operations.decisions.json"
     decisions = json.loads(decisions_path.read_text(encoding="utf-8"))
     assert decisions["version"] == 3
@@ -769,12 +879,12 @@ def test_verify_caches_checks_and_drives_review_to_published_state(
     )
     first = json.loads(capsys.readouterr().out)
     assert first["cached"] is False
-    assert first["state"]["state"] == "awaiting-review"
+    assert first["state"]["state"] == "awaiting-selection-review"
     assert first["checks"]["build"]["planned_stories"] == 2
     assert first["checks"]["build"]["used_stories"] == 2
     assert first["checks"]["prose_preflight"]["blocks"] == 7
-    package = tmp_path / first["review_inputs"]["package"]["path"]
-    package_digest = review_records.sha256_file(package)
+    selection_case = tmp_path / first["review_inputs"]["selection_case"]["path"]
+    package_digest = review_records.sha256_file(selection_case)
 
     assert (
         run_main(
@@ -788,9 +898,24 @@ def test_verify_caches_checks_and_drives_review_to_published_state(
     )
     second = json.loads(capsys.readouterr().out)
     assert second["cached"] is True
-    assert review_records.sha256_file(package) == package_digest
+    assert review_records.sha256_file(selection_case) == package_digest
 
-    decisions_path = tmp_path / first["review_inputs"]["decisions"]
+    approve_selection_review(tmp_path, resume)
+    assert (
+        run_main(
+            verification.main,
+            resume,
+            "--vault-root",
+            vault,
+            "--skip-vault-validation",
+        )
+        == 0
+    )
+    language = json.loads(capsys.readouterr().out)
+    assert language["cached"] is False
+    assert language["state"]["state"] == "awaiting-review"
+
+    decisions_path = tmp_path / language["review_inputs"]["decisions"]
     decisions = json.loads(decisions_path.read_text(encoding="utf-8"))
     decisions["reviewer"]["context"] = "Fresh reviewer used only the pinned cold-read package."
     decisions["verdict"] = "ready-to-mint"
@@ -817,6 +942,13 @@ def test_verify_caches_checks_and_drives_review_to_published_state(
     finalized = json.loads(capsys.readouterr().out)
     assert finalized["valid"] is True
     assert finalized["blocks"] == 7
+    assert finalized["selection_seal"] == "resumes/selections/support-operations.json"
+    seal = json.loads((tmp_path / finalized["selection_seal"]).read_text(encoding="utf-8"))
+    assert seal["selection_sha256"] == selection_guard.selection_digest(seal["selection"])
+    assert {story["id"] for story in seal["selection"]["stories"]} == {
+        "investigation-speed",
+        "investigation-portal",
+    }
     assert verification.workflow_state(resume, tmp_path)["state"] == "reviewed"
 
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
@@ -830,6 +962,184 @@ def test_verify_caches_checks_and_drives_review_to_published_state(
 
     resume.write_text(resume.read_text(encoding="utf-8") + "\n", encoding="utf-8")
     assert verification.workflow_state(resume, tmp_path)["state"] == "draft"
+
+
+def test_selection_gate_reviews_omitted_candidates_before_creating_language_inputs(
+    tmp_path: Path,
+) -> None:
+    vault, resume = project(tmp_path)
+    first = verification.verify_resume(
+        resume,
+        vault_root=vault,
+        skip_vault_validation=True,
+    )
+
+    assert set(first["review_inputs"]) == {"selection_case", "selection_decisions"}
+    assert not (tmp_path / "build" / "reviews" / "support-operations.cold.json").exists()
+    package = json.loads(
+        (tmp_path / first["review_inputs"]["selection_case"]["path"]).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert [(story["id"], story["selected"]) for story in package["stories"]] == [
+        ("investigation-speed", True),
+        ("investigation-portal", True),
+    ]
+    assert "score" not in json.dumps(package).lower()
+
+
+def test_rejected_selection_cannot_reach_language_review(tmp_path: Path) -> None:
+    vault, resume = project(tmp_path)
+    verification.verify_resume(resume, vault_root=vault, skip_vault_validation=True)
+    decisions = complete_selection_decisions(
+        tmp_path, resume, story_decision="strategy-revise"
+    )
+
+    result = selection_review.finalize_selection_review(decisions, tmp_path)
+
+    assert result["status"] == "changes-required"
+    with pytest.raises(ValueError, match="selection review is stale or incomplete"):
+        review_records.build_review_package(resume, tmp_path)
+
+
+def test_wording_change_does_not_reopen_approved_selection(tmp_path: Path) -> None:
+    vault, resume = project(tmp_path)
+    compilation.build_resume(resume, vault_root=vault)
+    record = approve_selection_review(tmp_path, resume)
+    resume.write_text(
+        resume.read_text(encoding="utf-8").replace(
+            "Support engineer who improves example workflows.",
+            "Support engineer improving example workflows.",
+        ),
+        encoding="utf-8",
+    )
+
+    assert selection_review.selection_review_freshness(record, tmp_path) == []
+
+
+def test_fact_change_reopens_approved_selection(tmp_path: Path) -> None:
+    vault, resume = project(tmp_path)
+    compilation.build_resume(resume, vault_root=vault)
+    record = approve_selection_review(tmp_path, resume)
+    fact = vault / "facts" / "profile" / "EX-007.md"
+    fact.write_text(
+        fact.read_text(encoding="utf-8").replace("Resume evidence", "Changed evidence"),
+        encoding="utf-8",
+    )
+
+    assert selection_review.selection_review_freshness(record, tmp_path) == [
+        "selection review fact EX-007 changed or is missing"
+    ]
+
+
+def test_selection_decisions_cannot_hide_an_omitted_candidate(tmp_path: Path) -> None:
+    vault, resume = project(tmp_path)
+    verification.verify_resume(resume, vault_root=vault, skip_vault_validation=True)
+    paths = selection_review.selection_review_paths(tmp_path, resume)
+    decisions = json.loads(paths["decisions"].read_text(encoding="utf-8"))
+    decisions["reviewer"]["context"] = "Reviewer received only the frozen selection case."
+    decisions["argument"] = {"decision": "approved", "note": "Complete."}
+    decisions["stories"] = decisions["stories"][:-1]
+    for item in decisions["stories"]:
+        item["decision"] = "approved"
+    for item in decisions["exclusions"]:
+        item["decision"] = "approved"
+    for item in decisions["role_arcs"]:
+        item["decision"] = "approved"
+    decisions["verdict"] = "approved"
+    paths["decisions"].write_text(json.dumps(decisions), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="every selected and omitted candidate"):
+        selection_review.finalize_selection_review(paths["decisions"], tmp_path)
+
+
+def test_verify_blocks_a_new_review_cycle_that_silently_removes_a_reviewed_story(
+    tmp_path: Path,
+    run_main,
+    capsys,
+) -> None:
+    vault, resume = project(tmp_path)
+    assert (
+        run_main(
+            verification.main,
+            resume,
+            "--vault-root",
+            vault,
+            "--skip-vault-validation",
+        )
+        == 0
+    )
+    verified = json.loads(capsys.readouterr().out)
+    assert verified["state"]["state"] == "awaiting-selection-review"
+    approve_selection_review(tmp_path, resume)
+    assert (
+        run_main(
+            verification.main,
+            resume,
+            "--vault-root",
+            vault,
+            "--skip-vault-validation",
+        )
+        == 0
+    )
+    verified = json.loads(capsys.readouterr().out)
+    decisions_path = tmp_path / verified["review_inputs"]["decisions"]
+    decisions = json.loads(decisions_path.read_text(encoding="utf-8"))
+    decisions["reviewer"]["context"] = "Fresh reviewer used only the cold-read package."
+    decisions["verdict"] = "ready-to-mint"
+    decisions["hiring_read"] = "compelling"
+    decisions["next_action"] = {"route": "mint", "summary": "Ready for user approval."}
+    decisions["language_review"]["status"] = "approved"
+    for block in decisions["language_review"]["blocks"]:
+        block["decision"] = "approved"
+    decisions_path.write_text(json.dumps(decisions), encoding="utf-8")
+    review_records.finalize_review_record(decisions_path, tmp_path)
+
+    source = resume.read_text(encoding="utf-8")
+    before_projects, remainder = source.split("# Selected Projects\n", 1)
+    _, after_projects = remainder.split("# Education\n", 1)
+    resume.write_text(f"{before_projects}# Education\n{after_projects}", encoding="utf-8")
+    plan_path = tmp_path / "resumes" / "plans" / "support-operations.yaml"
+    plan_text = plan_path.read_text(encoding="utf-8")
+    head, marker, tail = plan_text.rpartition("importance: core")
+    assert marker
+    plan_path.write_text(f"{head}importance: supporting{tail}", encoding="utf-8")
+
+    compilation.build_resume(resume, vault_root=vault)
+    assert (
+        run_main(
+            verification.main,
+            resume,
+            "--vault-root",
+            vault,
+            "--skip-vault-validation",
+        )
+        == 2
+    )
+    error = json.loads(capsys.readouterr().err)
+    assert "strategy approval required" in error["error"]
+    proposal_path = tmp_path / "build" / "revisions" / "support-operations.strategy.json"
+    proposal = json.loads(proposal_path.read_text(encoding="utf-8"))
+    assert proposal["blocking_changes"]["removed_story_ids"] == ["investigation-portal"]
+
+    approved = selection_guard.approve_proposal(
+        Path("build/revisions/support-operations.strategy.json"),
+        tmp_path,
+        "The user approved dropping this project for the narrower strategy.",
+    )
+    assert approved["status"] == "approved"
+    assert (
+        run_main(
+            verification.main,
+            resume,
+            "--vault-root",
+            vault,
+            "--skip-vault-validation",
+        )
+        == 0
+    )
+    allowed = json.loads(capsys.readouterr().out)
+    assert allowed["checks"]["build"]["selection_guard"]["status"] == ("strategy-change-approved")
 
 
 def test_preview_requires_an_explanation_for_accepted_fit_risk(tmp_path: Path, run_main) -> None:
@@ -899,7 +1209,7 @@ def test_project_report_tracks_current_and_stale_builds(
 
     assert current["valid"] is True
     assert current["resumes"][0]["build"]["status"] == "current"
-    assert current["next_action"]["route"] == "critique"
+    assert current["next_action"]["route"] == "selection-review"
     assert "1 baselines" in project_report.format_summary(current)
 
     write_approved_review(tmp_path, resume)

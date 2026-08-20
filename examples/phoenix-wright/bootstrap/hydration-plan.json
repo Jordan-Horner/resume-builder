@@ -110,7 +110,7 @@
     {
       "path": "facts/employment/wright-anything-agency/WAA-012.md",
       "expected_sha256": null,
-      "content": "---\nschema_version: 2\nid: WAA-012\ntitle: Return to courtroom practice\ntype: accomplishment\nstatus: confirmed\ncategory: employment\norganization: wright-anything-agency\nscope: role\nrole_ids:\n  - WAA-003\nsources:\n  - SRC-f953554da1da\nthemes:\n  - career-return\n  - criminal-defense\n---\n\n# Return to courtroom practice\n\nRegained his attorney's badge and led Turnabout Reclaimed, identified in the approved source as his first case after reinstatement.\n"
+      "content": "---\nschema_version: 2\nid: WAA-012\ntitle: Return to courtroom practice\ntype: accomplishment\nstatus: confirmed\ncategory: employment\norganization: wright-anything-agency\nscope: role\nrole_ids:\n  - WAA-003\nsources:\n  - SRC-f953554da1da\nthemes:\n  - career-return\n  - criminal-defense\n---\n\n# Return to courtroom practice\n\nRegained his attorney's badge and led Turnabout Reclaimed, identified in the approved source as his first case after reinstatement, obtaining an acquittal for the client.\n"
     },
     {
       "path": "facts/employment/wright-anything-agency/WAA-013.md",

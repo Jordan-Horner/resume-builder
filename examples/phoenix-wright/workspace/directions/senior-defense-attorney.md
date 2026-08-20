@@ -9,7 +9,7 @@ target_titles:
 audiences:
   - Fictional legal-practice hiring managers
   - Resume Builder evaluators
-positioning: Present a resilient defense attorney who handles complex matters, develops other advocates, and returns credibly from a documented professional setback.
+positioning: Present a senior defense attorney who handles complex matters, reconstructs contested evidence, and succeeds in unfamiliar court systems.
 essential_terms:
   - defense attorney
 priority_concepts:
@@ -74,13 +74,13 @@ priority_concepts:
     source_ids:
       - DIRSRC-001
   - id: professional-accountability
-    label: Professional accountability
+    label: Current standing and career return
     weight: 3
     terms:
-      - professional accountability
+      - active practice
       - career return
     evidence_themes:
-      - professional-accountability
+      - criminal-defense
       - career-return
     basis: user-confirmed
     source_ids:
@@ -89,6 +89,7 @@ de_emphasize:
   - Poker performance as a competitive accomplishment
   - Unsupported system-reform ownership
   - Cases led by other attorneys
+  - Adverse history that does not strengthen the target argument or correct a misleading visible claim
 avoid_terms:
   - undefeated attorney
   - win rate
@@ -97,7 +98,7 @@ defaults:
   page_format: letter
   minimum_coverage: 80
 success_criteria:
-  - Make the return from disbarment transparent and credible.
+  - Show current standing and successful post-return practice without volunteering adverse history as an accomplishment.
   - Preserve collaborator credit in shared matters.
   - Show progression from trainee to independent and senior practice.
   - Keep unresolved canon claims out of visible prose.
@@ -111,6 +112,6 @@ sources:
 # Senior Defense Attorney
 
 This fictional direction tests whether the engine can build a persuasive career
-argument from a long, non-corporate history without hiding an adverse event or
-taking credit from collaborators. It is provisional because it is a demo target,
+argument from a long, non-corporate history without turning every true vault
+fact into resume content or taking credit from collaborators. It is provisional because it is a demo target,
 not a researched real-world legal hiring profile.

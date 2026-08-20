@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "created_at": "2026-08-20T02:20:14.792067+00:00",
+  "resume": "resumes/baselines/senior-defense-attorney.md",
+  "resume_sha256": "9d4530d2e34e1bb910cc27a40404a55fda7c84e0c1f242264a2bfa074cca8a4f",
+  "selection_sha256": "ce3dd4009250a552b226bdf0036028f222bd5d6799b0715c1c929c5dc26f90d9",
+  "changed_block_ids": [
+    "experience[0].bullets[0]",
+    "experience[2].bullets[1]"
+  ],
+  "carried_blocks": [
+    {
+      "id": "candidate.headline",
+      "sha256": "05e6785220ecfa6ef1a6fb2fba8f7271ad8249aa47a18939c750268c4628efc4",
+      "decision": "approved",
+      "note": "The target role and differentiating evidence focus are immediately clear."
+    },
+    {
+      "id": "summary",
+      "sha256": "15c6b9f59c378fe3941d432d9d4a0fcfcb14169f9903b9a49faf79df4569398d",
+      "decision": "approved",
+      "note": "The summary pairs a clear defense-attorney target with concrete, high-stakes results."
+    },
+    {
+      "id": "experience[0].bullets[1]",
+      "sha256": "3a85519dbf747a33c7944b08f3f1c0501f78dc07b29225c047acff14c375d6d4",
+      "decision": "approved",
+      "note": "The unusual court context, evidentiary challenge, and historic result form a clear and persuasive progression."
+    },
+    {
+      "id": "experience[0].bullets[2]",
+      "sha256": "b8de320fde9a054b091747f000d0f7c9a238ff422254eaa13e2300b35d379a27",
+      "decision": "approved",
+      "note": "The sentence efficiently communicates personal stakes and a concrete courtroom result."
+    },
+    {
+      "id": "experience[1].bullets[0]",
+      "sha256": "daa20f11f2103f8301f8b9822d85b495d9e2d83c9893fdafbed49a0b05271432",
+      "decision": "approved",
+      "note": "The actor, reconstruction method, and two-part result are specific and easy to follow."
+    },
+    {
+      "id": "experience[1].bullets[1]",
+      "sha256": "98f0acd1890dac6dfbfd8fc19ce6564839b6a531ddd0cb2f412540148bf80a92",
+      "decision": "approved",
+      "note": "This concise bullet adds a distinct wrongful-conviction result without unnecessary setup."
+    },
+    {
+      "id": "experience[1].bullets[2]",
+      "sha256": "bd6c8a9da4adb3f94e5ce8488397cb85d3758682a3d8a181ab9d657c9b5dd2e3",
+      "decision": "approved",
+      "note": "The handoff and resumed lead-defense responsibility are understandable in context."
+    },
+    {
+      "id": "experience[2].bullets[0]",
+      "sha256": "58aeabf4197ae464e89f9dde22c9ed51ca6cee50671b32cd84880d0ab315bb09",
+      "decision": "approved",
+      "note": "The cross-examination action and resulting acquittal make the early-career contribution concrete."
+    }
+  ]
+}

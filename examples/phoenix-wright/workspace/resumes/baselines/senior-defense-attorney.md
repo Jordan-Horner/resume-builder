@@ -11,32 +11,26 @@ candidate:
 
 # Professional Summary
 
-Handles criminal matters involving contested evidence, wrongful convictions, and unfamiliar court systems. Reconstructed a fifteen-year-old incident, returned to courtroom practice after reinstatement, and now supports other attorneys through mentorship and co-counsel work. <!-- evidence: SKILL-001 SKILL-002 SKILL-003 CERT-001 WAA-004 WAA-013 WAA-015 -->
+Senior criminal defense attorney with a record of overturning wrongful convictions, reconstructing contested evidence, and winning high-stakes cases in unfamiliar court systems. Returned to active practice with an acquittal, then secured Khura'in's first not-guilty verdict in twenty-three years. <!-- evidence: SKILL-001 SKILL-002 SKILL-003 CERT-001 WAA-004 WAA-006 WAA-012 WAA-013 -->
 
 # Work Experience
 
 ## Wright Anything Agency | Senior Defense Attorney | 2027–2028 <!-- evidence: WAA-003 -->
 
-- Volunteered to defend a local guide in a court without a defense attorney for roughly twenty years. Challenged divination-based evidence, proved another person committed the crime, and secured the country's first not-guilty verdict in twenty-three years. <!-- evidence: WAA-013 --><!-- story: khurain-first-defense -->
-- Regained his attorney's badge and returned to courtroom practice as lead counsel in his first post-reinstatement case. <!-- evidence: WAA-012 --><!-- story: return-to-practice -->
-- Defended Maya Fey under a system that exposed defense participants to their client's punishment, obtaining a not-guilty result. <!-- evidence: WAA-014 --><!-- story: culpability-act-defense -->
-- Supported Apollo Justice as co-counsel in the final Khura'in matter while Apollo led the decisive trial. <!-- evidence: WAA-015 --><!-- story: apollo-co-counsel -->
+- Returned to courtroom practice after reinstatement and obtained an acquittal in the first case back. <!-- evidence: WAA-012 --><!-- story: return-to-practice -->
+- Volunteered to defend a local guide in a Khura'inese court that had gone roughly twenty years without a defense attorney. Challenged divination-based evidence, identified another perpetrator, and secured Khura'in's first not-guilty verdict in twenty-three years. <!-- evidence: WAA-013 --><!-- story: khurain-first-defense -->
+- Defended Maya Fey in a legal system where defense counsel faced the same punishment as a convicted client, securing a not-guilty verdict. <!-- evidence: WAA-014 --><!-- story: culpability-act-defense -->
 
 ## Wright & Co. Law Offices | Defense Attorney and Firm Head | 2016–2019 <!-- evidence: WAA-001 -->
 
 - Defended Miles Edgeworth in two trials involving a fifteen-year-old incident. Reconstructed the incident through testimony, documents, and physical evidence to secure two not-guilty verdicts and identify Gregory Edgeworth's killer. <!-- evidence: WAA-004 --><!-- story: edgeworth-defense -->
-- Handled a defense that exposed his client's culpability rather than ending in an exoneration. <!-- evidence: WAA-005 --><!-- story: ethical-conflict -->
 - Led Maggey Byrde's retrial and overturned the earlier wrongful conviction. <!-- evidence: WAA-006 --><!-- story: wrongful-conviction-retrial -->
-- Unknowingly presented a forged diary page in 2019; after the forgery was exposed, he lost his license and remained out of legal practice until his 2027 reinstatement. <!-- evidence: WAA-008 --><!-- story: professional-setback -->
-
-## Borscht Bowl Club | Pianist and Poker Player | 2019–2027 <!-- evidence: BBC-001 -->
-
-- Investigated the forged evidence and circumstances surrounding his disbarment. <!-- evidence: BBC-002 --><!-- story: long-running-investigation -->
+- Resumed the lead defense of Iris after Miles Edgeworth temporarily handled the case and helped clear her. <!-- evidence: WAA-007 --><!-- story: shared-defense -->
 
 ## Fey & Co. Law Offices | Rookie Defense Attorney | 2016 <!-- evidence: FCO-001 -->
 
-- Cross-examined the prosecution's witness in his first murder trial, exposed him as the actual killer, and obtained a not-guilty verdict for Larry Butz with Mia Fey as co-counsel. <!-- evidence: FCO-002 --><!-- story: first-trial -->
-- Continued the firm's active case after Mia Fey's death, defending Maya Fey and later representing himself in the same matter. <!-- evidence: FCO-003 --><!-- story: practice-continuity -->
+- Cross-examined the prosecution witness in Larry Butz's murder trial, exposed the witness as the actual killer, and obtained a not-guilty verdict. <!-- evidence: FCO-002 --><!-- story: first-trial -->
+- Continued the firm's defense practice after Mia Fey's death, representing Maya Fey before later serving as both defendant and defense counsel in the same matter. <!-- evidence: FCO-003 --><!-- story: practice-continuity -->
 
 # Education
 
@@ -44,4 +38,4 @@ Handles criminal matters involving contested evidence, wrongful convictions, and
 
 # Certifications
 
-- Attorney's Badge | Reinstated July 2027 <!-- evidence: CERT-001 -->
+- Attorney's Badge | Active as of July 2027 <!-- evidence: CERT-001 -->

@@ -1,0 +1,172 @@
+{
+  "version": 1,
+  "recorded_at": "2026-08-20T02:40:50.374372+00:00",
+  "resume": "resumes/baselines/senior-defense-attorney.md",
+  "selection_sha256": "ce3dd4009250a552b226bdf0036028f222bd5d6799b0715c1c929c5dc26f90d9",
+  "selection": {
+    "version": 1,
+    "direction": "directions/senior-defense-attorney.md",
+    "target": null,
+    "target_mode": "direct",
+    "progression_role_ids": [
+      "FCO-001",
+      "WAA-001",
+      "WAA-003"
+    ],
+    "stories": [
+      {
+        "id": "culpability-act-defense",
+        "section": "experience",
+        "role_ids": [
+          "WAA-003"
+        ],
+        "importance": "core",
+        "required": true,
+        "used_fact_ids": [
+          "WAA-014"
+        ]
+      },
+      {
+        "id": "edgeworth-defense",
+        "section": "experience",
+        "role_ids": [
+          "WAA-001"
+        ],
+        "importance": "core",
+        "required": true,
+        "used_fact_ids": [
+          "WAA-004"
+        ]
+      },
+      {
+        "id": "first-trial",
+        "section": "experience",
+        "role_ids": [
+          "FCO-001"
+        ],
+        "importance": "core",
+        "required": true,
+        "used_fact_ids": [
+          "FCO-002"
+        ]
+      },
+      {
+        "id": "khurain-first-defense",
+        "section": "experience",
+        "role_ids": [
+          "WAA-003"
+        ],
+        "importance": "core",
+        "required": true,
+        "used_fact_ids": [
+          "WAA-013"
+        ]
+      },
+      {
+        "id": "practice-continuity",
+        "section": "experience",
+        "role_ids": [
+          "FCO-001"
+        ],
+        "importance": "supporting",
+        "required": false,
+        "used_fact_ids": [
+          "FCO-003"
+        ]
+      },
+      {
+        "id": "return-to-practice",
+        "section": "experience",
+        "role_ids": [
+          "WAA-003"
+        ],
+        "importance": "core",
+        "required": true,
+        "used_fact_ids": [
+          "WAA-012"
+        ]
+      },
+      {
+        "id": "shared-defense",
+        "section": "experience",
+        "role_ids": [
+          "WAA-001"
+        ],
+        "importance": "core",
+        "required": true,
+        "used_fact_ids": [
+          "WAA-007"
+        ]
+      },
+      {
+        "id": "wrongful-conviction-retrial",
+        "section": "experience",
+        "role_ids": [
+          "WAA-001"
+        ],
+        "importance": "core",
+        "required": true,
+        "used_fact_ids": [
+          "WAA-006"
+        ]
+      }
+    ],
+    "summary_fact_ids": [
+      "CERT-001",
+      "SKILL-001",
+      "SKILL-002",
+      "SKILL-003",
+      "WAA-004",
+      "WAA-006",
+      "WAA-012",
+      "WAA-013"
+    ],
+    "role_arcs": [
+      {
+        "role_ids": [
+          "FCO-001"
+        ],
+        "required_dimensions": [
+          "early-career-proof"
+        ],
+        "required_story_ids": [
+          "first-trial"
+        ]
+      },
+      {
+        "role_ids": [
+          "WAA-001"
+        ],
+        "required_dimensions": [
+          "collaboration",
+          "complex-defense",
+          "evidence-analysis"
+        ],
+        "required_story_ids": [
+          "edgeworth-defense",
+          "shared-defense",
+          "wrongful-conviction-retrial"
+        ]
+      },
+      {
+        "role_ids": [
+          "WAA-003"
+        ],
+        "required_dimensions": [
+          "career-return",
+          "high-stakes-defense",
+          "international-advocacy"
+        ],
+        "required_story_ids": [
+          "culpability-act-defense",
+          "khurain-first-defense",
+          "return-to-practice"
+        ]
+      }
+    ]
+  },
+  "review": {
+    "path": "build/reviews/senior-defense-attorney.json",
+    "sha256": "1a0e2a1462a4a8f48e9db0357dc9915be7ba5ccfd5d134b52bf6acd4bcfbad64"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "cycles": {
+    "e1e036bd4599b99bfce1fff6bfa55a4114a2d117f061b39b8689958a05b0a9c2": [
+      "experience[0].bullets[1]",
+      "experience[2].bullets[0]"
+    ],
+    "6484f70ae778906c7ec68fcdfd093623d572c3f453116f62188b95f1376a28bf": [
+      "experience[0].bullets[0]",
+      "experience[0].bullets[2]",
+      "experience[1].bullets[2]",
+      "experience[2].bullets[1]"
+    ],
+    "bbd937c55cba67631a9ee72c94ce3f9ee20f12c582ce35ba3148751eda425669": [
+      "experience[0].bullets[0]",
+      "experience[2].bullets[1]"
+    ]
+  },
+  "updated_at": "2026-08-20T02:20:14.790750+00:00"
+}

@@ -21,9 +21,11 @@ editorial approval.
 6. **Verification** checks structure, evidence status, numeric claims,
    authorship language, direction coverage, job-specific retrieval, and stale
    inputs.
-7. **Editorial review** freezes a cold-read package, records a decision for
+7. **Selection review** freezes the non-prose hiring argument, including chosen
+   and omitted stories, and must approve it before wording review begins.
+8. **Editorial review** freezes a cold-read package, records a decision for
    every narrative block, and pins the decision to exact input hashes.
-8. **Preview and minting** publish only a reviewed build. PDF minting adds page
+9. **Preview and minting** publish only a reviewed build. PDF minting adds page
    budget, overflow, network, JavaScript, and text-extraction checks.
 
 ## Trust boundaries
@@ -35,7 +37,8 @@ editorial approval.
 | Job posting | Selection and match criteria | Candidate experience |
 | Language model | Drafting and judgment | Unsupported facts or authority |
 | Deterministic compiler | Traceability and structural integrity | Persuasiveness or semantic truth |
-| Career-professional review | Language and hiring argument | New factual evidence |
+| Selection reviewer | Story choice and complete hiring argument | New facts or resume prose |
+| Career-professional review | Language quality and hiring read | New factual evidence or story deletion |
 
 ## Dependency shape
 
@@ -71,4 +74,5 @@ test suite acting as the compatibility contract.
 - A changed fact, plan, direction, target, or build invalidates dependent
   reviews.
 - Preview and mint cannot bypass rejected or incomplete language review.
+- Language review cannot start before a current selection approval.
 - PDF minting cannot bypass page-budget or extraction failures.

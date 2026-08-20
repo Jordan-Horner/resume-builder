@@ -9,6 +9,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from resume_builder import selection_guard, synthesis
+
 FIXTURE_ROOT = Path(__file__).parents[1] / "examples" / "phoenix-wright"
 SOURCE_ID = re.compile(r"SRC-[0-9a-f]{12}")
 
@@ -52,6 +54,89 @@ def test_phoenix_fixture_validates_compiles_and_prepares_review(tmp_path: Path) 
     assert verification.returncode == 0, verification.stderr or verification.stdout
     assert (workspace / "build" / "senior-defense-attorney.verify.json").is_file()
     assert (workspace / "build" / "reviews" / "senior-defense-attorney.cold.json").is_file()
+
+
+def test_phoenix_review_cannot_pass_by_deleting_weak_stories(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    shutil.copytree(FIXTURE_ROOT / "workspace", workspace)
+    verification = _run(
+        workspace,
+        "verify",
+        "resumes/baselines/senior-defense-attorney.md",
+    )
+    assert verification.returncode == 0, verification.stderr or verification.stdout
+
+    package = json.loads(
+        (
+            workspace
+            / "build"
+            / "reviews"
+            / "senior-defense-attorney.selection.package.json"
+        ).read_text()
+    )
+    previous = json.loads(json.dumps(package["selection"]))
+    plan = synthesis.load_synthesis_plan(
+        Path("resumes/plans/senior-defense-attorney.yaml"),
+        workspace,
+        workspace / "vault",
+    )
+    current_story_ids = {story["id"] for story in previous["stories"]}
+    for story in plan.stories:
+        if story.story_id in current_story_ids:
+            continue
+        previous["stories"].append(
+            {
+                "id": story.story_id,
+                "section": story.section,
+                "role_ids": sorted(story.role_ids),
+                "importance": story.importance,
+                "required": False,
+                "used_fact_ids": sorted(story.core_fact_ids),
+            }
+        )
+    previous["progression_role_ids"].append("BBC-001")
+    previous["stories"].append(
+        {
+            "id": "borscht-investigation",
+            "section": "experience",
+            "role_ids": ["BBC-001"],
+            "importance": "supporting",
+            "required": False,
+            "used_fact_ids": ["BBC-002"],
+        }
+    )
+    previous["role_arcs"].append(
+        {
+            "role_ids": ["BBC-001"],
+            "required_dimensions": ["investigation"],
+            "required_story_ids": [],
+        }
+    )
+    previous["progression_role_ids"].sort()
+    previous["stories"].sort(key=lambda story: story["id"])
+    previous["role_arcs"].sort(key=lambda arc: arc["role_ids"])
+    fake_review = workspace / "build" / "reviews" / "prior-approved.json"
+    fake_review.write_text("{}", encoding="utf-8")
+    resume = workspace / "resumes" / "baselines" / "senior-defense-attorney.md"
+    selection_guard.write_selection_seal(workspace, resume, previous, fake_review)
+
+    blocked = _run(
+        workspace,
+        "verify",
+        "resumes/baselines/senior-defense-attorney.md",
+        "--refresh",
+    )
+    assert blocked.returncode == 2
+    assert "strategy approval required" in blocked.stderr
+    proposal = json.loads(
+        (workspace / "build" / "revisions" / "senior-defense-attorney.strategy.json").read_text()
+    )
+    changes = proposal["blocking_changes"]
+    assert changes["removed_role_ids"] == ["BBC-001"]
+    assert "borscht-investigation" in changes["removed_story_ids"]
+    assert set(plan_story.story_id for plan_story in plan.stories) - current_story_ids <= set(
+        changes["removed_story_ids"]
+    )
 
 
 def test_phoenix_fixture_sources_are_locked_and_preserved() -> None:

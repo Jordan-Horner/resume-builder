@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "status": "approved",
+  "approved_at": "2026-08-19T20:14:04.551508+00:00",
+  "reason": "User requested replacing the harmful disbarment bullet with affirmative target-relevant evidence while preserving the fact in the private vault.",
+  "proposal": "build/revisions/senior-defense-attorney.strategy.json",
+  "proposal_sha256": "7d51e490518bf19ddb4e107d6c43c8f2caae7406abc62511814117983a3c9519",
+  "previous_selection_sha256": "fcca048042f82d89359dd1ea1c8ab4f56f0c848856a0a76798a14698918bb9a8",
+  "proposed_selection_sha256": "ce3dd4009250a552b226bdf0036028f222bd5d6799b0715c1c929c5dc26f90d9",
+  "blocking_changes": {
+    "removed_story_ids": [
+      "professional-setback"
+    ],
+    "removed_required_dimensions": [
+      {
+        "role_ids": [
+          "WAA-001"
+        ],
+        "dimensions": [
+          "professional-accountability"
+        ]
+      }
+    ]
+  }
+}

@@ -40,8 +40,12 @@ resume-builder plan preview <plan.json>
 resume-builder plan apply <plan.json>
 resume-builder compile resumes/baselines/<direction>.md
 resume-builder verify resumes/baselines/<direction>.md
+resume-builder review selection-finalize build/reviews/<direction>.selection.decisions.json
+resume-builder review selection-validate build/reviews/<direction>.selection-review.json
 resume-builder review package resumes/baselines/<direction>.md
 resume-builder review apply-repairs build/reviews/<direction>.decisions.json
+resume-builder review strategy-approve build/revisions/<direction>.strategy.json \
+  --reason "Why this grouped selection change serves the target"
 resume-builder review finalize build/reviews/<direction>.decisions.json
 resume-builder review validate build/reviews/<direction>.json
 resume-builder feedback record build/<feedback-plan>.json [--session FB-...]
@@ -288,6 +292,12 @@ indexes. The scripts under
   assumptions alone.
 - Never silently remove a bullet, metric, employer, skill, or accomplishment.
 - Report material additions, removals, and rewrites in the change summary.
+- Treat the durable reviewed-selection seal under `resumes/selections/` as the
+  predecessor for future review cycles. If verification writes a grouped
+  proposal under `build/revisions/`, stop before language review, show the user
+  every structural loss, and run `review strategy-approve` only after the user
+  explicitly accepts that exact tradeoff. Reviewer criticism is not strategy
+  approval, and starting a fresh review package cannot bypass this gate.
 - For a fresh baseline with an original resume in the same lane, finish the new
   draft before opening the original. Then compare substantive evidence for
   retention, strengthening, intentional omission, vault gaps, and regressions.
@@ -296,8 +306,12 @@ indexes. The scripts under
 - Write resumes using the build-resume skill's canonical Markdown contract.
 - Build normal review input through the hash-aware `resume-builder verify`
   command. It compiles, runs the fast content checks, writes a compact receipt,
-  and prepares frozen review inputs while preserving each underlying stage's
-  independent output. Use `resume-builder compile` directly only for low-level
+  and first prepares a frozen, non-prose selection case. Give that case to an
+  independent strategy reviewer. The reviewer must judge every selected and
+  omitted candidate story plus each role arc, using `approved`,
+  `strategy-revise`, or `needs-user-decision`. Only an approved, current
+  selection record unlocks the isolated cold language package. Use
+  `resume-builder compile` directly only for low-level
   build diagnostics. After the separate
   career-professional review is approved and validated, publish the readable
   web preview through `resume-builder preview` for the user's final review.
@@ -312,7 +326,9 @@ indexes. The scripts under
   gates. Do not bypass unsupported numeric-claim failures. Review lexical and
   non-confirmed-fact warnings before presenting a resume; they are not semantic
   entailment proof, so use critique for editorial judgment.
-- Treat every compiled or verified resume as an unreviewed draft. After any headline,
+- Treat every compiled or verified resume as an unreviewed draft. Do not begin
+  the narrative review until `review selection-finalize` produces an approved
+  selection record. After any headline,
   summary, competency, experience bullet, project narrative, or education
   description changes, run `resume-builder review package`, give the isolated
   cold-read file to the provisional reviewer, then use the evidence appendix to
@@ -327,11 +343,13 @@ indexes. The scripts under
 - When the user has already requested a completed revision, preview, or mint,
   automatically apply a single clear reviewer-proposed `wording-only` repair
   with `resume-builder review apply-repairs`, then verify and independently
-  review every changed block again. Do not pause merely to ask permission for
+  review every changed block again. Carry unchanged approved blocks forward;
+  do not reopen them with another reviewer. Permit only one automatic repair
+  attempt per block in the current reviewed-selection cycle. Do not pause merely to ask permission for
   that exact repair. Pause when the change requires a new fact, changes
   authorship, authority, chronology, or substantive meaning, removes a distinct
   hiring claim, or forces a material strategy choice. Never carry the old block
-  approval across the repair.
+  approval across the changed block.
 - Never cite a `needs-review` fact in visible resume content. Choose action verbs
   from the authorship and authority explicitly supported by the cited facts;
   do not upgrade `used`, `supported`, or `contributed` into `created`, `built`,
@@ -349,6 +367,11 @@ indexes. The scripts under
   critique standards but not the builder's plan, evidence appendix, rationale,
   prior approval, or proposed fix. Record the actual method in the version 4 or
   5 review. A single-context review cannot approve current prose.
+- When agent delegation is available, run the selection gate in a fresh context
+  that receives only the generated selection case and the selection standard.
+  It must not receive the drafted resume prose, builder defense, prior verdict,
+  or proposed repair. It may route a complete strategy rebuild or a real user
+  choice, but it may not rewrite prose or approve facts by assigning a score.
 - Mint enforces its page budget and PDF extraction checks. A page-budget failure
   retains the draft PDF for inspection but is not a successful mint.
 - A direct statement from the user may support a clearly identified working

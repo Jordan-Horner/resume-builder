@@ -128,9 +128,16 @@ earlier commits.
   selection but cannot establish candidate experience.
 - **Important information is checked for accidental removal.** Plans and
   regression checks distinguish deliberate targeting from a lost accomplishment.
+  Before wording is judged, an independent selection review examines the whole
+  hiring argument—including stories the draft left out. Truthful but harmful
+  context does not earn resume space merely because it answers a reviewer risk.
+  After a selection passes review, removing a role, story, required dimension,
+  or supporting evidence requires one explicit, grouped strategy approval; a
+  later reviewer cannot make the resume pass by quietly shrinking it.
 - **Software and people perform different checks.** The engine catches evidence
-  and formatting problems; a separate cold review judges the writing and hiring
-  case. Changing an approved input requires a new review.
+  and formatting problems; a strategy reviewer judges what belongs, then a
+  separate cold reviewer judges only the writing. One wording-repair pass may revisit rejected blocks, while unchanged
+  approved blocks stay closed. Changing strategy starts a new approved cycle.
 
 These safeguards do not predict an employer's decision or produce a universal ATS
 score. They make the resume easier to verify, revise, and defend.

@@ -656,11 +656,14 @@ def load_synthesis_plan(path: Path, project_root: Path, vault_root: Path) -> Syn
                 raise ValueError(f"{owner} cites unknown facts: {unknown_risk_facts}")
             visible_plan_facts = planned_visible_facts if version >= 6 else selected_facts
             visible_plan_facts = set(visible_plan_facts) | set(summary_fact_ids)
-            unselected_risk_facts = sorted(set(risk_fact_ids) - visible_plan_facts)
-            if unselected_risk_facts:
+            excluded_fact_ids = {fact_id for fact_id, _reason in exclusions}
+            unaccounted_risk_facts = sorted(
+                set(risk_fact_ids) - visible_plan_facts - excluded_fact_ids
+            )
+            if unaccounted_risk_facts:
                 raise ValueError(
-                    f"{owner} cites evidence absent from selected stories and summary: "
-                    f"{unselected_risk_facts}"
+                    f"{owner} cites evidence absent from selected stories, summary, and "
+                    f"intentional exclusions: {unaccounted_risk_facts}"
                 )
             unresolved_risk = unresolved_risk or risk_status == "unresolved"
             risk_entries.append(

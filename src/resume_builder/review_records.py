@@ -18,6 +18,21 @@ from .compilation import compile_markdown
 from .evidence_questions import question_plan, resolve_question
 from .feedback_memory import RULE_ID, SESSION_ID, manifest_guidance_freshness
 from .layout import contained_path
+from .selection_guard import (
+    approve_proposal,
+    build_selection,
+    guard_selection,
+    matching_repair_handoff,
+    record_repair_attempts,
+    selection_digest,
+    write_repair_handoff,
+    write_selection_seal,
+)
+from .selection_review import (
+    finalize_selection_review,
+    require_approved_selection_review,
+    selection_review_freshness,
+)
 from .synthesis import load_synthesis_plan, role_arc_payloads
 
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -183,12 +198,30 @@ def _contribution_advisories(text: str) -> tuple[str, ...]:
     return tuple(advisories)
 
 
+def _candidate_voice_advisories(text: str) -> tuple[str, ...]:
+    """Flag pronouns that may turn an implied-first-person bullet into biography."""
+    possible_candidate_reference = re.search(
+        r"^(?:he|she)\b"
+        r"|^(?:in|during|after|before|throughout)\s+(?:his|her)\b"
+        r"|\b(?:himself|herself)\b",
+        text,
+        re.IGNORECASE,
+    )
+    if possible_candidate_reference:
+        return (
+            "block contains a third-person pronoun; identify its referent and revise when it "
+            "describes the candidate instead of another person",
+        )
+    return ()
+
+
 def _prose_advisories(text: str, role: str | None = None) -> tuple[str, ...]:
     """Return high-confidence prompts for contextual editorial review."""
     return (
         *_opening_advisories(text, role),
         *_density_advisories(text),
         *_contribution_advisories(text),
+        *_candidate_voice_advisories(text),
     )
 
 
@@ -332,6 +365,7 @@ def build_review_package(
     resumes_root = (resolved_root / "resumes").resolve()
     if not resume_path.is_relative_to(resumes_root) or not resume_path.is_file():
         raise ValueError("resume must name an existing file under resumes/")
+    require_approved_selection_review(resolved_root, resume_path)
     build_manifest_path = resolved_root / "build" / f"{resume_path.stem}.manifest.json"
     try:
         build_manifest = json.loads(build_manifest_path.read_text(encoding="utf-8"))
@@ -433,6 +467,8 @@ def build_review_package(
         if (
             isinstance(existing_package, dict)
             and existing_package.get("version") == 1
+            and isinstance(existing_package.get("selection_appendix"), dict)
+            and isinstance(existing_package["selection_appendix"].get("selection"), dict)
             and existing_package.get("resume") == expected_resume
             and existing_package.get("build_manifest") == expected_build
             and existing_package.get("plan") == expected_plan
@@ -440,6 +476,14 @@ def build_review_package(
             and existing_package.get("target") == target_record
             and existing_package.get("cold_read") == expected_cold
         ):
+            existing_appendix = _object(
+                existing_package.get("selection_appendix"),
+                "existing review package selection_appendix",
+            )
+            existing_selection = _object(
+                existing_appendix.get("selection"), "existing review package selection"
+            )
+            guard_selection(resolved_root, resume_path, existing_selection)
             return output
 
     inventory = narrative_block_inventory(resume_path)
@@ -499,6 +543,8 @@ def build_review_package(
     }
     atomic_write_json(cold_read_output, cold_read)
 
+    selection = build_selection(plan, synthesis_record, target=target_record)
+    guard_selection(resolved_root, resume_path, selection)
     package = {
         "version": 1,
         "generated_at": generated_at,
@@ -524,6 +570,7 @@ def build_review_package(
             "sha256": sha256_file(cold_read_output),
         },
         "selection_appendix": {
+            "selection": selection,
             "target_argument": plan.target_argument,
             "page_budget": (
                 {
@@ -553,6 +600,7 @@ def build_review_package(
         inventory,
         generated_at,
         feedback_rules,
+        selection,
     )
     return output
 
@@ -565,6 +613,7 @@ def _write_review_decisions(
     inventory: tuple[NarrativeReviewBlock, ...],
     generated_at: str,
     feedback_rules: list[object],
+    selection: dict[str, Any],
 ) -> Path:
     """Create or refresh the small reviewer-owned decision file for one package."""
     output = project_root / "build" / "reviews" / f"{resume.stem}.decisions.json"
@@ -589,6 +638,41 @@ def _write_review_decisions(
             and existing.get("review_inputs") == review_inputs
         ):
             return output
+    handoff = matching_repair_handoff(
+        project_root,
+        resume,
+        sha256_file(resume),
+        selection_digest(selection),
+    )
+    handoff_blocks = handoff.get("carried_blocks", []) if handoff is not None else []
+    carried = {
+        str(item.get("id")): item
+        for item in handoff_blocks
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    }
+    block_decisions = []
+    for block in inventory:
+        prior = carried.get(block.id)
+        if prior is not None and prior.get("sha256") == sha256_text(block.text):
+            block_decisions.append(
+                {
+                    "id": block.id,
+                    "sha256": sha256_text(block.text),
+                    "decision": "approved",
+                    "note": str(prior.get("note", "")),
+                    "repair": None,
+                }
+            )
+        else:
+            block_decisions.append(
+                {
+                    "id": block.id,
+                    "sha256": sha256_text(block.text),
+                    "decision": None,
+                    "note": "",
+                    "repair": None,
+                }
+            )
     template = {
         "version": 3 if feedback_rules else 2,
         "generated_at": generated_at,
@@ -603,16 +687,7 @@ def _write_review_decisions(
         "next_action": {"route": None, "summary": ""},
         "language_review": {
             "status": None,
-            "blocks": [
-                {
-                    "id": block.id,
-                    "sha256": sha256_text(block.text),
-                    "decision": None,
-                    "note": "",
-                    "repair": None,
-                }
-                for block in inventory
-            ],
+            "blocks": block_decisions,
         },
     }
     if feedback_rules:
@@ -835,6 +910,38 @@ def finalize_review_record(
     }
     if package_pins != decision_pins:
         raise ValueError("review decisions do not cover the exact cold-read narrative blocks")
+    package_resume = _object(package_data.get("resume"), "review package resume")
+    package_selection = _object(selection_appendix.get("selection"), "review package selection")
+    package_resume_path = contained_path(
+        resolved_root, package_resume.get("path"), "review package resume path"
+    )
+    require_approved_selection_review(resolved_root, package_resume_path)
+    handoff = matching_repair_handoff(
+        resolved_root,
+        package_resume_path,
+        str(package_resume.get("sha256")),
+        selection_digest(package_selection),
+    )
+    if handoff is not None:
+        decisions_by_id = {
+            str(_object(block, "review decision block").get("id")): _object(
+                block, "review decision block"
+            )
+            for block in decision_blocks
+        }
+        for prior_value in handoff["carried_blocks"]:
+            prior = _object(prior_value, "repair handoff carried block")
+            block_id = prior.get("id")
+            current = decisions_by_id.get(str(block_id))
+            if (
+                current is None
+                or current.get("sha256") != prior.get("sha256")
+                or current.get("decision") != "approved"
+                or current.get("note") != prior.get("note")
+            ):
+                raise ValueError(
+                    f"repair review cannot reopen unchanged approved block: {block_id}"
+                )
 
     build_manifest_record = _object(
         package_data.get("build_manifest"), "review package build_manifest"
@@ -907,7 +1014,7 @@ def finalize_review_record(
     finally:
         candidate.unlink(missing_ok=True)
     atomic_write_json(destination, record)
-    return {
+    result = {
         "valid": True,
         "record": destination.relative_to(resolved_root).as_posix(),
         "version": record["version"],
@@ -918,6 +1025,24 @@ def finalize_review_record(
         "feedback_status": validated.feedback_status,
         "feedback_rules": len(validated.feedback_rules),
     }
+    if (
+        validated.editorial_status == "approved"
+        and validated.verdict in {"ready-to-mint", "ready-with-optional-improvements"}
+        and validated.feedback_status in {"approved", "not-applicable"}
+    ):
+        selection = _object(selection_appendix.get("selection"), "review package selection")
+        resume_input = _source_input(
+            package_data.get("resume"), "review package resume", resolved_root, "resumes"
+        )
+        guard_selection(resolved_root, resume_input.path, selection)
+        seal = write_selection_seal(
+            resolved_root,
+            resume_input.path,
+            selection,
+            destination,
+        )
+        result["selection_seal"] = seal.relative_to(resolved_root).as_posix()
+    return result
 
 
 def apply_review_repairs(decisions: Path, project_root: Path) -> dict[str, Any]:
@@ -948,6 +1073,14 @@ def apply_review_repairs(decisions: Path, project_root: Path) -> dict[str, Any]:
     )
     if sha256_file(cold_read.path) != cold_read.sha256:
         raise ValueError("cold-read package changed after reviewer decisions were prepared")
+    review_package = _source_input(
+        review_inputs.get("review_package"),
+        "review decisions review_package",
+        resolved_root,
+        "build/reviews",
+    )
+    if sha256_file(review_package.path) != review_package.sha256:
+        raise ValueError("review package changed after reviewer decisions were prepared")
     try:
         cold_raw = json.loads(cold_read.path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -1019,7 +1152,40 @@ def apply_review_repairs(decisions: Path, project_root: Path) -> dict[str, Any]:
             expected_text = str(cold_block.get("text"))
         if repaired_inventory[block_id].text != expected_text:
             raise ValueError(f"wording repair changed an unexpected block: {block_id}")
+    try:
+        package_raw = json.loads(review_package.path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"invalid review package: {exc}") from exc
+    package = _object(package_raw, "review package")
+    appendix = _object(package.get("selection_appendix"), "review package selection_appendix")
+    selection = _object(appendix.get("selection"), "review package selection")
+    record_repair_attempts(
+        resolved_root,
+        resume.path,
+        selection_digest(selection),
+        sorted(replacements),
+    )
     atomic_write_text(resume.path, repaired)
+    carried_blocks: list[dict[str, object]] = [
+        {
+            "id": str(block.get("id")),
+            "sha256": str(block.get("sha256")),
+            "decision": "approved",
+            "note": str(block.get("note", "")),
+        }
+        for block in decision_blocks
+        if isinstance(block, dict)
+        and block.get("decision") == "approved"
+        and block.get("id") not in replacements
+    ]
+    write_repair_handoff(
+        resolved_root,
+        resume.path,
+        sha256_file(resume.path),
+        selection_digest(selection),
+        sorted(replacements),
+        carried_blocks,
+    )
     return {
         "valid": True,
         "resume": resume.path.relative_to(resolved_root).as_posix(),
@@ -1579,6 +1745,7 @@ def require_editorial_approval(
     record = load_review_record(review_path, project_root)
     if record.resume.path != resume.resolve():
         raise ValueError("review record names a different resume")
+    require_approved_selection_review(project_root, record.resume.path)
     reasons = review_freshness(record)
     if reasons:
         raise ValueError(f"career-professional review is stale or incomplete: {reasons}")
@@ -1627,6 +1794,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     repair_parser.add_argument("decisions", type=Path)
     repair_parser.add_argument("--project-root", type=Path, default=Path("."))
+    strategy_parser = subparsers.add_parser(
+        "strategy-approve", help="Approve one grouped structural-selection change"
+    )
+    strategy_parser.add_argument("proposal", type=Path)
+    strategy_parser.add_argument("--reason", required=True)
+    strategy_parser.add_argument("--project-root", type=Path, default=Path("."))
+    selection_finalize_parser = subparsers.add_parser(
+        "selection-finalize", help="Finalize the independent pre-language selection review"
+    )
+    selection_finalize_parser.add_argument("decisions", type=Path)
+    selection_finalize_parser.add_argument("--project-root", type=Path, default=Path("."))
+    selection_validate_parser = subparsers.add_parser(
+        "selection-validate", help="Validate a finalized selection review"
+    )
+    selection_validate_parser.add_argument("record", type=Path)
+    selection_validate_parser.add_argument("--project-root", type=Path, default=Path("."))
     question_parser = subparsers.add_parser(
         "question-plan", help="Validate or record one focused evidence-question round"
     )
@@ -1694,6 +1877,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         elif args.action == "apply-repairs":
             result = apply_review_repairs(args.decisions, project_root)
+        elif args.action == "strategy-approve":
+            result = approve_proposal(args.proposal, project_root, args.reason)
+        elif args.action == "selection-finalize":
+            result = finalize_selection_review(args.decisions, project_root)
+        elif args.action == "selection-validate":
+            selection_record_path = contained_path(
+                project_root, args.record.as_posix(), "selection review"
+            )
+            reasons = selection_review_freshness(selection_record_path, project_root)
+            result = {"valid": not reasons, "reasons": reasons}
+            if reasons:
+                print(json.dumps(result, indent=2), file=sys.stderr)
+                return 2
         elif args.action == "question-plan":
             result = question_plan(args.plan, project_root, apply=args.apply)
         elif args.action == "question-resolve":

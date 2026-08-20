@@ -23,6 +23,12 @@ from .review_records import (
     narrative_block_inventory,
     review_freshness,
 )
+from .selection_guard import build_selection, guard_selection
+from .selection_review import (
+    build_selection_review_package,
+    selection_review_freshness,
+    selection_review_paths,
+)
 from .synthesis import load_synthesis_plan
 from .validation import validate_vault
 
@@ -143,6 +149,10 @@ def workflow_state(resume: Path, project_root: Path) -> dict[str, Any]:
     build_reasons = build_manifest_freshness(manifest, project_root)
     if build_reasons:
         return {"state": "draft", "reasons": build_reasons}
+    selection_record = selection_review_paths(project_root, resume)["record"]
+    selection_reasons = selection_review_freshness(selection_record, project_root)
+    if selection_reasons:
+        return {"state": "awaiting-selection-review", "reasons": selection_reasons}
     review_path = project_root / "build" / "reviews" / f"{resume.stem}.json"
     if not review_path.is_file():
         return {"state": "awaiting-review", "reasons": []}
@@ -177,7 +187,7 @@ def _cached_receipt(
     except ValueError:
         return None
     if (
-        receipt.get("version") != 1
+        receipt.get("version") != 3
         or receipt.get("phase") != "verification"
         or receipt.get("inputs") != inputs
     ):
@@ -192,6 +202,16 @@ def _cached_receipt(
         return None
     manifest_path = project_root / "build" / f"{resume.stem}.manifest.json"
     if build_manifest_freshness(manifest_path, project_root):
+        return None
+    selection_reasons = selection_review_freshness(
+        selection_review_paths(project_root, resume)["record"], project_root
+    )
+    review_inputs = receipt.get("review_inputs")
+    if not isinstance(review_inputs, dict):
+        return None
+    if "selection_case" in review_inputs and not selection_reasons:
+        return None
+    if "selection_review" in review_inputs and selection_reasons:
         return None
     return receipt
 
@@ -285,13 +305,6 @@ def verify_resume(
             vault_root=resolved_vault,
         )
 
-    package_path = build_review_package(resume_path, project_root, target=target_path)
-    cold_path = package_path.with_name(
-        f"{package_path.name.removesuffix('.package.json')}.cold.json"
-    )
-    decisions_path = package_path.with_name(
-        f"{package_path.name.removesuffix('.package.json')}.decisions.json"
-    )
     inventory = narrative_block_inventory(resume_path)
     advisories = [
         {"id": block.id, "advisories": list(block.advisories)}
@@ -302,6 +315,21 @@ def verify_resume(
     evidence: dict[str, Any] = evidence_value if isinstance(evidence_value, dict) else {}
     synthesis_value = manifest.get("synthesis")
     synthesis: dict[str, Any] = synthesis_value if isinstance(synthesis_value, dict) else {}
+    selection = build_selection(
+        plan,
+        synthesis,
+        target=_optional_path_record(target_path, project_root),
+    )
+    selection_guard = guard_selection(project_root, resume_path, selection)
+    selection_package = build_selection_review_package(
+        project_root,
+        resume_path,
+        plan,
+        selection,
+        manifest=manifest_path,
+    )
+    selection_paths = selection_review_paths(project_root, resume_path)
+    selection_reasons = selection_review_freshness(selection_paths["record"], project_root)
     feedback_value = manifest.get("feedback_memory")
     feedback: dict[str, Any] = feedback_value if isinstance(feedback_value, dict) else {}
     role_arcs_value = synthesis.get("role_arcs")
@@ -339,6 +367,7 @@ def verify_resume(
                 for arc in role_arcs
                 if isinstance(arc, dict)
             ],
+            "selection_guard": selection_guard,
         },
         "direction": {
             "valid": True,
@@ -369,17 +398,48 @@ def verify_resume(
             if isinstance(feedback.get("rules"), list)
             else 0,
         },
+        "selection_review": {
+            "status": "approved" if not selection_reasons else "required",
+            "reasons": selection_reasons,
+            "package": relative_output(selection_package, project_root),
+        },
     }
-    artifact_paths = [manifest_path, payload_path, cold_path, package_path]
+    artifact_paths = [manifest_path, payload_path, selection_package]
     if match_result is not None:
         artifact_paths.extend(project_root / path for path in match_result["outputs"])
-    review_inputs = {
-        "cold_read": _path_record(cold_path, project_root),
-        "package": _path_record(package_path, project_root),
-        "decisions": relative_output(decisions_path, project_root),
-    }
+    if selection_reasons:
+        review_inputs = {
+            "selection_case": _path_record(selection_package, project_root),
+            "selection_decisions": relative_output(selection_paths["decisions"], project_root),
+        }
+        workflow = {
+            "state": "awaiting-selection-review",
+            "next_action": (
+                "Complete the independent selection decisions and run review "
+                "selection-finalize before language review."
+            ),
+        }
+    else:
+        package_path = build_review_package(resume_path, project_root, target=target_path)
+        cold_path = package_path.with_name(
+            f"{package_path.name.removesuffix('.package.json')}.cold.json"
+        )
+        decisions_path = package_path.with_name(
+            f"{package_path.name.removesuffix('.package.json')}.decisions.json"
+        )
+        artifact_paths.extend([selection_paths["record"], cold_path, package_path])
+        review_inputs = {
+            "selection_review": _path_record(selection_paths["record"], project_root),
+            "cold_read": _path_record(cold_path, project_root),
+            "package": _path_record(package_path, project_root),
+            "decisions": relative_output(decisions_path, project_root),
+        }
+        workflow = {
+            "state": "awaiting-review",
+            "next_action": "Complete the generated language decisions and run review finalize.",
+        }
     receipt = {
-        "version": 1,
+        "version": 3,
         "phase": "verification",
         "valid": True,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -388,10 +448,7 @@ def verify_resume(
         "artifacts": [_path_record(path, project_root) for path in artifact_paths],
         "checks": checks,
         "review_inputs": review_inputs,
-        "workflow": {
-            "state": "awaiting-review",
-            "next_action": "Complete the generated reviewer decisions and run review finalize.",
-        },
+        "workflow": workflow,
     }
     atomic_write_json(receipt_path, receipt)
     return {

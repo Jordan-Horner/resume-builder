@@ -47,6 +47,9 @@ career-professional pass must read every narrative block and ask:
    aloud, or does it sound like a framework describing itself?
 5. Does each specialist term add target-role meaning that a broader phrase
    would lose?
+6. Does the prose maintain the implied first-person voice customary in resumes,
+   without describing the candidate as `he`, `she`, `his`, `her`, or with a
+   third-person reflexive pronoun?
 
 Read each block in its visible resume context before treating it as finished.
 Compare it with its section and adjacent heading, then with the blocks directly

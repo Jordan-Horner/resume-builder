@@ -412,6 +412,46 @@ Leads complex engineering support work. <!-- evidence: PROFILE-001 -->
     assert blocks["experience[1].bullets[0]"].advisories == ()
 
 
+def test_review_inventory_flags_possible_third_person_candidate_voice(tmp_path: Path) -> None:
+    resume = tmp_path / "resumes" / "tailored" / "voice-test.md"
+    resume.parent.mkdir(parents=True)
+    resume.write_text(
+        """---
+version: 1
+candidate:
+  name: Example Candidate
+  headline: Defense Attorney
+  email: candidate@example.com
+  evidence: [PROFILE-001]
+---
+# Professional Summary
+
+Defense attorney handling complex matters. <!-- evidence: PROFILE-001 -->
+
+# Work Experience
+
+## Example Firm | Defense Attorney | 2021 - 2023 <!-- evidence: EY-001 -->
+
+- In his first trial, obtained an acquittal. <!-- evidence: EY-012 -->
+- Defended her against an unsupported charge. <!-- evidence: EY-013 -->
+""",
+        encoding="utf-8",
+    )
+
+    block = next(
+        item for item in narrative_block_inventory(resume) if item.id == "experience[0].bullets[0]"
+    )
+
+    assert block.advisories == (
+        "block contains a third-person pronoun; identify its referent and revise when it "
+        "describes the candidate instead of another person",
+    )
+    other_person = next(
+        item for item in narrative_block_inventory(resume) if item.id == "experience[0].bullets[1]"
+    )
+    assert other_person.advisories == ()
+
+
 def test_approved_advisory_requires_reviewer_note(tmp_path: Path) -> None:
     review_path, resume, raw = _review_project(tmp_path)
     resume.write_text(

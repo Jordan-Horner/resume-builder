@@ -466,6 +466,11 @@ def _next_action(
                 "route": "compile",
                 "message": f"Recompile {record['path']} from current inputs.",
             }
+        if record["workflow"]["state"] == "awaiting-selection-review":
+            return {
+                "route": "selection-review",
+                "message": f"Review the complete evidence selection for {record['path']}.",
+            }
         critique = record["critique"]
         if critique["status"] != "current":
             return {
@@ -502,6 +507,11 @@ def _next_action(
             }
         if target["match"]["status"] != "current":
             return {"route": "match", "message": f"Run the job match for {tailored['path']}."}
+        if tailored["workflow"]["state"] == "awaiting-selection-review":
+            return {
+                "route": "selection-review",
+                "message": f"Review the complete evidence selection for {tailored['path']}.",
+            }
         critique = tailored["critique"]
         if critique["status"] != "current":
             return {"route": "critique", "message": f"Critique {tailored['path']} before minting."}
@@ -695,7 +705,13 @@ def format_summary(result: dict[str, Any]) -> str:
 
     workflow_counts = {
         state: sum(1 for item in resumes if item["workflow"]["state"] == state)
-        for state in ("draft", "awaiting-review", "reviewed", "published")
+        for state in (
+            "draft",
+            "awaiting-selection-review",
+            "awaiting-review",
+            "reviewed",
+            "published",
+        )
     }
 
     lines = [
@@ -715,6 +731,7 @@ def format_summary(result: dict[str, Any]) -> str:
         (
             "Workflow: "
             f"{workflow_counts['draft']} draft, "
+            f"{workflow_counts['awaiting-selection-review']} awaiting selection review, "
             f"{workflow_counts['awaiting-review']} awaiting review, "
             f"{workflow_counts['reviewed']} reviewed, "
             f"{workflow_counts['published']} published"
