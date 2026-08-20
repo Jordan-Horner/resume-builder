@@ -28,10 +28,18 @@ def _run(workspace: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+def _copy_clean_fixture(workspace: Path) -> None:
+    """Copy only canonical fixture inputs, never ignored local build artifacts."""
+    shutil.copytree(
+        FIXTURE_ROOT / "workspace",
+        workspace,
+        ignore=shutil.ignore_patterns("build"),
+    )
+
+
 def test_phoenix_fixture_validates_compiles_and_prepares_review(tmp_path: Path) -> None:
-    fixture = FIXTURE_ROOT / "workspace"
     workspace = tmp_path / "workspace"
-    shutil.copytree(fixture, workspace)
+    _copy_clean_fixture(workspace)
 
     validation = _run(workspace, "validate", "--strict")
     assert validation.returncode == 0, validation.stderr or validation.stdout
@@ -52,13 +60,42 @@ def test_phoenix_fixture_validates_compiles_and_prepares_review(tmp_path: Path) 
         "resumes/baselines/senior-defense-attorney.md",
     )
     assert verification.returncode == 0, verification.stderr or verification.stdout
+    verification_result = json.loads(verification.stdout)
+    assert verification_result["state"]["state"] == "awaiting-selection-review"
     assert (workspace / "build" / "senior-defense-attorney.verify.json").is_file()
+    assert not (workspace / "build" / "reviews" / "senior-defense-attorney.cold.json").exists()
+
+    decisions_path = (
+        workspace / "build" / "reviews" / "senior-defense-attorney.selection.decisions.json"
+    )
+    decisions = json.loads(decisions_path.read_text(encoding="utf-8"))
+    decisions["reviewer"]["context"] = "Independent fixture selection review."
+    decisions["argument"] = {"decision": "approved", "note": "Complete argument."}
+    for group in ("stories", "exclusions", "role_arcs"):
+        for item in decisions[group]:
+            item["decision"] = "approved"
+    decisions["verdict"] = "approved"
+    decisions_path.write_text(json.dumps(decisions), encoding="utf-8")
+
+    finalized = _run(
+        workspace,
+        "review",
+        "selection-finalize",
+        "build/reviews/senior-defense-attorney.selection.decisions.json",
+    )
+    assert finalized.returncode == 0, finalized.stderr or finalized.stdout
+    language_handoff = _run(
+        workspace,
+        "verify",
+        "resumes/baselines/senior-defense-attorney.md",
+    )
+    assert language_handoff.returncode == 0, language_handoff.stderr or language_handoff.stdout
     assert (workspace / "build" / "reviews" / "senior-defense-attorney.cold.json").is_file()
 
 
 def test_phoenix_review_cannot_pass_by_deleting_weak_stories(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
-    shutil.copytree(FIXTURE_ROOT / "workspace", workspace)
+    _copy_clean_fixture(workspace)
     verification = _run(
         workspace,
         "verify",
@@ -68,10 +105,7 @@ def test_phoenix_review_cannot_pass_by_deleting_weak_stories(tmp_path: Path) -> 
 
     package = json.loads(
         (
-            workspace
-            / "build"
-            / "reviews"
-            / "senior-defense-attorney.selection.package.json"
+            workspace / "build" / "reviews" / "senior-defense-attorney.selection.package.json"
         ).read_text()
     )
     previous = json.loads(json.dumps(package["selection"]))

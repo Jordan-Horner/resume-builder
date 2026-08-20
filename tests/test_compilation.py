@@ -977,9 +977,7 @@ def test_selection_gate_reviews_omitted_candidates_before_creating_language_inpu
     assert set(first["review_inputs"]) == {"selection_case", "selection_decisions"}
     assert not (tmp_path / "build" / "reviews" / "support-operations.cold.json").exists()
     package = json.loads(
-        (tmp_path / first["review_inputs"]["selection_case"]["path"]).read_text(
-            encoding="utf-8"
-        )
+        (tmp_path / first["review_inputs"]["selection_case"]["path"]).read_text(encoding="utf-8")
     )
     assert [(story["id"], story["selected"]) for story in package["stories"]] == [
         ("investigation-speed", True),
@@ -991,9 +989,7 @@ def test_selection_gate_reviews_omitted_candidates_before_creating_language_inpu
 def test_rejected_selection_cannot_reach_language_review(tmp_path: Path) -> None:
     vault, resume = project(tmp_path)
     verification.verify_resume(resume, vault_root=vault, skip_vault_validation=True)
-    decisions = complete_selection_decisions(
-        tmp_path, resume, story_decision="strategy-revise"
-    )
+    decisions = complete_selection_decisions(tmp_path, resume, story_decision="strategy-revise")
 
     result = selection_review.finalize_selection_review(decisions, tmp_path)
 

@@ -111,7 +111,9 @@ def build_selection_review_package(
             "role_ids": list(arc.role_ids),
             "emphasis": arc.emphasis,
             "arc_focus": arc.arc_focus,
-            "selected_story_ids": [story_id for story_id in arc.story_ids if story_id in selected_ids],
+            "selected_story_ids": [
+                story_id for story_id in arc.story_ids if story_id in selected_ids
+            ],
             "candidate_story_ids": list(arc.story_ids),
             "required_dimensions": list(arc.required_dimensions),
             "required_story_ids": list(arc.required_story_ids),
@@ -202,7 +204,9 @@ def build_selection_review_package(
         raise ValueError("selection review requires a compiled build manifest")
     if paths["package"].is_file() and paths["decisions"].is_file():
         existing = _load_json(paths["package"], "selection package")
-        comparable_existing = {key: value for key, value in existing.items() if key != "generated_at"}
+        comparable_existing = {
+            key: value for key, value in existing.items() if key != "generated_at"
+        }
         comparable_new = {key: value for key, value in package.items() if key != "generated_at"}
         if comparable_existing == comparable_new:
             return paths["package"]
@@ -297,9 +301,13 @@ def finalize_selection_review(decisions: Path, project_root: Path) -> dict[str, 
     if not isinstance(package_stories, list) or not isinstance(raw_stories, list):
         raise ValueError("selection story inventory is invalid")
     expected = [(item.get("id"), item.get("selected")) for item in package_stories]
-    actual = [(item.get("id"), item.get("selected")) for item in raw_stories if isinstance(item, dict)]
+    actual = [
+        (item.get("id"), item.get("selected")) for item in raw_stories if isinstance(item, dict)
+    ]
     if actual != expected or len(actual) != len(raw_stories):
-        raise ValueError("selection decisions must cover every selected and omitted candidate unchanged")
+        raise ValueError(
+            "selection decisions must cover every selected and omitted candidate unchanged"
+        )
     for index, item in enumerate(raw_stories):
         decision = _validate_decision(item.get("decision"), f"story decision[{index}]")
         decisions_seen.append(decision)
@@ -311,9 +319,7 @@ def finalize_selection_review(decisions: Path, project_root: Path) -> dict[str, 
     if not isinstance(package_exclusions, list) or not isinstance(raw_exclusions, list):
         raise ValueError("selection exclusion inventory is invalid")
     expected_exclusions = [item.get("fact_id") for item in package_exclusions]
-    actual_exclusions = [
-        item.get("fact_id") for item in raw_exclusions if isinstance(item, dict)
-    ]
+    actual_exclusions = [item.get("fact_id") for item in raw_exclusions if isinstance(item, dict)]
     if actual_exclusions != expected_exclusions or len(actual_exclusions) != len(raw_exclusions):
         raise ValueError("selection decisions must cover every intentional exclusion unchanged")
     for index, item in enumerate(raw_exclusions):
@@ -431,10 +437,7 @@ def selection_review_freshness(record: Path, project_root: Path) -> list[str]:
             except ValueError as exc:
                 reasons.append(str(exc))
             else:
-                if (
-                    not target_path.is_file()
-                    or target.get("sha256") != sha256_file(target_path)
-                ):
+                if not target_path.is_file() or target.get("sha256") != sha256_file(target_path):
                     reasons.append("selection review target changed or is missing")
     facts = package_data.get("facts")
     if not isinstance(facts, list):
