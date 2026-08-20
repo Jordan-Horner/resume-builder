@@ -81,5 +81,6 @@ vault names that make backups harder to recognize later.
 - Canonical hydration requires judgment before facts become reusable.
 - Strong staleness rules intentionally cause rebuild and re-review work.
 - The current CLI favors explicit artifacts over a graphical interface.
-- A few orchestration modules should be decomposed before their workflows grow
-  further.
+- Versioned synthesis and review schemas remain deliberately detailed. Their
+  workflow facades are small, while architecture checks prevent reverse imports
+  and orchestration cycles from returning as those contracts grow.

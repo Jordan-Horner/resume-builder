@@ -40,6 +40,8 @@ jobs:
         run: ruff check src tests scripts .agents/skills/hydrate-vault/scripts && ruff format --check src tests scripts .agents/skills/hydrate-vault/scripts
       - name: Type check
         run: mypy src
+      - name: Check architecture boundaries
+        run: python scripts/check_architecture.py
       - name: Build package
         if: matrix.python-version == '3.14'
         run: python -m build

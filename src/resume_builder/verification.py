@@ -14,7 +14,7 @@ from . import __version__
 from .atomic import atomic_write_json
 from .compilation import build_resume, relative_output, sha256_file
 from .directions import audit_direction, parse_direction
-from .feedback_memory import manifest_guidance_freshness
+from .feedback_resolution import manifest_guidance_freshness
 from .job_matching import match_job, project_target_path
 from .rendering import contained_project_path
 from .review_records import (

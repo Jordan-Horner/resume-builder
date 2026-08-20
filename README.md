@@ -175,6 +175,7 @@ ruff format --check src tests scripts .agents/skills/hydrate-vault/scripts
 mypy src
 python -m build
 python scripts/audit_distribution.py
+python scripts/check_architecture.py
 ```
 
 </details>

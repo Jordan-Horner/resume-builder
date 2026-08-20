@@ -47,23 +47,33 @@ layering model. `atomic`, `layout`, `rendering`, and `validation` provide shared
 boundaries. Higher-level modules orchestrate source import, synthesis,
 compilation, verification, feedback, review, matching, preview, and minting.
 
-Two imports are intentionally lazy: feedback acceptance needs compiled preview
-and review freshness behavior, while compilation needs the effective guidance
-snapshot. Keeping those imports inside the narrow call sites prevents import
-time cycles. A future extraction should move shared guidance and review pins
-into dependency-neutral modules before further expanding those workflows.
+Dependency-neutral modules now separate canonical Markdown parsing, feedback
+resolution, review schema enforcement, and synthesis models from the workflows
+that write artifacts. Feedback acceptance may inspect an approved review, while
+compilation depends only on feedback resolution; neither relationship points
+back toward its caller. The package import graph is therefore acyclic.
 
-`review_records.py` is currently the largest module because it owns package
-construction, decision finalization, wording-only repair, record loading,
-freshness, and approval enforcement. The safest decomposition boundary is:
+`review_records.py` historically owned package construction, decision
+finalization, wording-only repair, record loading, freshness, and approval
+enforcement. Those responsibilities now live behind a small compatibility
+facade:
 
-- `review_packages.py` for cold-read and evidence-appendix construction;
-- `review_decisions.py` for finalization and repair application;
-- `review_schema.py` for loading and validation;
-- `review_freshness.py` for approval and staleness checks.
+- `review_blocks.py` inventories narrative prose and deterministic advisories;
+- `review_packages.py` builds cold-read and evidence-appendix artifacts;
+- `review_decisions.py` finalizes reviewer-owned decisions;
+- `review_repairs.py` applies the guarded wording-only repair pass;
+- `review_schema.py` loads records and enforces freshness and approval.
 
-That split should happen as a behavior-preserving refactor with the current
-test suite acting as the compatibility contract.
+Compatibility facades keep every pre-split public symbol importable from its
+original module and list it in `__all__`. A regression test pins that surface so
+future extractions cannot silently break callers while moving implementation.
+
+The same dependency direction applies to the other orchestration domains.
+`resume_parser.py` is independent of build orchestration; feedback recording,
+acceptance, and resolution are separate; synthesis models, loading, and auditing
+are separate; direction parsing and diagnostics are separate; and report policy
+is pure workflow logic. The architecture check rejects package cycles, forbidden
+reverse imports, and facade growth beyond their reviewed budgets.
 
 ## Release invariants
 
