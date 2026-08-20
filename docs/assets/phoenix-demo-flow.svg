@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" role="img" aria-labelledby="title desc">
+  <title id="title">Phoenix Wright evidence becomes a targeted resume without deleting career history</title>
+  <desc id="desc">A three-stage editorial diagram showing a career vault, targeting decisions, and a criminal-defense resume. Strong evidence is selected, adverse history is preserved but omitted, and unresolved leadership evidence is held for clarification.</desc>
+  <rect width="1200" height="560" fill="#f4f1ea"/>
+  <path d="M0 82h1200" stroke="#17374d" stroke-width="2"/>
+  <text x="54" y="51" fill="#132839" font-family="Georgia, serif" font-size="28" font-weight="700">One career record. Deliberate selection. No lost evidence.</text>
+
+  <text x="54" y="127" fill="#087f8c" font-family="Arial, sans-serif" font-size="16" font-weight="700" letter-spacing="2">CAREER VAULT</text>
+  <text x="54" y="168" fill="#132839" font-family="Georgia, serif" font-size="28" font-weight="700">Evidence stays available</text>
+  <g font-family="Arial, sans-serif" font-size="19" fill="#213b4b">
+    <circle cx="66" cy="221" r="6" fill="#087f8c"/><text x="86" y="228">Reconstructed a 15-year-old case</text>
+    <circle cx="66" cy="270" r="6" fill="#087f8c"/><text x="86" y="277">Overturned a wrongful conviction</text>
+    <circle cx="66" cy="319" r="6" fill="#b36b3f"/><text x="86" y="326">Disbarment history</text>
+    <circle cx="66" cy="368" r="6" fill="#8a7f73"/><text x="86" y="375">Mentorship with unresolved title</text>
+  </g>
+
+  <path d="M455 125v350" stroke="#c9c1b5" stroke-width="2"/>
+  <text x="500" y="127" fill="#087f8c" font-family="Arial, sans-serif" font-size="16" font-weight="700" letter-spacing="2">TARGETING DECISION</text>
+  <text x="500" y="168" fill="#132839" font-family="Georgia, serif" font-size="28" font-weight="700">Target: criminal defense</text>
+  <g font-family="Arial, sans-serif" font-size="16" fill="#213b4b">
+    <text x="500" y="222" font-weight="700" fill="#087f8c">SELECT</text><text x="582" y="222">Complex trials and evidence</text>
+    <text x="500" y="270" font-weight="700" fill="#087f8c">SELECT</text><text x="582" y="270">Corrective outcomes and co-counsel work</text>
+    <text x="500" y="318" font-weight="700" fill="#b36b3f">PRESERVE</text><text x="602" y="318">Adverse fact stays in the vault</text>
+    <text x="500" y="366" font-weight="700" fill="#756b61">HOLD</text><text x="562" y="366">Missing title needs clarification</text>
+  </g>
+  <path d="M501 421h314" stroke="#17374d" stroke-width="2"/>
+  <text x="500" y="454" fill="#132839" font-family="Georgia, serif" font-size="19" font-style="italic">Targeting changes emphasis, not history.</text>
+
+  <path d="M858 125v350" stroke="#c9c1b5" stroke-width="2"/>
+  <text x="903" y="127" fill="#087f8c" font-family="Arial, sans-serif" font-size="16" font-weight="700" letter-spacing="2">RESUME</text>
+  <text x="903" y="168" fill="#132839" font-family="Georgia, serif" font-size="28" font-weight="700">Focused resume</text>
+  <rect x="903" y="202" width="245" height="232" fill="#fbfaf6" stroke="#17374d" stroke-width="1.5"/>
+  <text x="925" y="238" fill="#132839" font-family="Georgia, serif" font-size="23" font-weight="700">Phoenix Wright</text>
+  <text x="925" y="267" fill="#245f8f" font-family="Arial, sans-serif" font-size="13" font-weight="700">SENIOR CRIMINAL DEFENSE</text>
+  <path d="M925 284h198" stroke="#087f8c" stroke-width="2"/>
+  <g fill="#213b4b" font-family="Arial, sans-serif" font-size="13">
+    <text x="925" y="316">• Evidence reconstruction</text>
+    <text x="925" y="345">• Wrongful-conviction reversal</text>
+    <text x="925" y="374">• High-stakes trial advocacy</text>
+    <text x="925" y="403">• Honest co-counsel credit</text>
+  </g>
+  <text x="903" y="474" fill="#213b4b" font-family="Arial, sans-serif" font-size="16">Every visible claim remains traceable.</text>
+</svg>

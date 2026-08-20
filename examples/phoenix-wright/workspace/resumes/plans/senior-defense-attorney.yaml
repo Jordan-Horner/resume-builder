@@ -1,8 +1,8 @@
 version: 6
 resume: resumes/baselines/senior-defense-attorney.md
 direction: directions/senior-defense-attorney.md
-target_argument: Phoenix is a senior defense attorney whose strongest evidence combines complex criminal-defense work, evidence reconstruction, wrongful-conviction reversals, successful post-return practice, and high-stakes advocacy in unfamiliar court systems.
-summary_job: Lead with complex defense work, evidence reconstruction, wrongful-conviction reversals, and successful recent practice.
+target_argument: Phoenix is an experienced criminal-defense trial attorney whose strongest evidence combines complex case preparation, evidence reconstruction, corrective outcomes, successful recent practice, and precise collaboration in shared matters.
+summary_job: Establish the criminal-defense target and connect evidence reconstruction, corrective outcomes, and high-stakes trial work without repeating a case list.
 summary_fact_ids:
   - SKILL-001
   - SKILL-002
@@ -12,13 +12,15 @@ summary_fact_ids:
   - WAA-006
   - WAA-012
   - WAA-013
+  - WAA-014
+  - WAA-015
 progression:
   - FCO-001
   - WAA-001
   - WAA-003
 target_mode: direct
 page_budget:
-  max_pages: 2
+  max_pages: 1
   source: direction-default
 stories:
   - id: return-to-practice
@@ -33,10 +35,10 @@ stories:
     core_fact_ids: [WAA-012]
     claim:
       subject: candidate
-      action: returned
-      object: to courtroom practice
-      scope: after reinstatement
-      outcome: obtained an acquittal in his first defense back
+      action: led
+      object: the first case after returning to courtroom practice
+      scope: following reinstatement
+      outcome: obtained an acquittal
       composition: single-fact
       relationship: One fact supports the return, reinstatement context, and first-case outcome.
       evidence:
@@ -94,11 +96,11 @@ stories:
     section: experience
     role_ids: [WAA-003]
     fact_ids: [WAA-015]
-    primary_job: mentorship
-    priority: 2
-    importance: supporting
-    rationale: Preserve the co-counsel evidence, but omit it when the available fact cannot show a concrete contribution beyond role attribution.
-    claim_focus: Mentorship through a supporting co-counsel role
+    primary_job: collaboration
+    priority: 4
+    importance: core
+    rationale: Add a distinct senior-practice collaboration signal while preserving Apollo's ownership of the decisive trial.
+    claim_focus: Senior co-counsel support with explicit collaborator credit
     core_fact_ids: [WAA-015]
     claim:
       subject: candidate
@@ -274,8 +276,8 @@ concept_fit:
     rationale: Two confirmed Khura'in matters demonstrate advocacy under an unfamiliar and unusually risky court system.
   - concept_id: professional-accountability
     status: demonstrated
-    fact_ids: [WAA-012, CERT-001]
-    rationale: Current credential evidence and a successful first case back demonstrate active standing and a credible career return.
+    fact_ids: [WAA-012]
+    rationale: A successful first case after reinstatement demonstrates current practice; the certification section separately shows active status.
 reviewer_risks:
   - id: disbarment-credibility
     concern: Volunteering the disbarment could overwhelm the affirmative hiring argument even though it remains truthful vault evidence.
@@ -290,7 +292,7 @@ reviewer_risks:
   - id: credential-specificity
     concern: A legal reader may expect a named bar jurisdiction even though canon does not provide one.
     status: resolved
-    fact_ids: [CERT-001]
+    fact_ids: [WAA-012]
     planning_action: Show the supported attorney-badge reinstatement and do not invent a real-world jurisdiction.
 presentation:
   competencies: omit
@@ -299,11 +301,11 @@ presentation:
 role_arcs:
   - role_ids: [WAA-003]
     emphasis: lead
-    arc_focus: Reinstated senior practice centered on international and high-stakes advocacy.
-    required_dimensions: [career-return, international-advocacy, high-stakes-defense]
-    required_story_ids: [return-to-practice, khurain-first-defense, culpability-act-defense]
-    optional_story_ids: [apollo-co-counsel]
-    selection_rationale: This is the highest-scope and most recent phase, so it carries the complete top-level hiring argument.
+    arc_focus: Current senior practice centered on high-stakes advocacy, successful return, and disciplined co-counsel work.
+    required_dimensions: [international-advocacy, high-stakes-defense, career-return, collaboration]
+    required_story_ids: [khurain-first-defense, culpability-act-defense, return-to-practice, apollo-co-counsel]
+    optional_story_ids: []
+    selection_rationale: This is the highest-scope and most recent phase, so it leads with the strongest trial result and also demonstrates current effectiveness and collaboration.
     omitted_signals:
       - signal: additional-domestic-casework
         fact_ids: [WAA-016]

@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "recorded_at": "2026-08-20T02:40:50.374372+00:00",
+  "recorded_at": "2026-08-20T11:55:49.196283+00:00",
   "resume": "resumes/baselines/senior-defense-attorney.md",
-  "selection_sha256": "ce3dd4009250a552b226bdf0036028f222bd5d6799b0715c1c929c5dc26f90d9",
+  "selection_sha256": "7df4753cdef73c9c327c798e6f1074d4c2baac1dac8929e55d143f090c02d079",
   "selection": {
     "version": 1,
     "direction": "directions/senior-defense-attorney.md",
@@ -14,6 +14,18 @@
       "WAA-003"
     ],
     "stories": [
+      {
+        "id": "apollo-co-counsel",
+        "section": "experience",
+        "role_ids": [
+          "WAA-003"
+        ],
+        "importance": "core",
+        "required": true,
+        "used_fact_ids": [
+          "WAA-015"
+        ]
+      },
       {
         "id": "culpability-act-defense",
         "section": "experience",
@@ -119,7 +131,9 @@
       "WAA-004",
       "WAA-006",
       "WAA-012",
-      "WAA-013"
+      "WAA-013",
+      "WAA-014",
+      "WAA-015"
     ],
     "role_arcs": [
       {
@@ -154,10 +168,12 @@
         ],
         "required_dimensions": [
           "career-return",
+          "collaboration",
           "high-stakes-defense",
           "international-advocacy"
         ],
         "required_story_ids": [
+          "apollo-co-counsel",
           "culpability-act-defense",
           "khurain-first-defense",
           "return-to-practice"
@@ -167,6 +183,6 @@
   },
   "review": {
     "path": "build/reviews/senior-defense-attorney.json",
-    "sha256": "1a0e2a1462a4a8f48e9db0357dc9915be7ba5ccfd5d134b52bf6acd4bcfbad64"
+    "sha256": "010747c136caeef7c7e83faabc024037aa4487bd561f40d32a43bd21ccda3f7b"
   }
 }

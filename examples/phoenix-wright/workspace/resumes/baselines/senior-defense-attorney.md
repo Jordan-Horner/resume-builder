@@ -4,22 +4,23 @@ lang: en
 page_format: letter
 candidate:
   name: Phoenix Wright
-  headline: Senior Defense Attorney | Criminal Defense | Evidence Reconstruction
+  headline: Senior Criminal Defense Attorney | Complex Trials | Evidence Reconstruction
   location: Fictional character — demonstration only
   evidence: [PROFILE-001, WAA-003, SKILL-001, SKILL-002]
 ---
 
 # Professional Summary
 
-Senior criminal defense attorney with a record of overturning wrongful convictions, reconstructing contested evidence, and winning high-stakes cases in unfamiliar court systems. Returned to active practice with an acquittal, then secured Khura'in's first not-guilty verdict in twenty-three years. <!-- evidence: SKILL-001 SKILL-002 SKILL-003 CERT-001 WAA-004 WAA-006 WAA-012 WAA-013 -->
+Active criminal defense attorney with experience reconstructing contested evidence, reversing a wrongful conviction, and handling high-stakes trials in domestic and unfamiliar court systems. Mentors other attorneys and serves as co-counsel on shared matters. <!-- evidence: SKILL-001 SKILL-002 SKILL-003 CERT-001 WAA-004 WAA-006 WAA-012 WAA-013 WAA-014 WAA-015 -->
 
 # Work Experience
 
 ## Wright Anything Agency | Senior Defense Attorney | 2027–2028 <!-- evidence: WAA-003 -->
 
-- Returned to courtroom practice after reinstatement and obtained an acquittal in the first case back. <!-- evidence: WAA-012 --><!-- story: return-to-practice -->
 - Volunteered to defend a local guide in a Khura'inese court that had gone roughly twenty years without a defense attorney. Challenged divination-based evidence, identified another perpetrator, and secured Khura'in's first not-guilty verdict in twenty-three years. <!-- evidence: WAA-013 --><!-- story: khurain-first-defense -->
 - Defended Maya Fey in a legal system where defense counsel faced the same punishment as a convicted client, securing a not-guilty verdict. <!-- evidence: WAA-014 --><!-- story: culpability-act-defense -->
+- Led the first case after returning to courtroom practice following reinstatement and obtained an acquittal. <!-- evidence: WAA-012 --><!-- story: return-to-practice -->
+- Supported Apollo Justice as co-counsel in the final Khura'in matter, where Apollo led the decisive trial. <!-- evidence: WAA-015 --><!-- story: apollo-co-counsel -->
 
 ## Wright & Co. Law Offices | Defense Attorney and Firm Head | 2016–2019 <!-- evidence: WAA-001 -->
 
@@ -30,7 +31,7 @@ Senior criminal defense attorney with a record of overturning wrongful convictio
 ## Fey & Co. Law Offices | Rookie Defense Attorney | 2016 <!-- evidence: FCO-001 -->
 
 - Cross-examined the prosecution witness in Larry Butz's murder trial, exposed the witness as the actual killer, and obtained a not-guilty verdict. <!-- evidence: FCO-002 --><!-- story: first-trial -->
-- Continued the firm's defense practice after Mia Fey's death, representing Maya Fey before later serving as both defendant and defense counsel in the same matter. <!-- evidence: FCO-003 --><!-- story: practice-continuity -->
+- Continued the firm's defense practice after Mia Fey's death, first representing Maya Fey and later mounting a defense after being accused in the same case. <!-- evidence: FCO-003 --><!-- story: practice-continuity -->
 
 # Education
 

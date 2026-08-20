@@ -83,3 +83,5 @@ jobs:
           resume-builder direction validate
           resume-builder synthesis resumes/plans/senior-defense-attorney.yaml
           resume-builder verify resumes/baselines/senior-defense-attorney.md
+      - name: Check public demo assets
+        run: python scripts/check_demo_assets.py

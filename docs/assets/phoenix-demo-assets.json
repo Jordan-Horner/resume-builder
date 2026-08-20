@@ -1,0 +1,16 @@
+{
+  "assets": {
+    "docs/assets/phoenix-demo-flow.svg": "592ef4ecd372b78102065c02bcee366f61cec7a95ca36f6499c22bdc1919a4b3",
+    "docs/assets/phoenix-wright-resume.jpg": "f35e81e8a329f295870edc449343edf94bfbe8e74a6c35b7086f9de526a5f52b"
+  },
+  "inputs": {
+    "examples/phoenix-wright/README.md": "4a90cd167cd4371fb26cf2fce9e4996eaa1a8bfba578211d3caee92c4926ccaa",
+    "examples/phoenix-wright/workspace/directions/senior-defense-attorney.md": "1378ae55b2834705bad36a44928306122b560910338c2fb6fd2d6b303bd05d10",
+    "examples/phoenix-wright/workspace/resumes/baselines/senior-defense-attorney.md": "a74fad3cc4093db41684ffb5a7b63c2b2bd6925766aedab5bbb79432bde839c0",
+    "examples/phoenix-wright/workspace/resumes/plans/senior-defense-attorney.yaml": "ddf8938af00b8e5e1d127d543bc220d400bccd24d4da6e2ee8bdcc25c29266e9",
+    "examples/phoenix-wright/workspace/resumes/selections/senior-defense-attorney.json": "648ad50d807340db88ebe9cfc1732407a13c9c739f613e7e196abc773ac0cfe4",
+    "examples/phoenix-wright/workspace/templates/resume-template.html": "d29d92d8fe0a0b3bbaf4a0ebd7e66a8ce502c5fda8ae2660e16154cd221cdcac",
+    "scripts/capture_demo_resume.py": "61a58b2205c5679bf9e0d45770e5b590689b03ba6655b332752f26fc08e3a971"
+  },
+  "version": 1
+}

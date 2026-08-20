@@ -1,61 +1,60 @@
 {
   "version": 1,
-  "created_at": "2026-08-20T02:20:14.792067+00:00",
+  "created_at": "2026-08-20T11:46:58.058047+00:00",
   "resume": "resumes/baselines/senior-defense-attorney.md",
-  "resume_sha256": "9d4530d2e34e1bb910cc27a40404a55fda7c84e0c1f242264a2bfa074cca8a4f",
-  "selection_sha256": "ce3dd4009250a552b226bdf0036028f222bd5d6799b0715c1c929c5dc26f90d9",
+  "resume_sha256": "1059c6d798dd20cf27c0bb40b57f144b204ac0b1bfebebd8e96608cc8a046e74",
+  "selection_sha256": "7df4753cdef73c9c327c798e6f1074d4c2baac1dac8929e55d143f090c02d079",
   "changed_block_ids": [
-    "experience[0].bullets[0]",
-    "experience[2].bullets[1]"
+    "experience[0].bullets[2]"
   ],
   "carried_blocks": [
     {
       "id": "candidate.headline",
-      "sha256": "05e6785220ecfa6ef1a6fb2fba8f7271ad8249aa47a18939c750268c4628efc4",
+      "sha256": "37c00509e4980d9acdb538e3799c3f26029b911354b6150bbb27f072b1ded164",
       "decision": "approved",
-      "note": "The target role and differentiating evidence focus are immediately clear."
+      "note": "Clear target and differentiated practice focus; the headline scans naturally without unnecessary setup."
     },
     {
-      "id": "summary",
-      "sha256": "15c6b9f59c378fe3941d432d9d4a0fcfcb14169f9903b9a49faf79df4569398d",
+      "id": "experience[0].bullets[0]",
+      "sha256": "3a85519dbf747a33c7944b08f3f1c0501f78dc07b29225c047acff14c375d6d4",
       "decision": "approved",
-      "note": "The summary pairs a clear defense-attorney target with concrete, high-stakes results."
+      "note": "The two-sentence structure keeps the unusual court context, evidentiary action, and result clear on first reading."
     },
     {
       "id": "experience[0].bullets[1]",
-      "sha256": "3a85519dbf747a33c7944b08f3f1c0501f78dc07b29225c047acff14c375d6d4",
-      "decision": "approved",
-      "note": "The unusual court context, evidentiary challenge, and historic result form a clear and persuasive progression."
-    },
-    {
-      "id": "experience[0].bullets[2]",
       "sha256": "b8de320fde9a054b091747f000d0f7c9a238ff422254eaa13e2300b35d379a27",
       "decision": "approved",
-      "note": "The sentence efficiently communicates personal stakes and a concrete courtroom result."
+      "note": "The legal risk and acquittal are concise, understandable, and distinct from the adjacent matter."
+    },
+    {
+      "id": "experience[0].bullets[3]",
+      "sha256": "6f02c247c8c1b8c736e857c1da7e539c232f0ae2b7eaa98277505a554e20672d",
+      "decision": "approved",
+      "note": "The sentence clearly calibrates the candidate's supporting role and Apollo Justice's lead role."
     },
     {
       "id": "experience[1].bullets[0]",
       "sha256": "daa20f11f2103f8301f8b9822d85b495d9e2d83c9893fdafbed49a0b05271432",
       "decision": "approved",
-      "note": "The actor, reconstruction method, and two-part result are specific and easy to follow."
+      "note": "The matter, reconstruction method, and two concrete outcomes form a clear and credible sequence."
     },
     {
       "id": "experience[1].bullets[1]",
       "sha256": "98f0acd1890dac6dfbfd8fc19ce6564839b6a531ddd0cb2f412540148bf80a92",
       "decision": "approved",
-      "note": "This concise bullet adds a distinct wrongful-conviction result without unnecessary setup."
+      "note": "A direct, concise statement of trial leadership and reversal of a wrongful conviction."
     },
     {
       "id": "experience[1].bullets[2]",
       "sha256": "bd6c8a9da4adb3f94e5ce8488397cb85d3758682a3d8a181ab9d657c9b5dd2e3",
       "decision": "approved",
-      "note": "The handoff and resumed lead-defense responsibility are understandable in context."
+      "note": "The transition back to lead counsel and the outcome are understandable without excess detail."
     },
     {
       "id": "experience[2].bullets[0]",
       "sha256": "58aeabf4197ae464e89f9dde22c9ed51ca6cee50671b32cd84880d0ab315bb09",
       "decision": "approved",
-      "note": "The cross-examination action and resulting acquittal make the early-career contribution concrete."
+      "note": "The action, evidentiary breakthrough, and verdict are concrete and easy to follow."
     }
   ]
 }
