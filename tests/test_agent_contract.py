@@ -435,10 +435,13 @@ def test_screen_job_skill_is_compact_read_only_triage() -> None:
     assert "never show only `founded in <year>`" in normalized_contract
     assert "Remote, Hybrid, or On-site" in contract
     assert "Full-time, Part-time, or Contract" in contract
+    assert "Annual:" in contract
     assert "Hourly:" in contract
-    assert "Annual equivalent:" in contract
+    assert "Annualized equivalent:" in contract
     assert "Benefits:" in contract
     assert "Not specified in the posting" in contract
+    assert "show hourly pay only when the posting states an hourly rate" in normalized_skill
+    assert "Do not derive or display an hourly rate from annual compensation" in contract
     assert "general consultant FAQ does not establish benefits" in normalized_contract
     assert "roughly 350 words" in normalized_contract
     assert "Is this a stretch?" in contract

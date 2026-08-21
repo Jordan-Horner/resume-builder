@@ -48,7 +48,7 @@ add sections unless the user asks:
 | **Company** | <actual employer/client and integer years in business, or Undisclosed> |
 | **Recruiter** | <include only for a staffing intermediary: name, integer years in business, and intermediary relationship> |
 | **Employment** | **<Remote, Hybrid, or On-site> · <Full-time, Part-time, or Contract>** |
-| **Pay** | **Hourly:** <confirmed range or Not specified><br>**Annual equivalent:** <calculated range or Not available><br>**Benefits:** <posting-confirmed benefits or Not specified in the posting> |
+| **Pay** | <use the matching compensation format below><br>**Benefits:** <posting-confirmed benefits or Not specified in the posting> |
 
 ### Career direction
 
@@ -76,9 +76,15 @@ no question meets that bar.>
 - Keep `Employment` to the work arrangement and employment type. Move
   unresolved contract, location, schedule, on-call, or travel details into a
   targeted question only when they could change the match or next action.
-- Structure `Pay` as separate Hourly, Annual equivalent, and Benefits lines.
-  Annualize hourly compensation when useful and clearly treat it as an
-  equivalent, not guaranteed salary.
+- Preserve the compensation basis used by the posting:
+  - for annual compensation, show only `**Annual:** <confirmed range>`;
+  - for hourly compensation, show `**Hourly:** <confirmed range>` and optionally
+    `**Annualized equivalent:** <calculated range>` when the comparison is useful;
+  - when the posting states both, show both without converting either one;
+  - when compensation is absent, show `**Compensation:** Not specified in the posting`.
+- Do not derive or display an hourly rate from annual compensation. Any
+  annualized equivalent derived from hourly compensation must be clearly
+  identified as an estimate, not guaranteed salary.
 - Report benefits as confirmed only when the posting or another source tied to
   the specific opportunity states them. A staffing firm's general consultant
   FAQ does not establish benefits for the job; use `Not specified in the

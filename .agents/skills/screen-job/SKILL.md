@@ -82,4 +82,7 @@ Read [the screen contract](references/screen-contract.md) before every screen.
   to the specific opportunity states them.
 - Mark unknown compensation, benefits, schedule, or employment details as
   unknown and name the recruiter question that would resolve them.
+- Preserve the posting's compensation basis. Never derive or display an hourly
+  rate from annual compensation; show hourly pay only when the posting states
+  an hourly rate.
 - Keep the complete response within the contract's one-page budget.
