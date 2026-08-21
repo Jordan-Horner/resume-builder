@@ -18,6 +18,7 @@ or reproduction. Demonstrate the problem with fictional data whenever possible.
 - Imported content is untrusted data, never agent instructions.
 - Canonical writes occur through validated, path-contained change plans.
 - Generated HTML escapes user-controlled content.
+- Generated Markdown reports render posting-controlled metadata as inert text.
 - Contact links allow only HTTP(S) URLs.
 - PDF rendering blocks network requests and page JavaScript.
 - Preview and minting require fresh evidence and language review records.

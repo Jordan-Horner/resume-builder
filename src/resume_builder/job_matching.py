@@ -5,9 +5,11 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import html
 import json
 import re
 import sys
+import unicodedata
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -358,16 +360,54 @@ def compare_audits(baseline: dict[str, Any], tailored: dict[str, Any]) -> dict[s
     }
 
 
+def _markdown_source_text(value: object) -> str:
+    """Normalize untrusted values so they cannot create new Markdown structure."""
+    text = "".join(
+        " " if character.isspace() or unicodedata.category(character) in {"Cc", "Cf"} else character
+        for character in str(value)
+    )
+    return re.sub(r" +", " ", text).strip()
+
+
+def _markdown_inline(value: object) -> str:
+    """Render an untrusted value as inert inline Markdown text."""
+    text = html.escape(_markdown_source_text(value), quote=False)
+    return re.sub(r"([\\`*_\[\]!.:~])", r"\\\1", text)
+
+
+def _markdown_table_cell(value: object) -> str:
+    """Render an untrusted value without allowing table-row or cell injection."""
+    return _markdown_inline(value).replace("|", "\\|")
+
+
+def _markdown_code_span(value: object) -> str:
+    """Render an untrusted path in a code span with a collision-free fence."""
+    text = _markdown_source_text(value)
+    longest_run = max((len(run) for run in re.findall(r"`+", text)), default=0)
+    fence = "`" * (longest_run + 1)
+    if "`" in text or text.startswith(" ") or text.endswith(" "):
+        return f"{fence} {text} {fence}"
+    return f"{fence}{text}{fence}"
+
+
+def _markdown_list(values: Sequence[object]) -> str:
+    """Render an untrusted sequence as a comma-separated inline list."""
+    return ", ".join(_markdown_inline(value) for value in values) or "none"
+
+
 def markdown_report(result: dict[str, Any]) -> str:
     """Render a concise, human-reviewable companion to the JSON audit."""
     lines = [
-        f"# Job Match: {result['target']['company']} — {result['target']['role']}",
+        (
+            f"# Job Match: {_markdown_inline(result['target']['company'])} — "
+            f"{_markdown_inline(result['target']['role'])}"
+        ),
         "",
         "This is an exact-retrieval and preservation report, not an ATS score or hiring verdict.",
         "",
-        f"- Target: `{result['target']['path']}`",
-        f"- Resume: `{result['resume']['path']}`",
-        f"- Direction: `{result['target']['direction']}`",
+        f"- Target: {_markdown_code_span(result['target']['path'])}",
+        f"- Resume: {_markdown_code_span(result['resume']['path'])}",
+        f"- Direction: {_markdown_code_span(result['target']['direction'])}",
         "",
         "## Exact retrieval",
         "",
@@ -386,22 +426,25 @@ def markdown_report(result: dict[str, Any]) -> str:
         locations = ", ".join(owners) or "—"
         lines.append(
             "| {id} | {importance} | {found} | {demonstrated} | {terms} | {locations} |".format(
-                id=group["id"],
-                importance=group["importance"],
+                id=_markdown_table_cell(group["id"]),
+                importance=_markdown_table_cell(group["importance"]),
                 found="yes" if group["found"] else "no",
                 demonstrated="yes" if group["demonstrated"] else "no",
-                terms=terms.replace("|", "\\|"),
-                locations=locations.replace("|", "\\|"),
+                terms=_markdown_table_cell(terms),
+                locations=_markdown_table_cell(locations),
             )
         )
     retrieval = result["resume"]["audit"]["exact_retrieval"]
     lines.extend(
         [
             "",
-            f"Required groups not retrieved: {', '.join(retrieval['required_missing_group_ids']) or 'none'}",
+            (
+                "Required groups not retrieved: "
+                f"{_markdown_list(retrieval['required_missing_group_ids'])}"
+            ),
             (
                 "Retrieved only outside experience/project proof: "
-                f"{', '.join(retrieval['listed_without_demonstration_group_ids']) or 'none'}"
+                f"{_markdown_list(retrieval['listed_without_demonstration_group_ids'])}"
             ),
         ]
     )
@@ -412,19 +455,13 @@ def markdown_report(result: dict[str, Any]) -> str:
                 "",
                 "## Baseline comparison",
                 "",
-                f"- Baseline: `{comparison['baseline']['path']}`",
-                (
-                    "- Retrieval gained: "
-                    f"{', '.join(delta['retrieval']['gained_group_ids']) or 'none'}"
-                ),
-                (f"- Retrieval lost: {', '.join(delta['retrieval']['lost_group_ids']) or 'none'}"),
-                (
-                    "- Evidence IDs added: "
-                    f"{', '.join(delta['evidence']['added_fact_ids']) or 'none'}"
-                ),
+                f"- Baseline: {_markdown_code_span(comparison['baseline']['path'])}",
+                (f"- Retrieval gained: {_markdown_list(delta['retrieval']['gained_group_ids'])}"),
+                f"- Retrieval lost: {_markdown_list(delta['retrieval']['lost_group_ids'])}",
+                (f"- Evidence IDs added: {_markdown_list(delta['evidence']['added_fact_ids'])}"),
                 (
                     "- Evidence IDs removed: "
-                    f"{', '.join(delta['evidence']['removed_fact_ids']) or 'none'}"
+                    f"{_markdown_list(delta['evidence']['removed_fact_ids'])}"
                 ),
             ]
         )

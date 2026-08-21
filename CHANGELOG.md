@@ -39,6 +39,8 @@ changes.
 
 ### Fixed
 
+- Job-match Markdown reports now neutralize markup and line-structure injection
+  from captured posting data
 - Whitespace-only synthesis-list entries can no longer satisfy unresolved
   reviewer-risk gap requirements
 - Resume plans and prose no longer rely on unresolved workflow-adoption and

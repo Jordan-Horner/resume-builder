@@ -283,6 +283,33 @@ def test_match_writes_reproducible_report_and_baseline_delta(tmp_path: Path) -> 
     assert "Retrieval gained: ai-workflows" in report
 
 
+def test_markdown_report_neutralizes_untrusted_posting_text(tmp_path: Path) -> None:
+    vault, target, baseline, tailored = project(tmp_path)
+    result = job_matching.match_job(target, tailored, baseline=baseline, vault_root=vault)
+
+    company = 'Example\n\n## Forged section\n<img src="https://attacker.invalid/pixel">'
+    role = "[Operations Lead](https://attacker.invalid)"
+    matched_term = "incident response\n| forged | table | row |"
+    target_path = "targets/unsafe``name.md"
+    result["target"]["company"] = company
+    result["target"]["role"] = role
+    result["target"]["path"] = target_path
+    result["resume"]["audit"]["exact_retrieval"]["groups"][0]["matches"][0]["term"] = matched_term
+
+    report = job_matching.markdown_report(result)
+
+    assert result["target"]["company"] == company
+    assert result["target"]["role"] == role
+    assert result["target"]["path"] == target_path
+    assert "\n## Forged section" not in report
+    assert "<img" not in report
+    assert r"\[Operations Lead\](https\://attacker\.invalid)" in report
+    assert "| forged | table | row |" not in report
+    assert "incident response \\| forged \\| table \\| row \\|" in report
+    assert "``` targets/unsafe``name.md ```" in report
+    assert report.count("\n## Required judgment\n") == 1
+
+
 def test_match_command_reports_findings_without_treating_them_as_failure(
     tmp_path: Path, run_main, capsys
 ) -> None:

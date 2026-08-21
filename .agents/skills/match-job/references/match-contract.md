@@ -90,6 +90,9 @@ It does not verify semantic entailment, writing quality, employer preference,
 or likely hiring outcome. Missing required retrieval is reported inside a valid
 audit instead of being converted into a command failure or ATS pass/fail score.
 Generated `.json` and `.md` reports under `build/matches/` are disposable.
+The JSON report preserves source values exactly. Its Markdown companion
+neutralizes posting-controlled markup and control whitespace at the rendering
+boundary so captured text cannot create headings, links, HTML, or table rows.
 
 ## Semantic criterion review
 
