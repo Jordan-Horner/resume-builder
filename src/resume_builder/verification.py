@@ -19,9 +19,7 @@ from .job_matching import match_job, project_target_path
 from .rendering import contained_project_path
 from .review_records import (
     build_review_package,
-    load_review_record,
     narrative_block_inventory,
-    review_freshness,
 )
 from .selection_guard import build_selection, guard_selection
 from .selection_review import (
@@ -138,39 +136,23 @@ def _preview_freshness(resume: Path, project_root: Path) -> list[str]:
     reasons: list[str] = []
     if preview.get("phase") != "preview" or preview.get("valid") is not True:
         reasons.append("preview manifest is not a successful preview")
-    for owner in ("build_manifest", "review_record", "output"):
+    owners = ["build_manifest", "output"]
+    if preview.get("version") in {1, 2}:
+        owners.append("review_record" if preview.get("version") == 2 else "editorial_review")
+    for owner in owners:
         reasons.extend(_record_freshness(preview.get(owner), project_root, f"preview {owner}"))
     return reasons
 
 
 def workflow_state(resume: Path, project_root: Path) -> dict[str, Any]:
-    """Return the current Draft → Review → Published lifecycle state."""
+    """Return the current Draft → Preview → Published lifecycle state."""
     manifest = project_root / "build" / f"{resume.stem}.manifest.json"
     build_reasons = build_manifest_freshness(manifest, project_root)
     if build_reasons:
         return {"state": "draft", "reasons": build_reasons}
-    selection_record = selection_review_paths(project_root, resume)["record"]
-    selection_reasons = selection_review_freshness(selection_record, project_root)
-    if selection_reasons:
-        return {"state": "awaiting-selection-review", "reasons": selection_reasons}
-    review_path = project_root / "build" / "reviews" / f"{resume.stem}.json"
-    if not review_path.is_file():
-        return {"state": "awaiting-review", "reasons": []}
-    try:
-        review = load_review_record(review_path, project_root)
-        review_reasons = review_freshness(review)
-    except (OSError, ValueError, json.JSONDecodeError) as exc:
-        return {"state": "awaiting-review", "reasons": [str(exc)]}
-    if review_reasons:
-        return {"state": "awaiting-review", "reasons": review_reasons}
-    if review.editorial_status != "approved":
-        return {
-            "state": "draft",
-            "reasons": ["career-professional review requires narrative changes"],
-        }
     preview_reasons = _preview_freshness(resume, project_root)
     if preview_reasons:
-        return {"state": "reviewed", "reasons": preview_reasons}
+        return {"state": "preview-ready", "reasons": preview_reasons}
     return {"state": "published", "reasons": []}
 
 
@@ -269,7 +251,7 @@ def verify_resume(
             "valid": True,
             "cached": True,
             "source": relative_output(resume_path, project_root),
-            "state": workflow_state(resume_path, project_root),
+            "state": cached["workflow"],
             "receipt": relative_output(receipt_path, project_root),
             "checks": cached["checks"],
             "review_inputs": cached["review_inputs"],
@@ -455,7 +437,7 @@ def verify_resume(
         "valid": True,
         "cached": False,
         "source": relative_output(resume_path, project_root),
-        "state": workflow_state(resume_path, project_root),
+        "state": workflow,
         "receipt": relative_output(receipt_path, project_root),
         "checks": checks,
         "review_inputs": review_inputs,

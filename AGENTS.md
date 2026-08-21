@@ -124,10 +124,9 @@ indexes. The scripts under
   or quickly evaluate one real job before deciding whether to invest in formal
   matching or tailoring. Keep the screen read-only and within its one-page
   output contract.
-- Use `.agents/skills/critique-resume/SKILL.md` after every new resume or
-  narrative-content change. It owns editorial approval, targeted story
-  questions, and the readiness verdict; the builder cannot approve its own
-  prose.
+- Use `.agents/skills/critique-resume/SKILL.md` only when the user explicitly
+  asks for a critique, professional review, hiring read, or readiness opinion.
+  Critique is advisory and is not required to preview, edit, or mint a resume.
 - Use `.agents/skills/match-job/SKILL.md` only when a real job posting or
   preserved target exists and the user wants a detailed evidence audit or has
   chosen to pursue the opportunity. It owns job-specific criteria, exact
@@ -194,9 +193,11 @@ indexes. The scripts under
   revision under the same session ID before editing again. The newest
   revision controls the next attempt. Keep failed interpretations in the
   temporary history and never promote them.
-- Continue through verification, independent critique, and web preview. Run
+- Apply the requested edit and immediately regenerate the web preview. Do not
+  run verification, selection review, or independent critique during the
+  preview/edit loop. Run
   `resume-builder feedback accept FB-<session> --preview build/<resume>.preview.json`
-  only after the user accepts that reviewed preview or explicitly asks to mint
+  only after the user accepts that preview or explicitly asks to mint
   it. Accept each intended session explicitly and promote only
   the latest revision: reusable guidance becomes the narrowest applicable
   durable or local rule, a cosmetic one-off closes with `none`, and a factual
@@ -261,6 +262,25 @@ indexes. The scripts under
 
 ## Resume integrity
 
+- The default interactive lifecycle is **prompt/build → preview ↔ edit →
+  mint**. Before the first preview, search the vault and ask only for factual
+  information required to build an honest draft. `resume-builder preview`
+  compiles the current Markdown and publishes it immediately. Every
+  user-requested edit returns directly to a refreshed preview; do not run
+  selection review, language review, matching, or critique unless the user
+  explicitly asks for that analysis.
+- If the user adds content during preview, first search the canonical vault. If
+  the evidence already exists, edit the resume and refresh the preview. If it
+  introduces a new factual claim, ask at most one targeted question needed to
+  state it accurately, show the revised preview, and persist the approved fact
+  through `hydrate-vault` before minting. Do not restart the full build or
+  critique workflow merely because content was added.
+- Treat an explicit `Mint` request as approval of the latest current preview.
+  Mint performs the hard release checks: current source and evidence pins,
+  compiled-payload integrity, page budget, PDF rendering, and text extraction.
+  If one fails, explain the concrete failure and return to the preview/edit
+  loop. Do not introduce a review workflow as a prerequisite.
+
 - Follow `.agents/skills/build-resume/SKILL.md` when generating or changing a
   resume.
 - Before drafting a fresh baseline or substantial rewrite, create the build
@@ -304,25 +324,15 @@ indexes. The scripts under
   Use `critique-resume` separately for full editorial judgment.
 - Preserve evidence comments when rewriting resume bullets.
 - Write resumes using the build-resume skill's canonical Markdown contract.
-- Build normal review input through the hash-aware `resume-builder verify`
-  command. It compiles, runs the fast content checks, writes a compact receipt,
-  and first prepares a frozen, non-prose selection case. Give that case to an
-  independent strategy reviewer. The reviewer must judge every selected and
-  omitted candidate story plus each role arc, using `approved`,
-  `strategy-revise`, or `needs-user-decision`. Only an approved, current
-  selection record unlocks the isolated cold language package. Use
-  `resume-builder compile` directly only for low-level
-  build diagnostics. After the separate
-  career-professional review is approved and validated, publish the readable
-  web preview through `resume-builder preview` for the user's final review.
-  Treat the command's structured `user_handoff` as required: immediately post
-  its `rendered_markdown` as the organized user-facing response and ask for
-  review. Do not print the command JSON or reduce the response to a bare link.
-  Generating the HTML or merely reporting its path does not complete this step.
-  Use `resume-builder render` only for low-level renderer development or
-  diagnostics.
-- Mint a final PDF only through `resume-builder mint`, after the Markdown and
-  reviewed web preview is ready and the user has given final approval.
+- Publish the readable web preview through `resume-builder preview` after the
+  initial build and after every user edit. Treat the command's structured
+  `user_handoff` as required: immediately post its `rendered_markdown`; do not
+  print the command JSON or reduce the response to a bare link. Use
+  `resume-builder verify` and the selection/language review commands only for
+  an explicitly requested critique. Use `resume-builder render` only for
+  renderer development or diagnostics.
+- Mint a final PDF only through `resume-builder mint`, after the user has seen
+  the current preview. Saying `Mint` is explicit approval of that preview.
   Building a resume must not create HTML or PDF as a side effect.
 - Never hand-edit generated JSON, HTML, or PDF or treat any of them as
   canonical.
@@ -330,30 +340,11 @@ indexes. The scripts under
   gates. Do not bypass unsupported numeric-claim failures. Review lexical and
   non-confirmed-fact warnings before presenting a resume; they are not semantic
   entailment proof, so use critique for editorial judgment.
-- Treat every compiled or verified resume as an unreviewed draft. Do not begin
-  the narrative review until `review selection-finalize` produces an approved
-  selection record. After any headline,
-  summary, competency, experience bullet, project narrative, or education
-  description changes, run `resume-builder review package`, give the isolated
-  cold-read file to the provisional reviewer, then use the evidence appendix to
-  complete `critique-resume`. Complete the generated reviewer decisions file
-  and run `resume-builder review finalize`; do not assemble the version 4 or 5
-  record and its hashes manually. Validate the resulting hash-pinned review
-  record before describing the prose as approved.
-- Resolve applicable accepted feedback rules and open revision sessions before
-  drafting. Keep them out of the independent cold review, then require the
-  separate post-cold compliance decisions generated for all effective guidance.
-  A ready preview cannot contain a feedback-rule `revise` decision.
-- When the user has already requested a completed revision, preview, or mint,
-  automatically apply a single clear reviewer-proposed `wording-only` repair
-  with `resume-builder review apply-repairs`, then verify and independently
-  review every changed block again. Carry unchanged approved blocks forward;
-  do not reopen them with another reviewer. Permit only one automatic repair
-  attempt per block in the current reviewed-selection cycle. Do not pause merely to ask permission for
-  that exact repair. Pause when the change requires a new fact, changes
-  authorship, authority, chronology, or substantive meaning, removes a distinct
-  hiring claim, or forces a material strategy choice. Never carry the old block
-  approval across the changed block.
+- When the user explicitly requests critique, use the hash-aware
+  `resume-builder verify` and review commands to create the isolated selection
+  and language packages. Those optional review records describe the critique;
+  they do not gate preview or mint. Reviewer-proposed repairs remain optional
+  suggestions until the user asks to apply them.
 - Never cite a `needs-review` fact in visible resume content. Choose action verbs
   from the authorship and authority explicitly supported by the cited facts;
   do not upgrade `used`, `supported`, or `contributed` into `created`, `built`,
@@ -366,12 +357,13 @@ indexes. The scripts under
 - Follow **Conversational feedback routing** for every user-driven wording
   change. A direct Markdown edit may change the resume, but it does not create
   editorial memory and must not be treated as though the feedback lifecycle ran.
-- When agent delegation is available, run the provisional language gate in a
+- During an explicitly requested critique, when agent delegation is available,
+  run the provisional language review in a
   fresh reviewer context that receives the resume, block inventory, target, and
   critique standards but not the builder's plan, evidence appendix, rationale,
   prior approval, or proposed fix. Record the actual method in the version 4 or
   5 review. A single-context review cannot approve current prose.
-- When agent delegation is available, run the selection gate in a fresh context
+- During an explicitly requested critique, run the selection review in a fresh context
   that receives only the generated selection case and the selection standard.
   It must not receive the drafted resume prose, builder defense, prior verdict,
   or proposed repair. It may route a complete strategy rebuild or a real user
@@ -398,6 +390,11 @@ indexes. The scripts under
   team, workflow, and process names may identify evidence, but the prose must
   explain the relevant problem, function, audience, scale, or value without
   depending on those names.
+- Apply the same contract's natural-voice test before review. Prefer a direct
+  clause when a constructed modifier hides how a technology relates to the
+  work, and inspect repeated opening verbs across neighboring bullets. Improve
+  rhythm through the distinct supported contribution or outcome, never through
+  unsupported synonym rotation.
 - Require version 2 and later plans to declare the summary's complete evidence set. Every
   role-scoped employment fact in the summary must appear again in a later resume
   block. Allow organization-scoped facts to remain summary-only rather than
@@ -412,30 +409,25 @@ indexes. The scripts under
   hardcode employer-specific placement. Let critique flag ambiguous placement
   and ask a pointed question when resolving it would materially improve the
   resume.
-- Keep responsibilities distinct: `build-resume` writes and compiles an
-  explicitly unreviewed draft from evidence and reports regressions;
-  `critique-resume` owns every narrative-block decision and the full editorial
-  quality judgment; `hydrate-vault` persists new factual answers; `mint` creates
-  the final PDF. Do not duplicate or self-certify the critique inside the build
-  step.
+- Keep responsibilities distinct: `build-resume` writes, previews, and revises
+  evidence-grounded drafts; `critique-resume` provides an optional independent
+  editorial opinion when requested; `hydrate-vault` persists new factual
+  answers; `mint` audits the current approved preview and creates the PDF.
 - Critique must give a candid career-professional opinion and a separate hiring
   read, not just a compliance checklist or deterministic score. It should make
   the recommended tradeoff clear while distinguishing evidence, professional
   judgment, and market assumptions that need research.
-- When critique is used in a persistent build-to-mint workflow, save the
+- When critique is explicitly requested, save the
   narrative and version 4 or 5 hash-pinned review record defined by the critique contract
   under `build/reviews/`. A changed resume, plan, direction, or target makes the
   review stale; never refresh hashes without reviewing the changed content.
-- Minting requires a fresh review that covers every current narrative block and
-  contains no `revise` decision. `--accept-review-risk` may acknowledge a
-  documented non-language fit or evidence tradeoff; it can never bypass rejected
-  prose, incomplete block coverage, or a stale review.
+- Minting requires a current preview, not a critique record. The explicit mint
+  request records user approval of the current preview and then runs the hard
+  evidence, freshness, page-budget, rendering, and extraction checks.
 - An approved block carrying a deterministic advisory must include the
   reviewer's contextual reason; an empty approval cannot silently dismiss it.
-- Do not mint after a `Needs revision` verdict unless the user explicitly
-  accepts the identified tradeoff. `Ready with optional improvements` may be
-  minted when requested. `Ready to mint` should lead to an offer to mint, not an
-  automatic PDF.
+- An optional critique verdict is advisory. Show its tradeoffs honestly, but do
+  not let it silently override the user's explicit approval of the preview.
 
 ## Job-specific matching
 

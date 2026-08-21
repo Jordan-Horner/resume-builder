@@ -31,7 +31,7 @@ Git tools do not. Never write candidate data into same-named engine folders.
    baseline or when consuming a role shape. Use `research-role` when current
    market research must create, refresh, or compare that profile. Read the
    [rendering contract](references/rendering-contract.md) when the user wants
-   a reviewed web preview or a final PDF.
+   a web preview or a final PDF.
 2. Run `resume-builder validate --vault-root <repo>/vault --strict`. If the
    vault has no registered sources or canonical facts, explain that it is empty
    and route intake through `hydrate-vault`, which can accept resume files, an
@@ -74,7 +74,7 @@ Git tools do not. Never write candidate data into same-named engine folders.
    - job description or company when tailoring;
    - desired emphasis, de-emphasis, or content that must remain;
    - one page, two pages, or best judgment;
-   - Markdown review input, reviewed HTML for final approval, or a final minted PDF.
+   - Markdown source, an editable HTML preview, or a final minted PDF.
    Clarify ambiguous acronyms. If the user is unsure of a direction, inspect the
    vault and propose two or three evidence-backed options instead of asking an
    open-ended career-history questionnaire.
@@ -169,7 +169,12 @@ Git tools do not. Never write candidate data into same-named engine folders.
    not let an internal project, system, team, workflow, or process name carry a
    claim's meaning. Describe the reader-relevant problem, function, audience,
    scale, or value, retaining a name only when it adds useful context and is
-   immediately understandable. Conversation-only facts may appear in a clearly
+   immediately understandable. Apply the quality contract's natural-voice test
+   across individual blocks and neighboring bullets: prefer direct clauses when
+   constructed modifiers hide how a technology relates to the work, and flag a
+   run of identical opening verbs when it makes distinct contributions sound
+   templated. Do not vary wording by unsupported synonym substitution.
+   Conversation-only facts may appear in a clearly
    identified working draft, but do not carry them into a final baseline or
    minted resume. Route material new statements through
    `hydrate-vault` as user-supplied career notes, apply the reviewed change plan,
@@ -200,30 +205,13 @@ Git tools do not. Never write candidate data into same-named engine folders.
    merely detail supporting the same claim—return it to the role-arc decision
    and either give it a separate story or record why it is omitted. Never let a
    prose cleanup silently narrow the role's career story.
-8. Run `resume-builder synthesis resumes/plans/<resume-slug>.yaml`, then use
-   `resume-builder verify` on the completed Markdown as the normal review
-   handoff. Pass `--target` and `--baseline` for a tailored resume. Verification
-   compiles the draft, runs the direction and optional match checks, writes a
-   compact hash-pinned receipt, and first creates a non-prose selection case plus
-   reviewer decisions file. An unchanged rerun must use the cached receipt rather than
-   regenerate review inputs. Use `resume-builder compile` directly only for a
-   low-level diagnostic. Compilation does not publish HTML.
-   Verification also compares the draft's non-prose selection with the last
-   ready review. If it stops with a grouped strategy proposal, do not send the
-   smaller draft to another reviewer. Show the user the roles, stories,
-   evidence, required dimensions, or summary support that would be lost. Run
-   `resume-builder review strategy-approve <proposal> --reason "..."` only
-   after the user explicitly accepts that exact tradeoff, then verify again.
-   Give the generated `.selection.package.json` to a fresh strategy reviewer.
-   It must judge the complete hiring argument, every selected and omitted story,
-   and every role arc. A risk does not justify adverse visible content by itself.
-   Finalize the decisions with `resume-builder review selection-finalize`; only
-   an approved current selection unlocks the cold language-review inputs.
-   Compilation never creates a PDF. Never maintain the generated JSON or manifest
-   separately or hand-edit generated HTML. Read compiler
-   warnings and resolve weak grounding or provisional evidence before presenting
-   the draft. Treat `editorial_status: unreviewed` literally. Never hand-edit
-   generated HTML, JSON, manifests, or PDFs.
+8. Run `resume-builder synthesis resumes/plans/<resume-slug>.yaml`, then
+   `resume-builder preview <resume>`. Preview compiles the Markdown, validates
+   its structured evidence, and publishes the current HTML in one command. Fix
+   hard compiler failures before presenting the draft, but do not create
+   selection or language-review packages. Compilation never creates a PDF.
+   Never maintain generated JSON separately. Never hand-edit generated HTML, JSON,
+   manifests, or PDFs.
 9. Perform the regression review before finishing. For a fresh baseline whose
    registered sources include an earlier resume in the same lane, open that
    original only after the new draft is complete and run the source-comparison
@@ -235,74 +223,31 @@ Git tools do not. Never write candidate data into same-named engine folders.
    valuable accomplishment is absent from the vault, report an evidence
    opportunity and route it to `hydrate-vault` instead of copying or inventing
    it.
-10. For a job-tailored resume, pass the preserved target and source baseline to
-    `resume-builder verify` and inspect its match receipt. Review exact retrieval
-    gained or lost, evidence IDs added or removed, and semantic criteria
-    separately. Run `resume-builder match` directly only when diagnosing that
-    stage. Do not turn the result into a universal ATS score or automatically
-    inject missing phrases.
-11. Inspect the direction audit in the verification receipt. Run
-    `resume-builder direction audit` directly only for a focused diagnostic. Report the
-    overall evidence score, experience evidence score, planned concept-fit mix,
-    optional essential-terminology result, advisory vocabulary score, and style
-    diagnostics separately. Treat `editorial_status: not-reviewed` literally:
-    coverage is not a hiring-quality verdict. Direction terms are retrieval
-    signals, not preferred wording; never rewrite the profile to raise the audit
-    score or copy its concept labels into the resume.
-12. End the builder pass and invoke `critique-resume` after every new resume or
-    change to its headline, summary, competencies, bullets, project narrative,
-    or education description. First complete the independent selection review
-    produced by verification. Use the frozen language inputs produced by the
-    next verification run only after that gate is approved.
-    `resume-builder verify`; run `resume-builder review package <resume>` only
-    when diagnosing that lower-level stage. Give an independent reviewer only
-    the generated `.cold.json` target and block inventory for provisional
-    decisions. After those decisions are fixed, use the separate
-    `.package.json` evidence appendix to verify claim relationships, chronology,
-    selection, fit, and compliance with every applicable accepted rule and
-    latest open-session revision.
-    Keep feedback memory out of the provisional cold read. Record every decision in the generated
-    `build/reviews/<slug>.decisions.json`, then run `resume-builder review
-    finalize` to construct and validate the version 4 record, or version 5 when
-    effective feedback guidance applies. Run
-    `resume-builder review validate` as an explicit diagnostic when needed;
-    never assemble or refresh review hashes manually. A broad
-    whole-resume opinion is not approval. Follow its finding routes: revise from existing
-    evidence here, hydrate new facts through `hydrate-vault`, or adjust the
-    direction profile before rebuilding. Every prose revision makes the prior
-    review stale and requires another complete narrative-block critique. Contact,
-    date, or formatting-only corrections do not require another critique unless
-    they alter a returned narrative block. After the career-professional review
-    is approved and validated, run `resume-builder preview <resume>` to publish
-    readable HTML for the user's final review. The preview command returns a
-    structured `user_handoff`; post its `rendered_markdown` immediately as the
-    organized user-facing response and request explicit review. Do not print the
-    command JSON, reduce the response to a bare link, stop at saying the preview
-    was generated, or leave the artifact only in tool output. After the user
-    explicitly approves that preview and wants the final PDF, run
-    `resume-builder mint <resume>`; when the user selects a different page
-    budget, change and recompile the version 6 plan before minting.
-    When the user has already authorized a completed revision, preview, or mint
-    workflow, do not pause for a rejected block that has one clear,
-    evidence-safe wording repair. Record that replacement as `wording-only` in
-    the version 2 or 3 decisions file, run `resume-builder review apply-repairs`,
-    verify the changed resume, and send every changed block to a fresh
-    independent reviewer. The repair handoff carries unchanged approved blocks
-    forward and the reviewer evaluates only changed or still-unresolved blocks.
-    Permit one automatic repair attempt per block in that selection cycle. If
-    the repaired block is rejected again, stop and ask for a user wording
-    decision, hydrate missing evidence, or propose a grouped strategy change as
-    appropriate; do not recruit another reviewer or delete the story to obtain
-    approval. A repair suggestion never carries approval forward for the
-    changed block and never bypasses its new hash or evidence checks.
-    If the user rejects the revised wording, update the same temporary feedback
-    session before another edit. When the user explicitly accepts the reviewed
-    preview or asks to mint it, run `resume-builder feedback accept FB-<session>
-    --preview build/<resume>.preview.json` before minting. Accept each intended
-    session explicitly. Promote only the exact revision pinned to that preview and show
-    the returned "Saved for future resumes" receipt; close `none` sessions and
-    route `hydrate` sessions through canonical hydration.
-13. Run `resume-builder direction validate`, then `resume-builder validate
+10. Run `resume-builder match`, `resume-builder verify`, or the direction audit
+    only when the user explicitly asks for matching, critique, readiness, or a
+    focused diagnostic. These optional checks do not gate preview or mint. Do
+    not turn their results into a universal ATS score or automatically inject
+    missing phrases. Direction terms remain retrieval signals, not preferred
+    wording.
+11. Run `resume-builder preview <resume>` after the initial draft and after
+    every user-requested edit. Preview compiles the current Markdown, checks its
+    structured evidence locally, and publishes HTML without requiring a
+    selection or language review. Post the command's `user_handoff.rendered_markdown`
+    immediately. Stay in the preview → edit → preview loop until the user says
+    `Mint`. When the user adds content during preview, use canonical vault
+    evidence immediately when it exists. For a new factual claim, ask at most
+    one targeted question needed for accurate wording, refresh the preview, and
+    persist the approved fact through `hydrate-vault` before minting; do not
+    restart selection or critique. A `Mint` request approves the latest current
+    preview. Accept each open
+    feedback session with `resume-builder feedback accept` against that preview,
+    then run `resume-builder mint
+    <resume>`. Mint checks current source and evidence pins, the compiled
+    payload, page budget, PDF rendering, and text extraction. Use
+    `resume-builder verify` and `critique-resume` only when the user explicitly
+    asks for an independent critique or readiness opinion; optional review
+    findings never gate preview or mint.
+12. Run `resume-builder direction validate`, then `resume-builder validate
     --vault-root <repo>/vault --strict`, inspect the Git diff, and leave rendered
     files under `build/`.
 
@@ -316,21 +261,12 @@ Git tools do not. Never write candidate data into same-named engine folders.
   owned, and led.
 - Never overwrite a directional baseline with a job-specific resume.
 - Never silently remove approved resume content during an update.
-- Never respond to a reviewer rejection by removing, demoting, moving, or
-  weakening a selected story in the same language-review cycle. Resolve wording
-  inside the frozen selection. Structural change requires the grouped proposal
-  and exact user approval enforced by `verify`.
-- Never self-approve builder prose. Only a fresh version 4 or 5 record produced by
-  the separate `critique-resume` pass can approve narrative blocks.
-- Apply reviewer-proposed repairs automatically only when the user has already
-  authorized the downstream revision or finalization and the repair is
-  explicitly classified as `wording-only`. Do not auto-apply a suggestion that
-  adds facts, changes ownership or authority, moves chronology, removes a
-  distinct hiring claim, or selects among materially different strategies.
-- Use one authoritative cold review and at most one automatic wording repair per
-  block per selection cycle. Carry unchanged approvals forward; do not let a
-  sequence of fresh reviewers reopen unrelated blocks or turn approval into an
-  optimization target.
+- Never let an optional critique silently remove, demote, move, or weaken a
+  selected story. Show the suggestion to the user and return to the normal
+  preview/edit loop only when they ask to apply it.
+- The user's explicit wording edits and mint request control the interactive
+  lifecycle. Do not insert an independent reviewer between an edit and its
+  refreshed preview.
 - Treat a version 4, 5, or 6 story's `fact_ids` as available evidence, not mandatory
   sentence content. Preserve `core_fact_ids`; report optional facts left unused.
 - Treat version 5 and 6 `role_arcs` as story-allocation decisions, not fixed bullet

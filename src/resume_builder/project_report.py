@@ -176,7 +176,7 @@ def _mint_status(resume: Path, project_root: Path) -> dict[str, Any]:
         return _status("invalid", mint_path, project_root, [str(exc)])
     reasons: list[str] = []
     if (
-        manifest.get("version") not in {1, 2}
+        manifest.get("version") not in {1, 2, 3}
         or manifest.get("phase") != "mint"
         or not manifest.get("valid")
     ):
@@ -186,8 +186,10 @@ def _mint_status(resume: Path, project_root: Path) -> dict[str, Any]:
         reasons.append("mint uses a different compiler version")
     if manifest.get("source") != _relative(resume, project_root):
         reasons.append("mint names a different resume source")
-    review_key = "review_record" if manifest.get("version") == 2 else "editorial_review"
-    for key in ("build_manifest", "preview_manifest", review_key, "output"):
+    pinned_keys = ["build_manifest", "preview_manifest", "output"]
+    if manifest.get("version") in {1, 2}:
+        pinned_keys.append("review_record" if manifest.get("version") == 2 else "editorial_review")
+    for key in pinned_keys:
         reason = _record_freshness(manifest.get(key), project_root, f"mint {key}")
         if reason:
             reasons.append(reason)
@@ -242,7 +244,7 @@ def _preview_status(resume: Path, project_root: Path) -> dict[str, Any]:
         return _status("invalid", preview_path, project_root, [str(exc)])
     reasons: list[str] = []
     if (
-        manifest.get("version") not in {1, 2}
+        manifest.get("version") not in {1, 2, 3}
         or manifest.get("phase") != "preview"
         or not manifest.get("valid")
     ):
@@ -254,8 +256,10 @@ def _preview_status(resume: Path, project_root: Path) -> dict[str, Any]:
         reasons.append("preview names a different resume source")
     if manifest.get("final_review_status") != "awaiting-user-approval":
         reasons.append("preview does not await final user approval")
-    review_key = "review_record" if manifest.get("version") == 2 else "editorial_review"
-    for key in ("build_manifest", review_key, "output"):
+    pinned_keys = ["build_manifest", "output"]
+    if manifest.get("version") in {1, 2}:
+        pinned_keys.append("review_record" if manifest.get("version") == 2 else "editorial_review")
+    for key in pinned_keys:
         reason = _record_freshness(manifest.get(key), project_root, f"preview {key}")
         if reason:
             reasons.append(reason)
@@ -489,9 +493,7 @@ def format_summary(result: dict[str, Any]) -> str:
         state: sum(1 for item in resumes if item["workflow"]["state"] == state)
         for state in (
             "draft",
-            "awaiting-selection-review",
-            "awaiting-review",
-            "reviewed",
+            "preview-ready",
             "published",
         )
     }
@@ -513,9 +515,7 @@ def format_summary(result: dict[str, Any]) -> str:
         (
             "Workflow: "
             f"{workflow_counts['draft']} draft, "
-            f"{workflow_counts['awaiting-selection-review']} awaiting selection review, "
-            f"{workflow_counts['awaiting-review']} awaiting review, "
-            f"{workflow_counts['reviewed']} reviewed, "
+            f"{workflow_counts['preview-ready']} ready for preview, "
             f"{workflow_counts['published']} published"
         ),
         f"Fresh artifacts: {current('build')} builds, {current('critique')} critiques, {current('mint')} mints",

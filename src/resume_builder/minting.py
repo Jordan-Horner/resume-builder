@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mint a validated resume draft as a final, audited PDF artifact."""
+"""Mint the current user-approved preview as a final, audited PDF artifact."""
 
 from __future__ import annotations
 
@@ -15,9 +15,8 @@ from . import __version__
 from .atomic import atomic_write_json
 from .compilation import relative_output, sha256_file
 from .pdf_rendering import render_pdf
+from .previewing import _current_build
 from .rendering import contained_project_path
-from .review_records import require_editorial_approval
-from .review_records import sha256_file as review_sha256_file
 
 
 def mint_resume(
@@ -31,7 +30,7 @@ def mint_resume(
     synthesis_plan: Path | None = None,
     accept_review_risk: bool = False,
 ) -> dict[str, Any]:
-    """Render the exact user-reviewed HTML as a PDF and audit the final artifact."""
+    """Render the exact preview approved by the mint request and audit the PDF."""
     if max_pages is not None and max_pages < 1:
         raise ValueError("--max-pages must be a positive integer")
     project_root = vault_root.expanduser().resolve().parent
@@ -40,12 +39,6 @@ def mint_resume(
     resolved_base = contained_project_path(base_argument, project_root, "build", "output base")
     if resolved_base.suffix:
         raise ValueError("output base must not have a file extension")
-
-    review = require_editorial_approval(
-        resume_path,
-        project_root,
-        accept_review_risk=accept_review_risk,
-    )
 
     json_path = resolved_base.with_suffix(".json")
     html_path = resolved_base.with_suffix(".html")
@@ -60,11 +53,11 @@ def mint_resume(
         raise ValueError("mint requires the current user-review web preview") from exc
     if not isinstance(build_manifest, dict) or not isinstance(preview_manifest, dict):
         raise ValueError("mint requires valid build and preview manifests")
+    _current_build(resume_path, project_root, vault_root, resolved_base)
     preview_build = preview_manifest.get("build_manifest")
     preview_output = preview_manifest.get("output")
-    preview_review = preview_manifest.get("review_record")
     if (
-        preview_manifest.get("version") != 2
+        preview_manifest.get("version") != 3
         or preview_manifest.get("phase") != "preview"
         or preview_manifest.get("valid") is not True
         or not isinstance(preview_build, dict)
@@ -73,9 +66,6 @@ def mint_resume(
         or not isinstance(preview_output, dict)
         or preview_output.get("path") != relative_output(html_path, project_root)
         or preview_output.get("sha256") != sha256_file(html_path)
-        or not isinstance(preview_review, dict)
-        or preview_review.get("path") != relative_output(review.source, project_root)
-        or preview_review.get("sha256") != review_sha256_file(review.source)
     ):
         raise ValueError("mint preview is stale; publish and approve the current build")
     if preview_manifest.get("source") != relative_output(resume_path, project_root):
@@ -113,16 +103,6 @@ def mint_resume(
             requested_plan, project_root
         ):
             raise ValueError("mint build uses a different synthesis plan")
-    if review.verdict == "needs-revision":
-        risk_acceptance = preview_manifest.get("risk_acceptance")
-        if (
-            not accept_review_risk
-            or not isinstance(risk_acceptance, dict)
-            or risk_acceptance.get("accepted") is not True
-            or not isinstance(risk_acceptance.get("note"), str)
-            or not str(risk_acceptance["note"]).strip()
-        ):
-            raise ValueError("mint requires the recorded review-risk acceptance from preview")
     synthesis = build_manifest.get("synthesis")
     planned_budget = None
     if isinstance(synthesis, dict):
@@ -144,18 +124,12 @@ def mint_resume(
             "draft PDF was retained for inspection"
         )
     manifest = {
-        "version": 2,
+        "version": 3,
         "phase": "mint",
         "valid": page_error is None,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "compiler": {"name": "resume-builder", "version": __version__},
         "source": relative_output(resume_path, project_root),
-        "review_record": {
-            "path": relative_output(review.source, project_root),
-            "sha256": review_sha256_file(review.source),
-            "verdict": review.verdict,
-            "hiring_read": review.hiring_read,
-        },
         "build_manifest": {
             "path": relative_output(build_manifest_path, project_root),
             "sha256": sha256_file(build_manifest_path),
@@ -203,7 +177,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--vault-root", type=Path, default=Path("vault"))
     parser.add_argument("--template", type=Path, default=Path("templates/resume-template.html"))
     parser.add_argument("--synthesis-plan", type=Path)
-    parser.add_argument("--accept-review-risk", action="store_true")
+    parser.add_argument("--accept-review-risk", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     try:
         result = mint_resume(

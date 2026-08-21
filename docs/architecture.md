@@ -18,15 +18,14 @@ editorial approval.
    evidence composition inspectable before prose is written.
 5. **Resume Markdown** is the only editable presentation source. Every factual
    block cites canonical fact IDs.
-6. **Verification** checks structure, evidence status, numeric claims,
-   authorship language, direction coverage, job-specific retrieval, and stale
-   inputs.
-7. **Selection review** freezes the non-prose hiring argument, including chosen
-   and omitted stories, and must approve it before wording review begins.
-8. **Editorial review** freezes a cold-read package, records a decision for
-   every narrative block, and pins the decision to exact input hashes.
-9. **Preview and minting** publish only a reviewed build. PDF minting adds page
-   budget, overflow, network, JavaScript, and text-extraction checks.
+6. **Preview** compiles the current Markdown, checks structure, evidence,
+   numeric claims, authorship, and stale inputs, then publishes editable HTML.
+7. **Editing** returns directly to preview after each user-requested change.
+8. **Optional review** provides selection, cold-language, matching, or hiring
+   analysis only when the user explicitly requests it.
+9. **Minting** treats the explicit mint request as approval of the current
+   preview and adds page-budget, overflow, network, JavaScript, and
+   text-extraction checks.
 
 ## Trust boundaries
 
@@ -49,7 +48,7 @@ compilation, verification, feedback, review, matching, preview, and minting.
 
 Dependency-neutral modules now separate canonical Markdown parsing, feedback
 resolution, review schema enforcement, and synthesis models from the workflows
-that write artifacts. Feedback acceptance may inspect an approved review, while
+that write artifacts. Feedback acceptance pins the user-approved preview, while
 compilation depends only on feedback resolution; neither relationship points
 back toward its caller. The package import graph is therefore acyclic.
 
@@ -63,7 +62,7 @@ facade:
 - `review_decisions.py` finalizes reviewer-owned decisions;
 - `review_repairs.py` applies the guarded wording-only repair pass;
 - `review_schema.py` strictly loads compatible record versions;
-- `review_approval.py` enforces freshness and release authorization.
+- `review_approval.py` enforces freshness for explicitly requested critiques.
 
 Compatibility facades keep every pre-split public symbol importable from its
 original module and list it in `__all__`. A regression test pins that surface so
@@ -90,11 +89,8 @@ their reviewed budgets.
 - Canonical facts are never edited outside a validated change plan.
 - A `needs-review` fact cannot appear in visible resume prose.
 - High-authority verbs must be supported by the action evidence.
-- A changed narrative block invalidates its previous approval.
-- A changed fact, plan, direction, target, or build invalidates dependent
-  reviews.
-- Preview and mint cannot bypass rejected or incomplete language review.
-- Preview and mint require a release-capable review record: version 4 without
-  applicable feedback guidance, or version 5 when feedback guidance was applied.
-- Language review cannot start before a current selection approval.
+- A changed resume or evidence source makes the published preview stale until
+  `preview` recompiles it.
+- Preview and mint do not require an optional critique record.
+- An explicit mint invocation approves only the exact current preview.
 - PDF minting cannot bypass page-budget or extraction failures.

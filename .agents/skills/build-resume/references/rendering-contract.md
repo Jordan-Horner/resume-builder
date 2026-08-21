@@ -8,19 +8,17 @@ and minting are separate lifecycle stages.
 ## Normal command
 
 ```bash
-resume-builder verify resumes/baselines/<direction>.md
-resume-builder review apply-repairs build/reviews/<direction>.decisions.json
-resume-builder review finalize build/reviews/<direction>.decisions.json
-resume-builder review validate build/reviews/<direction>.json
+resume-builder preview resumes/baselines/<direction>.md
+# edit the Markdown, then preview again
 resume-builder preview resumes/baselines/<direction>.md
 resume-builder mint resumes/baselines/<direction>.md
 resume-builder mint resumes/baselines/<direction>.md --max-pages 1
 ```
 
-`verify` is the normal review handoff. It orchestrates compilation, direction
-and optional target checks, prose preflight, and review packaging; writes a
-compact hash-pinned receipt; and reuses unchanged results. The underlying
-commands remain independently callable for diagnostics. `compile` enforces the
+`preview` is the normal interactive command. It compiles the current Markdown,
+validates its structured evidence and renderer, and publishes HTML in one step.
+Edit the Markdown and run `preview` again until the user says `Mint`. `compile`
+enforces the
 [canonical Markdown contract](markdown-contract.md),
 validates evidence and the renderer, and writes JSON plus a reproducibility
 manifest with `editorial_status: unreviewed`. It does not publish HTML and never
@@ -28,7 +26,8 @@ creates a PDF. It preserves the last published HTML and PDF; their manifests
 become stale instead of their files disappearing.
 Use `resume-builder compile` directly when diagnosing only that build stage.
 
-`review package` writes two pinned inputs. The `.cold.json` file contains only
+When the user explicitly asks for an independent critique, `verify` prepares
+the optional review workflow. `review package` writes two pinned inputs. The `.cold.json` file contains only
 the target and visible resume blocks for the provisional independent read. The
 `.package.json` appendix pins the compiled build, plan, direction, concept and
 risk decisions, structured evidence audit, and exact canonical facts for the
@@ -44,11 +43,9 @@ decisions.
 `review validate` remains a focused diagnostic that checks the record against
 both files, the build manifest, every narrative block, and every cited fact hash.
 
-`preview` never rebuilds reviewed content. It renders the exact compiled JSON
-and template pinned by the approved review, then publishes that HTML for final
-user review. Its notice separately reports evidence integrity, career review,
-role-fit judgment, career verdict, and pending user approval; the notice never
-appears in print. Its structured `user_handoff` marks presentation as required
+`preview` rebuilds the current Markdown and publishes it for the preview/edit
+loop. It does not require or claim an independent language or selection review.
+Its structured `user_handoff` marks presentation as required
 and supplies the artifact path, absolute path, pending approval state, next
 action, organized presentation fields, and ready-to-post `rendered_markdown`.
 The agent must post `rendered_markdown` as the user-facing response rather than
@@ -140,8 +137,9 @@ out of scope for resume wording and factual claims.
 hashes, compiler version, ATS replacements, evidence findings, warnings, and
 generated JSON hash. `build/reviews/<slug>.cold.json` is the isolated
 provisional review input, and `build/reviews/<slug>.package.json` is its later
-evidence and selection appendix. `build/<slug>.preview.json` pins the approved review,
-build manifest, reviewed HTML, and pending final-user-approval state.
+evidence and selection appendix; these exist only after an explicit critique
+request. `build/<slug>.preview.json` pins the current build manifest, HTML, and
+pending user-approval state.
 `build/<slug>.mint.json` separately records the
 build and preview-manifest hashes, explicit user approval, page budget, PDF
 audit, and PDF hash. The manifests make

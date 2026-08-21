@@ -50,6 +50,31 @@ career-professional pass must read every narrative block and ask:
 6. Does the prose maintain the implied first-person voice customary in resumes,
    without describing the candidate as `he`, `she`, `his`, `her`, or with a
    third-person reflexive pronoun?
+7. Does a compound modifier or noun stack hide a relationship that a direct
+   clause would explain more naturally—for example, what a framework did in an
+   application rather than merely calling the application framework-enabled?
+8. Do several adjacent bullets begin with the same broad verb, making distinct
+   contributions sound mechanically generated or interchangeable?
+
+Apply a one-point budget to every bullet. It should make one main hiring claim
+and normally carry no more than two supporting details, such as method, scope,
+or outcome. Revise a sentence with three or more parallel items unless the list
+itself supplies essential evidence of scale, breadth, or differentiation. A
+detail does not earn space merely because the vault supports it.
+
+Prefer direct relationships over constructed modifiers when the compressed
+phrase makes the reader infer how a technology, system, or person related to the
+work. Terms such as `framework-enabled`, `AI-powered`, and `data-driven` are not
+banned; keep them when they are conventional and precise. When a direct clause
+would more clearly say what the technology did or how it was used, choose the
+direct relationship.
+
+Read opening verbs across each role, not only one bullet at a time. Repeating an
+accurate verb is acceptable when the repeated authorship is itself important,
+but a run of identical openings can flatten distinct accomplishments and sound
+templated. Restore natural rhythm by leading with the specific supported
+contribution, decision, or outcome. Do not rotate synonyms merely for variety,
+and never choose a different verb that changes authorship, authority, or scope.
 
 Read each block in its visible resume context before treating it as finished.
 Compare it with its section and adjacent heading, then with the blocks directly

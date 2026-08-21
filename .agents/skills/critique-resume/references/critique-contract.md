@@ -96,6 +96,20 @@ and education description, decide `approved` or `revise` using these questions:
    avoiding `he`, `she`, `his`, `her`, or reflexive third-person narration when
    those pronouns refer to the candidate rather than another person?
 
+Enforce a one-point budget. Each bullet should make one main hiring claim and
+normally use no more than two supporting details. Mark it `revise` when three or
+more parallel mechanisms, failure types, tools, stages, or qualifiers turn the
+point into an inventory, unless that list itself is essential evidence of
+scale, breadth, or differentiation. Do not preserve an item merely because it
+is factually supported; preserve it only when it strengthens this bullet's one
+claim.
+
+Apply the resume-quality contract's direct-relationship and opening-rhythm
+checks during this gate. A constructed modifier should be revised when it makes
+the reader infer what a technology did in the work, and repeated opening verbs
+should be judged across neighboring bullets when they flatten distinct
+contributions. Neither check is a banned-word list or a synonym-variation quota.
+
 Judge the block where the candidate and employer will see it, not as an isolated
 string. Use the context supplied by the cold-read package and apply all four tests:
 

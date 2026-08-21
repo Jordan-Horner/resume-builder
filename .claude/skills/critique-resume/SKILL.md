@@ -1,6 +1,6 @@
 ---
 name: critique-resume
-description: Give a candid, evidence-grounded resume critique from the combined perspective of an experienced career strategist, recruiter, and hiring manager. Review every narrative block for natural language, positioning, interview value, role and seniority fit, proof, progression, regressions, and missing stories before PDF minting, then route each material finding to resume revision, vault hydration, direction adjustment, or minting. Use after every new resume or narrative-content change and whenever the user asks for professional resume advice, an opinion, critique, review, improvement, story questions, or a readiness decision. Do not import career facts, rewrite the resume without permission, or generate a PDF.
+description: Give a candid, evidence-grounded resume critique from the combined perspective of an experienced career strategist, recruiter, and hiring manager. Review narrative blocks for natural language, positioning, interview value, role and seniority fit, proof, progression, regressions, and missing stories, then route material findings to resume revision, vault hydration, direction adjustment, or minting. Use only when the user explicitly asks for professional resume advice, an opinion, critique, review, improvement, story questions, or a readiness decision. Critique is optional and never gates preview, editing, or minting. Do not import career facts, rewrite the resume without permission, or generate a PDF.
 ---
 
 # Claude Code compatibility entry point

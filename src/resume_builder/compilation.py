@@ -63,7 +63,7 @@ PREVIEW_NOTICE = re.compile(
     r'(<aside class="draft-notice" role="status">\s*)(.*?)(\s*</aside>)',
     re.DOTALL,
 )
-STALE_PREVIEW_NOTICE = "Previous preview · Current build changed · Review required"
+STALE_PREVIEW_NOTICE = "Previous preview · Current draft changed · Refresh preview"
 
 
 def sha256_file(path: Path) -> str:
@@ -126,7 +126,7 @@ def build_resume(
     facts = known_fact_ids(vault_root.resolve())
     template_text = template_path.read_text(encoding="utf-8")
     # Validate the template and rendered payload without publishing a web preview.
-    # A readable HTML artifact is created only by the review-gated preview stage.
+    # A readable HTML artifact is created only by the preview stage.
     render_payload(payload, template_text, facts)
     json_path = resolved_base.with_suffix(".json")
     manifest_path = resolved_base.with_suffix(".manifest.json")

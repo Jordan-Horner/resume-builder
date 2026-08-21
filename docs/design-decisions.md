@@ -30,14 +30,17 @@ synthesis plan makes selection, omission, story purpose, role arcs, evidence
 composition, and page budget reviewable before polished language obscures the
 decisions.
 
-## Why deterministic checks and human review?
+## Why deterministic checks and optional professional review?
 
 Deterministic checks are good at structure, hashes, identifiers, status,
 numeric support, and narrow authorship rules. They cannot decide whether a
 sentence sounds natural or whether the resume makes a convincing hiring case.
 
-The independent cold review is therefore a separate gate. It sees the visible
-resume first, before evidence rationale can bias the language judgment.
+The normal workflow keeps deterministic evidence checks in preview and lets the
+user edit what they see directly. An independent cold review remains available
+when the user explicitly asks for a professional critique; it sees the visible
+resume first, before evidence rationale can bias the language judgment, but it
+does not block preview or minting.
 
 ## Why hash-pin review records?
 
@@ -79,8 +82,10 @@ vault names that make backups harder to recognize later.
 
 - The workflow has more ceremony than a one-shot generator.
 - Canonical hydration requires judgment before facts become reusable.
-- Strong staleness rules intentionally cause rebuild and re-review work.
+- Strong staleness rules intentionally require a fresh preview before minting.
 - The current CLI favors explicit artifacts over a graphical interface.
-- Versioned synthesis and review schemas remain deliberately detailed. Their
-  workflow facades are small, while architecture checks prevent reverse imports
-  and orchestration cycles from returning as those contracts grow.
+- Versioned synthesis schemas remain deliberately detailed. Optional review
+  schemas preserve rigorous critique when requested, without adding ceremony to
+  ordinary preview and editing. Their workflow facades remain small, while
+  architecture checks prevent reverse imports and orchestration cycles from
+  returning as those contracts grow.

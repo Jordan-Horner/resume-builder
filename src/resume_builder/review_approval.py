@@ -163,17 +163,17 @@ def require_editorial_approval(
     *,
     accept_review_risk: bool = False,
 ) -> ReviewRecord:
-    """Return the fresh approved review that authorizes minting ``resume``."""
+    """Return a fresh approved record for an explicitly requested critique workflow."""
     review_path = project_root / "build" / "reviews" / f"{resume.stem}.json"
     if not review_path.is_file():
-        raise ValueError("mint requires a fresh career-professional review record")
+        raise ValueError("critique finalization requires a fresh career-professional review record")
     record = load_review_record(review_path, project_root)
     if record.resume.path != resume.resolve():
         raise ValueError("review record names a different resume")
     if record.version < 4:
         raise ValueError(
-            "preview and mint require a version 4 or 5 review record; "
-            "legacy review records remain readable but cannot authorize release"
+            "critique finalization requires a version 4 or 5 review record; "
+            "legacy review records remain readable but cannot authorize approval"
         )
     if record.version == 4 and record.build_manifest is not None:
         try:
@@ -184,7 +184,7 @@ def require_editorial_approval(
         rules = memory.get("rules") if isinstance(memory, dict) else None
         if isinstance(rules, list) and rules:
             raise ValueError(
-                "preview and mint require a version 5 review record when the build "
+                "critique finalization requires a version 5 review record when the build "
                 "applied feedback guidance"
             )
     require_approved_selection_review(project_root, record.resume.path)

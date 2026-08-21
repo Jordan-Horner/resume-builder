@@ -117,7 +117,7 @@ def test_build_resume_skill_routes_and_preserves_work() -> None:
     assert "resumes/baselines/<direction>.md" in skill_text
     assert "resumes/tailored/<company>-<role>.md" in skill_text
     assert "do not create a separately" in skill_text
-    assert "resume-builder compile" in skill_text
+    assert "resume-builder preview" in skill_text
     assert "resume-builder mint" in skill_text
     assert "Compilation never creates a PDF" in skill_text
     assert "Never hand-edit generated HTML" in normalized_skill
@@ -155,16 +155,16 @@ def test_build_resume_skill_routes_and_preserves_work() -> None:
     assert "cold-reader context test" in normalized_skill
     assert "internal names as provenance, not explanation" in normalized_skill
     assert "project, system, team, workflow, or process name" in normalized_skill
-    assert "Never self-approve builder prose" in normalized_skill
-    assert "resume-builder review package" in normalized_skill
-    assert "resume-builder review apply-repairs" in normalized_skill
+    assert "preview → edit → preview" in normalized_skill
+    assert "When the user adds content during preview" in skill_text
+    assert "ask at most one targeted question" in normalized_skill
+    assert "do not restart selection or critique" in normalized_skill
+    assert "explicitly asks for an independent critique" in normalized_skill
     assert "feedback-memory contract" in normalized_skill
     assert "resume-builder feedback resolve" in normalized_skill
     assert "resume-builder feedback accept" in normalized_skill
     assert "latest open-session revisions" in normalized_skill
-    assert "wording-only" in normalized_skill
-    assert "fresh independent reviewer" in normalized_skill
-    assert "version 4 or 5 record" in normalized_skill
+    assert "do not gate preview or mint" in normalized_skill
     assert "structured claim boundary" in normalized_skill
     assert "required versus optional stories" in normalized_skill
     assert "`claim_focus`" in skill_text
@@ -181,9 +181,7 @@ def test_build_resume_skill_routes_and_preserves_work() -> None:
     assert "rather than a bullet quota" in normalized_skill
     assert "perform a redistribution check" in normalized_skill
     assert "silently narrow the role's career story" in normalized_skill
-    assert "whole-resume opinion is not approval" in normalized_skill
     assert "cold-read" in normalized_skill
-    assert "evidence appendix" in normalized_skill
     assert "contribution-first verb test" in normalized_skill
     assert "omit the story rather than reaching for a stronger synonym" in normalized_skill
     assert "Never cite a `needs-review` fact" in skill_text
@@ -257,6 +255,9 @@ def test_critique_skill_owns_mandatory_editorial_approval_and_is_non_mutating() 
     assert "every narrative block" in normalized_skill
     assert "Never let the builder assign its own" in normalized_skill
     assert "Narrative-block language gate" in contract
+    assert "Enforce a one-point budget" in contract
+    assert "normally use no more than two supporting details" in normalized_contract
+    assert "three or more parallel mechanisms" in normalized_contract
     assert "not a banned-word list" in normalized_contract
     assert "Adjacent-heading test" in contract
     assert "Opening-removal test" in contract
@@ -278,6 +279,26 @@ def test_critique_skill_owns_mandatory_editorial_approval_and_is_non_mutating() 
     assert "an `approved` decision must also include a concise note" in normalized_contract
     assert "resume-builder review validate" in contract
     assert "never bypasses a `revise` decision" in normalized_contract
+    assert "direct-relationship and opening-rhythm checks" in normalized_contract
+    assert "Neither check is a banned-word list" in normalized_contract
+
+
+def test_resume_drafting_does_not_copy_planning_shorthand_into_prose() -> None:
+    skill = (BUILD_SKILL / "SKILL.md").read_text(encoding="utf-8")
+    synthesis = (BUILD_SKILL / "references" / "synthesis-contract.md").read_text(encoding="utf-8")
+    agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    normalized_skill = " ".join(skill.split())
+    normalized_synthesis = " ".join(synthesis.split())
+    normalized_agents = " ".join(agents.split())
+
+    assert "natural-voice test" in normalized_skill
+    assert "constructed modifiers hide how a technology relates" in normalized_skill
+    assert "run of identical opening verbs" in normalized_skill
+    assert "Never copy it mechanically into the resume" in normalized_synthesis
+    assert "compressed modifiers or noun stacks" in normalized_synthesis
+    assert "inspect their rhythm across the complete role" in normalized_synthesis
+    assert "natural-voice test before review" in normalized_agents
+    assert "unsupported synonym rotation" in normalized_agents
 
 
 def test_critique_answers_route_through_hydration_before_final_use() -> None:
@@ -296,13 +317,9 @@ def test_critique_answers_route_through_hydration_before_final_use() -> None:
     assert "question-resolve" in normalized_hydrate
     assert "registered career-note source" in normalized_agents
     assert "search canonical facts first" in normalized_agents
-    assert (
-        "Do not duplicate or self-certify the critique inside the build step" in normalized_agents
-    )
-    assert "Do not mint after a `Needs revision` verdict" in normalized_agents
-    assert "builder cannot approve its own prose" in normalized_agents
-    assert "contains no `revise` decision" in normalized_agents
-    assert "fresh reviewer context" in normalized_agents
+    assert "prompt/build → preview ↔ edit → mint" in normalized_agents
+    assert "Saying `Mint` is explicit approval" in normalized_agents
+    assert "Critique is advisory" in normalized_agents
     assert "empty approval cannot silently dismiss" in normalized_agents
     assert (
         "If a draft is weak, the agent checks your saved career evidence and imported sources"
@@ -395,12 +412,11 @@ def test_agent_contract_requires_preview_handoff_to_be_presented() -> None:
     agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
     skill = (BUILD_SKILL / "SKILL.md").read_text(encoding="utf-8")
 
-    assert "structured `user_handoff`" in agents
+    assert "structured" in agents and "`user_handoff`" in agents
     assert "`rendered_markdown`" in agents
     assert "bare link" in agents
-    assert "structured `user_handoff`" in skill
-    assert "organized user-facing response" in skill
-    assert "leave the artifact only in tool output" in skill
+    assert "structured" in skill and "`user_handoff.rendered_markdown`" in skill
+    assert "immediately" in skill
 
 
 def test_match_job_skill_preserves_job_specific_boundaries() -> None:
@@ -516,8 +532,15 @@ def test_resume_quality_contract_teaches_principles_not_copywriting() -> None:
     assert "must not carry the sentence's meaning" in normalized_quality
     assert "problem, function, audience, scale, or value" in normalized_quality
     assert "Natural voice test" in quality
+    assert "Apply a one-point budget" in quality
+    assert "normally carry no more than two supporting details" in normalized_quality
+    assert "three or more parallel items" in normalized_quality
     assert "Would a capable manager plausibly use this language" in normalized_quality
     assert "Do not enforce a banned-word list" in normalized_quality
+    assert "direct relationships over constructed modifiers" in normalized_quality
+    assert "framework-enabled" in quality
+    assert "Read opening verbs across each role" in normalized_quality
+    assert "Do not rotate synonyms merely for variety" in normalized_quality
     assert "visible resume context" in normalized_quality
     assert "adjacent heading" in normalized_quality
     assert "opening words loses no supported scope" in normalized_quality

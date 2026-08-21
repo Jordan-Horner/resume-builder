@@ -11,9 +11,8 @@ export RESUME_BUILDER_WORKSPACE="$PWD/examples/phoenix-wright/workspace"
 resume-builder validate --strict
 resume-builder direction validate
 resume-builder synthesis resumes/plans/senior-defense-attorney.yaml
-resume-builder verify resumes/baselines/senior-defense-attorney.md
-resume-builder review selection-finalize build/reviews/senior-defense-attorney.selection.decisions.json
-resume-builder verify resumes/baselines/senior-defense-attorney.md
+resume-builder preview resumes/baselines/senior-defense-attorney.md
+resume-builder mint resumes/baselines/senior-defense-attorney.md
 ```
 
 ## 60-second recording script
@@ -35,15 +34,15 @@ Show a role direction and the synthesis plan. Highlight one story’s job and it
 action, object, scope, outcome, and evidence mapping. Then open the resulting
 Markdown bullet and its hidden evidence comment.
 
-**34–46 seconds — Verification and review**
+**34–46 seconds — Preview and edit**
 
-Run the project report and verification command. Show the frozen selection case
-and its approval, then the separate cold-read package. Explain that every
-narrative block receives an independent, hash-pinned language decision.
+Run the preview command and open the HTML. Make one wording edit, rerun preview,
+and show that the current draft replaces the previous preview without a review
+detour.
 
 **46–60 seconds — Output**
 
-Open the reviewed HTML preview and audited PDF. End on: “Evidence in; a
+Open the user-approved HTML preview and audited PDF. End on: “Evidence in; a
 role-specific, reviewable, reproducible resume out.”
 
 ## Three-minute walkthrough
@@ -54,9 +53,9 @@ role-specific, reviewable, reproducible resume out.”
 3. Apply canonical facts and show provenance.
 4. Select a direction and inspect the synthesis plan.
 5. Compile and intentionally demonstrate one blocked unsupported claim.
-6. Correct the claim and verify the draft.
-7. Show the independent cold review and stale-hash behavior.
-8. Publish the HTML preview and mint the audited PDF.
+6. Correct the claim and publish the HTML preview.
+7. Make a visible wording edit and refresh the preview.
+8. Say `Mint` and create the audited PDF from that current preview.
 9. Tailor to a fictional posting and compare it with the baseline.
 
 ## Required visuals
@@ -65,9 +64,9 @@ role-specific, reviewable, reproducible resume out.”
 - Source-to-fact provenance
 - Synthesis story and evidence map
 - Blocked unsupported claim
-- Cold-read review record
+- Preview, edit, and refreshed preview
 - Baseline-versus-tailored comparison
-- Reviewed preview and PDF
+- User-approved preview and PDF
 
 ## Recording checklist
 

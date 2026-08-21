@@ -486,23 +486,18 @@ def test_compile_command_writes_review_input_without_web_preview(tmp_path: Path,
     assert not outside.with_suffix(".html").exists()
 
 
-def test_preview_requires_review_then_publishes_html_for_final_approval(
+def test_preview_compiles_current_draft_and_publishes_html_for_editing(
     tmp_path: Path, run_main
 ) -> None:
     vault, resume = project(tmp_path)
 
-    assert run_main(previewing.main, resume, "--vault-root", vault) == 2
-    assert not (tmp_path / "build" / "support-operations.html").exists()
-
-    assert run_main(compilation.main, resume, "--vault-root", vault) == 0
-    write_approved_review(tmp_path, resume)
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
 
     html_path = tmp_path / "build" / "support-operations.html"
     rendered = html_path.read_text(encoding="utf-8")
     assert "Test Candidate" in rendered
-    assert "Language reviewed" in rendered
-    assert "Awaiting your final approval" in rendered
+    assert "Draft preview" in rendered
+    assert "Edit or mint when ready" in rendered
     assert 'data-evidence="EX-005"' in rendered
     assert ' - <span class="certification-org">Example Issuer</span>' in rendered
     assert "<!-- evidence:" not in rendered
@@ -510,12 +505,13 @@ def test_preview_requires_review_then_publishes_html_for_final_approval(
         (tmp_path / "build" / "support-operations.preview.json").read_text(encoding="utf-8")
     )
     assert preview_manifest["phase"] == "preview"
-    assert preview_manifest["review_record"]["status"] == "approved"
+    assert preview_manifest["version"] == 3
+    assert "review_record" not in preview_manifest
     assert preview_manifest["review_statuses"] == {
         "evidence_integrity": "claim-checked",
-        "language_review": "approved",
-        "role_fit": "compelling",
-        "career_verdict": "ready-to-mint",
+        "language_review": "user-review",
+        "role_fit": "not-reviewed",
+        "career_verdict": "not-reviewed",
         "user_review": "pending",
     }
     assert preview_manifest["final_review_status"] == "awaiting-user-approval"
@@ -526,7 +522,7 @@ def test_preview_requires_review_then_publishes_html_for_final_approval(
         "artifact": {
             "path": "build/support-operations.html",
             "media_type": "text/html",
-            "label": "Open the reviewed resume preview",
+            "label": "Open the current resume preview",
         },
         "approval": {
             "required": True,
@@ -536,20 +532,15 @@ def test_preview_requires_review_then_publishes_html_for_final_approval(
         "presentation": {
             "title": "Resume Preview",
             "summary": (
-                "Your resume has passed its evidence and language reviews. It is ready for "
-                "your final review but has not yet been converted to PDF."
+                "Your resume preview is ready. Review it and tell me what to change. "
+                'When it looks right, reply "Mint" to create the PDF.'
             ),
             "review_heading": "Review your resume",
             "guidance_heading": "What to check",
-            "guidance": (
-                "Confirm that the resume feels accurate, natural, and appropriately "
-                "positioned for the role."
-            ),
+            "guidance": ("Confirm that the content feels accurate and sounds like you."),
             "status_heading": "Current status",
             "status_items": [
-                {"label": "Evidence integrity", "value": "Claims checked"},
-                {"label": "Resume language", "value": "Approved"},
-                {"label": "Role fit", "value": "Compelling"},
+                {"label": "Preview", "value": "Current"},
                 {"label": "Your approval", "value": "Still needed"},
                 {"label": "Final PDF", "value": "Not created"},
             ],
@@ -565,19 +556,16 @@ def test_preview_requires_review_then_publishes_html_for_final_approval(
     assert str(html_path.resolve()) in handoff["artifact"]["markdown"]
     assert handoff["rendered_markdown"] == (
         "## Resume Preview\n\n"
-        "Your resume has passed its evidence and language reviews. It is ready for your "
-        "final review but has not yet been converted to PDF.\n\n"
+        "Your resume preview is ready. Review it and tell me what to change. When it looks "
+        'right, reply "Mint" to create the PDF.\n\n'
         "### Review your resume\n\n"
         f"[Open the full resume preview](<{html_path.resolve()}>)\n\n"
         "### What to check\n\n"
-        "Confirm that the resume feels accurate, natural, and appropriately positioned "
-        "for the role.\n\n"
+        "Confirm that the content feels accurate and sounds like you.\n\n"
         "### Current status\n\n"
         "| Review area | Result |\n"
         "|---|---|\n"
-        "| Evidence integrity | Claims checked |\n"
-        "| Resume language | Approved |\n"
-        "| Role fit | Compelling |\n"
+        "| Preview | Current |\n"
         "| Your approval | Still needed |\n"
         "| Final PDF | Not created |\n\n"
         'Reply "Mint" to create the PDF, or tell me what to change.'
@@ -589,28 +577,20 @@ def test_preview_requires_review_then_publishes_html_for_final_approval(
     }
 
 
-def test_preview_cannot_bypass_a_missing_selection_review(tmp_path: Path, run_main) -> None:
+def test_preview_does_not_require_a_selection_review(tmp_path: Path, run_main) -> None:
     vault, resume = project(tmp_path)
-    assert run_main(compilation.main, resume, "--vault-root", vault) == 0
-    write_approved_review(tmp_path, resume)
-    selection_review.selection_review_paths(tmp_path, resume)["record"].unlink()
-
-    assert run_main(previewing.main, resume, "--vault-root", vault) == 2
+    assert run_main(previewing.main, resume, "--vault-root", vault) == 0
+    assert not selection_review.selection_review_paths(tmp_path, resume)["record"].exists()
 
 
 def test_preview_handoff_identifies_a_tailored_resume() -> None:
     presentation = previewing._handoff_presentation(
         tailored=True,
-        evidence_integrity="claim-checked",
-        language_review="approved",
-        role_fit="strong-fit",
     )
 
     assert presentation["summary"].startswith("Your tailored resume")
     assert presentation["status_items"] == [
-        {"label": "Evidence integrity", "value": "Claims checked"},
-        {"label": "Resume language", "value": "Approved"},
-        {"label": "Role fit", "value": "Strong fit"},
+        {"label": "Preview", "value": "Current"},
         {"label": "Your approval", "value": "Still needed"},
         {"label": "Final PDF", "value": "Not created"},
     ]
@@ -628,7 +608,7 @@ def test_compile_preserves_published_preview_but_marks_it_stale(tmp_path: Path, 
 
     stale_html = html_path.read_text(encoding="utf-8")
     assert stale_html != published_html
-    assert "Previous preview · Current build changed · Review required" in stale_html
+    assert "Previous preview · Current draft changed · Refresh preview" in stale_html
     assert "Test Candidate" in stale_html
     status = project_report._preview_status(resume, tmp_path)
     assert status["status"] == "stale"
@@ -647,7 +627,7 @@ def test_review_becomes_stale_when_one_reviewed_fact_changes(tmp_path: Path, run
     assert "EX-005.md changed after evidence review" in review_records.review_freshness(record)
 
 
-def test_review_and_preview_reject_a_changed_compiled_payload(tmp_path: Path, run_main) -> None:
+def test_preview_rebuilds_a_changed_compiled_payload(tmp_path: Path, run_main) -> None:
     vault, resume = project(tmp_path)
     assert run_main(compilation.main, resume, "--vault-root", vault) == 0
     review_path = write_approved_review(tmp_path, resume)
@@ -659,7 +639,11 @@ def test_review_and_preview_reject_a_changed_compiled_payload(tmp_path: Path, ru
     assert "support-operations.json changed after evidence review" in (
         review_records.review_freshness(record)
     )
-    assert run_main(previewing.main, resume, "--vault-root", vault) == 2
+    assert run_main(previewing.main, resume, "--vault-root", vault) == 0
+    manifest = json.loads(
+        (tmp_path / "build" / "support-operations.manifest.json").read_text(encoding="utf-8")
+    )
+    assert manifest["outputs"][0]["sha256"] == compilation.sha256_file(payload_path)
 
 
 def test_review_package_separates_cold_read_and_rejects_changed_build_output(
@@ -894,7 +878,6 @@ def test_applicable_feedback_memory_requires_post_cold_review_compliance(
         )
         == []
     )
-    review_records.require_editorial_approval(resume, tmp_path)
     feedback_memory.retire_feedback_rule(
         str(accepted["accepted"][0]["rule"]),
         "Test that only builds using this rule become stale.",
@@ -1045,7 +1028,7 @@ def test_verify_caches_checks_and_drives_review_to_published_state(
         "investigation-speed",
         "investigation-portal",
     }
-    assert verification.workflow_state(resume, tmp_path)["state"] == "reviewed"
+    assert verification.workflow_state(resume, tmp_path)["state"] == "preview-ready"
 
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
     preview = json.loads(capsys.readouterr().out)
@@ -1234,7 +1217,7 @@ def test_verify_blocks_a_new_review_cycle_that_silently_removes_a_reviewed_story
     assert allowed["checks"]["build"]["selection_guard"]["status"] == ("strategy-change-approved")
 
 
-def test_preview_requires_an_explanation_for_accepted_fit_risk(tmp_path: Path, run_main) -> None:
+def test_optional_review_risk_does_not_block_the_preview_loop(tmp_path: Path, run_main) -> None:
     vault, resume = project(tmp_path)
     assert run_main(compilation.main, resume, "--vault-root", vault) == 0
     review_path = write_approved_review(tmp_path, resume)
@@ -1247,35 +1230,13 @@ def test_preview_requires_an_explanation_for_accepted_fit_risk(tmp_path: Path, r
     }
     review_path.write_text(json.dumps(review), encoding="utf-8")
 
-    assert run_main(previewing.main, resume, "--vault-root", vault) == 2
-    assert (
-        run_main(
-            previewing.main,
-            resume,
-            "--vault-root",
-            vault,
-            "--accept-review-risk",
-        )
-        == 2
-    )
-    assert (
-        run_main(
-            previewing.main,
-            resume,
-            "--vault-root",
-            vault,
-            "--accept-review-risk",
-            "--review-risk-note",
-            "User accepts the documented role-scope tradeoff for this application.",
-        )
-        == 0
-    )
+    assert run_main(previewing.main, resume, "--vault-root", vault) == 0
     preview = json.loads(
         (tmp_path / "build" / "support-operations.preview.json").read_text(encoding="utf-8")
     )
-    assert preview["review_statuses"]["career_verdict"] == "needs-revision"
-    assert preview["review_statuses"]["role_fit"] == "weak-or-misaligned"
-    assert preview["risk_acceptance"]["accepted"] is True
+    assert preview["review_statuses"]["career_verdict"] == "not-reviewed"
+    assert preview["review_statuses"]["role_fit"] == "not-reviewed"
+    assert "risk_acceptance" not in preview
 
 
 def test_project_report_tracks_current_and_stale_builds(
@@ -1301,7 +1262,7 @@ def test_project_report_tracks_current_and_stale_builds(
 
     assert current["valid"] is True
     assert current["resumes"][0]["build"]["status"] == "current"
-    assert current["next_action"]["route"] == "selection-review"
+    assert current["next_action"]["route"] == "preview"
     assert "1 baselines" in project_report.format_summary(current)
 
     write_approved_review(tmp_path, resume)
@@ -1310,13 +1271,13 @@ def test_project_report_tracks_current_and_stale_builds(
     assert reviewed["resumes"][0]["critique"]["status"] == "current"
     assert reviewed["resumes"][0]["critique"]["evidence_status"] == "claim-checked"
     assert reviewed["resumes"][0]["critique"]["language_status"] == "approved"
-    assert reviewed["next_action"]["route"] == "assess-regression-coverage"
+    assert reviewed["next_action"]["route"] == "preview"
 
     resume.write_text(resume.read_text(encoding="utf-8") + "\n", encoding="utf-8")
     stale = project_report.project_report(vault, strict=True)
 
     assert stale["resumes"][0]["build"]["status"] == "stale"
-    assert stale["next_action"]["route"] == "compile"
+    assert stale["next_action"]["route"] == "preview"
 
 
 def test_project_report_rejects_same_stem_build_owned_by_another_resume(
@@ -1390,8 +1351,6 @@ def test_initial_draft_readiness_requires_role_and_experience_evidence() -> None
 
 def test_mint_command_creates_audited_pdf(tmp_path: Path, run_main, monkeypatch) -> None:
     vault, resume = project(tmp_path)
-    assert run_main(compilation.main, resume, "--vault-root", vault) == 0
-    write_approved_review(tmp_path, resume)
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
     called: dict[str, Path] = {}
 
@@ -1418,7 +1377,8 @@ def test_mint_command_creates_audited_pdf(tmp_path: Path, run_main, monkeypatch)
     )
     assert manifest["phase"] == "mint"
     assert manifest["valid"] is True
-    assert manifest["review_record"]["verdict"] == "ready-to-mint"
+    assert manifest["version"] == 3
+    assert "review_record" not in manifest
     assert manifest["preview_manifest"]["path"] == "build/support-operations.preview.json"
     assert manifest["user_approval"]["status"] == "approved-for-mint"
     assert project_report._mint_status(resume, tmp_path)["status"] == "current"
@@ -1427,20 +1387,20 @@ def test_mint_command_creates_audited_pdf(tmp_path: Path, run_main, monkeypatch)
     assert project_report._mint_status(resume, tmp_path)["status"] == "stale"
 
 
-def test_mint_rejects_missing_or_stale_editorial_review(tmp_path: Path, run_main) -> None:
+def test_mint_rejects_missing_or_stale_preview(tmp_path: Path, run_main) -> None:
     vault, resume = project(tmp_path)
 
     assert run_main(minting.main, resume, "--vault-root", vault) == 2
 
-    assert run_main(compilation.main, resume, "--vault-root", vault) == 0
-    write_approved_review(tmp_path, resume)
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
     resume.write_text(resume.read_text(encoding="utf-8") + "\n", encoding="utf-8")
 
     assert run_main(minting.main, resume, "--vault-root", vault) == 2
 
 
-def test_mint_cannot_bypass_rejected_language(tmp_path: Path, run_main) -> None:
+def test_user_mint_is_not_blocked_by_an_optional_language_review(
+    tmp_path: Path, run_main, monkeypatch
+) -> None:
     vault, resume = project(tmp_path)
     assert run_main(compilation.main, resume, "--vault-root", vault) == 0
     review_path = write_approved_review(tmp_path, resume)
@@ -1453,17 +1413,21 @@ def test_mint_cannot_bypass_rejected_language(tmp_path: Path, run_main) -> None:
     editorial["blocks"][0]["note"] = "The headline is generic and needs clearer language."
     review_path.write_text(json.dumps(review), encoding="utf-8")
 
-    assert (
-        run_main(
-            minting.main,
-            resume,
-            "--vault-root",
-            vault,
-            "--accept-review-risk",
-        )
-        == 2
-    )
-    assert not (tmp_path / "build" / "support-operations.pdf").exists()
+    assert run_main(previewing.main, resume, "--vault-root", vault) == 0
+
+    def fake_render_pdf(
+        html_path: Path, output: Path, payload: dict[str, object], browser: Path | None = None
+    ) -> dict[str, object]:
+        output.write_bytes(b"%PDF-user-approved")
+        return {
+            "layout": {"horizontal_overflow": False, "overflowing_elements": []},
+            "extraction": {"pages": 1, "extractable_pages": 1, "claims_recovered": 10},
+        }
+
+    monkeypatch.setattr(minting, "render_pdf", fake_render_pdf)
+
+    assert run_main(minting.main, resume, "--vault-root", vault) == 0
+    assert (tmp_path / "build" / "support-operations.pdf").exists()
 
 
 def test_pdf_renderer_rejects_missing_explicit_browser(tmp_path: Path) -> None:
@@ -1498,8 +1462,6 @@ def test_compile_normalizes_ats_characters(tmp_path: Path, run_main) -> None:
 @pytest.mark.browser
 def test_mint_pdf_end_to_end(tmp_path: Path, run_main) -> None:
     vault, resume = project(tmp_path)
-    assert run_main(compilation.main, resume, "--vault-root", vault) == 0
-    write_approved_review(tmp_path, resume)
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
 
     assert (
@@ -1522,8 +1484,6 @@ def test_mint_pdf_end_to_end(tmp_path: Path, run_main) -> None:
 
 def test_strict_page_budget_retains_audited_draft(tmp_path: Path, run_main, monkeypatch) -> None:
     vault, resume = project(tmp_path)
-    assert run_main(compilation.main, resume, "--vault-root", vault) == 0
-    write_approved_review(tmp_path, resume)
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
 
     def oversized_pdf(

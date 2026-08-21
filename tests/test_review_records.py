@@ -144,7 +144,9 @@ def test_v3_approved_review_requires_independent_cold_reviewer(tmp_path: Path) -
 
 
 @pytest.mark.parametrize("version", [2, 3])
-def test_legacy_review_records_cannot_authorize_release(tmp_path: Path, version: int) -> None:
+def test_legacy_review_records_cannot_authorize_critique_approval(
+    tmp_path: Path, version: int
+) -> None:
     review_path, resume, raw = _review_project(tmp_path)
     if version == 3:
         raw["version"] = 3
@@ -155,7 +157,7 @@ def test_legacy_review_records_cannot_authorize_release(tmp_path: Path, version:
         review_path.write_text(json.dumps(raw), encoding="utf-8")
 
     assert load_review_record(review_path, tmp_path).version == version
-    with pytest.raises(ValueError, match=r"legacy review records.*cannot authorize release"):
+    with pytest.raises(ValueError, match=r"legacy review records.*cannot authorize approval"):
         require_editorial_approval(resume, tmp_path)
 
 

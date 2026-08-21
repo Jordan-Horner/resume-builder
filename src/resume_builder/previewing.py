@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish a career-professional-reviewed resume as a web preview."""
+"""Compile and publish the current resume as an editable web preview."""
 
 from __future__ import annotations
 
@@ -13,48 +13,31 @@ from typing import Any
 
 from . import __version__
 from .atomic import atomic_write_json, atomic_write_text
-from .compilation import relative_output, sha256_file
+from .compilation import build_resume, relative_output, sha256_file
 from .rendering import contained_project_path, known_fact_ids, load_payload, render_payload
-from .review_records import require_editorial_approval
-from .review_records import sha256_file as review_sha256_file
 
-READY_NOTICE = "Evidence checked · Language reviewed · Awaiting your final approval"
-RISK_NOTICE = "Evidence checked · Language reviewed · Career-fit risk remains"
+DRAFT_NOTICE = "Draft preview · Edit or mint when ready"
 PREVIEW_MODE = {
     "kind": "continuous-web",
     "pagination": "PDF page count is calculated only during minting",
 }
 
 
-def _display_status(value: str) -> str:
-    """Convert a machine status into concise user-facing text."""
-    if value == "claim-checked":
-        return "Claims checked"
-    return value.replace("-", " ").capitalize()
-
-
-def _handoff_presentation(
-    *, tailored: bool, evidence_integrity: str, language_review: str, role_fit: str
-) -> dict[str, Any]:
-    """Return the user-facing structure for the final preview handoff."""
+def _handoff_presentation(*, tailored: bool) -> dict[str, Any]:
+    """Return the user-facing structure for the preview/edit loop."""
     resume_label = "tailored resume" if tailored else "resume"
     return {
         "title": "Resume Preview",
         "summary": (
-            f"Your {resume_label} has passed its evidence and language reviews. "
-            "It is ready for your final review but has not yet been converted to PDF."
+            f"Your {resume_label} preview is ready. Review it and tell me what to change. "
+            'When it looks right, reply "Mint" to create the PDF.'
         ),
         "review_heading": "Review your resume",
         "guidance_heading": "What to check",
-        "guidance": (
-            "Confirm that the resume feels accurate, natural, and appropriately "
-            "positioned for the role."
-        ),
+        "guidance": "Confirm that the content feels accurate and sounds like you.",
         "status_heading": "Current status",
         "status_items": [
-            {"label": "Evidence integrity", "value": _display_status(evidence_integrity)},
-            {"label": "Resume language", "value": _display_status(language_review)},
-            {"label": "Role fit", "value": _display_status(role_fit)},
+            {"label": "Preview", "value": "Current"},
             {"label": "Your approval", "value": "Still needed"},
             {"label": "Final PDF", "value": "Not created"},
         ],
@@ -88,7 +71,7 @@ def _current_build(
     vault_root: Path,
     resolved_base: Path,
 ) -> tuple[Path, Path, dict[str, Any]]:
-    """Return current compiled artifacts without rebuilding reviewed content."""
+    """Return the current compiled artifacts and verify their pinned inputs."""
     json_path = resolved_base.with_suffix(".json")
     manifest_path = resolved_base.with_suffix(".manifest.json")
     try:
@@ -166,7 +149,7 @@ def preview_resume(
     accept_review_risk: bool = False,
     review_risk_note: str | None = None,
 ) -> dict[str, Any]:
-    """Publish the exact compiled build after a fresh career-professional review."""
+    """Compile and publish the current draft for the user's preview/edit loop."""
     project_root = vault_root.expanduser().resolve().parent
     resume_path = contained_project_path(resume, project_root, "resumes", "resume")
     template_path = contained_project_path(template, project_root, "templates", "template")
@@ -175,6 +158,13 @@ def preview_resume(
     if resolved_base.suffix:
         raise ValueError("output base must not have a file extension")
 
+    build_resume(
+        resume_path,
+        output_base=resolved_base,
+        vault_root=vault_root,
+        template=template_path,
+        synthesis_plan=synthesis_plan,
+    )
     json_path, build_manifest_path, build_manifest = _current_build(
         resume_path, project_root, vault_root, resolved_base
     )
@@ -183,11 +173,6 @@ def preview_resume(
         template_path, project_root
     ):
         raise ValueError("preview build uses a different rendering template")
-    review = require_editorial_approval(
-        resume_path,
-        project_root,
-        accept_review_risk=accept_review_risk,
-    )
     if synthesis_plan is not None:
         requested_plan = contained_project_path(
             synthesis_plan, project_root, "resumes/plans", "synthesis plan"
@@ -197,18 +182,6 @@ def preview_resume(
             requested_plan, project_root
         ):
             raise ValueError("preview build uses a different synthesis plan")
-    if review.verdict == "needs-revision" and accept_review_risk:
-        if not isinstance(review_risk_note, str) or not review_risk_note.strip():
-            raise ValueError("accepted review risk requires --review-risk-note")
-        risk_acceptance: dict[str, object] | None = {
-            "accepted": True,
-            "note": review_risk_note.strip(),
-        }
-        preview_notice = RISK_NOTICE
-    else:
-        risk_acceptance = None
-        preview_notice = READY_NOTICE
-
     html_path = resolved_base.with_suffix(".html")
     preview_manifest_path = resolved_base.with_suffix(".preview.json")
     payload = load_payload(json_path)
@@ -222,25 +195,25 @@ def preview_resume(
         payload,
         template_text,
         known_fact_ids(vault_root.resolve()),
-        preview_notice=preview_notice,
+        preview_notice=DRAFT_NOTICE,
     )
     atomic_write_text(html_path, rendered)
 
     relative_html_path = relative_output(html_path, project_root)
-    evidence_status = review.evidence_status or "legacy-not-separated"
-    presentation = _handoff_presentation(
-        tailored=resume_path.parent.name == "tailored",
-        evidence_integrity=evidence_status,
-        language_review=review.editorial_status,
-        role_fit=review.hiring_read,
+    evidence = build_manifest.get("evidence")
+    evidence_status = (
+        "claim-checked"
+        if isinstance(evidence, dict) and isinstance(evidence.get("structured_claims_checked"), int)
+        else "legacy-not-separated"
     )
+    presentation = _handoff_presentation(tailored=resume_path.parent.name == "tailored")
     user_handoff: dict[str, Any] = {
         "required": True,
         "action": "present-preview",
         "artifact": {
             "path": relative_html_path,
             "media_type": "text/html",
-            "label": "Open the reviewed resume preview",
+            "label": "Open the current resume preview",
         },
         "approval": {
             "required": True,
@@ -251,27 +224,19 @@ def preview_resume(
     }
 
     manifest = {
-        "version": 2,
+        "version": 3,
         "phase": "preview",
         "valid": True,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "compiler": {"name": "resume-builder", "version": __version__},
         "source": relative_output(resume_path, project_root),
-        "review_record": {
-            "path": relative_output(review.source, project_root),
-            "sha256": review_sha256_file(review.source),
-            "verdict": review.verdict,
-            "hiring_read": review.hiring_read,
-            "status": review.editorial_status,
-        },
         "review_statuses": {
             "evidence_integrity": evidence_status,
-            "language_review": review.editorial_status,
-            "role_fit": review.hiring_read,
-            "career_verdict": review.verdict,
+            "language_review": "user-review",
+            "role_fit": "not-reviewed",
+            "career_verdict": "not-reviewed",
             "user_review": "pending",
         },
-        "risk_acceptance": risk_acceptance,
         "preview_mode": {
             **PREVIEW_MODE,
             "experience_bullets": experience_bullets,
@@ -316,15 +281,15 @@ def preview_resume(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Publish one reviewed resume as HTML under build/."""
+    """Compile and publish one resume as editable HTML under build/."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("resume", type=Path)
     parser.add_argument("--output-base", type=Path)
     parser.add_argument("--vault-root", type=Path, default=Path("vault"))
     parser.add_argument("--template", type=Path, default=Path("templates/resume-template.html"))
     parser.add_argument("--synthesis-plan", type=Path)
-    parser.add_argument("--accept-review-risk", action="store_true")
-    parser.add_argument("--review-risk-note")
+    parser.add_argument("--accept-review-risk", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--review-risk-note", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     try:
         result = preview_resume(

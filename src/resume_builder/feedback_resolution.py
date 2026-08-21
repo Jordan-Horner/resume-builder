@@ -243,18 +243,28 @@ def _validate_session(data: dict[str, Any], path: Path, project_root: Path) -> N
     accepted_result = data.get("accepted_result")
     if accepted_result is not None:
         result = _object(accepted_result, f"{path} accepted_result")
-        expected = {
+        common = {
             "resume_sha256",
             "build_manifest",
             "build_sha256",
-            "review_record",
-            "review_sha256",
             "preview_manifest",
             "preview_sha256",
             "output",
             "output_sha256",
             "effective_digest",
         }
+        reviewed = common | {"review_record", "review_sha256"}
+        user_approved = common | {"approval"}
+        actual = set(result)
+        if actual == reviewed:
+            expected = reviewed
+        elif actual == user_approved and result.get("approval") == "user-approved-preview":
+            expected = user_approved
+        else:
+            raise ValueError(
+                f"{path} accepted_result must pin either a reviewed preview or a "
+                "user-approved preview"
+            )
         _exact_fields(result, expected, f"{path} accepted_result")
         for field in expected:
             _nonempty(result.get(field), f"{path} accepted_result.{field}")

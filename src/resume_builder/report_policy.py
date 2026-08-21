@@ -48,35 +48,13 @@ def _next_action(
             return {"route": "plan", "message": f"Create or repair the plan for {record['path']}."}
         if record["build"]["status"] != "current":
             return {
-                "route": "compile",
-                "message": f"Recompile {record['path']} from current inputs.",
+                "route": "preview",
+                "message": f"Build and preview {record['path']} from current inputs.",
             }
-        if record["workflow"]["state"] == "awaiting-selection-review":
+        if record["preview"]["status"] != "current":
             return {
-                "route": "selection-review",
-                "message": f"Review the complete evidence selection for {record['path']}.",
-            }
-        critique = record["critique"]
-        if critique["status"] != "current":
-            return {
-                "route": "critique",
-                "message": f"Run the narrative-block critique for {record['path']}.",
-            }
-        if critique.get("evidence_status") == "changes-required":
-            return {
-                "route": "rebuild",
-                "message": f"Repair evidence integrity for {record['path']}.",
-            }
-        if critique.get("language_status") == "changes-required":
-            critique_action = critique["next_action"]
-            return {
-                "route": critique_action["route"],
-                "message": critique_action["summary"],
-            }
-        if critique.get("feedback_status") == "changes-required":
-            return {
-                "route": "rebuild",
-                "message": f"Repair accepted-feedback compliance for {record['path']}.",
+                "route": "preview",
+                "message": f"Preview {record['path']} for user edits.",
             }
     for target in targets:
         if target["tailored_resume"] is None:
@@ -87,50 +65,13 @@ def _next_action(
         tailored = next(record for record in resumes if record["path"] == target["tailored_resume"])
         if tailored["build"]["status"] != "current":
             return {
-                "route": "compile",
-                "message": f"Compile {tailored['path']} from current inputs.",
-            }
-        if target["match"]["status"] != "current":
-            return {"route": "match", "message": f"Run the job match for {tailored['path']}."}
-        if tailored["workflow"]["state"] == "awaiting-selection-review":
-            return {
-                "route": "selection-review",
-                "message": f"Review the complete evidence selection for {tailored['path']}.",
-            }
-        critique = tailored["critique"]
-        if critique["status"] != "current":
-            return {"route": "critique", "message": f"Critique {tailored['path']} before minting."}
-        if critique.get("target") != target["path"]:
-            return {
-                "route": "critique",
-                "message": f"Critique {tailored['path']} against its current target before minting.",
-            }
-        if critique.get("evidence_status") == "changes-required":
-            return {
-                "route": "rebuild",
-                "message": f"Repair evidence integrity for {tailored['path']}.",
-            }
-        if critique.get("language_status") == "changes-required":
-            critique_action = critique["next_action"]
-            return {
-                "route": critique_action["route"],
-                "message": critique_action["summary"],
-            }
-        if critique.get("feedback_status") == "changes-required":
-            return {
-                "route": "rebuild",
-                "message": f"Repair accepted-feedback compliance for {tailored['path']}.",
-            }
-        if critique.get("verdict") == "needs-revision":
-            critique_action = critique["next_action"]
-            return {
-                "route": critique_action["route"],
-                "message": critique_action["summary"],
+                "route": "preview",
+                "message": f"Build and preview {tailored['path']} from current inputs.",
             }
         if tailored["preview"]["status"] != "current":
             return {
                 "route": "preview",
-                "message": f"Publish {tailored['path']} for final user review.",
+                "message": f"Preview {tailored['path']} for user edits.",
             }
         if tailored["mint"]["status"] != "current":
             return {

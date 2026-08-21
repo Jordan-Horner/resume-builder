@@ -89,7 +89,9 @@ Version 4 also records:
 
 15. **Claim focus:** `claim_focus` names the one hiring message the story's
     visible bullet must deliver. It is concise planning language, not polished
-    resume prose.
+    resume prose. Never copy it mechanically into the resume. Planning shorthand
+    may use compressed modifiers or noun stacks; the draft must restate the
+    relationship in natural, reader-facing language.
 16. **Minimum evidence:** `core_fact_ids` is the smallest non-empty subset of
     the story's `fact_ids` that must support that claim. Other `fact_ids` are
     optional supporting evidence and may be used only when they materially
@@ -232,6 +234,10 @@ the declared relationship are truthful, natural, and persuasive.
   resolution, change, or result that deserves the space; otherwise omit it. Do
   not disguise weak evidence with `created`, `built`, `designed`, `owned`,
   `managed`, or `led`.
+- After choosing accurate verbs one story at a time, inspect their rhythm across
+  the complete role. A run of identical openings is a prompt to recover each
+  story's distinct supported contribution or outcome, not permission to rotate
+  synonyms or increase authority.
 - In versions 4 and 5, begin with `claim_focus` and the minimum `core_fact_ids`
   set.
   Treat the remaining `fact_ids` as available evidence, not a checklist. Add an

@@ -37,29 +37,26 @@ def _acceptance_result(
     session: dict[str, Any],
     preview: Path,
 ) -> dict[str, str]:
-    """Validate that one reviewed preview contains the exact open revision."""
-    from .review_records import load_review_record, review_freshness, sha256_file
+    """Validate that one user-approved preview contains the exact open revision."""
+    from .compilation import sha256_file
 
     preview_path = _project_file(root, preview.as_posix(), "accepted feedback preview", "build")
     if not preview_path.name.endswith(".preview.json"):
         raise ValueError("accepted feedback preview must be a *.preview.json file")
     preview_data = _read_json(preview_path, "accepted feedback preview")
     if (
-        preview_data.get("version") != 2
+        preview_data.get("version") not in {2, 3}
         or preview_data.get("phase") != "preview"
         or preview_data.get("valid") is not True
         or preview_data.get("final_review_status") != "awaiting-user-approval"
     ):
         raise ValueError("feedback acceptance requires a successful current preview")
     build_record = _object(preview_data.get("build_manifest"), "preview build manifest")
-    review_record = _object(preview_data.get("review_record"), "preview review record")
     output_record = _object(preview_data.get("output"), "preview output")
     build_path = _project_file(root, build_record.get("path"), "preview build", "build")
-    review_path = _project_file(root, review_record.get("path"), "preview review", "build/reviews")
     output_path = _project_file(root, output_record.get("path"), "preview output", "build")
     for path, record, owner in (
         (build_path, build_record, "preview build"),
-        (review_path, review_record, "preview review"),
         (output_path, output_record, "preview output"),
     ):
         if record.get("sha256") != sha256_file(path):
@@ -83,33 +80,45 @@ def _acceptance_result(
     ]
     if len(matching_guidance) != 1:
         raise ValueError("preview does not contain the exact current feedback revision")
-    review = load_review_record(review_path, root)
-    reasons = review_freshness(review)
-    if reasons:
-        raise ValueError(f"feedback acceptance review is stale or incomplete: {reasons}")
-    matching_decisions = [
-        decision
-        for decision in review.feedback_rules
-        if decision.id == session["id"] and decision.revision == current_revision
-    ]
-    if (
-        review.feedback_status != "approved"
-        or len(matching_decisions) != 1
-        or matching_decisions[0].decision != "complies"
-    ):
-        raise ValueError("preview lacks approved compliance for the current feedback revision")
-    return {
+    result = {
         "resume_sha256": str(_object(build.get("source"), "build source").get("sha256")),
         "build_manifest": build_path.relative_to(root).as_posix(),
         "build_sha256": sha256_file(build_path),
-        "review_record": review_path.relative_to(root).as_posix(),
-        "review_sha256": sha256_file(review_path),
         "preview_manifest": preview_path.relative_to(root).as_posix(),
         "preview_sha256": sha256_file(preview_path),
         "output": output_path.relative_to(root).as_posix(),
         "output_sha256": sha256_file(output_path),
         "effective_digest": digest,
     }
+    if preview_data.get("version") == 2:
+        from .review_records import load_review_record, review_freshness
+
+        review_record = _object(preview_data.get("review_record"), "preview review record")
+        review_path = _project_file(
+            root, review_record.get("path"), "preview review", "build/reviews"
+        )
+        if review_record.get("sha256") != sha256_file(review_path):
+            raise ValueError("preview review changed after preview publication")
+        review = load_review_record(review_path, root)
+        reasons = review_freshness(review)
+        if reasons:
+            raise ValueError(f"feedback acceptance review is stale or incomplete: {reasons}")
+        matching_decisions = [
+            decision
+            for decision in review.feedback_rules
+            if decision.id == session["id"] and decision.revision == current_revision
+        ]
+        if (
+            review.feedback_status != "approved"
+            or len(matching_decisions) != 1
+            or matching_decisions[0].decision != "complies"
+        ):
+            raise ValueError("preview lacks approved compliance for the current feedback revision")
+        result["review_record"] = review_path.relative_to(root).as_posix()
+        result["review_sha256"] = sha256_file(review_path)
+    else:
+        result["approval"] = "user-approved-preview"
+    return result
 
 
 def accept_feedback(
@@ -159,7 +168,7 @@ def accept_feedback(
             "feedback acceptance must name one exact session; accept additional sessions separately"
         )
     if preview is None:
-        raise ValueError("feedback acceptance requires --preview for the reviewed result")
+        raise ValueError("feedback acceptance requires --preview for the user-approved result")
     accepted: list[dict[str, object]] = []
     for path in paths:
         if not path.is_file():

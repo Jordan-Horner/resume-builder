@@ -143,16 +143,14 @@ earlier commits.
   selection but cannot establish candidate experience.
 - **Important information is checked for accidental removal.** Plans and
   regression checks distinguish deliberate targeting from a lost accomplishment.
-  Before wording is judged, an independent selection review examines the whole
-  hiring argument—including stories the draft left out. Truthful but harmful
-  context does not earn resume space merely because it answers a reviewer risk.
-  After a selection passes review, removing a role, story, required dimension,
-  or supporting evidence requires one explicit, grouped strategy approval; a
-  later reviewer cannot make the resume pass by quietly shrinking it.
-- **Software and people perform different checks.** The engine catches evidence
-  and formatting problems; a strategy reviewer judges what belongs, then a
-  separate cold reviewer judges only the writing. One wording-repair pass may revisit rejected blocks, while unchanged
-  approved blocks stay closed. Changing strategy starts a new approved cycle.
+  Preview performs the local evidence and formatting checks, then returns the
+  draft directly to the user for editing. An optional independent critique can
+  examine the complete hiring argument and writing when requested; it does not
+  block preview or minting.
+- **The user owns the wording loop.** The normal lifecycle is build, preview,
+  edit, preview, and mint. An explicit mint request approves the current
+  preview; mint then performs the hard source, evidence, page, rendering, and
+  PDF-extraction checks.
 
 These safeguards do not predict an employer's decision or produce a universal ATS
 score. They make the resume easier to verify, revise, and defend.

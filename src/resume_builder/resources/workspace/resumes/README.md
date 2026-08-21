@@ -10,23 +10,15 @@ Hydration must never write here. Resume builders create reviewable
 Markdown changes using the canonical structure documented in
 `.agents/skills/build-resume/references/markdown-contract.md`. Use
 `resume-builder feedback resolve <plan> --include-open` before user-driven
-revisions. Direct user criticism is first recorded as a temporary session and
-its latest revision is checked after the independent cold review. After the user
-accepts the reviewed preview, promote each intended session with
+revisions. Direct user criticism is first recorded as a temporary session.
+Apply the edit and run `resume-builder preview` immediately; repeat that
+preview/edit loop until the user says `Mint`. Then promote each intended session with
 `resume-builder feedback accept FB-<session> --preview
-build/<resume>.preview.json`; unchanged effective guidance preserves that
-preview for minting.
-Use
-`resume-builder verify` for the normal review handoff: it compiles the draft,
-runs the fast content checks, writes a cached verification receipt, and prepares
-the frozen cold-read package plus reviewer decisions file. Complete that file
-through `critique-resume`. When an already-authorized workflow has one clear
-wording-only repair, run `resume-builder review apply-repairs`, re-verify, and
-repeat the independent review without pausing. Then run `resume-builder review finalize` to create
-and validate the version 4 record. After approval, run `resume-builder preview`
-to publish a continuous web preview. Create the audited final PDF with
-`resume-builder mint` only after explicit final approval. Leave every generated
-artifact under `build/`.
+build/<resume>.preview.json`, then create the audited PDF with
+`resume-builder mint`. The mint request is approval of that exact current
+preview. Leave every generated artifact under `build/`. Use
+`resume-builder verify` and `critique-resume` only for an explicitly requested
+independent critique; their records do not gate preview or mint.
 
 Plans under `plans/` keep the evidence strategy reviewable. Existing version 1
 plans remain valid and require every planned story. Version 2 plans add a
@@ -50,14 +42,6 @@ This prevents one cited fact from lending unsupported authorship or impact to
 another fact in the same bullet.
 
 Job-specific tailoring also requires a preserved posting under `targets/`.
-Pass the target and baseline to `resume-builder verify` so its receipt includes
-exact retrieval gains, evidence removals, and semantic gaps before critique or
-minting. Compilation is always an unreviewed draft. The verifier runs
-`review package`; have `critique-resume` decide every narrative
-block from the isolated cold-read file before consulting the evidence appendix;
-`resume-builder review finalize` and `resume-builder review validate` must pass before the prose is considered
-approved or a web preview can be published. Never overwrite the baseline with the
-tailored version; Git history preserves revisions within each stable file.
-When accepted rules or open revisions apply, the decisions file includes a
-separate post-cold feedback-compliance review. The cold reviewer never receives
-that guidance.
+Never overwrite the baseline with the tailored version; Git history preserves
+revisions within each stable file. Matching and independent critique remain
+available on request but do not interrupt the preview/edit loop.
