@@ -48,8 +48,14 @@ both files, the build manifest, every narrative block, and every cited fact hash
 and template pinned by the approved review, then publishes that HTML for final
 user review. Its notice separately reports evidence integrity, career review,
 role-fit judgment, career verdict, and pending user approval; the notice never
-appears in print. The HTML explicitly identifies itself as a continuous web
-preview; PDF page count is calculated only during minting. `mint` renders that
+appears in print. Its structured `user_handoff` marks presentation as required
+and supplies the artifact path, absolute path, pending approval state, next
+action, organized presentation fields, and ready-to-post `rendered_markdown`.
+The agent must post `rendered_markdown` as the user-facing response rather than
+printing the command JSON or reducing the handoff to a bare link. Generating the
+HTML alone does not complete the preview step. The HTML explicitly identifies
+itself as a continuous web preview; PDF page count is calculated only during
+minting. `mint` renders that
 exact user-reviewed HTML and creates a
 separately audited PDF using pinned Playwright Chromium;
 install it once with `python -m playwright install chromium`.

@@ -520,6 +520,73 @@ def test_preview_requires_review_then_publishes_html_for_final_approval(
     }
     assert preview_manifest["final_review_status"] == "awaiting-user-approval"
     assert preview_manifest["output"]["path"] == "build/support-operations.html"
+    assert preview_manifest["user_handoff"] == {
+        "required": True,
+        "action": "present-preview",
+        "artifact": {
+            "path": "build/support-operations.html",
+            "media_type": "text/html",
+            "label": "Open the reviewed resume preview",
+        },
+        "approval": {
+            "required": True,
+            "status": "pending",
+            "next_action_on_approval": "mint",
+        },
+        "presentation": {
+            "title": "Resume Preview",
+            "summary": (
+                "Your resume has passed its evidence and language reviews. It is ready for "
+                "your final review but has not yet been converted to PDF."
+            ),
+            "review_heading": "Review your resume",
+            "guidance_heading": "What to check",
+            "guidance": (
+                "Confirm that the resume feels accurate, natural, and appropriately "
+                "positioned for the role."
+            ),
+            "status_heading": "Current status",
+            "status_items": [
+                {"label": "Evidence integrity", "value": "Claims checked"},
+                {"label": "Resume language", "value": "Approved"},
+                {"label": "Role fit", "value": "Compelling"},
+                {"label": "Your approval", "value": "Still needed"},
+                {"label": "Final PDF", "value": "Not created"},
+            ],
+            "response_prompt": 'Reply "Mint" to create the PDF, or tell me what to change.',
+        },
+    }
+
+    result = previewing.preview_resume(resume, vault_root=vault)
+    handoff = result["user_handoff"]
+    assert handoff["required"] is True
+    assert handoff["action"] == "present-preview"
+    assert handoff["artifact"]["absolute_path"] == str(html_path.resolve())
+    assert str(html_path.resolve()) in handoff["artifact"]["markdown"]
+    assert handoff["rendered_markdown"] == (
+        "## Resume Preview\n\n"
+        "Your resume has passed its evidence and language reviews. It is ready for your "
+        "final review but has not yet been converted to PDF.\n\n"
+        "### Review your resume\n\n"
+        f"[Open the full resume preview](<{html_path.resolve()}>)\n\n"
+        "### What to check\n\n"
+        "Confirm that the resume feels accurate, natural, and appropriately positioned "
+        "for the role.\n\n"
+        "### Current status\n\n"
+        "| Review area | Result |\n"
+        "|---|---|\n"
+        "| Evidence integrity | Claims checked |\n"
+        "| Resume language | Approved |\n"
+        "| Role fit | Compelling |\n"
+        "| Your approval | Still needed |\n"
+        "| Final PDF | Not created |\n\n"
+        'Reply "Mint" to create the PDF, or tell me what to change.'
+    )
+    assert handoff["approval"] == {
+        "required": True,
+        "status": "pending",
+        "next_action_on_approval": "mint",
+    }
 
 
 def test_preview_cannot_bypass_a_missing_selection_review(tmp_path: Path, run_main) -> None:
@@ -529,6 +596,24 @@ def test_preview_cannot_bypass_a_missing_selection_review(tmp_path: Path, run_ma
     selection_review.selection_review_paths(tmp_path, resume)["record"].unlink()
 
     assert run_main(previewing.main, resume, "--vault-root", vault) == 2
+
+
+def test_preview_handoff_identifies_a_tailored_resume() -> None:
+    presentation = previewing._handoff_presentation(
+        tailored=True,
+        evidence_integrity="claim-checked",
+        language_review="approved",
+        role_fit="strong-fit",
+    )
+
+    assert presentation["summary"].startswith("Your tailored resume")
+    assert presentation["status_items"] == [
+        {"label": "Evidence integrity", "value": "Claims checked"},
+        {"label": "Resume language", "value": "Approved"},
+        {"label": "Role fit", "value": "Strong fit"},
+        {"label": "Your approval", "value": "Still needed"},
+        {"label": "Final PDF", "value": "Not created"},
+    ]
 
 
 def test_compile_preserves_published_preview_but_marks_it_stale(tmp_path: Path, run_main) -> None:

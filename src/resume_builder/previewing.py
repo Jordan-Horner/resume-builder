@@ -26,6 +26,62 @@ PREVIEW_MODE = {
 }
 
 
+def _display_status(value: str) -> str:
+    """Convert a machine status into concise user-facing text."""
+    if value == "claim-checked":
+        return "Claims checked"
+    return value.replace("-", " ").capitalize()
+
+
+def _handoff_presentation(
+    *, tailored: bool, evidence_integrity: str, language_review: str, role_fit: str
+) -> dict[str, Any]:
+    """Return the user-facing structure for the final preview handoff."""
+    resume_label = "tailored resume" if tailored else "resume"
+    return {
+        "title": "Resume Preview",
+        "summary": (
+            f"Your {resume_label} has passed its evidence and language reviews. "
+            "It is ready for your final review but has not yet been converted to PDF."
+        ),
+        "review_heading": "Review your resume",
+        "guidance_heading": "What to check",
+        "guidance": (
+            "Confirm that the resume feels accurate, natural, and appropriately "
+            "positioned for the role."
+        ),
+        "status_heading": "Current status",
+        "status_items": [
+            {"label": "Evidence integrity", "value": _display_status(evidence_integrity)},
+            {"label": "Resume language", "value": _display_status(language_review)},
+            {"label": "Role fit", "value": _display_status(role_fit)},
+            {"label": "Your approval", "value": "Still needed"},
+            {"label": "Final PDF", "value": "Not created"},
+        ],
+        "response_prompt": 'Reply "Mint" to create the PDF, or tell me what to change.',
+    }
+
+
+def _render_handoff_markdown(presentation: dict[str, Any], artifact_markdown: str) -> str:
+    """Render the structured preview handoff for direct presentation."""
+    status_rows = "\n".join(
+        f"| {item['label']} | {item['value']} |" for item in presentation["status_items"]
+    )
+    return "\n\n".join(
+        [
+            f"## {presentation['title']}",
+            presentation["summary"],
+            f"### {presentation['review_heading']}",
+            artifact_markdown,
+            f"### {presentation['guidance_heading']}",
+            presentation["guidance"],
+            f"### {presentation['status_heading']}",
+            f"| Review area | Result |\n|---|---|\n{status_rows}",
+            presentation["response_prompt"],
+        ]
+    )
+
+
 def _current_build(
     resume: Path,
     project_root: Path,
@@ -170,6 +226,30 @@ def preview_resume(
     )
     atomic_write_text(html_path, rendered)
 
+    relative_html_path = relative_output(html_path, project_root)
+    evidence_status = review.evidence_status or "legacy-not-separated"
+    presentation = _handoff_presentation(
+        tailored=resume_path.parent.name == "tailored",
+        evidence_integrity=evidence_status,
+        language_review=review.editorial_status,
+        role_fit=review.hiring_read,
+    )
+    user_handoff: dict[str, Any] = {
+        "required": True,
+        "action": "present-preview",
+        "artifact": {
+            "path": relative_html_path,
+            "media_type": "text/html",
+            "label": "Open the reviewed resume preview",
+        },
+        "approval": {
+            "required": True,
+            "status": "pending",
+            "next_action_on_approval": "mint",
+        },
+        "presentation": presentation,
+    }
+
     manifest = {
         "version": 2,
         "phase": "preview",
@@ -185,7 +265,7 @@ def preview_resume(
             "status": review.editorial_status,
         },
         "review_statuses": {
-            "evidence_integrity": review.evidence_status or "legacy-not-separated",
+            "evidence_integrity": evidence_status,
             "language_review": review.editorial_status,
             "role_fit": review.hiring_read,
             "career_verdict": review.verdict,
@@ -202,13 +282,16 @@ def preview_resume(
         },
         "final_review_status": "awaiting-user-approval",
         "output": {
-            "path": relative_output(html_path, project_root),
+            "path": relative_html_path,
             "sha256": sha256_file(html_path),
         },
+        "user_handoff": user_handoff,
         "warnings": list(build_manifest.get("warnings", [])),
         "errors": [],
     }
     atomic_write_json(preview_manifest_path, manifest)
+    absolute_html_path = str(html_path.resolve())
+    artifact_markdown = f"[Open the full resume preview](<{absolute_html_path}>)"
     return {
         "valid": True,
         "source": relative_output(resume_path, project_root),
@@ -219,6 +302,15 @@ def preview_resume(
         "review_statuses": manifest["review_statuses"],
         "final_review_status": "awaiting-user-approval",
         "preview_mode": manifest["preview_mode"],
+        "user_handoff": {
+            **user_handoff,
+            "artifact": {
+                **user_handoff["artifact"],
+                "absolute_path": absolute_html_path,
+                "markdown": artifact_markdown,
+            },
+            "rendered_markdown": _render_handoff_markdown(presentation, artifact_markdown),
+        },
         "warnings": list(build_manifest.get("warnings", [])),
     }
 

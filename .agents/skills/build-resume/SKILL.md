@@ -274,8 +274,12 @@ Git tools do not. Never write candidate data into same-named engine folders.
     date, or formatting-only corrections do not require another critique unless
     they alter a returned narrative block. After the career-professional review
     is approved and validated, run `resume-builder preview <resume>` to publish
-    readable HTML for the user's final review. After the user explicitly
-    approves that preview and wants the final PDF, run
+    readable HTML for the user's final review. The preview command returns a
+    structured `user_handoff`; post its `rendered_markdown` immediately as the
+    organized user-facing response and request explicit review. Do not print the
+    command JSON, reduce the response to a bare link, stop at saying the preview
+    was generated, or leave the artifact only in tool output. After the user
+    explicitly approves that preview and wants the final PDF, run
     `resume-builder mint <resume>`; when the user selects a different page
     budget, change and recompile the version 6 plan before minting.
     When the user has already authorized a completed revision, preview, or mint

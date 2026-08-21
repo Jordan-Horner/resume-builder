@@ -315,6 +315,10 @@ indexes. The scripts under
   build diagnostics. After the separate
   career-professional review is approved and validated, publish the readable
   web preview through `resume-builder preview` for the user's final review.
+  Treat the command's structured `user_handoff` as required: immediately post
+  its `rendered_markdown` as the organized user-facing response and ask for
+  review. Do not print the command JSON or reduce the response to a bare link.
+  Generating the HTML or merely reporting its path does not complete this step.
   Use `resume-builder render` only for low-level renderer development or
   diagnostics.
 - Mint a final PDF only through `resume-builder mint`, after the Markdown and

@@ -97,7 +97,10 @@ career record is the foundation; each resume is a focused view of that record.
    evidence.
 4. **Shows you the result.** A separate career-professional review evaluates the
    writing and hiring case. You approve a readable web preview before the system
-   creates a final, format-checked PDF.
+   creates a final, format-checked PDF. The preview step returns a structured,
+   required handoff with organized, ready-to-post Markdown so the agent presents
+   the complete review prompt instead of merely generating a file in the
+   background.
 
 If a draft is weak, the agent checks your saved career evidence and imported
 sources before asking a question. It asks only focused questions that could

@@ -386,6 +386,21 @@ def test_build_resume_rendering_contract_uses_vault_evidence() -> None:
     assert "resume-builder compile" in rendering
     assert "#087f8c" in rendering
     assert "#245f8f" in rendering
+    assert "user_handoff" in rendering
+    assert "rendered_markdown" in rendering
+    assert "bare link" in rendering
+
+
+def test_agent_contract_requires_preview_handoff_to_be_presented() -> None:
+    agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    skill = (BUILD_SKILL / "SKILL.md").read_text(encoding="utf-8")
+
+    assert "structured `user_handoff`" in agents
+    assert "`rendered_markdown`" in agents
+    assert "bare link" in agents
+    assert "structured `user_handoff`" in skill
+    assert "organized user-facing response" in skill
+    assert "leave the artifact only in tool output" in skill
 
 
 def test_match_job_skill_preserves_job_specific_boundaries() -> None:
