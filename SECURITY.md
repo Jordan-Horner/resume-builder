@@ -25,6 +25,4 @@ or reproduction. Demonstrate the problem with fictional data whenever possible.
 
 ## Supported versions
 
-Resume Builder has not published its first public release. Security fixes
-currently apply to the latest commit on `main`. This section will identify
-supported release lines when public versions are tagged.
+Security fixes apply to the latest commit on `main`.
