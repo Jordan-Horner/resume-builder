@@ -39,6 +39,8 @@ changes.
 
 ### Fixed
 
+- Whitespace-only synthesis-list entries can no longer satisfy unresolved
+  reviewer-risk gap requirements
 - Resume plans and prose no longer rely on unresolved workflow-adoption and
   false-positive-escalation claims
 

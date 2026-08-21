@@ -66,13 +66,18 @@ def optional_string(value: object, owner: str) -> str | None:
 
 def string_list(value: object, owner: str, *, required: bool = True) -> list[str]:
     """Return a unique list of non-empty strings."""
-    if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
+    if not isinstance(value, list):
         raise ValueError(f"{owner} must be a list of non-empty strings")
     if required and not value:
         raise ValueError(f"{owner} must not be empty")
-    if len(set(value)) != len(value):
+    if not all(isinstance(item, str) for item in value):
+        raise ValueError(f"{owner} must be a list of non-empty strings")
+    normalized = [item.strip() for item in value]
+    if any(not item for item in normalized):
+        raise ValueError(f"{owner} must be a list of non-empty strings")
+    if len(set(normalized)) != len(normalized):
         raise ValueError(f"{owner} must not contain duplicates")
-    return value
+    return normalized
 
 
 def fact_metadata(vault_root: Path) -> dict[str, dict[str, object]]:

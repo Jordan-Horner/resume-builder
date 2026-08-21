@@ -622,6 +622,71 @@ def test_reviewer_risk_can_cite_intentionally_excluded_evidence(tmp_path: Path) 
     assert plan.exclusions[0][0] == "FACT-003"
 
 
+def test_unresolved_reviewer_risk_rejects_whitespace_only_gap(tmp_path: Path) -> None:
+    vault, path = project(tmp_path)
+    upgrade_to_v3(path)
+    text = path.read_text(encoding="utf-8")
+    text = text.replace(
+        "status: resolved\n    fact_ids: [FACT-001]",
+        "status: unresolved\n    fact_ids: []",
+        1,
+    ).replace("gaps: []", 'gaps: [" "]', 1)
+    path.write_text(text, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="synthesis gaps must be a list of non-empty strings"):
+        synthesis.load_synthesis_plan(path, tmp_path, vault)
+
+
+def test_unresolved_reviewer_risk_still_requires_a_gap(tmp_path: Path) -> None:
+    vault, path = project(tmp_path)
+    upgrade_to_v3(path)
+    path.write_text(
+        path.read_text(encoding="utf-8").replace(
+            "status: resolved\n    fact_ids: [FACT-001]",
+            "status: unresolved\n    fact_ids: []",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="unresolved synthesis reviewer risks require"):
+        synthesis.load_synthesis_plan(path, tmp_path, vault)
+
+
+def test_synthesis_lists_strip_meaningful_values(tmp_path: Path) -> None:
+    vault, path = project(tmp_path)
+    upgrade_to_v3(path)
+    text = path.read_text(encoding="utf-8")
+    text = text.replace(
+        "status: resolved\n    fact_ids: [FACT-001]",
+        "status: unresolved\n    fact_ids: []",
+        1,
+    )
+    text = text.replace("progression: [ROLE-001]", 'progression: [" ROLE-001 "]', 1)
+    text = text.replace("gaps: []", 'gaps: ["  Missing verified scale  "]', 1)
+    path.write_text(text, encoding="utf-8")
+
+    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+
+    assert plan.progression == ("ROLE-001",)
+    assert plan.gaps == ("Missing verified scale",)
+
+
+def test_synthesis_lists_reject_duplicates_after_stripping(tmp_path: Path) -> None:
+    vault, path = project(tmp_path)
+    path.write_text(
+        path.read_text(encoding="utf-8").replace(
+            "gaps: []",
+            'gaps: ["Missing verified scale", " Missing verified scale "]',
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="synthesis gaps must not contain duplicates"):
+        synthesis.load_synthesis_plan(path, tmp_path, vault)
+
+
 def test_v3_requires_every_direction_concept_classification(tmp_path: Path) -> None:
     vault, path = project(tmp_path)
     upgrade_to_v3(path)
