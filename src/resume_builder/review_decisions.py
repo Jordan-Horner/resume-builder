@@ -302,8 +302,10 @@ def finalize_review_record(
         }
         for prior_value in handoff["carried_blocks"]:
             prior = _object(prior_value, "repair handoff carried block")
-            block_id = prior.get("id")
-            current = decisions_by_id.get(str(block_id))
+            carried_block_id = prior.get("id")
+            if not isinstance(carried_block_id, str) or not carried_block_id:
+                raise ValueError("repair handoff carried block id must be a non-empty string")
+            current = decisions_by_id.get(carried_block_id)
             if (
                 current is None
                 or current.get("sha256") != prior.get("sha256")
@@ -311,7 +313,7 @@ def finalize_review_record(
                 or current.get("note") != prior.get("note")
             ):
                 raise ValueError(
-                    f"repair review cannot reopen unchanged approved block: {block_id}"
+                    f"repair review cannot reopen unchanged approved block: {carried_block_id}"
                 )
 
     build_manifest_record = _object(

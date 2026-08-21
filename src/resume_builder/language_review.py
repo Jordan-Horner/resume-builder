@@ -455,10 +455,10 @@ def finalize_language_review(
         digest = sha256_text(block.text)
         decision = decisions_by_id.get(block.id)
         if decision is None:
-            prior = prior_approved.get(block.id)
-            if prior is None or prior.get("sha256") != digest:
+            prior_block = prior_approved.get(block.id)
+            if prior_block is None or prior_block.get("sha256") != digest:
                 raise ValueError(f"language review is missing current block: {block.id}")
-            decision = prior
+            decision = prior_block
         final_blocks.append(
             {
                 "id": block.id,

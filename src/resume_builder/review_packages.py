@@ -400,7 +400,7 @@ def _write_review_decisions(
                     "repair": None,
                 }
             )
-    template = {
+    template: dict[str, Any] = {
         "version": 3 if feedback_rules else 2,
         "generated_at": generated_at,
         "review_inputs": review_inputs,
