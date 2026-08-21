@@ -522,7 +522,8 @@ def test_screen_job_skill_is_compact_read_only_triage() -> None:
     assert "Hourly:" in contract
     assert "Annualized equivalent:" in contract
     assert "Benefits:" in contract
-    assert "Not specified in the posting" in contract
+    assert "**Compensation:** Not specified" in contract
+    assert "**Benefits:** Not specified" in contract
     assert "show hourly pay only when the posting states an hourly rate" in normalized_skill
     assert "Do not derive or display an hourly rate from annual compensation" in contract
     assert "general consultant FAQ does not establish benefits" in normalized_contract
@@ -538,6 +539,25 @@ def test_screen_job_skill_is_compact_read_only_triage() -> None:
     assert "**Recommendation:" not in contract
     assert "Low priority" not in contract
     assert "one specific next action" in normalized_contract
+    assert "Mandatory and role-defining" in contract
+    assert "Mandatory but substitutable" in contract
+    assert "Lifestyle constraint" in contract
+    assert "eligibility risk separately from transferable overlap" in normalized_skill
+    assert "do not let it satisfy the eligibility gate" in normalized_contract
+    assert "capability clusters" in normalized_contract
+    assert "Do not count missing keywords" in normalized_contract
+    assert "fixed number of gaps" in normalized_contract
+    assert "assume that tools in the same category are equivalent" in normalized_contract
+    assert "percentages, points, or a universal score" in normalized_contract
+    assert "Required primary-platform tenure" in contract
+    assert "accepted equivalent capability" in contract
+    assert "candidate evidence is incomplete" in contract
+    assert "every role-defining minimum" in normalized_contract.lower()
+    assert "completed evidence search" in normalized_contract
+    assert "treat that requirement as unsupported" in normalized_contract
+    for label in ("Strong", "Partial", "Weak", "Unknown"):
+        assert f"**{label} match**" in contract
+    assert "**Bad match**" not in contract
     assert interface["interface"]["display_name"] == "Screen Job"
     assert "$screen-job" in interface["interface"]["default_prompt"]
 

@@ -44,8 +44,9 @@ Read [the screen contract](references/screen-contract.md) before every screen.
    resumes, relevant directions, and stored work preferences. Reuse an existing
    posting snapshot when present, but do not create one merely to screen.
 5. Compare the posting with demonstrated evidence. Select the closest existing
-   resume, if any, and classify the overall match using the contract's fixed
-   labels. Distinguish:
+   resume, if any. Classify only the material requirements using the contract's
+   requirement types, then assign one of its fixed overall-match labels. Judge
+   eligibility risk separately from transferable overlap, and distinguish:
    - evidence already visible in the closest resume;
    - canonical evidence available for a later rebuild;
    - missing detail that a pointed user story could resolve; and

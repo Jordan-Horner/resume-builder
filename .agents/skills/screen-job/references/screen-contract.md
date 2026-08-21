@@ -11,16 +11,59 @@ opportunity; they never become candidate facts.
 
 ## Match decision
 
-Choose exactly one match label:
+Classify only material posting requirements before choosing the label:
 
-- **Strong match** — the closest resume visibly proves most core requirements;
-  only prioritization or light tailoring appears necessary.
-- **Partial match** — meaningful direct or transferable evidence exists, but
-  one or two material requirements, stories, or visibility problems remain.
-- **Weak match** — the core work or required evidence is substantially absent
-  or misaligned.
-- **Unknown match** — the posting or vault lacks enough information for a
-  defensible classification.
+- **Mandatory and role-defining** — central to the role's daily work and stated
+  as a minimum; absence creates an eligibility risk.
+- **Mandatory but substitutable** — required, but the posting or a reliable
+  opportunity-specific source explicitly permits equivalent tools, education,
+  or experience.
+- **Supporting** — important to performance but not an apparent eligibility
+  gate.
+- **Preferred** — a differentiator rather than a minimum.
+- **Lifestyle constraint** — location, schedule, travel, on-call, employment
+  type, or compensation that could independently make the job unsuitable.
+
+Then decide in this order:
+
+1. If the posting is materially incomplete or known candidate sources are
+   unavailable or unfinished, use **Unknown match** and ask a targeted question
+   when one could resolve it. Do not use **Unknown match** merely because a
+   completed evidence search does not establish a stated requirement; treat
+   that requirement as unsupported.
+2. If a mandatory and role-defining requirement is unsupported and no accepted
+   substitution is stated, use **Weak match**. Keep adjacent experience under
+   `Strongest overlap`; do not let it satisfy the eligibility gate.
+3. Otherwise judge the breadth of demonstrated core work and choose exactly one
+   label:
+   - **Strong match** — the closest resume visibly proves most core requirements,
+     including every clearly role-defining minimum; only prioritization or light
+     tailoring appears necessary.
+   - **Partial match** — most core work is demonstrated, the remaining material
+     gaps are limited and credibly bridgeable, and no unsupported,
+     non-substitutable role-defining minimum remains.
+   - **Weak match** — several independent core capabilities are absent, or the
+     demonstrated work is substantially misaligned, even when some transferable
+     overlap exists.
+   - **Unknown match** — the posting, vault, or registered source material lacks
+     enough information for a defensible classification.
+
+Treat related terms as capability clusters rather than separate gaps. Do not
+count missing keywords, use a fixed number of gaps as an automatic threshold,
+or assume that tools in the same category are equivalent. One unsupported
+role-defining minimum can justify **Weak match**; several missing preferences
+may not. Accept a substitution only when the posting or a reliable source tied
+to the opportunity permits it. Do not invent percentages, points, or a
+universal score.
+
+Use these boundary cases to calibrate judgment:
+
+| Scenario | Expected label |
+|---|---|
+| Required primary-platform tenure is unsupported and no substitution is permitted | **Weak match** |
+| Several related tool terms are absent, but an accepted equivalent capability is demonstrated | **Partial match** |
+| Material experience may exist, but the posting or candidate evidence is incomplete | **Unknown match** |
+| Every role-defining minimum and most core work are visibly demonstrated | **Strong match** |
 
 Do not call the match an ATS score. ATS visibility is one part of the `Match`
 field and must distinguish missing wording from missing evidence.
@@ -48,7 +91,7 @@ add sections unless the user asks:
 | **Company** | <actual employer/client and integer years in business, or Undisclosed> |
 | **Recruiter** | <include only for a staffing intermediary: name, integer years in business, and intermediary relationship> |
 | **Employment** | **<Remote, Hybrid, or On-site> · <Full-time, Part-time, or Contract>** |
-| **Pay** | <use the matching compensation format below><br>**Benefits:** <posting-confirmed benefits or Not specified in the posting> |
+| **Pay** | <use the matching compensation format below><br>**Benefits:** <posting-confirmed benefits or Not specified> |
 
 ### Career direction
 
@@ -81,14 +124,14 @@ no question meets that bar.>
   - for hourly compensation, show `**Hourly:** <confirmed range>` and optionally
     `**Annualized equivalent:** <calculated range>` when the comparison is useful;
   - when the posting states both, show both without converting either one;
-  - when compensation is absent, show `**Compensation:** Not specified in the posting`.
+  - when compensation is absent, show `**Compensation:** Not specified`.
+- When job-specific benefits are absent, show `**Benefits:** Not specified`.
 - Do not derive or display an hourly rate from annual compensation. Any
   annualized equivalent derived from hourly compensation must be clearly
   identified as an estimate, not guaranteed salary.
 - Report benefits as confirmed only when the posting or another source tied to
   the specific opportunity states them. A staffing firm's general consultant
-  FAQ does not establish benefits for the job; use `Not specified in the
-  posting` instead.
+  FAQ does not establish benefits for the job; use `Not specified` instead.
 - Put `Match` before company, employment, and pay so the user's fit is the first
   substantive answer.
 - Keep the closest resume, strongest overlap, primary gap, and ATS visibility
