@@ -17,6 +17,7 @@ from . import __version__
 from .artifact_paths import default_resume_output_base
 from .atomic import atomic_write_bytes, atomic_write_json
 from .compilation import relative_output, sha256_file
+from .language_review import current_language_review
 from .pdf_rendering import render_pdf
 from .previewing import _current_build
 from .rendering import contained_project_path
@@ -76,8 +77,9 @@ def mint_resume(
     _current_build(resume_path, project_root, vault_root, resolved_base)
     preview_build = preview_manifest.get("build_manifest")
     preview_output = preview_manifest.get("output")
+    preview_language = preview_manifest.get("language_review")
     if (
-        preview_manifest.get("version") != 3
+        preview_manifest.get("version") != 4
         or preview_manifest.get("phase") != "preview"
         or preview_manifest.get("valid") is not True
         or not isinstance(preview_build, dict)
@@ -86,12 +88,22 @@ def mint_resume(
         or not isinstance(preview_output, dict)
         or preview_output.get("path") != relative_output(html_path, project_root)
         or preview_output.get("sha256") != sha256_file(html_path)
+        or not isinstance(preview_language, dict)
     ):
         raise ValueError("mint preview is stale; publish and approve the current build")
     if preview_manifest.get("source") != relative_output(resume_path, project_root):
         raise ValueError("mint preview names a different resume")
     if preview_manifest.get("final_review_status") != "awaiting-user-approval":
         raise ValueError("mint preview is not awaiting explicit user approval")
+    language = current_language_review(resume_path, project_root)
+    if (
+        language["status"] != "approved"
+        or preview_language.get("path") != relative_output(language["path"], project_root)
+        or preview_language.get("sha256") != language["sha256"]
+    ):
+        raise ValueError(
+            "mint requires the current independent natural-language review to be approved"
+        )
     template_path = contained_project_path(template, project_root, "templates", "template")
     build_template = build_manifest.get("template")
     if not isinstance(build_template, dict) or build_template.get("path") != relative_output(
@@ -147,7 +159,7 @@ def mint_resume(
     if page_error is None:
         atomic_write_bytes(submission_path, pdf_path.read_bytes())
     manifest = {
-        "version": 3,
+        "version": 4,
         "phase": "mint",
         "valid": page_error is None,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -160,6 +172,11 @@ def mint_resume(
         "preview_manifest": {
             "path": relative_output(preview_manifest_path, project_root),
             "sha256": sha256_file(preview_manifest_path),
+        },
+        "language_review": {
+            "path": relative_output(language["path"], project_root),
+            "sha256": language["sha256"],
+            "status": language["status"],
         },
         "user_approval": {
             "status": "approved-for-mint",

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -8,10 +9,12 @@ import pytest
 from resume_builder import (
     compilation,
     feedback_memory,
+    language_review,
     minting,
     pdf_rendering,
     previewing,
     project_report,
+    review_policy,
     review_records,
     selection_guard,
     selection_review,
@@ -408,6 +411,49 @@ def write_approved_review(tmp_path: Path, resume: Path) -> Path:
     return review
 
 
+def write_language_review(
+    tmp_path: Path,
+    resume: Path,
+    *,
+    revise_block: str | None = None,
+) -> Path:
+    """Create the standalone independent language record used by preview and mint."""
+    manifest = tmp_path / "build" / "resumes" / resume.stem / "resume.manifest.json"
+    if verification.build_manifest_freshness(manifest, tmp_path):
+        compilation.build_resume(resume, vault_root=tmp_path / "vault")
+    prepared = language_review.prepare_language_review(resume, tmp_path)
+    if prepared["cached"]:
+        return language_review.language_review_paths(tmp_path, resume)["record"]
+    decisions_path = language_review.language_review_paths(tmp_path, resume)["decisions"]
+    decisions = json.loads(decisions_path.read_text(encoding="utf-8"))
+    decisions["reviewer"]["context"] = (
+        "Fresh reviewer received only the generated cold-read blocks and their visible context."
+    )
+    decisions["language_review"]["status"] = (
+        "changes-required" if revise_block is not None else "approved"
+    )
+    for block in decisions["language_review"]["blocks"]:
+        if block["id"] == revise_block:
+            block["decision"] = "revise"
+            block["note"] = "The sentence is unnatural and needs a clearer direct clause."
+        else:
+            block["decision"] = "approved"
+            cold = json.loads(
+                language_review.language_review_paths(tmp_path, resume)["cold"].read_text(
+                    encoding="utf-8"
+                )
+            )
+            advisory_ids = {item["id"] for item in cold["blocks"] if item.get("advisories")}
+            block["note"] = (
+                "The flagged wording is clear in its visible context."
+                if block["id"] in advisory_ids
+                else ""
+            )
+    decisions_path.write_text(json.dumps(decisions), encoding="utf-8")
+    language_review.finalize_language_review(decisions_path, tmp_path)
+    return language_review.language_review_paths(tmp_path, resume)["record"]
+
+
 def test_compile_markdown_preserves_structure_and_evidence() -> None:
     payload = compilation.compile_markdown(resume_markdown())
 
@@ -488,17 +534,19 @@ def test_compile_command_writes_review_input_without_web_preview(tmp_path: Path,
     assert not outside.with_suffix(".html").exists()
 
 
-def test_preview_compiles_current_draft_and_publishes_html_for_editing(
+def test_preview_requires_language_review_then_publishes_html_for_editing(
     tmp_path: Path, run_main
 ) -> None:
     vault, resume = project(tmp_path)
 
+    assert run_main(previewing.main, resume, "--vault-root", vault) == 2
+    write_language_review(tmp_path, resume)
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
 
     html_path = tmp_path / "build" / "resumes" / "support-operations" / "resume.html"
     rendered = html_path.read_text(encoding="utf-8")
     assert "Test Candidate" in rendered
-    assert "Draft preview" in rendered
+    assert "Language reviewed" in rendered
     assert "Edit or mint when ready" in rendered
     assert 'data-evidence="EX-005"' in rendered
     assert ' - <span class="certification-org">Example Issuer</span>' in rendered
@@ -509,15 +557,17 @@ def test_preview_compiles_current_draft_and_publishes_html_for_editing(
         )
     )
     assert preview_manifest["phase"] == "preview"
-    assert preview_manifest["version"] == 3
+    assert preview_manifest["version"] == 4
     assert "review_record" not in preview_manifest
     assert preview_manifest["review_statuses"] == {
         "evidence_integrity": "claim-checked",
-        "language_review": "user-review",
-        "role_fit": "not-reviewed",
-        "career_verdict": "not-reviewed",
+        "language_review": "approved",
+        "role_fit": "strong-and-well-positioned",
+        "career_verdict": "not-required",
         "user_review": "pending",
     }
+    assert preview_manifest["language_review"]["issues"] == []
+    assert preview_manifest["hybrid_review"]["career_review"]["run"] is False
     assert preview_manifest["final_review_status"] == "awaiting-user-approval"
     assert preview_manifest["output"]["path"] == "build/resumes/support-operations/resume.html"
     assert preview_manifest["user_handoff"] == {
@@ -541,7 +591,8 @@ def test_preview_compiles_current_draft_and_publishes_html_for_editing(
         "presentation": {
             "title": "Resume Preview",
             "summary": (
-                "Your resume preview is ready. Review it and tell me what to change. "
+                "Your resume passed its independent language review. Review it and tell me "
+                "what to change. "
                 'When it looks right, reply "Mint" to create the PDF.'
             ),
             "review_heading": "Review your resume",
@@ -564,8 +615,8 @@ def test_preview_compiles_current_draft_and_publishes_html_for_editing(
     assert str(html_path.resolve()) in handoff["artifact"]["markdown"]
     assert handoff["rendered_markdown"] == (
         "## Resume Preview\n\n"
-        "Your resume preview is ready. Review it and tell me what to change. When it looks "
-        'right, reply "Mint" to create the PDF.\n\n'
+        "Your resume passed its independent language review. Review it and tell me what to "
+        'change. When it looks right, reply "Mint" to create the PDF.\n\n'
         "### Review your resume\n\n"
         f"[Open the full resume preview](<{html_path.resolve()}>)\n\n"
         "### What to check\n\n"
@@ -581,13 +632,107 @@ def test_preview_compiles_current_draft_and_publishes_html_for_editing(
 
 def test_preview_does_not_require_a_selection_review(tmp_path: Path, run_main) -> None:
     vault, resume = project(tmp_path)
+    write_language_review(tmp_path, resume)
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
     assert not selection_review.selection_review_paths(tmp_path, resume)["record"].exists()
+
+
+def test_hybrid_review_route_uses_strong_improvable_and_exploratory_paths(
+    tmp_path: Path, run_main, capsys
+) -> None:
+    vault, _resume = project(tmp_path)
+    plan = synthesis.load_synthesis_plan(
+        Path("resumes/plans/support-operations.yaml"), tmp_path, vault
+    )
+
+    strong = review_policy.hybrid_review_route(plan)
+    improvable = review_policy.hybrid_review_route(replace(plan, target_mode="adjacent"))
+    exploratory = review_policy.hybrid_review_route(replace(plan, target_mode="exploratory"))
+
+    assert strong["fit"]["band"] == "strong-and-well-positioned"
+    assert strong["career_review"]["run"] is False
+    assert improvable["fit"]["band"] == "competitive-but-improvable"
+    assert improvable["career_review"]["run"] is True
+    assert exploratory["fit"]["band"] == "weak-or-exploratory"
+    assert exploratory["career_review"]["run"] is False
+    assert exploratory["career_review"]["next_action"] == "surface-evidence-gap"
+    assert (
+        run_main(
+            review_records.main,
+            "route",
+            "resumes/baselines/support-operations.md",
+            "--project-root",
+            tmp_path,
+        )
+        == 0
+    )
+    routed = json.loads(capsys.readouterr().out)
+    assert routed["fit"]["band"] == "strong-and-well-positioned"
+
+
+def test_language_review_reuses_unchanged_approved_blocks(tmp_path: Path) -> None:
+    vault, resume = project(tmp_path)
+    write_language_review(tmp_path, resume)
+    resume.write_text(
+        resume.read_text(encoding="utf-8").replace(
+            "Created a test artifact for repeatable example steps.",
+            "Created a repeatable test artifact for example investigation steps.",
+        ),
+        encoding="utf-8",
+    )
+    compilation.build_resume(resume, vault_root=vault)
+
+    prepared = language_review.prepare_language_review(resume, tmp_path)
+    assert prepared["pending_blocks"] == 1
+    assert prepared["review_inputs"]["prior_approved_blocks"] == 6
+    paths = language_review.language_review_paths(tmp_path, resume)
+    cold = json.loads(paths["cold"].read_text(encoding="utf-8"))
+    assert [block["id"] for block in cold["blocks"]] == ["projects[0].description"]
+
+    decisions = json.loads(paths["decisions"].read_text(encoding="utf-8"))
+    decisions["reviewer"]["context"] = (
+        "Fresh reviewer received only the changed block with its visible neighboring context."
+    )
+    decisions["language_review"]["status"] = "approved"
+    decisions["language_review"]["blocks"][0]["decision"] = "approved"
+    paths["decisions"].write_text(json.dumps(decisions), encoding="utf-8")
+    result = language_review.finalize_language_review(paths["decisions"], tmp_path)
+
+    assert result["reviewed_blocks"] == 1
+    assert result["carried_blocks"] == 6
+    assert language_review.language_review_freshness(paths["record"], tmp_path, resume) == []
+
+
+def test_improvable_fit_requires_deeper_career_review_before_preview(
+    tmp_path: Path, run_main
+) -> None:
+    vault, resume = project(tmp_path)
+    plan_path = tmp_path / "resumes" / "plans" / "support-operations.yaml"
+    plan_path.write_text(
+        plan_path.read_text(encoding="utf-8").replace(
+            "target_mode: direct", "target_mode: adjacent"
+        ),
+        encoding="utf-8",
+    )
+    write_language_review(tmp_path, resume)
+
+    assert run_main(previewing.main, resume, "--vault-root", vault) == 2
+    write_approved_review(tmp_path, resume)
+    carried = json.loads(
+        (tmp_path / "build" / "reviews" / "support-operations.decisions.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert carried["language_review"]["status"] == "approved"
+    assert all(block["decision"] == "approved" for block in carried["language_review"]["blocks"])
+    assert run_main(previewing.main, resume, "--vault-root", vault) == 0
 
 
 def test_preview_handoff_identifies_a_tailored_resume() -> None:
     presentation = previewing._handoff_presentation(
         tailored=True,
+        language_status="approved",
+        language_issues=0,
     )
 
     assert presentation["summary"].startswith("Your tailored resume")
@@ -599,6 +744,7 @@ def test_compile_preserves_published_preview_but_marks_it_stale(tmp_path: Path, 
     vault, resume = project(tmp_path)
     assert run_main(compilation.main, resume, "--vault-root", vault) == 0
     write_approved_review(tmp_path, resume)
+    write_language_review(tmp_path, resume)
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
     html_path = tmp_path / "build" / "resumes" / "support-operations" / "resume.html"
     published_html = html_path.read_text(encoding="utf-8")
@@ -626,16 +772,19 @@ def test_review_becomes_stale_when_one_reviewed_fact_changes(tmp_path: Path, run
     assert "EX-005.md changed after evidence review" in review_records.review_freshness(record)
 
 
-def test_preview_rebuilds_a_changed_compiled_payload(tmp_path: Path, run_main) -> None:
+def test_preview_rebuild_requires_a_fresh_language_review(tmp_path: Path, run_main) -> None:
     vault, resume = project(tmp_path)
     assert run_main(compilation.main, resume, "--vault-root", vault) == 0
     review_path = write_approved_review(tmp_path, resume)
+    write_language_review(tmp_path, resume)
     payload_path = tmp_path / "build" / "resumes" / "support-operations" / "resume.json"
     payload_path.write_text(payload_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
 
     record = review_records.load_review_record(review_path, tmp_path)
 
     assert "resume.json changed after evidence review" in (review_records.review_freshness(record))
+    assert run_main(previewing.main, resume, "--vault-root", vault) == 2
+    write_language_review(tmp_path, resume)
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
     manifest = json.loads(
         (tmp_path / "build" / "resumes" / "support-operations" / "resume.manifest.json").read_text(
@@ -863,6 +1012,7 @@ def test_applicable_feedback_memory_requires_post_cold_review_compliance(
         review_records.require_editorial_approval(resume, tmp_path)
     review_path.write_text(json.dumps(version_five), encoding="utf-8")
 
+    write_language_review(tmp_path, resume)
     previewing.preview_resume(resume, vault_root=vault)
     accepted = feedback_memory.accept_feedback(
         tmp_path,
@@ -1029,6 +1179,7 @@ def test_verify_caches_checks_and_drives_review_to_published_state(
     }
     assert verification.workflow_state(resume, tmp_path)["state"] == "preview-ready"
 
+    write_language_review(tmp_path, resume)
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
     preview = json.loads(capsys.readouterr().out)
     assert preview["preview_mode"] == {
@@ -1240,14 +1391,15 @@ def test_optional_review_risk_does_not_block_the_preview_loop(tmp_path: Path, ru
     }
     review_path.write_text(json.dumps(review), encoding="utf-8")
 
+    write_language_review(tmp_path, resume)
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
     preview = json.loads(
         (tmp_path / "build" / "resumes" / "support-operations" / "resume.preview.json").read_text(
             encoding="utf-8"
         )
     )
-    assert preview["review_statuses"]["career_verdict"] == "not-reviewed"
-    assert preview["review_statuses"]["role_fit"] == "not-reviewed"
+    assert preview["review_statuses"]["career_verdict"] == "needs-revision"
+    assert preview["review_statuses"]["role_fit"] == "weak-or-misaligned"
     assert "risk_acceptance" not in preview
 
 
@@ -1363,6 +1515,7 @@ def test_initial_draft_readiness_requires_role_and_experience_evidence() -> None
 
 def test_mint_command_creates_audited_pdf(tmp_path: Path, run_main, monkeypatch) -> None:
     vault, resume = project(tmp_path)
+    write_language_review(tmp_path, resume)
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
     called: dict[str, Path] = {}
 
@@ -1396,8 +1549,9 @@ def test_mint_command_creates_audited_pdf(tmp_path: Path, run_main, monkeypatch)
     )
     assert manifest["phase"] == "mint"
     assert manifest["valid"] is True
-    assert manifest["version"] == 3
+    assert manifest["version"] == 4
     assert "review_record" not in manifest
+    assert manifest["language_review"]["status"] == "approved"
     assert (
         manifest["preview_manifest"]["path"]
         == "build/resumes/support-operations/resume.preview.json"
@@ -1417,45 +1571,28 @@ def test_mint_rejects_missing_or_stale_preview(tmp_path: Path, run_main) -> None
 
     assert run_main(minting.main, resume, "--vault-root", vault) == 2
 
+    write_language_review(tmp_path, resume)
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
     resume.write_text(resume.read_text(encoding="utf-8") + "\n", encoding="utf-8")
 
     assert run_main(minting.main, resume, "--vault-root", vault) == 2
 
 
-def test_user_mint_is_not_blocked_by_an_optional_language_review(
-    tmp_path: Path, run_main, monkeypatch
-) -> None:
+def test_mint_is_blocked_by_changes_required_language_review(tmp_path: Path, run_main) -> None:
     vault, resume = project(tmp_path)
-    assert run_main(compilation.main, resume, "--vault-root", vault) == 0
-    review_path = write_approved_review(tmp_path, resume)
-    review = json.loads(review_path.read_text(encoding="utf-8"))
-    review["verdict"] = "needs-revision"
-    review["next_action"] = {"route": "rebuild", "summary": "Rewrite rejected prose."}
-    editorial = review["language_review"]
-    editorial["status"] = "changes-required"
-    editorial["blocks"][0]["decision"] = "revise"
-    editorial["blocks"][0]["note"] = "The headline is generic and needs clearer language."
-    review_path.write_text(json.dumps(review), encoding="utf-8")
+    revise_block = next(iter(review_records.narrative_blocks(resume)))
+    write_language_review(tmp_path, resume, revise_block=revise_block)
 
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
-
-    def fake_render_pdf(
-        html_path: Path, output: Path, payload: dict[str, object], browser: Path | None = None
-    ) -> dict[str, object]:
-        output.write_bytes(b"%PDF-user-approved")
-        return {
-            "layout": {"horizontal_overflow": False, "overflowing_elements": []},
-            "extraction": {"pages": 1, "extractable_pages": 1, "claims_recovered": 10},
-        }
-
-    monkeypatch.setattr(minting, "render_pdf", fake_render_pdf)
-
-    assert run_main(minting.main, resume, "--vault-root", vault) == 0
-    assert (tmp_path / "build" / "resumes" / "support-operations" / "resume.pdf").exists()
-    assert (
-        tmp_path / "exports" / "resumes" / "support-operations" / "Test-Candidate-Resume.pdf"
-    ).exists()
+    preview = json.loads(
+        (tmp_path / "build" / "resumes" / "support-operations" / "resume.preview.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert preview["review_statuses"]["language_review"] == "changes-required"
+    assert preview["language_review"]["issues"][0]["id"] == revise_block
+    assert run_main(minting.main, resume, "--vault-root", vault) == 2
+    assert not (tmp_path / "build" / "resumes" / "support-operations" / "resume.pdf").exists()
 
 
 def test_pdf_renderer_rejects_missing_explicit_browser(tmp_path: Path) -> None:
@@ -1494,6 +1631,7 @@ def test_compile_normalizes_ats_characters(tmp_path: Path, run_main) -> None:
 @pytest.mark.browser
 def test_mint_pdf_end_to_end(tmp_path: Path, run_main) -> None:
     vault, resume = project(tmp_path)
+    write_language_review(tmp_path, resume)
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
 
     assert (
@@ -1518,6 +1656,7 @@ def test_mint_pdf_end_to_end(tmp_path: Path, run_main) -> None:
 
 def test_strict_page_budget_retains_audited_draft(tmp_path: Path, run_main, monkeypatch) -> None:
     vault, resume = project(tmp_path)
+    write_language_review(tmp_path, resume)
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
 
     def oversized_pdf(

@@ -10,6 +10,7 @@ from typing import Any
 from . import __version__
 from .artifact_paths import resume_output_base
 from .atomic import atomic_write_json
+from .language_review import current_language_review
 from .layout import contained_path
 from .review_blocks import (
     NarrativeReviewBlock,
@@ -125,6 +126,29 @@ def build_review_package(
     cold_read_output = resolved_root / "build" / "reviews" / f"{resume_path.stem}.cold.json"
     output = resolved_root / "build" / "reviews" / f"{resume_path.stem}.package.json"
     decisions_output = resolved_root / "build" / "reviews" / f"{resume_path.stem}.decisions.json"
+    language_record: dict[str, str] | None = None
+    language_blocks: dict[str, dict[str, Any]] = {}
+    try:
+        current_language = current_language_review(resume_path, resolved_root)
+    except ValueError:
+        current_language = None
+    if current_language is not None and current_language["status"] == "approved":
+        language_record = {
+            "path": current_language["path"].relative_to(resolved_root).as_posix(),
+            "sha256": str(current_language["sha256"]),
+        }
+        language_data = json.loads(current_language["path"].read_text(encoding="utf-8"))
+        language_review = language_data.get("language_review")
+        language_values = (
+            language_review.get("blocks") if isinstance(language_review, dict) else None
+        )
+        if isinstance(language_values, list):
+            language_blocks = {
+                str(block.get("id")): block
+                for block in language_values
+                if isinstance(block, dict) and block.get("decision") == "approved"
+            }
+
     if cold_read_output.is_file() and output.is_file() and decisions_output.is_file():
         try:
             existing_package = json.loads(output.read_text(encoding="utf-8"))
@@ -161,6 +185,7 @@ def build_review_package(
             and existing_package.get("direction") == expected_direction
             and existing_package.get("target") == target_record
             and existing_package.get("cold_read") == expected_cold
+            and existing_package.get("language_review") == language_record
         ):
             existing_appendix = _object(
                 existing_package.get("selection_appendix"),
@@ -255,6 +280,7 @@ def build_review_package(
             "path": cold_read_output.relative_to(resolved_root).as_posix(),
             "sha256": sha256_file(cold_read_output),
         },
+        "language_review": language_record,
         "selection_appendix": {
             "selection": selection,
             "target_argument": plan.target_argument,
@@ -287,6 +313,7 @@ def build_review_package(
         generated_at,
         feedback_rules,
         selection,
+        language_blocks,
     )
     return output
 
@@ -300,6 +327,7 @@ def _write_review_decisions(
     generated_at: str,
     feedback_rules: list[object],
     selection: dict[str, Any],
+    language_blocks: dict[str, dict[str, Any]],
 ) -> Path:
     """Create or refresh the small reviewer-owned decision file for one package."""
     output = project_root / "build" / "reviews" / f"{resume.stem}.decisions.json"
@@ -349,6 +377,19 @@ def _write_review_decisions(
                     "repair": None,
                 }
             )
+        elif block.id in language_blocks and language_blocks[block.id].get("sha256") == sha256_text(
+            block.text
+        ):
+            approved = language_blocks[block.id]
+            block_decisions.append(
+                {
+                    "id": block.id,
+                    "sha256": sha256_text(block.text),
+                    "decision": "approved",
+                    "note": str(approved.get("note", "")),
+                    "repair": None,
+                }
+            )
         else:
             block_decisions.append(
                 {
@@ -372,7 +413,9 @@ def _write_review_decisions(
         "findings": {"material": 0, "worthwhile": 0, "optional": 0},
         "next_action": {"route": None, "summary": ""},
         "language_review": {
-            "status": None,
+            "status": "approved"
+            if language_blocks and all(block["decision"] == "approved" for block in block_decisions)
+            else None,
             "blocks": block_decisions,
         },
     }

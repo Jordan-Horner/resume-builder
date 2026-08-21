@@ -8,6 +8,11 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from .evidence_questions import question_plan, resolve_question
+from .language_review import (
+    finalize_language_review,
+    language_review_freshness,
+    prepare_language_review,
+)
 from .layout import contained_path
 from .review_approval import require_editorial_approval, review_freshness
 from .review_blocks import (
@@ -40,6 +45,11 @@ from .review_schema import (
     sha256_file,
     sha256_text,
 )
+from .review_workflow_cli import (
+    HYBRID_REVIEW_ACTIONS,
+    add_hybrid_review_parsers,
+    run_hybrid_review_action,
+)
 from .selection_guard import (
     approve_proposal,
 )
@@ -68,12 +78,15 @@ __all__ = [
     "ReviewRecord",
     "apply_review_repairs",
     "build_review_package",
+    "finalize_language_review",
     "finalize_review_record",
+    "language_review_freshness",
     "load_review_record",
     "main",
     "narrative_block_inventory",
     "narrative_block_inventory_from_markdown",
     "narrative_blocks",
+    "prepare_language_review",
     "require_editorial_approval",
     "review_freshness",
     "sha256_file",
@@ -96,6 +109,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     package_parser.add_argument("resume", type=Path)
     package_parser.add_argument("--target", type=Path)
     package_parser.add_argument("--project-root", type=Path, default=Path("."))
+    add_hybrid_review_parsers(subparsers)
     validate_parser = subparsers.add_parser("validate", help="Validate a review record")
     validate_parser.add_argument("record", type=Path)
     validate_parser.add_argument("--project-root", type=Path, default=Path("."))
@@ -169,6 +183,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                     for block in blocks
                 ],
             }
+        elif args.action in HYBRID_REVIEW_ACTIONS:
+            result, exit_code = run_hybrid_review_action(args, project_root)
+            if exit_code:
+                print(json.dumps(result, indent=2), file=sys.stderr)
+                return exit_code
         elif args.action == "package":
             output = build_review_package(args.resume, project_root, target=args.target)
             cold_read = output.with_name(f"{output.name.removesuffix('.package.json')}.cold.json")

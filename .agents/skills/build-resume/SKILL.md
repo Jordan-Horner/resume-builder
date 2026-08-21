@@ -218,13 +218,21 @@ Git tools do not. Never write candidate data into same-named engine folders.
    one dominant hiring claim. A secondary action may remain when it functions as
    method, scope, constraint, reliability, or result for that claim; otherwise
    trim it or return a distinct target-relevant accomplishment to the role arc.
-8. Run `resume-builder synthesis resumes/plans/<resume-slug>.yaml`, then
-   `resume-builder preview <resume>`. Preview compiles the Markdown, validates
-   its structured evidence, and publishes the current HTML in one command. Fix
-   hard compiler failures before presenting the draft, but do not create
-   selection or language-review packages. Compilation never creates a PDF.
-   Never maintain generated JSON separately. Never hand-edit generated HTML, JSON,
-   manifests, or PDFs.
+8. Run `resume-builder synthesis resumes/plans/<resume-slug>.yaml`, then compile
+   the current Markdown. Fix hard compiler failures before review. Run
+   `resume-builder review route <resume>` to select the hybrid path, then always
+   run `resume-builder review language-package <resume>` and pass `--target`
+   for a tailored resume. Give a fresh reviewer only the returned
+   `.language.cold.json` file and the natural-voice standards. Complete the
+   generated decisions and run `resume-builder review language-finalize`.
+   The first pass reviews every narrative block. Later passes reuse exact
+   approved unchanged blocks and review only changed blocks with their supplied
+   visible context. If one rejected block has one clear evidence-safe wording
+   repair, apply it once and repeat the changed-block review. Do not turn a
+   factual, authority, chronology, or story-selection problem into a wording
+   repair. Compilation never creates a PDF; neither does review. Never maintain
+   generated JSON separately. Never hand-edit generated HTML, JSON, manifests,
+   or PDFs.
 9. Perform the regression review before finishing. For a fresh baseline whose
    registered sources include an earlier resume in the same lane, open that
    original only after the new draft is complete and run the source-comparison
@@ -236,16 +244,22 @@ Git tools do not. Never write candidate data into same-named engine folders.
    valuable accomplishment is absent from the vault, report an evidence
    opportunity and route it to `hydrate-vault` instead of copying or inventing
    it.
-10. Run `resume-builder match`, `resume-builder verify`, or the direction audit
-    only when the user explicitly asks for matching, critique, readiness, or a
-    focused diagnostic. These optional checks do not gate preview or mint. Do
-    not turn their results into a universal ATS score or automatically inject
-    missing phrases. Direction terms remain retrieval signals, not preferred
-    wording.
-11. Run `resume-builder preview <resume>` after the initial draft and after
-    every user-requested edit. Preview compiles the current Markdown, checks its
-    structured evidence locally, and publishes HTML without requiring a
-    selection or language review. Post the command's `user_handoff.rendered_markdown`
+10. Follow the route result. For `strong-and-well-positioned`, continue after
+    the approved language review. For `competitive-but-improvable`, invoke
+    `critique-resume` automatically for the career-strategist and hiring-
+    manager review before preview; the full package reuses the exact approved
+    standalone language decisions instead of reviewing the same prose again.
+    For `weak-or-exploratory`, explain the genuine evidence gap and continue
+    after language review unless the user explicitly requests the deeper
+    critique. A real posting's semantic criterion review may refine the route:
+    run deeper review when selection or positioning can plausibly improve the
+    case, but do not use it to disguise an unsupported central requirement.
+    Never turn retrieval into a universal ATS score or inject missing phrases.
+    Treat direction terms as retrieval signals, not preferred wording.
+11. Run `resume-builder preview <resume>` after the required reviews and after
+    every user-requested edit has passed its changed-block language review.
+    Preview reuses the current compiled build, publishes HTML, and pins the
+    standalone language record. Post the command's `user_handoff.rendered_markdown`
     immediately. When `user_handoff.presentation_policy.mode` is
     `exclusive-current-stage`, return that rendered Markdown as the complete
     final handoff without adding earlier-stage confirmations, workflow examples,
@@ -272,18 +286,21 @@ Git tools do not. Never write candidate data into same-named engine folders.
     whether the story belongs in this resume. If recommending a revision, show
     only the exact `Current bullet`, exact `Proposed bullet`, and `Update this
     bullet and refresh the preview?`, plus a short note that other affected
-    resumes remain unchanged. After approval, return to edit → preview; do
-    not restart selection or critique merely because the vault changed. A
+    resumes remain unchanged. After approval, return to edit → compile →
+    changed-block language review → preview. Do not restart selection or the
+    full career review merely because wording changed; reroute only after a
+    material evidence, selection, direction, or target change. A
     `Mint` request approves the latest current preview. Accept each open
     feedback session with `resume-builder feedback accept` against that preview,
     then run `resume-builder mint
     <resume>`. Mint checks current source and evidence pins, the compiled
-    payload, page budget, PDF rendering, and text extraction. Use
-    `resume-builder verify` and `critique-resume` only when the user explicitly
-    asks for an independent critique or readiness opinion; optional review
-    findings never gate preview or mint.
-12. Run `resume-builder direction validate`, then `resume-builder validate
-    --vault-root <repo>/vault --strict`, inspect the Git diff, and keep internal
+    payload, approved standalone language record, page budget, PDF rendering,
+    and text extraction. Use the deeper critique automatically when the hybrid
+    route requires it and whenever the user explicitly asks for an independent
+    critique or readiness opinion.
+12. Run `resume-builder direction validate`, then `resume-builder direction audit
+    directions/<direction>.md <resume>`, followed by `resume-builder validate
+    --vault-root <repo>/vault --strict`. Inspect the Git diff and keep internal
     per-resume artifacts under `build/resumes/<resume-slug>/` while handing off the upload-ready PDF from
     `exports/resumes/<resume-slug>/`.
 
@@ -297,12 +314,13 @@ Git tools do not. Never write candidate data into same-named engine folders.
   owned, and led.
 - Never overwrite a directional baseline with a job-specific resume.
 - Never silently remove approved resume content during an update.
-- Never let an optional critique silently remove, demote, move, or weaken a
+- Never let a deeper critique silently remove, demote, move, or weaken a
   selected story. Show the suggestion to the user and return to the normal
   preview/edit loop only when they ask to apply it.
 - The user's explicit wording edits and mint request control the interactive
-  lifecycle. Do not insert an independent reviewer between an edit and its
-  refreshed preview.
+  lifecycle. Always run the bounded changed-block language reviewer between an
+  edit and its refreshed preview; do not rerun the full strategy workflow for a
+  wording-only change.
 - Do not mistake a small textual edit for a wording-only edit. Truth-changing
   revisions use the before-and-after vault confirmation sequence; truth-
   preserving revisions stay in the immediate edit → preview loop.

@@ -36,8 +36,10 @@ Read [the screen contract](references/screen-contract.md) before every screen.
      current number of years in business, never only as a founding year;
    - inspect the stated or estimated compensation and employment arrangement;
    - check only the practical signals that could change the decision, such as
-     remote eligibility, contract status, benefits, travel, schedule, on-call,
-     or a material reputation concern.
+     remote eligibility, contract status, benefits, work-life balance, travel,
+     schedule, on-call, or a material reputation concern. When reporting a
+     numeric work-life-balance rating, verify the response count and rating
+     scope from the same source.
    Prefer the official company site and posting, then one useful independent
    source. Do not turn a quick screen into exhaustive company research.
 4. Inspect `vault/vault.json`, canonical facts, existing baselines and tailored
@@ -86,6 +88,10 @@ Read [the screen contract](references/screen-contract.md) before every screen.
 - Never present a staffing intermediary's general benefits as confirmed job
   benefits. Treat benefits as confirmed only when the posting or a source tied
   to the specific opportunity states them.
+- Never show a numeric work-life-balance rating without the exact supporting
+  review or response count. Do not attach a page-wide company review count to a
+  category rating unless the source explicitly says that count applies to the
+  rating; omit the score when its count is unavailable.
 - Mark unknown compensation, benefits, schedule, or employment details as
   unknown and name the recruiter question that would resolve them.
 - Preserve the posting's compensation basis. Never derive or display an hourly

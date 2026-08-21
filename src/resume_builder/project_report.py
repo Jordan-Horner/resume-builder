@@ -177,7 +177,7 @@ def _mint_status(resume: Path, project_root: Path) -> dict[str, Any]:
         return _status("invalid", mint_path, project_root, [str(exc)])
     reasons: list[str] = []
     if (
-        manifest.get("version") not in {1, 2, 3}
+        manifest.get("version") not in {1, 2, 3, 4}
         or manifest.get("phase") != "mint"
         or not manifest.get("valid")
     ):
@@ -192,6 +192,8 @@ def _mint_status(resume: Path, project_root: Path) -> dict[str, Any]:
         pinned_keys.append("submission_output")
     if manifest.get("version") in {1, 2}:
         pinned_keys.append("review_record" if manifest.get("version") == 2 else "editorial_review")
+    if manifest.get("version") == 4:
+        pinned_keys.append("language_review")
     for key in pinned_keys:
         reason = _record_freshness(manifest.get(key), project_root, f"mint {key}")
         if reason:
@@ -247,7 +249,7 @@ def _preview_status(resume: Path, project_root: Path) -> dict[str, Any]:
         return _status("invalid", preview_path, project_root, [str(exc)])
     reasons: list[str] = []
     if (
-        manifest.get("version") not in {1, 2, 3}
+        manifest.get("version") not in {1, 2, 3, 4}
         or manifest.get("phase") != "preview"
         or not manifest.get("valid")
     ):
@@ -262,6 +264,8 @@ def _preview_status(resume: Path, project_root: Path) -> dict[str, Any]:
     pinned_keys = ["build_manifest", "output"]
     if manifest.get("version") in {1, 2}:
         pinned_keys.append("review_record" if manifest.get("version") == 2 else "editorial_review")
+    if manifest.get("version") == 4:
+        pinned_keys.append("language_review")
     for key in pinned_keys:
         reason = _record_freshness(manifest.get(key), project_root, f"preview {key}")
         if reason:

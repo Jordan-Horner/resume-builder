@@ -1,4 +1,4 @@
 interface:
   display_name: "Critique Resume"
-  short_description: "Get a block-by-block career-professional review"
-  default_prompt: "Use $critique-resume as an experienced career strategist and hiring reviewer to review every narrative block, give a candid opinion, prioritize the changes that would most improve my interview case, attach a wording-only repair when an authorized workflow has one clear evidence-safe fix, and ask only evidence-building questions."
+  short_description: "Run a strategic hiring review when needed"
+  default_prompt: "Use $critique-resume for the hybrid route's deeper career-strategist and hiring-manager review, reusing the current independent language decisions and surfacing only material improvements."

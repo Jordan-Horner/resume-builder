@@ -233,6 +233,54 @@ def finalize_review_record(
     }
     if package_pins != decision_pins:
         raise ValueError("review decisions do not cover the exact cold-read narrative blocks")
+    language_pin = package_data.get("language_review")
+    if language_pin is not None:
+        if not isinstance(language_pin, dict):
+            raise ValueError("review package language_review pin is invalid")
+        standalone_language = _source_input(
+            language_pin,
+            "review package language_review",
+            resolved_root,
+            "build/reviews",
+        )
+        if sha256_file(standalone_language.path) != standalone_language.sha256:
+            raise ValueError("standalone language review changed after packaging")
+        try:
+            language_data = json.loads(standalone_language.path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError(f"invalid standalone language review: {exc}") from exc
+        standalone_review = _object(
+            language_data.get("language_review"), "standalone language review"
+        )
+        if standalone_review.get("status") != "approved":
+            raise ValueError("packaged standalone language review must be approved")
+        standalone_blocks = standalone_review.get("blocks")
+        if not isinstance(standalone_blocks, list):
+            raise ValueError("standalone language review blocks are invalid")
+        standalone_by_id = {
+            str(_object(block, "standalone language block").get("id")): _object(
+                block, "standalone language block"
+            )
+            for block in standalone_blocks
+        }
+        for block_id, approved in standalone_by_id.items():
+            current = next(
+                (
+                    block
+                    for block in decision_blocks
+                    if isinstance(block, dict) and block.get("id") == block_id
+                ),
+                None,
+            )
+            if (
+                current is None
+                or current.get("sha256") != approved.get("sha256")
+                or current.get("decision") != "approved"
+                or current.get("note") != approved.get("note")
+            ):
+                raise ValueError(
+                    f"career review cannot reopen standalone approved language block: {block_id}"
+                )
     package_resume = _object(package_data.get("resume"), "review package resume")
     package_selection = _object(selection_appendix.get("selection"), "review package selection")
     package_resume_path = contained_path(

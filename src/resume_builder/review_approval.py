@@ -163,7 +163,7 @@ def require_editorial_approval(
     *,
     accept_review_risk: bool = False,
 ) -> ReviewRecord:
-    """Return a fresh approved record for an explicitly requested critique workflow."""
+    """Return a fresh approved record for a route-required or requested deep critique."""
     review_path = project_root / "build" / "reviews" / f"{resume.stem}.json"
     if not review_path.is_file():
         raise ValueError("critique finalization requires a fresh career-professional review record")

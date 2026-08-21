@@ -469,13 +469,15 @@ hiring reads are `compelling`, `credible-but-not-yet-differentiated`, or
 improvement. Hash the files actually reviewed. The project report marks the
 review stale whenever the resume, plan, direction, optional target, compiled
 build, cold-read package, evidence appendix, or any cited fact changes.
-Narrative and JSON remain disposable and do not gate compilation, but preview
-and minting reject missing, stale, incomplete, evidence-failed, or
-language- or feedback-rejected reviews. Versions 2 through 4 remain readable
-for backward compatibility. New reviews without applicable feedback use version
-4; reviews with effective feedback guidance use version 5 so evidence integrity, career
-review, feedback compliance, role fit, career verdict, and user approval remain
-separate statuses. The
+Narrative and JSON remain disposable and do not gate compilation. Preview
+requires the separate current natural-language record; mint requires that
+record to be approved. The version 4 or 5 full critique record is required only
+when the hybrid route selects the `competitive-but-improvable` branch or the
+user explicitly requests the deeper opinion. Versions 2 through 4 remain
+readable for backward compatibility. New full reviews without applicable
+feedback use version 4; reviews with effective feedback guidance use version 5
+so evidence integrity, language quality, career review, feedback compliance,
+role fit, career verdict, and user approval remain separate statuses. The
 `--accept-review-risk` option may acknowledge a documented non-language fit or
 evidence gap only with a written preview note after user approval; it never
 bypasses a `revise` decision. Never update hashes without repeating the review.

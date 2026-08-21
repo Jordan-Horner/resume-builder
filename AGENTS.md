@@ -40,6 +40,9 @@ resume-builder plan preview <plan.json>
 resume-builder plan apply <plan.json>
 resume-builder compile resumes/baselines/<direction>.md
 resume-builder verify resumes/baselines/<direction>.md
+resume-builder review route resumes/baselines/<direction>.md
+resume-builder review language-package resumes/baselines/<direction>.md
+resume-builder review language-finalize build/reviews/<direction>.language.decisions.json
 resume-builder review selection-finalize build/reviews/<direction>.selection.decisions.json
 resume-builder review selection-validate build/reviews/<direction>.selection-review.json
 resume-builder review package resumes/baselines/<direction>.md
@@ -126,9 +129,14 @@ indexes. The scripts under
   or quickly evaluate one real job before deciding whether to invest in formal
   matching or tailoring. Keep the screen read-only and within its one-page
   output contract.
-- Use `.agents/skills/critique-resume/SKILL.md` only when the user explicitly
-  asks for a critique, professional review, hiring read, or readiness opinion.
-  Critique is advisory and is not required to preview, edit, or mint a resume.
+- Run the independent natural-language portion of the career-professional
+  review for every new resume and every changed narrative block. Use the
+  standalone `review language-package` and `review language-finalize` path so
+  it does not require the strategy-selection gate. Use
+  `.agents/skills/critique-resume/SKILL.md` for the deeper career-strategist and
+  hiring-manager review when `resume-builder review route` classifies the
+  resume as `competitive-but-improvable`, or whenever the user explicitly asks
+  for a critique, hiring read, or readiness opinion.
 - Use `.agents/skills/match-job/SKILL.md` only when a real job posting or
   preserved target exists and the user wants a detailed evidence audit or has
   chosen to pursue the opportunity. It owns job-specific criteria, exact
@@ -226,9 +234,11 @@ indexes. The scripts under
   revision under the same session ID before editing again. The newest
   revision controls the next attempt. Keep failed interpretations in the
   temporary history and never promote them.
-- Apply the requested edit and immediately regenerate the web preview. Do not
-  run verification, selection review, or independent critique during the
-  preview/edit loop. Run
+- Apply the requested edit, compile it, and complete the standalone natural-
+  language review before regenerating the web preview. Reuse exact approved
+  unchanged blocks and send only changed blocks, with their supplied visible
+  context, to the fresh reviewer. Do not restart selection or the full career
+  review for a wording-only edit. Run
   `resume-builder feedback accept FB-<session> --preview build/resumes/<resume>/resume.preview.json`
   only after the user accepts that revised sentence in the preview or
   explicitly asks to mint it. Accept each intended session explicitly and promote only
@@ -305,13 +315,16 @@ indexes. The scripts under
 
 ## Resume integrity
 
-- The default interactive lifecycle is **prompt/build → preview ↔ edit →
-  mint**. Before the first preview, search the vault and ask only for factual
-  information required to build an honest draft. `resume-builder preview`
-  compiles the current Markdown and publishes it immediately. Every
-  user-requested edit returns directly to a refreshed preview; do not run
-  selection review, language review, matching, or critique unless the user
-  explicitly asks for that analysis.
+- The default interactive lifecycle is **prompt/build → language review →
+  hybrid fit route → preview ↔ edit/language recheck → mint**. Before the first
+  preview, search the vault and ask only for factual information required to
+  build an honest draft. Compile the draft, run `resume-builder review route`,
+  and complete the standalone independent natural-language review. A `strong-
+  and-well-positioned` result proceeds to preview. A `competitive-but-
+  improvable` result automatically runs the career-strategist and hiring-
+  manager review before preview. A `weak-or-exploratory` result proceeds after
+  language review with an honest evidence-gap explanation; do not spend the
+  full review merely rearranging prose unless the user requests it.
 - If the user adds content during preview, first search the canonical vault. If
   the evidence already exists, edit the resume and refresh the preview. If it
   introduces a new factual claim, ask at most one targeted question needed to
@@ -319,8 +332,9 @@ indexes. The scripts under
   through `hydrate-vault` before minting. Do not restart the full build or
   critique workflow merely because content was added.
 - Treat an explicit `Mint` request as approval of the latest current preview.
-  Mint performs the hard release checks: current source and evidence pins,
-  compiled-payload integrity, page budget, PDF rendering, and text extraction.
+  Mint requires that preview's current approved independent natural-language
+  record and performs the hard release checks: current source and evidence
+  pins, compiled-payload integrity, page budget, PDF rendering, and text extraction.
   If one fails, explain the concrete failure and return to the preview/edit
   loop. Do not introduce a review workflow as a prerequisite.
 
@@ -367,12 +381,14 @@ indexes. The scripts under
   Use `critique-resume` separately for full editorial judgment.
 - Preserve evidence comments when rewriting resume bullets.
 - Write resumes using the build-resume skill's canonical Markdown contract.
-- Publish the readable web preview through `resume-builder preview` after the
-  initial build and after every user edit. Treat the command's structured
+- Publish the readable web preview through `resume-builder preview` only after
+  the current standalone natural-language review is finalized, and after the
+  conditional career review when routing requires it. Repeat the changed-block
+  language check after every user edit. Treat the command's structured
   `user_handoff` as required: immediately post its `rendered_markdown`; do not
   print the command JSON or reduce the response to a bare link. Use
-  `resume-builder verify` and the selection/language review commands only for
-  an explicitly requested critique. Use `resume-builder render` only for
+  Use `resume-builder verify` and the selection review commands for the
+  conditional or explicitly requested deeper critique. Use `resume-builder render` only for
   renderer development or diagnostics.
 - Mint a final PDF only through `resume-builder mint`, after the user has seen
   the current preview. Saying `Mint` is explicit approval of that preview.
@@ -386,11 +402,12 @@ indexes. The scripts under
   gates. Do not bypass unsupported numeric-claim failures. Review lexical and
   non-confirmed-fact warnings before presenting a resume; they are not semantic
   entailment proof, so use critique for editorial judgment.
-- When the user explicitly requests critique, use the hash-aware
+- When the hybrid route or the user requests deeper critique, use the hash-aware
   `resume-builder verify` and review commands to create the isolated selection
-  and language packages. Those optional review records describe the critique;
-  they do not gate preview or mint. Reviewer-proposed repairs remain optional
-  suggestions until the user asks to apply them.
+  and career-review packages. Those records gate preview only when hybrid
+  routing selected the deeper branch; an explicitly requested critique remains
+  advisory. Apply one clear evidence-safe wording repair automatically when the
+  user already authorized building, previewing, or minting the resume.
 - Never cite a `needs-review` fact in visible resume content. Choose action verbs
   from the authorship and authority explicitly supported by the cited facts;
   do not upgrade `used`, `supported`, or `contributed` into `created`, `built`,
@@ -403,13 +420,13 @@ indexes. The scripts under
 - Follow **Conversational feedback routing** for every user-driven wording
   change. A direct Markdown edit may change the resume, but it does not create
   editorial memory and must not be treated as though the feedback lifecycle ran.
-- During an explicitly requested critique, when agent delegation is available,
+- For every new or changed narrative block, when agent delegation is available,
   run the provisional language review in a
   fresh reviewer context that receives the resume, block inventory, target, and
   critique standards but not the builder's plan, evidence appendix, rationale,
   prior approval, or proposed fix. Record the actual method in the version 4 or
   5 review. A single-context review cannot approve current prose.
-- During an explicitly requested critique, run the selection review in a fresh context
+- During a route-required or explicitly requested deeper critique, run the selection review in a fresh context
   that receives only the generated selection case and the selection standard.
   It must not receive the drafted resume prose, builder defense, prior verdict,
   or proposed repair. It may route a complete strategy rebuild or a real user
@@ -464,24 +481,27 @@ indexes. The scripts under
   hardcode employer-specific placement. Let critique flag ambiguous placement
   and ask a pointed question when resolving it would materially improve the
   resume.
-- Keep responsibilities distinct: `build-resume` writes, previews, and revises
-  evidence-grounded drafts; `critique-resume` provides an optional independent
-  editorial opinion when requested; `hydrate-vault` persists new factual
-  answers; `mint` audits the current approved preview and creates the PDF.
+- Keep responsibilities distinct: `build-resume` writes, language-checks,
+  previews, and revises evidence-grounded drafts; `critique-resume` provides
+  the conditional career-strategist and hiring-manager judgment plus explicitly
+  requested full critiques; `hydrate-vault` persists new factual answers;
+  `mint` audits the current language-approved preview and creates the PDF.
 - Critique must give a candid career-professional opinion and a separate hiring
   read, not just a compliance checklist or deterministic score. It should make
   the recommended tradeoff clear while distinguishing evidence, professional
   judgment, and market assumptions that need research.
-- When critique is explicitly requested, save the
+- When deeper critique is route-required or explicitly requested, save the
   narrative and version 4 or 5 hash-pinned review record defined by the critique contract
   under `build/reviews/`. A changed resume, plan, direction, or target makes the
   review stale; never refresh hashes without reviewing the changed content.
-- Minting requires a current preview, not a critique record. The explicit mint
-  request records user approval of the current preview and then runs the hard
+- Minting requires a current preview with a current approved standalone language
+  record. It requires the deeper critique only when the hybrid route selected
+  that branch. The explicit mint request records user approval of the current preview and then runs the hard
   evidence, freshness, page-budget, rendering, and extraction checks.
 - An approved block carrying a deterministic advisory must include the
   reviewer's contextual reason; an empty approval cannot silently dismiss it.
-- An optional critique verdict is advisory. Show its tradeoffs honestly, but do
+- A deeper critique verdict remains professional judgment after material
+  language and evidence issues are resolved. Show its tradeoffs honestly, but do
   not let it silently override the user's explicit approval of the preview.
 
 ## Job-specific matching

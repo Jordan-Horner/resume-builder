@@ -91,7 +91,9 @@ add sections unless the user asks:
 | **Company** | <actual employer/client and integer years in business, or Undisclosed> |
 | **Recruiter** | <include only for a staffing intermediary: name, integer years in business, and intermediary relationship> |
 | **Employment** | **<Remote, Hybrid, or On-site> · <Full-time, Part-time, or Contract>** |
-| **Pay** | <use the matching compensation format below><br>**Benefits:** <posting-confirmed benefits or Not specified> |
+| **Pay** | <use the matching compensation format below> |
+| **Benefits** | <posting-confirmed benefits or Not specified> |
+| **Work-life balance** | <source-linked rating with its exact response count and scope, a concise sourced qualitative signal, or Not enough reliable data> |
 
 ### Career direction
 
@@ -125,7 +127,20 @@ no question meets that bar.>
     `**Annualized equivalent:** <calculated range>` when the comparison is useful;
   - when the posting states both, show both without converting either one;
   - when compensation is absent, show `**Compensation:** Not specified`.
-- When job-specific benefits are absent, show `**Benefits:** Not specified`.
+- Always place `Benefits` immediately after `Pay` as its own table row. When
+  job-specific benefits are absent, show `Not specified`.
+- Always place `Work-life balance` immediately after `Benefits` as its own table row.
+  Prefer a current independent employee-review source and identify whether the
+  evidence is company-wide, location-specific, or role-specific.
+- A numeric work-life-balance rating must include the exact review or response
+  count supporting that rating, for example `**3.8/5** from 115 reviews
+  (company-wide)`. Do not substitute a page-wide overall review count for a
+  category-specific rating unless the source explicitly states that the same
+  count applies. If the rating's count is unavailable, omit the numeric rating
+  and use a concise qualitative signal or `Not enough reliable data`.
+- Treat employee reviews as directional and anecdotal. Do not imply that a
+  company-wide rating predicts the experience of a particular team, manager,
+  location, or role.
 - Do not derive or display an hourly rate from annual compensation. Any
   annualized equivalent derived from hourly compensation must be clearly
   identified as an estimate, not guaranteed salary.
@@ -151,7 +166,9 @@ no question meets that bar.>
 
 Prefer current official sources for company identity, employment programs, and
 job-specific benefits. Use independent review or compensation sources as
-directional signals and state their limitations. When a staffing intermediary
+directional signals and state their limitations. For work-life balance, prefer
+a source that exposes both the rating and its supporting response count; omit a
+numeric rating when the count cannot be verified. When a staffing intermediary
 represents an undisclosed client, the client's culture, manager, workload, job
 security, and benefits remain unknown even if the intermediary has favorable
 reviews or advertises benefits for some consultants.

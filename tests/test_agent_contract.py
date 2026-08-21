@@ -20,6 +20,8 @@ def test_agents_file_is_canonical_and_names_safe_commands() -> None:
     assert "CODEX.md" not in agents
     assert "resume-builder hydrate" in agents
     assert "resume-builder plan apply" in agents
+    assert "resume-builder review language-package" in agents
+    assert "resume-builder review language-finalize" in agents
     assert ".agents/skills/build-resume/SKILL.md" in agents
     assert "Never ask the user to repeat information" in normalized_agents
     assert "do not create a separately maintained" in normalized_agents
@@ -122,6 +124,9 @@ def test_build_resume_skill_routes_and_preserves_work() -> None:
     assert "do not create a separately" in skill_text
     assert "resume-builder preview" in skill_text
     assert "resume-builder mint" in skill_text
+    assert "resume-builder review route" in skill_text
+    assert "resume-builder review language-package" in skill_text
+    assert "resume-builder review language-finalize" in skill_text
     assert "Compilation never creates a PDF" in skill_text
     assert "Never hand-edit generated HTML" in normalized_skill
     assert "no generated resumes" in skill_text
@@ -165,13 +170,13 @@ def test_build_resume_skill_routes_and_preserves_work() -> None:
     assert "without adding earlier-stage confirmations" in normalized_skill
     assert "When the user adds content during preview" in skill_text
     assert "no more than two materially useful enrichment questions" in normalized_skill
-    assert "do not restart selection or critique" in normalized_skill
-    assert "explicitly asks for an independent critique" in normalized_skill
+    assert "changed-block language review" in normalized_skill
+    assert "competitive-but-improvable" in normalized_skill
     assert "feedback-memory contract" in normalized_skill
     assert "resume-builder feedback resolve" in normalized_skill
     assert "resume-builder feedback accept" in normalized_skill
     assert "latest open-session revisions" in normalized_skill
-    assert "do not gate preview or mint" in normalized_skill
+    assert "approved standalone language record" in normalized_skill
     assert "structured claim boundary" in normalized_skill
     assert "required versus optional stories" in normalized_skill
     assert "`claim_focus`" in skill_text
@@ -247,12 +252,14 @@ def test_critique_skill_owns_mandatory_editorial_approval_and_is_non_mutating() 
     normalized_contract = " ".join(contract.split())
 
     assert metadata["name"] == "critique-resume"
+    assert "competitive-but-improvable" in metadata["description"]
+    assert "standalone independent natural-language review" in metadata["description"]
     assert "Do not" in metadata["description"]
     assert interface["interface"]["display_name"] == "Critique Resume"
     assert "$critique-resume" in interface["interface"]["default_prompt"]
-    assert "experienced career strategist" in interface["interface"]["default_prompt"]
-    assert "candid opinion" in interface["interface"]["default_prompt"]
-    assert "improve my interview case" in interface["interface"]["default_prompt"]
+    assert "career-strategist" in interface["interface"]["default_prompt"]
+    assert "hybrid route" in interface["interface"]["default_prompt"]
+    assert "independent language decisions" in interface["interface"]["default_prompt"]
     assert "Do not edit the resume unless the user asks" in skill_text
     assert "Do not infer a role assignment" in skill_text
     assert "Ready to mint" in contract
@@ -366,9 +373,9 @@ def test_critique_answers_route_through_hydration_before_final_use() -> None:
     assert "question-resolve" in normalized_hydrate
     assert "registered career-note source" in normalized_agents
     assert "search canonical facts first" in normalized_agents
-    assert "prompt/build → preview ↔ edit → mint" in normalized_agents
+    assert "prompt/build → language review → hybrid fit route" in normalized_agents
     assert "Saying `Mint` is explicit approval" in normalized_agents
-    assert "Critique is advisory" in normalized_agents
+    assert "competitive-but-improvable" in normalized_agents
     assert "empty approval cannot silently dismiss" in normalized_agents
     assert (
         "If a draft is weak, the agent checks your saved career evidence and imported sources"
@@ -521,9 +528,14 @@ def test_screen_job_skill_is_compact_read_only_triage() -> None:
     assert "Annual:" in contract
     assert "Hourly:" in contract
     assert "Annualized equivalent:" in contract
-    assert "Benefits:" in contract
+    assert "| **Benefits**" in contract
+    assert "Work-life balance" in contract
     assert "**Compensation:** Not specified" in contract
-    assert "**Benefits:** Not specified" in contract
+    assert "job-specific benefits are absent, show `Not specified`" in normalized_contract
+    assert "numeric work-life-balance rating must include the exact review or response" in normalized_contract
+    assert "omit the numeric rating" in normalized_contract
+    assert contract.index("| **Pay**") < contract.index("| **Benefits**")
+    assert contract.index("| **Benefits**") < contract.index("| **Work-life balance**")
     assert "show hourly pay only when the posting states an hourly rate" in normalized_skill
     assert "Do not derive or display an hourly rate from annual compensation" in contract
     assert "general consultant FAQ does not establish benefits" in normalized_contract

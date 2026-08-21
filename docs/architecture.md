@@ -18,12 +18,15 @@ editorial approval.
    evidence composition inspectable before prose is written.
 5. **Resume Markdown** is the only editable presentation source. Every factual
    block cites canonical fact IDs.
-6. **Preview** compiles the current Markdown, checks structure, evidence,
-   numeric claims, authorship, and stale inputs, then publishes editable HTML.
-7. **Editing** returns directly to preview after each user-requested change.
-8. **Optional review** provides selection, cold-language, matching, or hiring
-   analysis only when the user explicitly requests it.
-9. **Minting** treats the explicit mint request as approval of the current
+6. **Language review** cold-reads every new or changed narrative block and
+   reuses exact approved unchanged blocks.
+7. **Hybrid routing** sends strong resumes directly to preview, competitive but
+   improvable resumes through selection and hiring review, and exploratory
+   resumes to an honest evidence-gap handoff.
+8. **Preview** reuses the current build and language record, then publishes
+   editable HTML.
+9. **Editing** recompiles and rechecks changed narrative blocks before preview.
+10. **Minting** treats the explicit mint request as approval of the current
    preview and adds page-budget, overflow, network, JavaScript, and
    text-extraction checks.
 
@@ -58,11 +61,16 @@ enforcement. Those responsibilities now live behind a small compatibility
 facade:
 
 - `review_blocks.py` inventories narrative prose and deterministic advisories;
+- `language_review.py` prepares, carries forward, finalizes, and validates the
+  standalone natural-language record;
 - `review_packages.py` builds cold-read and evidence-appendix artifacts;
+- `review_policy.py` selects the transparent hybrid review path from the
+  synthesis plan;
 - `review_decisions.py` finalizes reviewer-owned decisions;
 - `review_repairs.py` applies the guarded wording-only repair pass;
 - `review_schema.py` strictly loads compatible record versions;
-- `review_approval.py` enforces freshness for explicitly requested critiques.
+- `review_approval.py` enforces freshness for route-required or explicitly
+  requested deeper critiques.
 
 Compatibility facades keep every pre-split public symbol importable from its
 original module and list it in `__all__`. A regression test pins that surface so
@@ -91,6 +99,8 @@ their reviewed budgets.
 - High-authority verbs must be supported by the action evidence.
 - A changed resume or evidence source makes the published preview stale until
   `preview` recompiles it.
-- Preview and mint do not require an optional critique record.
+- Preview requires a current standalone natural-language record, and mint
+  requires it to be approved.
+- The deeper critique record is required only when hybrid routing selects it.
 - An explicit mint invocation approves only the exact current preview.
 - PDF minting cannot bypass page-budget or extraction failures.

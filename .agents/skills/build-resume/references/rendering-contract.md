@@ -8,17 +8,22 @@ and minting are separate lifecycle stages.
 ## Normal command
 
 ```bash
+resume-builder compile resumes/baselines/<direction>.md
+resume-builder review route resumes/baselines/<direction>.md
+resume-builder review language-package resumes/baselines/<direction>.md
+resume-builder review language-finalize build/reviews/<direction>.language.decisions.json
 resume-builder preview resumes/baselines/<direction>.md
-# edit the Markdown, then preview again
+# edit the Markdown, then compile and review only changed blocks
 resume-builder preview resumes/baselines/<direction>.md
 resume-builder mint resumes/baselines/<direction>.md
 resume-builder mint resumes/baselines/<direction>.md --max-pages 1
 ```
 
-`preview` is the normal interactive command. It compiles the current Markdown,
-validates its structured evidence and renderer, and publishes HTML in one step.
-Edit the Markdown and run `preview` again until the user says `Mint`. `compile`
-enforces the
+`preview` is the normal interactive presentation command. It reuses the current
+compiled Markdown and current independent language record, validates their
+pins, and publishes HTML. Edit the Markdown, compile it, complete the changed-
+block language review, and run `preview` again until the user says `Mint`.
+`compile` enforces the
 [canonical Markdown contract](markdown-contract.md),
 validates evidence and the renderer, and writes JSON plus a reproducibility
 manifest with `editorial_status: unreviewed`. It does not publish HTML and never
@@ -26,8 +31,13 @@ creates a PDF. It preserves the last published HTML and PDF; their manifests
 become stale instead of their files disappearing.
 Use `resume-builder compile` directly when diagnosing only that build stage.
 
-When the user explicitly asks for an independent critique, `verify` prepares
-the optional review workflow. `review package` writes two pinned inputs. The `.cold.json` file contains only
+Every draft first uses `review language-package`. Its
+`.language.cold.json` file contains all narrative blocks on the first pass and
+only new or changed blocks on later passes, with visible neighbor context.
+`review language-finalize` carries exact approved unchanged blocks into the new
+hash-pinned record. When hybrid routing selects the deeper review or the user
+explicitly requests it, `verify` prepares the strategy and hiring workflow.
+`review package` writes two pinned inputs. The `.cold.json` file contains only
 the target and visible resume blocks for the provisional independent read. The
 `.package.json` appendix pins the compiled build, plan, direction, concept and
 risk decisions, structured evidence audit, and exact canonical facts for the
@@ -43,8 +53,9 @@ decisions.
 `review validate` remains a focused diagnostic that checks the record against
 both files, the build manifest, every narrative block, and every cited fact hash.
 
-`preview` rebuilds the current Markdown and publishes it for the preview/edit
-loop. It does not require or claim an independent language or selection review.
+`preview` publishes the current compiled Markdown for the preview/edit loop. It
+requires and reports the standalone independent language review. It requires
+the deeper critique only when hybrid routing selected that branch.
 Its structured `user_handoff` marks presentation as required
 and supplies the artifact path, absolute path, pending approval state, next
 action, organized presentation fields, and ready-to-post `rendered_markdown`.
@@ -135,11 +146,14 @@ out of scope for resume wording and factual claims.
 
 `build/resumes/<slug>/resume.manifest.json` records the build's source, template, cited-fact
 hashes, compiler version, ATS replacements, evidence findings, warnings, and
-generated JSON hash. `build/reviews/<slug>.cold.json` is the isolated
-provisional review input, and `build/reviews/<slug>.package.json` is its later
-evidence and selection appendix; these exist only after an explicit critique
-request. `build/resumes/<slug>/resume.preview.json` pins the current build manifest, HTML, and
-pending user-approval state.
+generated JSON hash. `build/reviews/<slug>.language.cold.json` and
+`build/reviews/<slug>.language.json` are the always-on isolated language input
+and current decision record. `build/reviews/<slug>.cold.json` is the isolated
+full-critique prose input, and `build/reviews/<slug>.package.json` is its later
+evidence and selection appendix; those deeper artifacts exist only when hybrid
+routing or the user requests the career review.
+`build/resumes/<slug>/resume.preview.json` pins the current build manifest,
+language record, HTML, and pending user-approval state.
 `build/resumes/<slug>/resume.mint.json` separately records the
 build and preview-manifest hashes, explicit user approval, page budget, PDF
 audit, internal PDF hash, and submission-export hash. Successful minting copies

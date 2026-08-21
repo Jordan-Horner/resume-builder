@@ -153,7 +153,7 @@ def _acceptance_result(
         raise ValueError("accepted feedback preview must be a *.preview.json file")
     preview_data = _read_json(preview_path, "accepted feedback preview")
     if (
-        preview_data.get("version") not in {2, 3}
+        preview_data.get("version") not in {2, 3, 4}
         or preview_data.get("phase") != "preview"
         or preview_data.get("valid") is not True
         or preview_data.get("final_review_status") != "awaiting-user-approval"

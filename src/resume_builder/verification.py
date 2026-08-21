@@ -140,6 +140,8 @@ def _preview_freshness(resume: Path, project_root: Path) -> list[str]:
     owners = ["build_manifest", "output"]
     if preview.get("version") in {1, 2}:
         owners.append("review_record" if preview.get("version") == 2 else "editorial_review")
+    if preview.get("version") == 4:
+        owners.append("language_review")
     for owner in owners:
         reasons.extend(_record_freshness(preview.get(owner), project_root, f"preview {owner}"))
     return reasons

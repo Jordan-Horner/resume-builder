@@ -95,8 +95,10 @@ career record is the foundation; each resume is a focused view of that record.
 3. **Drafts and checks the resume.** It looks for unsupported metrics,
    exaggerated authority, lost accomplishments, weak wording, and missing
    evidence.
-4. **Shows you the result.** A separate career-professional review evaluates the
-   writing and hiring case. You approve a readable web preview before the system
+4. **Shows you the result.** An independent reviewer always checks new or changed
+   resume language. A deeper career-strategist and hiring-manager review runs
+   when the resume is competitive but can be positioned more strongly. You
+   approve a readable web preview before the system
    creates a final, format-checked PDF. The preview step returns a structured,
    required handoff with organized, ready-to-post Markdown so the agent presents
    the complete review prompt instead of merely generating a file in the
@@ -147,12 +149,13 @@ earlier commits.
   selection but cannot establish candidate experience.
 - **Important information is checked for accidental removal.** Plans and
   regression checks distinguish deliberate targeting from a lost accomplishment.
-  Preview performs the local evidence and formatting checks, then returns the
-  draft directly to the user for editing. An optional independent critique can
-  examine the complete hiring argument and writing when requested; it does not
-  block preview or minting.
-- **The user owns the wording loop.** The normal lifecycle is build, preview,
-  edit, preview, and mint. An explicit mint request approves the current
+  Every new or changed narrative block receives an independent language check
+  before preview. Exact approved unchanged blocks are reused. The deeper career
+  review runs only when hybrid routing finds an improvable fit or the user asks
+  for it.
+- **The user owns the wording loop.** The normal lifecycle is build, language
+  review, preview, edit, changed-block review, preview, and mint. An explicit
+  mint request approves the current
   preview; mint then performs the hard source, evidence, page, rendering, and
   PDF-extraction checks.
 

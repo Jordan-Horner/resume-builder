@@ -1,6 +1,6 @@
 ---
 name: critique-resume
-description: Give a candid, evidence-grounded resume critique from the combined perspective of an experienced career strategist, recruiter, and hiring manager. Review narrative blocks for natural language, positioning, interview value, role and seniority fit, proof, progression, regressions, and missing stories, then route material findings to resume revision, vault hydration, direction adjustment, or minting. Use only when the user explicitly asks for professional resume advice, an opinion, critique, review, improvement, story questions, or a readiness decision. Critique is optional and never gates preview, editing, or minting. Do not import career facts, rewrite the resume without permission, or generate a PDF.
+description: Give a candid, evidence-grounded resume critique from the combined perspective of an experienced career strategist, recruiter, and hiring manager. Review positioning, interview value, role and seniority fit, proof, progression, regressions, and missing stories, then route material findings to resume revision, vault hydration, direction adjustment, or minting. Use automatically when Resume Builder's hybrid route classifies a resume as competitive-but-improvable, and when the user explicitly asks for professional resume advice, an opinion, critique, review, improvement, story questions, or a readiness decision. The standalone independent natural-language review runs for every resume before this deeper review. Do not import career facts, rewrite the resume without permission, or generate a PDF.
 ---
 
 # Critique Resume
@@ -49,7 +49,10 @@ or candidate evidence into the engine checkout.
    `references/regression-review.md` as shared quality standards. Read the
    build skill's `references/feedback-memory-contract.md` when the review
    package contains applicable accepted rules or open-session revisions.
-2. Use `resume-builder verify <resume>` as the normal review handoff, passing
+2. Validate the current standalone language record with `resume-builder review
+   language-validate`. It owns the independent natural-language decisions for
+   every current block. Do not send already approved prose to a second language
+   reviewer. Use `resume-builder verify <resume>` as the deeper review handoff, passing
    `--target` and `--baseline` when applicable. Inspect its compact build,
    direction, match, and prose-preflight results. Verification establishes
    structural and factual validity; it does not establish editorial quality.
@@ -73,11 +76,15 @@ or candidate evidence into the engine checkout.
    unchanged rerun. Run `compile`, `direction audit`, `match`, or `review
    package` directly only when diagnosing one of those stages. The lower-level
    packaging command remains `resume-builder review package` for focused
-   diagnostics. Give a fresh reviewer only the `.cold.json` file, which
-   contains the target, visible blocks, heading and neighbor context, and
-   advisories. Do not give that reviewer the `.package.json` appendix, synthesis
-   plan, vault facts, builder rationale, prior approval, desired diagnosis, or
-   proposed replacement before every provisional block decision is fixed.
+   diagnostics. When the generated decisions already carry exact approvals
+   from the pinned standalone language record, preserve them and perform only
+   the career-strategist and hiring-manager work below. For a legacy explicit
+   critique without a standalone record, give a fresh reviewer only the
+   `.cold.json` file, which contains the target, visible blocks, heading and
+   neighbor context, and advisories. Do not give that reviewer the
+   `.package.json` appendix, synthesis plan, vault facts, builder rationale,
+   prior approval, desired diagnosis, or proposed replacement before every
+   provisional block decision is fixed.
    Afterward, use the appendix to verify the declared fact relationships,
    chronology, selection, reviewer risks, structured evidence audit, and
    accepted-feedback compliance without
@@ -196,6 +203,11 @@ or candidate evidence into the engine checkout.
    pinned accepted rule or open revision after all cold language decisions are fixed. A ready verdict
    requires approved language and approved feedback compliance. Never expose
    the rules to the provisional cold reviewer.
+   When the hybrid route invoked this review automatically, use the full record
+   to improve the draft but keep the user handoff compact: surface only a
+   material unresolved fact or strategic choice, otherwise continue to the web
+   preview. Deliver the complete critique narrative when the user explicitly
+   requested the professional opinion.
 10. Ask no more than five targeted questions before producing the next draft.
     Rank them by expected resume value, not document order. Before showing them,
     create `build/reviews/<resume-slug>.questions.json`, preview it with

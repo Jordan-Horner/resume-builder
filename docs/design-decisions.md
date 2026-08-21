@@ -30,17 +30,20 @@ synthesis plan makes selection, omission, story purpose, role arcs, evidence
 composition, and page budget reviewable before polished language obscures the
 decisions.
 
-## Why deterministic checks and optional professional review?
+## Why always review language but route the deeper professional review?
 
 Deterministic checks are good at structure, hashes, identifiers, status,
 numeric support, and narrow authorship rules. They cannot decide whether a
 sentence sounds natural or whether the resume makes a convincing hiring case.
 
-The normal workflow keeps deterministic evidence checks in preview and lets the
-user edit what they see directly. An independent cold review remains available
-when the user explicitly asks for a professional critique; it sees the visible
-resume first, before evidence rationale can bias the language judgment, but it
-does not block preview or minting.
+Every new or changed narrative block receives an independent cold language
+review before preview. Exact approved unchanged blocks are reused so a small
+edit does not reopen the whole document. The deeper career-strategist and
+hiring-manager review runs when the synthesis plan is competitive but
+improvable, or when the user asks for it. Clearly strong resumes avoid that
+cost; exploratory resumes receive an honest evidence-gap explanation instead
+of expensive prose rearrangement. Minting always requires the current language
+record to be approved.
 
 ## Why hash-pin review records?
 

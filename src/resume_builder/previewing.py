@@ -15,9 +15,15 @@ from . import __version__
 from .artifact_paths import default_resume_output_base
 from .atomic import atomic_write_json, atomic_write_text
 from .compilation import build_resume, relative_output, sha256_file
+from .language_review import current_language_review
 from .rendering import contained_project_path, known_fact_ids, load_payload, render_payload
+from .review_approval import review_freshness
+from .review_policy import hybrid_review_route
+from .review_schema import load_review_record
+from .synthesis import load_synthesis_plan
 
-DRAFT_NOTICE = "Draft preview · Edit or mint when ready"
+APPROVED_NOTICE = "Language reviewed · Edit or mint when ready"
+ATTENTION_NOTICE = "Language reviewed · Wording needs attention before minting"
 PREVIEW_MODE = {
     "kind": "continuous-web",
     "pagination": "PDF page count is calculated only during minting",
@@ -29,20 +35,54 @@ PRESENTATION_POLICY = {
 }
 
 
-def _handoff_presentation(*, tailored: bool) -> dict[str, Any]:
+def _handoff_presentation(
+    *, tailored: bool, language_status: str, language_issues: int
+) -> dict[str, Any]:
     """Return the user-facing structure for the preview/edit loop."""
     resume_label = "tailored resume" if tailored else "resume"
+    if language_status == "approved":
+        summary = (
+            f"Your {resume_label} passed its independent language review. Review it and tell "
+            'me what to change. When it looks right, reply "Mint" to create the PDF.'
+        )
+        guidance = "Confirm that the content feels accurate and sounds like you."
+        response_prompt = 'Reply "Mint" to create the PDF, or tell me what to change.'
+    else:
+        noun = "item" if language_issues == 1 else "items"
+        summary = (
+            f"Your {resume_label} preview is ready, but the independent language review found "
+            f"{language_issues} {noun} that still need attention."
+        )
+        guidance = "Review the flagged wording before creating the final PDF."
+        response_prompt = "Tell me how you want to revise the flagged wording."
     return {
         "title": "Resume Preview",
-        "summary": (
-            f"Your {resume_label} preview is ready. Review it and tell me what to change. "
-            'When it looks right, reply "Mint" to create the PDF.'
-        ),
+        "summary": summary,
         "review_heading": "Review your resume",
         "guidance_heading": "What to check",
-        "guidance": "Confirm that the content feels accurate and sounds like you.",
-        "response_prompt": 'Reply "Mint" to create the PDF, or tell me what to change.',
+        "guidance": guidance,
+        "response_prompt": response_prompt,
     }
+
+
+def _current_career_review(
+    resume: Path, project_root: Path
+) -> tuple[str, str, dict[str, str] | None]:
+    """Return the current optional deep-review statuses without treating them as language QA."""
+    path = project_root / "build" / "reviews" / f"{resume.stem}.json"
+    if not path.is_file():
+        return "not-reviewed", "not-reviewed", None
+    try:
+        record = load_review_record(path, project_root)
+    except ValueError:
+        return "not-reviewed", "not-reviewed", None
+    if review_freshness(record):
+        return "not-reviewed", "not-reviewed", None
+    return (
+        record.hiring_read,
+        record.verdict,
+        {"path": relative_output(path, project_root), "sha256": sha256_file(path)},
+    )
 
 
 def _render_handoff_markdown(presentation: dict[str, Any], artifact_markdown: str) -> str:
@@ -153,16 +193,21 @@ def preview_resume(
     if resolved_base.suffix:
         raise ValueError("output base must not have a file extension")
 
-    build_resume(
-        resume_path,
-        output_base=resolved_base,
-        vault_root=vault_root,
-        template=template_path,
-        synthesis_plan=synthesis_plan,
-    )
-    json_path, build_manifest_path, build_manifest = _current_build(
-        resume_path, project_root, vault_root, resolved_base
-    )
+    try:
+        json_path, build_manifest_path, build_manifest = _current_build(
+            resume_path, project_root, vault_root, resolved_base
+        )
+    except ValueError:
+        build_resume(
+            resume_path,
+            output_base=resolved_base,
+            vault_root=vault_root,
+            template=template_path,
+            synthesis_plan=synthesis_plan,
+        )
+        json_path, build_manifest_path, build_manifest = _current_build(
+            resume_path, project_root, vault_root, resolved_base
+        )
     build_template = build_manifest.get("template")
     if not isinstance(build_template, dict) or build_template.get("path") != relative_output(
         template_path, project_root
@@ -177,6 +222,24 @@ def preview_resume(
             requested_plan, project_root
         ):
             raise ValueError("preview build uses a different synthesis plan")
+    language = current_language_review(resume_path, project_root)
+    synthesis_record = build_manifest.get("synthesis")
+    if not isinstance(synthesis_record, dict) or not isinstance(synthesis_record.get("path"), str):
+        raise ValueError("preview build synthesis record is missing")
+    plan = load_synthesis_plan(Path(synthesis_record["path"]), project_root, project_root / "vault")
+    route = hybrid_review_route(plan)
+    role_fit, career_verdict, career_record = _current_career_review(resume_path, project_root)
+    career_required = bool(route["career_review"]["run"])
+    if career_required and career_record is None:
+        raise ValueError(
+            "the hybrid fit check requires the career-strategist and hiring-manager review "
+            "before preview because this resume is competitive but still improvable"
+        )
+    if career_record is None:
+        role_fit = str(route["fit"]["band"])
+        career_verdict = (
+            "gap-documented" if route["fit"]["band"] == "weak-or-exploratory" else "not-required"
+        )
     html_path = resolved_base.with_suffix(".html")
     preview_manifest_path = resolved_base.with_suffix(".preview.json")
     payload = load_payload(json_path)
@@ -190,7 +253,7 @@ def preview_resume(
         payload,
         template_text,
         known_fact_ids(vault_root.resolve()),
-        preview_notice=DRAFT_NOTICE,
+        preview_notice=(APPROVED_NOTICE if language["status"] == "approved" else ATTENTION_NOTICE),
     )
     atomic_write_text(html_path, rendered)
 
@@ -201,7 +264,11 @@ def preview_resume(
         if isinstance(evidence, dict) and isinstance(evidence.get("structured_claims_checked"), int)
         else "legacy-not-separated"
     )
-    presentation = _handoff_presentation(tailored=resume_path.parent.name == "tailored")
+    presentation = _handoff_presentation(
+        tailored=resume_path.parent.name == "tailored",
+        language_status=str(language["status"]),
+        language_issues=len(language["issues"]),
+    )
     user_handoff: dict[str, Any] = {
         "required": True,
         "action": "present-preview",
@@ -214,13 +281,15 @@ def preview_resume(
         "approval": {
             "required": True,
             "status": "pending",
-            "next_action_on_approval": "mint",
+            "next_action_on_approval": (
+                "mint" if language["status"] == "approved" else "revise-language"
+            ),
         },
         "presentation": presentation,
     }
 
     manifest = {
-        "version": 3,
+        "version": 4,
         "phase": "preview",
         "valid": True,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -228,11 +297,18 @@ def preview_resume(
         "source": relative_output(resume_path, project_root),
         "review_statuses": {
             "evidence_integrity": evidence_status,
-            "language_review": "user-review",
-            "role_fit": "not-reviewed",
-            "career_verdict": "not-reviewed",
+            "language_review": language["status"],
+            "role_fit": role_fit,
+            "career_verdict": career_verdict,
             "user_review": "pending",
         },
+        "language_review": {
+            "path": relative_output(language["path"], project_root),
+            "sha256": language["sha256"],
+            "issues": language["issues"],
+        },
+        "career_review": career_record,
+        "hybrid_review": route,
         "preview_mode": {
             **PREVIEW_MODE,
             "experience_bullets": experience_bullets,
