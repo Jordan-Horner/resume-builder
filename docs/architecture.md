@@ -71,9 +71,11 @@ future extractions cannot silently break callers while moving implementation.
 The same dependency direction applies to the other orchestration domains.
 `resume_parser.py` is independent of build orchestration; feedback recording,
 acceptance, and resolution are separate; synthesis models, loading, and auditing
-are separate; direction parsing and diagnostics are separate; and report policy
-is pure workflow logic. The architecture check rejects package cycles, forbidden
-reverse imports, and facade growth beyond their reviewed budgets.
+are separate; synthesis schema primitives and direction-derived inputs are kept
+outside the version-aware plan assembler; direction parsing and diagnostics are
+separate; and report policy is pure workflow logic. The architecture check
+rejects package cycles, forbidden reverse imports, and facade growth beyond
+their reviewed budgets.
 
 ## Release invariants
 

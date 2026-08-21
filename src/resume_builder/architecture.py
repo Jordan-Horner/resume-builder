@@ -13,6 +13,7 @@ FACADE_LINE_BUDGETS = {
     "project_report": 650,
     "review_records": 300,
     "synthesis": 180,
+    "synthesis_loader": 750,
 }
 
 FORBIDDEN_IMPORTS = {
@@ -33,6 +34,7 @@ FORBIDDEN_IMPORTS = {
     "synthesis_audit": {"synthesis", "synthesis_loader"},
     "synthesis_loader": {"synthesis", "synthesis_audit"},
     "synthesis_models": {"synthesis", "synthesis_audit", "synthesis_loader"},
+    "synthesis_schema": {"synthesis", "synthesis_audit", "synthesis_loader"},
 }
 
 
