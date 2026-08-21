@@ -84,5 +84,7 @@ reverse imports, and facade growth beyond their reviewed budgets.
 - A changed fact, plan, direction, target, or build invalidates dependent
   reviews.
 - Preview and mint cannot bypass rejected or incomplete language review.
+- Preview and mint require a release-capable review record: version 4 without
+  applicable feedback guidance, or version 5 when feedback guidance was applied.
 - Language review cannot start before a current selection approval.
 - PDF minting cannot bypass page-budget or extraction failures.

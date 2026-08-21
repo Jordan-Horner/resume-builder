@@ -869,6 +869,17 @@ def test_applicable_feedback_memory_requires_post_cold_review_compliance(
     assert result["version"] == 5
     assert result["feedback_status"] == "approved"
     assert result["feedback_rules"] == 1
+
+    review_path = tmp_path / "build" / "reviews" / "support-operations.json"
+    version_five = json.loads(review_path.read_text(encoding="utf-8"))
+    version_four = dict(version_five)
+    version_four["version"] = 4
+    version_four.pop("feedback_review")
+    review_path.write_text(json.dumps(version_four), encoding="utf-8")
+    with pytest.raises(ValueError, match=r"version 5.*applied feedback guidance"):
+        review_records.require_editorial_approval(resume, tmp_path)
+    review_path.write_text(json.dumps(version_five), encoding="utf-8")
+
     previewing.preview_resume(resume, vault_root=vault)
     accepted = feedback_memory.accept_feedback(
         tmp_path,

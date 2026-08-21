@@ -11,6 +11,7 @@ from resume_builder.review_records import (
     main,
     narrative_block_inventory,
     narrative_blocks,
+    require_editorial_approval,
     review_freshness,
     sha256_text,
 )
@@ -140,6 +141,22 @@ def test_v3_approved_review_requires_independent_cold_reviewer(tmp_path: Path) -
 
     assert record.version == 3
     assert record.reviewer_method == "independent-cold-review"
+
+
+@pytest.mark.parametrize("version", [2, 3])
+def test_legacy_review_records_cannot_authorize_release(tmp_path: Path, version: int) -> None:
+    review_path, resume, raw = _review_project(tmp_path)
+    if version == 3:
+        raw["version"] = 3
+        raw["reviewer"] = {
+            "method": "independent-cold-review",
+            "context": "Fresh reviewer received the resume and block inventory only.",
+        }
+        review_path.write_text(json.dumps(raw), encoding="utf-8")
+
+    assert load_review_record(review_path, tmp_path).version == version
+    with pytest.raises(ValueError, match=r"legacy review records.*cannot authorize release"):
+        require_editorial_approval(resume, tmp_path)
 
 
 def test_review_record_requires_complete_block_coverage(tmp_path: Path) -> None:
