@@ -519,6 +519,11 @@ def test_preview_compiles_current_draft_and_publishes_html_for_editing(
     assert preview_manifest["user_handoff"] == {
         "required": True,
         "action": "present-preview",
+        "presentation_policy": {
+            "mode": "exclusive-current-stage",
+            "supersedes_prior_handoffs": True,
+            "append_to_rendered_markdown": False,
+        },
         "artifact": {
             "path": "build/support-operations.html",
             "media_type": "text/html",
@@ -552,6 +557,11 @@ def test_preview_compiles_current_draft_and_publishes_html_for_editing(
     handoff = result["user_handoff"]
     assert handoff["required"] is True
     assert handoff["action"] == "present-preview"
+    assert handoff["presentation_policy"] == {
+        "mode": "exclusive-current-stage",
+        "supersedes_prior_handoffs": True,
+        "append_to_rendered_markdown": False,
+    }
     assert handoff["artifact"]["absolute_path"] == str(html_path.resolve())
     assert str(html_path.resolve()) in handoff["artifact"]["markdown"]
     assert handoff["rendered_markdown"] == (
@@ -1058,10 +1068,21 @@ def test_selection_gate_reviews_omitted_candidates_before_creating_language_inpu
     package = json.loads(
         (tmp_path / first["review_inputs"]["selection_case"]["path"]).read_text(encoding="utf-8")
     )
+    assert package["version"] == 1
     assert [(story["id"], story["selected"]) for story in package["stories"]] == [
         ("investigation-speed", True),
         ("investigation-portal", True),
     ]
+    assert package["review_standard"]["story_composition_test"] == [
+        "Identify one dominant hiring claim for every selected story.",
+        "Require every additional action or accomplishment to strengthen that claim as method, scope, constraint, reliability, or result.",
+        "Do not combine details merely because they share a fact file, role, employer, system, or time period.",
+        "Use strategy-revise when the plan should integrate the relationship more clearly, trim a nonessential detail, or return a distinct target-relevant accomplishment to the role arc.",
+    ]
+    decisions = json.loads(
+        (tmp_path / first["review_inputs"]["selection_decisions"]).read_text(encoding="utf-8")
+    )
+    assert set(decisions["stories"][0]) == {"id", "selected", "decision", "note"}
     assert "score" not in json.dumps(package).lower()
 
 

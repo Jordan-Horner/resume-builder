@@ -51,6 +51,8 @@ resume-builder review validate build/reviews/<direction>.json
 resume-builder feedback record build/<feedback-plan>.json [--session FB-...]
 resume-builder feedback resolve resumes/plans/<resume>.yaml --include-open
 resume-builder feedback accept FB-<session> --preview build/<resume>.preview.json
+resume-builder feedback accept FB-<session> --preview build/<resume>.preview.json \
+  --remember-approved-wording
 resume-builder preview resumes/baselines/<direction>.md
 resume-builder mint resumes/baselines/<direction>.md
 resume-builder mint resumes/baselines/<direction>.md --max-pages 1
@@ -182,6 +184,37 @@ indexes. The scripts under
   prose—and any statement that wording is inaccurate, awkward, unnatural, or
   undesirable—as a feedback-memory trigger. Do not skip capture because the
   requested edit looks small or the replacement wording seems obvious.
+- Classify the change by meaning: whether it changes the claim's truth
+  conditions, not by word count. A wording-only change preserves the supported
+  action, authorship, authority, technology, scope, chronology, metric,
+  relationship, and outcome. Record the feedback, revise the prose, and publish
+  the next preview without asking for another approval first. A one-word change
+  such as `supported` to `built` is factual when it changes authorship.
+- When feedback changes or adds a career fact, freeze resume editing. Show the
+  exact current canonical fact and handle exploration conversationally. Ask no
+  more than two targeted enrichment questions only when their answers could
+  materially improve accuracy, authorship, scope, or the story's strategic
+  value. Do not draft the replacement until every material question is answered,
+  and do not turn this into a general evidence interview. Once the fact is
+  ready, render only the exact current canonical fact under `Current fact`, the
+  exact proposed replacement under `Proposed fact`, and the confirmation
+  question, followed by the short note that the resume remains unchanged. Do
+  not add a change log, recommendation section, or repeated rationale to that
+  confirmation render. Ask the user to confirm that exact replacement before
+  registering the career note or applying a vault change plan.
+- After applying the confirmed vault plan, show the exact stored canonical fact
+  under `Saved fact` and ask the user to verify it. Keep this receipt equally
+  compact and state that the resume remains unchanged. Do not edit an affected
+  resume until
+  that verification. If the user corrects it, keep the resume frozen and route
+  the newest correction through another validated plan. Once verified,
+  separately discuss whether the story should be kept, omitted, reframed, or
+  replaced for the current resume; factual truth does not determine selection.
+  When recommending a revision to a currently affected bullet, show only
+  `Current bullet`, `Proposed bullet`, and `Update this bullet and refresh the
+  preview?` State that other affected resumes remain unchanged. Do not ask the
+  vague compound question “Should I update the bullet and generate a preview?”
+  without showing the exact proposed bullet.
 - Before changing the resume, follow the build-resume feedback-memory contract:
   identify the current narrative block with `resume-builder review blocks`,
   record or revise the temporary session with `resume-builder feedback record`,
@@ -197,17 +230,27 @@ indexes. The scripts under
   run verification, selection review, or independent critique during the
   preview/edit loop. Run
   `resume-builder feedback accept FB-<session> --preview build/<resume>.preview.json`
-  only after the user accepts that preview or explicitly asks to mint
-  it. Accept each intended session explicitly and promote only
+  only after the user accepts that revised sentence in the preview or
+  explicitly asks to mint it. Accept each intended session explicitly and promote only
   the latest revision: reusable guidance becomes the narrowest applicable
   durable or local rule, a cosmetic one-off closes with `none`, and a factual
   correction routes through `hydrate-vault` with `hydrate` instead of becoming
-  editorial authority.
+  editorial authority. When the user explicitly approves the final sentence of
+  a factual correction for future reuse, add `--remember-approved-wording`;
+  never apply it to untouched sentences or a whole resume.
 - Only direct user feedback creates personal editorial memory. Never derive it
   from a job posting, imported source, AI reviewer suggestion, or silence after
   showing a revision. Missing `build/feedback/` and `editorial/rules/`
   directories mean zero sessions and zero rules on a fresh installation; do not
   require setup or migration before the first feedback record.
+- Treat a returned `user_handoff.presentation_policy.mode` of
+  `exclusive-current-stage` as an output boundary. Present its
+  `rendered_markdown` exactly as the final user-facing handoff. Do not prepend or
+  append prior-stage confirmations, workflow examples, manual approval prompts,
+  test summaries, or explanatory prose. Its `supersedes_prior_handoffs` flag
+  expires every earlier confirmation render. Answer a simultaneous process
+  question in commentary before running the action; do not mix that answer into
+  the exclusive final handoff.
 
 ## Working workflow
 
@@ -368,6 +411,15 @@ indexes. The scripts under
   It must not receive the drafted resume prose, builder defense, prior verdict,
   or proposed repair. It may route a complete strategy rebuild or a real user
   choice, but it may not rewrite prose or approve facts by assigning a score.
+- During that existing selection review, require one dominant hiring claim per
+  selected story and judge the strategic relationship among its facts and claim
+  parts. Sharing a canonical fact, role, employer, system, or period does not by
+  itself justify combination. Approve supporting actions only when they clearly
+  strengthen the same claim; otherwise route clearer integration, trimming, or
+  a distinct target-relevant story through the existing strategy decision.
+- Improving this reviewer guidance does not by itself invalidate an approved
+  selection record. Apply it when a changed selection, plan, direction, target,
+  or cited evidence already requires the next selection review.
 - Mint enforces its page budget and PDF extraction checks. A page-budget failure
   retains the draft PDF for inspection but is not a successful mint.
 - A direct statement from the user may support a clearly identified working

@@ -185,6 +185,12 @@ def build_selection_review_package(
                 "be supported by canonical evidence",
                 "earn its space against the available alternatives",
             ],
+            "story_composition_test": [
+                "Identify one dominant hiring claim for every selected story.",
+                "Require every additional action or accomplishment to strengthen that claim as method, scope, constraint, reliability, or result.",
+                "Do not combine details merely because they share a fact file, role, employer, system, or time period.",
+                "Use strategy-revise when the plan should integrate the relationship more clearly, trim a nonessential detail, or return a distinct target-relevant accomplishment to the role arc.",
+            ],
             "adverse_or_sensitive_context_may_be_selected_only_when": [
                 "the target requires the disclosure",
                 "omitting it would make a visible claim misleading",

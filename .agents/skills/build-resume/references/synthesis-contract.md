@@ -223,6 +223,16 @@ the declared relationship are truthful, natural, and persuasive.
   into one bullet.
 - Combine facts only when they describe the same defensible story and the
   resulting statement preserves their ownership, period, and certainty.
+- Treat a canonical fact as an evidence container, not a sentence or story
+  boundary. One fact may contain several actions or accomplishments, while one
+  strong story may draw on several facts. Sharing a fact file, role, employer,
+  system, or time period is not by itself a strategic reason to combine them.
+- Give every proposed story one dominant hiring claim. Additional evidence may
+  join it only when it strengthens that claim as method, scope, constraint,
+  reliability, or result. Separate actions can still form one story when their
+  relationship is clear—for example, monitoring that made a delivered system
+  operable—but the plan must express that hierarchy instead of joining
+  co-equal accomplishments with an unexplained `and`.
 - Keep facts separate when they demonstrate materially different capabilities
   or when combining them would obscure chronology or authorship.
 - Give every bullet one primary job. Supporting details may reinforce that job,
@@ -260,6 +270,12 @@ the declared relationship are truthful, natural, and persuasive.
   claim, return it to the role arc and decide whether it deserves its own story.
   Record a reason if it remains omitted. Do not let cleaner sentences produce a
   thinner role argument by accident.
+- Apply a strategic-relationship test before prose: do the selected details
+  jointly prove one stronger hiring claim, or are they merely several true
+  things placed together? Keep a coherent combination, trim evidence that does
+  not materially strengthen the dominant claim, and split only when the
+  secondary accomplishment supplies a distinct target-relevant reason to hire
+  the candidate and earns the role and page space.
 - Match the supporting dimension to `primary_job`. Leadership and ownership
   bullets normally earn space through stakes, decisions, coordination, or
   outcomes—not a raw inventory of every system touched. Preserve exact technical
@@ -296,6 +312,8 @@ Do not begin resume prose until the plan shows:
   driven by distinct supported hiring signals rather than a bullet quota;
 - one claim focus and a minimum supporting evidence set for every story;
 - one structured action/object/scope/outcome boundary for every story;
+- one dominant hiring claim per story, with an explicit strategic relationship
+  for every additional action or accomplishment included in that boundary;
 - supported role placement;
 - visible career progression where relevant;
 - use of the strongest directionally relevant evidence available across the

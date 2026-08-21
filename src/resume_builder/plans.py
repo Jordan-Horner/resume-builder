@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import sys
 import tempfile
@@ -120,6 +121,58 @@ def validate_staged_plan(
         return validate_vault(staged_layout.root, strict=True)
 
 
+def affected_references(layout: VaultLayout, plan: VaultChangePlan) -> dict[str, object]:
+    """List project artifacts that mention facts updated by this plan."""
+    changed_fact_ids = sorted(
+        write.path.stem
+        for write in plan.writes
+        if write.expected_sha256 is not None and write.path.is_relative_to(layout.facts)
+    )
+    result: dict[str, object] = {
+        "fact_ids": changed_fact_ids,
+        "resumes": [],
+        "synthesis_plans": [],
+        "build_manifests": [],
+    }
+    if not changed_fact_ids:
+        return result
+
+    project_root = layout.root.parent
+    pattern = re.compile(
+        r"(?<![A-Za-z0-9-])(?:"
+        + "|".join(re.escape(item) for item in changed_fact_ids)
+        + r")(?![A-Za-z0-9-])"
+    )
+
+    def matching_files(paths: list[Path]) -> list[str]:
+        matches: list[str] = []
+        for path in paths:
+            try:
+                content = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            if pattern.search(content):
+                matches.append(path.relative_to(project_root).as_posix())
+        return sorted(matches)
+
+    resumes_root = project_root / "resumes"
+    plan_root = resumes_root / "plans"
+    resume_paths = (
+        [path for path in resumes_root.rglob("*.md") if plan_root not in path.parents]
+        if resumes_root.exists()
+        else []
+    )
+    synthesis_paths = (
+        [*plan_root.rglob("*.yaml"), *plan_root.rglob("*.yml")] if plan_root.exists() else []
+    )
+    build_root = project_root / "build"
+    manifest_paths = list(build_root.rglob("*.manifest.json")) if build_root.exists() else []
+    result["resumes"] = matching_files(resume_paths)
+    result["synthesis_plans"] = matching_files(synthesis_paths)
+    result["build_manifests"] = matching_files(manifest_paths)
+    return result
+
+
 def plan_summary(
     layout: VaultLayout,
     plan: VaultChangePlan,
@@ -141,6 +194,7 @@ def plan_summary(
         ],
         "validation_errors": validation.get("errors", []),
         "validation_warnings": validation.get("warnings", []),
+        "affected_references": affected_references(layout, plan),
         "vault_root": str(layout.root),
     }
 

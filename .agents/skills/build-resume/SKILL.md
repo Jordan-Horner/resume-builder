@@ -84,7 +84,13 @@ Git tools do not. Never write candidate data into same-named engine folders.
    revision" receipt. Pass the returned session ID when the user rejects a
    replacement again so the latest correction replaces the earlier
    interpretation even when its kind or scope changes. Do not promote an
-   intermediate interpretation.
+   intermediate interpretation. Classify the change by meaning, not edit size.
+   For wording-only feedback that preserves every factual claim boundary,
+   continue directly to edit and preview without another approval question. A
+   changed verb, noun, or number is not wording-only when it changes supported
+   authorship, authority, technology, scope, chronology, metric, relationship,
+   or outcome. For a factual change, freeze the resume and follow the factual
+   confirmation sequence in the feedback-memory contract before drafting.
 6. For a fresh baseline or substantial rewrite, write the versioned synthesis
    plan required by the synthesis contract under
    `resumes/plans/<resume-slug>.yaml`. Plan the target argument, career
@@ -205,6 +211,13 @@ Git tools do not. Never write candidate data into same-named engine folders.
    merely detail supporting the same claim—return it to the role-arc decision
    and either give it a separate story or record why it is omitted. Never let a
    prose cleanup silently narrow the role's career story.
+   Treat canonical facts as evidence containers rather than story boundaries.
+   Do not combine details merely because they occur in one fact, role, employer,
+   system, or period. Before drafting each story, apply the synthesis contract's
+   strategic-relationship test: the selected details must jointly strengthen
+   one dominant hiring claim. A secondary action may remain when it functions as
+   method, scope, constraint, reliability, or result for that claim; otherwise
+   trim it or return a distinct target-relevant accomplishment to the role arc.
 8. Run `resume-builder synthesis resumes/plans/<resume-slug>.yaml`, then
    `resume-builder preview <resume>`. Preview compiles the Markdown, validates
    its structured evidence, and publishes the current HTML in one command. Fix
@@ -233,13 +246,35 @@ Git tools do not. Never write candidate data into same-named engine folders.
     every user-requested edit. Preview compiles the current Markdown, checks its
     structured evidence locally, and publishes HTML without requiring a
     selection or language review. Post the command's `user_handoff.rendered_markdown`
-    immediately. Stay in the preview → edit → preview loop until the user says
-    `Mint`. When the user adds content during preview, use canonical vault
-    evidence immediately when it exists. For a new factual claim, ask at most
-    one targeted question needed for accurate wording, refresh the preview, and
-    persist the approved fact through `hydrate-vault` before minting; do not
-    restart selection or critique. A `Mint` request approves the latest current
-    preview. Accept each open
+    immediately. When `user_handoff.presentation_policy.mode` is
+    `exclusive-current-stage`, return that rendered Markdown as the complete
+    final handoff without adding earlier-stage confirmations, workflow examples,
+    approval prompts, test summaries, or other prose. Treat
+    `supersedes_prior_handoffs` as expiring every earlier confirmation render.
+    Answer any simultaneous process question in commentary before previewing,
+    not beside the exclusive preview handoff. Stay in the preview → edit → preview loop until the user says
+    `Mint`. When the user explicitly approves one sentence they manually
+    refined, accept only that feedback session against the current preview. For
+    a factual-correction session, pass `--remember-approved-wording` so the
+    final sentence becomes a fact-scoped preferred example. Never infer
+    sentence approval from untouched prose, whole-resume approval, or minting.
+    When the user adds content during preview, use canonical vault evidence
+    immediately when it exists. For a new or changed factual claim, do not place
+    the claim into the resume first. Show the current canonical fact and handle
+    exploration as ordinary conversation. Ask no more than two materially useful
+    enrichment questions and do not draft a replacement until they are answered.
+    Once ready, show only the exact `Current fact`, exact `Proposed fact`, the
+    confirmation question, and a short note that the resume remains unchanged;
+    do not add a recommendation or change-log section to the confirmation.
+    Obtain confirmation before routing the replacement through `hydrate-vault`.
+    After applying the validated plan, show only the exact `Saved fact`, the
+    factual-verification question, and the unchanged-resume note. Only then discuss
+    whether the story belongs in this resume. If recommending a revision, show
+    only the exact `Current bullet`, exact `Proposed bullet`, and `Update this
+    bullet and refresh the preview?`, plus a short note that other affected
+    resumes remain unchanged. After approval, return to edit → preview; do
+    not restart selection or critique merely because the vault changed. A
+    `Mint` request approves the latest current preview. Accept each open
     feedback session with `resume-builder feedback accept` against that preview,
     then run `resume-builder mint
     <resume>`. Mint checks current source and evidence pins, the compiled
@@ -267,6 +302,9 @@ Git tools do not. Never write candidate data into same-named engine folders.
 - The user's explicit wording edits and mint request control the interactive
   lifecycle. Do not insert an independent reviewer between an edit and its
   refreshed preview.
+- Do not mistake a small textual edit for a wording-only edit. Truth-changing
+  revisions use the before-and-after vault confirmation sequence; truth-
+  preserving revisions stay in the immediate edit → preview loop.
 - Treat a version 4, 5, or 6 story's `fact_ids` as available evidence, not mandatory
   sentence content. Preserve `core_fact_ids`; report optional facts left unused.
 - Treat version 5 and 6 `role_arcs` as story-allocation decisions, not fixed bullet
@@ -278,6 +316,11 @@ Git tools do not. Never write candidate data into same-named engine folders.
   optional stories remain removable when the resolved page budget requires it.
 - Treat the contents inside each cited fact the same way: fact IDs establish
   provenance, but they do not require every supported detail to appear.
+- When resolved fact-scoped guidance contains an explicitly user-approved
+  sentence as its sole preferred example, reuse that sentence by default for
+  the matching accomplishment. Adapt it only when the target or page constraint
+  requires a different emphasis. Do not replace it merely for stylistic
+  variety, and do not treat preferred wording as factual evidence.
 - Never cite a `needs-review` fact in visible resume content. Compilation treats
   unresolved evidence as a release failure, not as prose the reviewer can make
   true.

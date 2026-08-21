@@ -60,7 +60,12 @@ or candidate evidence into the engine checkout.
    If verification returns `selection_case`, do not review prose. Give only that
    case and the selection standard to a fresh strategy reviewer. Require a
    decision for the whole argument, every selected and omitted story, and every
-   role arc. Finalize the result with `review selection-finalize`. A
+   role arc. Before approving a selected story, require the reviewer to apply
+   the critique contract's dominant-claim and strategic-relationship test; one
+   fact or role may contain several accomplishments, and factual compatibility
+   alone does not justify one combined story. Use the existing story decision
+   and note to route an incoherent grouping back to planning. Finalize the
+   result with `review selection-finalize`. A
    `strategy-revise` result returns the complete argument to `build-resume`; a
    `needs-user-decision` result pauses for the exact material tradeoff. Rerun
    verification after approval to obtain the cold language inputs.

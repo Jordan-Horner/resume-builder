@@ -62,12 +62,25 @@ def _opening_advisories(text: str, role: str | None) -> tuple[str, ...]:
     return ()
 
 
+def _has_long_parallel_list(text: str) -> bool:
+    """Return whether a clause likely contains four or more parallel items."""
+    for clause in re.split(r"[;.!?]", text):
+        for conjunction in re.finditer(r",\s*(?:and|or)\b", clause, re.IGNORECASE):
+            if clause[: conjunction.start()].count(",") >= 3:
+                return True
+    return False
+
+
 def _density_advisories(text: str) -> tuple[str, ...]:
-    """Flag likely nested enumerations without imposing a universal length limit."""
+    """Flag likely long or nested enumerations without imposing a length limit."""
     comma_count = text.count(",")
     conjunction_count = len(re.findall(r"\b(?:and|or)\b", text, re.IGNORECASE))
     has_clause_pivot = re.search(r"\b(?:while|then)\b", text, re.IGNORECASE) is not None
-    if (comma_count >= 6 and conjunction_count >= 2) or (comma_count >= 5 and has_clause_pivot):
+    if (
+        _has_long_parallel_list(text)
+        or (comma_count >= 6 and conjunction_count >= 2)
+        or (comma_count >= 5 and has_clause_pivot)
+    ):
         return (
             "block may contain nested lists competing with its main claim; verify that each "
             "enumerated detail materially improves proof, scope, outcome, or differentiation",

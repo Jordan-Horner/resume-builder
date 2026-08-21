@@ -402,6 +402,7 @@ Leads complex engineering support work. <!-- evidence: PROFILE-001 -->
 
 - Directed incident response during high-severity customer issues, coordinating investigations, live troubleshooting, engineering updates, and resolution across databases, APIs, logs, cloud systems, and connected workflows. <!-- evidence: EX-003 -->
 - Owned high-severity, customer-facing production issues from investigation through resolution, leading live troubleshooting across databases, APIs, logs, and cloud systems while coordinating engineering updates. <!-- evidence: EX-004 -->
+- Reduced investigation time by combining customer context, health checks, logs, processing errors, and connected-system data. <!-- evidence: EX-005 -->
 
 ## Example Organization C | Cloud Engineer | 2022 - 2023 <!-- evidence: EZ-001 -->
 
@@ -425,6 +426,10 @@ Leads complex engineering support work. <!-- evidence: PROFILE-001 -->
         "enumerated detail materially improves proof, scope, outcome, or differentiation",
     )
     assert blocks["experience[0].bullets[1]"].advisories == (
+        "block may contain nested lists competing with its main claim; verify that each "
+        "enumerated detail materially improves proof, scope, outcome, or differentiation",
+    )
+    assert blocks["experience[0].bullets[2]"].advisories == (
         "block may contain nested lists competing with its main claim; verify that each "
         "enumerated detail materially improves proof, scope, outcome, or differentiation",
     )

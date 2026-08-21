@@ -12,6 +12,7 @@ from .feedback_resolution import (
     RULE_ID,
     SESSION_ID,
     _effective_digest,
+    _identity_digest,
     _nonempty,
     _object,
     _project_file,
@@ -30,6 +31,113 @@ def _retire_rule(path: Path, data: dict[str, Any], reason: str) -> None:
     data["retired_at"] = _now()
     data["retirement_reason"] = reason
     atomic_write_json(path, data)
+
+
+def _atomic_json_updates(updates: list[tuple[Path, dict[str, Any]]]) -> None:
+    """Write related feedback records together and restore them on failure."""
+    originals = {
+        update_path: update_path.read_bytes() if update_path.is_file() else None
+        for update_path, _ in updates
+    }
+    try:
+        for update_path, value in updates:
+            atomic_write_json(update_path, value)
+    except BaseException:
+        for update_path, original in originals.items():
+            if original is None:
+                update_path.unlink(missing_ok=True)
+            else:
+                atomic_write_bytes(update_path, original)
+        raise
+
+
+def _approved_wording_rule(
+    root: Path,
+    session: dict[str, Any],
+    current: dict[str, Any],
+    accepted_result: dict[str, str],
+) -> tuple[Path, dict[str, Any], str]:
+    """Create a fact-scoped rule for one explicitly approved current sentence."""
+    scope = _object(_object(session.get("identity"), "feedback identity").get("scope"), "scope")
+    if scope.get("level") != "facts":
+        raise ValueError("approved wording memory requires fact-scoped feedback")
+
+    source = _object(current.get("source"), "feedback revision source")
+    resume_path = _project_file(root, source.get("resume"), "feedback source resume", "resumes")
+    from .compilation import sha256_file
+    from .feedback_recording import _block_inventory
+
+    if sha256_file(resume_path) != accepted_result["resume_sha256"]:
+        raise ValueError("approved wording resume changed after preview publication")
+    block_id = _nonempty(source.get("block_id"), "feedback source block_id")
+    block = _block_inventory(resume_path).get(block_id)
+    if block is None:
+        raise ValueError("approved wording block no longer exists in the accepted resume")
+    fact_ids = scope.get("fact_ids")
+    evidence = block.get("evidence")
+    if (
+        not isinstance(fact_ids, list)
+        or not isinstance(evidence, list)
+        or not set(str(item) for item in fact_ids).issubset(str(item) for item in evidence)
+    ):
+        raise ValueError("approved wording no longer cites its fact-scoped evidence")
+    sentence = _nonempty(block.get("text"), "approved wording sentence")
+
+    wording_scope = dict(scope)
+    wording_scope["resume"] = None
+    identity = {
+        "subject_key": f"{session['identity']['subject_key']}-approved-wording",
+        "kind": "presentation",
+        "scope": wording_scope,
+    }
+    rule_id = f"ER-{_identity_digest(identity)}"
+    rule_path = root / "editorial" / "rules" / f"{rule_id}.json"
+    if rule_path.is_file():
+        rule = _read_json(rule_path, "approved wording rule")
+        _validate_rule(rule, rule_path, root)
+        if rule["identity"] != identity:
+            raise ValueError("existing approved wording rule has a different semantic identity")
+        revisions = list(rule["revisions"])
+    else:
+        revisions = []
+        rule = {
+            "version": 1,
+            "id": rule_id,
+            "status": "active",
+            "identity": identity,
+            "strength": "preference",
+            "current_revision": 0,
+            "revisions": [],
+            "retired_at": None,
+            "retirement_reason": None,
+        }
+    revisions.append(
+        {
+            "revision": len(revisions) + 1,
+            "accepted_at": _now(),
+            "source_session": session["id"],
+            "source_session_revision": session["current_revision"],
+            "summary": "The user explicitly approved this sentence for future reuse.",
+            "instruction": (
+                "Reuse the approved sentence by default when this accomplishment is selected; "
+                "adapt it only when the target or page constraint requires a different emphasis."
+            ),
+            "must_preserve": current["must_preserve"],
+            "must_avoid": current["must_avoid"],
+            "preferred_examples": [sentence],
+        }
+    )
+    rule.update(
+        {
+            "status": "active",
+            "strength": "preference",
+            "current_revision": len(revisions),
+            "revisions": revisions,
+            "retired_at": None,
+            "retirement_reason": None,
+        }
+    )
+    return rule_path, rule, sentence
 
 
 def _acceptance_result(
@@ -127,6 +235,7 @@ def accept_feedback(
     session_id: str | None = None,
     resume: Path | None = None,
     preview: Path | None = None,
+    remember_approved_wording: bool = False,
     acceptance_result_fn: Callable[
         [Path, dict[str, Any], Path], dict[str, str]
     ] = _acceptance_result,
@@ -180,12 +289,40 @@ def accept_feedback(
         accepted_result = acceptance_result_fn(root, session, preview)
         promotion = session["promotion"]
         current = session["revisions"][session["current_revision"] - 1]
+        wording_update: tuple[Path, dict[str, Any], str] | None = None
+        if remember_approved_wording:
+            if promotion != "hydrate":
+                raise ValueError(
+                    "--remember-approved-wording is only needed for factual corrections; "
+                    "other reusable feedback should use its existing preferred_examples"
+                )
+            wording_update = _approved_wording_rule(root, session, current, accepted_result)
         if promotion == "hydrate":
             session["status"] = "needs-hydration"
             session["accepted_at"] = _now()
             session["accepted_result"] = accepted_result
-            atomic_write_json(path, session)
-            accepted.append({"session_id": session["id"], "route": "hydrate", "rule": None})
+            updates: list[tuple[Path, dict[str, Any]]] = []
+            wording_rule_id = None
+            wording_sentence = None
+            if wording_update is not None:
+                wording_path, wording_rule, wording_sentence = wording_update
+                wording_rule_id = str(wording_rule["id"])
+                session["promoted_rule"] = {
+                    "id": wording_rule_id,
+                    "revision": wording_rule["current_revision"],
+                    "path": wording_path.relative_to(root).as_posix(),
+                }
+                updates.append((wording_path, wording_rule))
+            updates.append((path, session))
+            _atomic_json_updates(updates)
+            accepted.append(
+                {
+                    "session_id": session["id"],
+                    "route": "hydrate+memory" if wording_rule_id else "hydrate",
+                    "rule": wording_rule_id,
+                    "preferred_sentence": wording_sentence,
+                }
+            )
             continue
         if promotion == "none":
             session["status"] = "closed"
@@ -274,20 +411,7 @@ def accept_feedback(
             "path": rule_path.relative_to(root).as_posix(),
         }
         updates = [*retired_updates, (rule_path, rule), (path, session)]
-        originals = {
-            update_path: update_path.read_bytes() if update_path.is_file() else None
-            for update_path, _ in updates
-        }
-        try:
-            for update_path, value in updates:
-                atomic_write_json(update_path, value)
-        except BaseException:
-            for update_path, original in originals.items():
-                if original is None:
-                    update_path.unlink(missing_ok=True)
-                else:
-                    atomic_write_bytes(update_path, original)
-            raise
+        _atomic_json_updates(updates)
         accepted.append(
             {
                 "session_id": session["id"],

@@ -98,6 +98,9 @@ def test_skill_uses_preview_and_plan_boundaries() -> None:
     assert "generated resume as a source claim" in normalized_skill
     assert "schema-v2.md" in skill
     assert "scope: organization" in skill
+    assert "exact current canonical fact" in normalized_skill
+    assert "exact stored canonical fact" in normalized_skill
+    assert "Keep affected resumes unchanged until the user verifies it" in normalized_skill
 
 
 def test_build_resume_skill_routes_and_preserves_work() -> None:
@@ -156,8 +159,12 @@ def test_build_resume_skill_routes_and_preserves_work() -> None:
     assert "internal names as provenance, not explanation" in normalized_skill
     assert "project, system, team, workflow, or process name" in normalized_skill
     assert "preview → edit → preview" in normalized_skill
+    assert "exclusive-current-stage" in normalized_skill
+    assert "supersedes_prior_handoffs" in normalized_skill
+    assert "complete final handoff" in normalized_skill
+    assert "without adding earlier-stage confirmations" in normalized_skill
     assert "When the user adds content during preview" in skill_text
-    assert "ask at most one targeted question" in normalized_skill
+    assert "no more than two materially useful enrichment questions" in normalized_skill
     assert "do not restart selection or critique" in normalized_skill
     assert "explicitly asks for an independent critique" in normalized_skill
     assert "feedback-memory contract" in normalized_skill
@@ -177,6 +184,8 @@ def test_build_resume_skill_routes_and_preserves_work() -> None:
     assert "one functional scope phrase" in normalized_skill
     assert "Do not make one bullet perform both" in skill_text
     assert "raw comma-separated inventory" in normalized_skill
+    assert "evidence containers rather than story boundaries" in normalized_skill
+    assert "strategic-relationship test" in normalized_skill
     assert "explicit role arc" in normalized_skill
     assert "rather than a bullet quota" in normalized_skill
     assert "perform a redistribution check" in normalized_skill
@@ -186,6 +195,44 @@ def test_build_resume_skill_routes_and_preserves_work() -> None:
     assert "omit the story rather than reaching for a stronger synonym" in normalized_skill
     assert "Never cite a `needs-review` fact" in skill_text
     assert "action-verb lists as brainstorming aids" in normalized_skill
+    assert "Classify the change by meaning, not edit size" in normalized_skill
+    assert "freeze the resume" in normalized_skill
+    assert "no more than two materially useful enrichment questions" in normalized_skill
+    assert "exact `Saved fact`" in normalized_skill
+    assert "show only the exact `Current fact`, exact `Proposed fact`" in normalized_skill
+    assert "do not add a recommendation or change-log section" in normalized_skill
+
+
+def test_feedback_contract_separates_wording_edits_from_fact_changes() -> None:
+    agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    normalized_agents = " ".join(agents.split())
+    contract = (BUILD_SKILL / "references" / "feedback-memory-contract.md").read_text(
+        encoding="utf-8"
+    )
+    normalized_contract = " ".join(contract.split())
+
+    for text in (normalized_agents, normalized_contract):
+        assert "Classify" in text and "meaning" in text
+        assert "word count" in text
+        assert "wording-only" in text
+        assert "authorship" in text
+        assert "exact current canonical fact" in text
+        assert "exact proposed" in text
+        assert "no more than two" in text
+        assert "exact stored" in text
+        assert "Keep the resume" in text or "keep the resume" in text
+        assert "kept, omitted, reframed, or replaced" in text
+        assert "resume remains unchanged" in text
+
+    assert "Do not add `My read`" in contract
+    assert "**Current fact**" in contract
+    assert "**Proposed fact**" in contract
+    assert "**Saved fact**" in contract
+    assert "**Is this accurate?**" in contract
+    assert "**Current bullet**" in contract
+    assert "**Proposed bullet**" in contract
+    assert "**Update this bullet and refresh the preview?**" in contract
+    assert "Other affected resumes will remain unchanged" in contract
 
 
 def test_critique_skill_owns_mandatory_editorial_approval_and_is_non_mutating() -> None:
@@ -264,6 +311,8 @@ def test_critique_skill_owns_mandatory_editorial_approval_and_is_non_mutating() 
     assert "Neighbor test" in contract
     assert "Cold-reader-in-context test" in contract
     assert "Role-arc completeness" in contract
+    assert "dominant-claim and strategic-relationship" in normalized_contract
+    assert "factual compatibility alone does not justify" in normalized_skill
     assert "not a bullet count" in normalized_skill
     assert "There is no universal ideal count" in contract
     assert "overload revision made prose cleaner" in normalized_skill

@@ -150,13 +150,17 @@ def accept_for_unit_test(
     tmp_path: Path,
     session_id: str,
     monkeypatch: pytest.MonkeyPatch,
+    *,
+    remember_approved_wording: bool = False,
 ) -> dict[str, object]:
     """Exercise promotion while the preview gate is covered by integration tests."""
     monkeypatch.setattr(
         feedback_memory,
         "_acceptance_result",
         lambda *_args: {
-            "resume_sha256": "0" * 64,
+            "resume_sha256": hashlib.sha256(
+                (tmp_path / "resumes" / "baselines" / "support.md").read_bytes()
+            ).hexdigest(),
             "build_manifest": "build/example.manifest.json",
             "build_sha256": "1" * 64,
             "review_record": "build/reviews/example.json",
@@ -172,6 +176,7 @@ def accept_for_unit_test(
         tmp_path,
         session_id=session_id,
         preview=Path("build/example.preview.json"),
+        remember_approved_wording=remember_approved_wording,
     )
 
 
@@ -337,3 +342,45 @@ def test_non_durable_feedback_closes_without_creating_a_rule(
     accepted = accept_for_unit_test(tmp_path, str(recorded["session_id"]), monkeypatch)
     assert accepted["accepted"][0]["route"] == "closed"
     assert not (tmp_path / "editorial" / "rules").exists()
+
+
+def test_factual_correction_can_remember_only_the_explicitly_approved_sentence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    vault, resume, synthesis_plan = project(tmp_path)
+    plan_path = feedback_plan(
+        tmp_path,
+        resume,
+        instruction="Correct the fact and preserve the approved final sentence.",
+        promotion="hydrate",
+    )
+    recorded = feedback_memory.record_feedback(plan_path, tmp_path)
+    approved_sentence = "Diagnosed customer issues across service boundaries."
+    resume.write_text(
+        resume.read_text(encoding="utf-8").replace(
+            "Traced customer-impacting defects across service boundaries.",
+            approved_sentence,
+        ),
+        encoding="utf-8",
+    )
+
+    accepted = accept_for_unit_test(
+        tmp_path,
+        str(recorded["session_id"]),
+        monkeypatch,
+        remember_approved_wording=True,
+    )
+
+    result = accepted["accepted"][0]
+    assert result["route"] == "hydrate+memory"
+    assert result["preferred_sentence"] == approved_sentence
+    rule_path = tmp_path / "editorial" / "rules" / f"{result['rule']}.json"
+    rule = json.loads(rule_path.read_text(encoding="utf-8"))
+    assert rule["identity"]["scope"]["fact_ids"] == ["FACT-001"]
+    assert rule["identity"]["scope"]["resume"] is None
+    assert rule["revisions"][0]["preferred_examples"] == [approved_sentence]
+    assert "Support engineer who resolves customer issues." not in json.dumps(rule)
+
+    resolved = feedback_memory.resolve_feedback(synthesis_plan, tmp_path, vault)
+    assert resolved["rules"][0]["preferred_examples"] == [approved_sentence]

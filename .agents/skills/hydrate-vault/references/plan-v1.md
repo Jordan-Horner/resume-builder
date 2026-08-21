@@ -34,6 +34,14 @@ Rules:
 - Preserve existing IDs, source references, manual wording, and unsupported
   facts unless the reviewed plan explicitly updates them.
 - Run `plan validate` and `plan preview` before `plan apply`.
+- For a user-requested correction to an existing fact, present the exact current
+  fact and exact proposed replacement before apply. Apply only after explicit
+  confirmation, then read the stored file back and present the exact canonical
+  fact for verification. Keep affected resumes unchanged until verification.
 
 The apply command stages the complete vault, runs strict validation, rechecks
 optimistic hashes, writes atomically, and rolls back if final validation fails.
+Preview and apply results also include a read-only `affected_references` record
+for updated fact IDs. It lists resume Markdown, synthesis plans, and compiled
+build manifests that mention those facts. The list is informational: plan
+validation never rewrites or blocks the referenced artifacts.

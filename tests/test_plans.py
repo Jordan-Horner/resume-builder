@@ -143,3 +143,49 @@ def test_plan_rejects_noncanonical_target(tmp_path: Path, run_main) -> None:
     )
 
     assert run_main(plans.main, "validate", plan, "--vault-root", vault) == 2
+
+
+def test_updated_fact_reports_referencing_artifacts_without_editing_them(
+    tmp_path: Path,
+    run_main,
+) -> None:
+    vault, source_id = create_valid_vault(tmp_path, run_main)
+    resume = tmp_path / "resumes" / "baselines" / "support.md"
+    resume.parent.mkdir(parents=True)
+    resume.write_text("- Existing claim. <!-- evidence: EMP-001 -->\n", encoding="utf-8")
+    synthesis = tmp_path / "resumes" / "plans" / "support.yaml"
+    synthesis.parent.mkdir(parents=True)
+    synthesis.write_text("fact_ids: [EMP-001]\n", encoding="utf-8")
+    manifest = tmp_path / "build" / "support.manifest.json"
+    manifest.parent.mkdir()
+    manifest.write_text('{"evidence": {"facts": [{"id": "EMP-001"}]}}\n')
+    originals = {path: path.read_bytes() for path in (resume, synthesis, manifest)}
+
+    fact = vault / "facts" / "employment" / "example-corp" / "EMP-001.md"
+    update_plan = tmp_path / "update-plan.json"
+    update_plan.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "rationale": "Correct an existing fact and report its references.",
+                "writes": [
+                    {
+                        "path": "facts/employment/example-corp/EMP-001.md",
+                        "expected_sha256": hashlib.sha256(fact.read_bytes()).hexdigest(),
+                        "content": fact_content("EMP-001", source_id, "Corrected fact"),
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    loaded = plans.load_plan(update_plan, plans.VaultLayout.load(vault))
+    references = plans.affected_references(plans.VaultLayout.load(vault), loaded)
+
+    assert references == {
+        "fact_ids": ["EMP-001"],
+        "resumes": ["resumes/baselines/support.md"],
+        "synthesis_plans": ["resumes/plans/support.yaml"],
+        "build_manifests": ["build/support.manifest.json"],
+    }
+    assert all(path.read_bytes() == original for path, original in originals.items())

@@ -21,6 +21,11 @@ PREVIEW_MODE = {
     "kind": "continuous-web",
     "pagination": "PDF page count is calculated only during minting",
 }
+PRESENTATION_POLICY = {
+    "mode": "exclusive-current-stage",
+    "supersedes_prior_handoffs": True,
+    "append_to_rendered_markdown": False,
+}
 
 
 def _handoff_presentation(*, tailored: bool) -> dict[str, Any]:
@@ -210,6 +215,7 @@ def preview_resume(
     user_handoff: dict[str, Any] = {
         "required": True,
         "action": "present-preview",
+        "presentation_policy": PRESENTATION_POLICY,
         "artifact": {
             "path": relative_html_path,
             "media_type": "text/html",

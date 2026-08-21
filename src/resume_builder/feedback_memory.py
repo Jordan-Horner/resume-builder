@@ -63,6 +63,7 @@ def accept_feedback(
     session_id: str | None = None,
     resume: Path | None = None,
     preview: Path | None = None,
+    remember_approved_wording: bool = False,
 ) -> dict[str, object]:
     """Accept feedback through the compatibility facade's preview validator."""
     return _accept_feedback(
@@ -70,6 +71,7 @@ def accept_feedback(
         session_id=session_id,
         resume=resume,
         preview=preview,
+        remember_approved_wording=remember_approved_wording,
         acceptance_result_fn=_acceptance_result,
     )
 
@@ -137,6 +139,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     accept_parser.add_argument("session_id", nargs="?")
     accept_parser.add_argument("--resume", type=Path)
     accept_parser.add_argument("--preview", type=Path)
+    accept_parser.add_argument("--remember-approved-wording", action="store_true")
     resolve_parser = subparsers.add_parser("resolve", help="Resolve guidance for one plan")
     resolve_parser.add_argument("plan", type=Path)
     resolve_parser.add_argument("--vault-root", type=Path, default=Path("vault"))
@@ -168,6 +171,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 session_id=args.session_id,
                 resume=args.resume,
                 preview=args.preview,
+                remember_approved_wording=args.remember_approved_wording,
             )
         elif args.action == "resolve":
             vault_root = args.vault_root

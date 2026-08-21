@@ -72,6 +72,21 @@ A reviewer risk alone never justifies harmful visible content. Reviewing omitted
 options prevents deletion from gaming the verdict. Only a current `approved`
 selection record permits the narrative gate.
 
+For every selected story, apply a dominant-claim and strategic-relationship
+test before approval. A factually valid grouping is not automatically a strong
+resume story. Decide whether its actions, object, scope, and outcome jointly
+prove one stronger hiring claim or merely place several true things together.
+The same fact file, role, employer, system, or time period is not sufficient
+reason to combine them. Preserve combinations when secondary evidence clearly
+strengthens the dominant claim as method, scope, constraint, reliability, or
+result. Return `strategy-revise` when the plan should integrate the relationship
+more clearly, trim a nonessential detail, or return an independently valuable
+accomplishment to the role arc as a separate story. Use the existing decision
+and note fields; this judgment does not create another review stage or schema.
+An improvement to this guidance applies the next time changed selection,
+evidence, direction, or target already requires a selection review. It does not
+invalidate a current approved selection record by itself.
+
 ### Narrative-block language gate
 
 Compilation produces a draft; it never approves prose. Use `resume-builder
