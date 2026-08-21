@@ -31,6 +31,12 @@ FORBIDDEN_IMPORTS = {
         "feedback_recording",
         "review_records",
     },
+    "review_approval": {
+        "feedback_acceptance",
+        "feedback_memory",
+        "feedback_recording",
+        "review_records",
+    },
     "synthesis_audit": {"synthesis", "synthesis_loader"},
     "synthesis_loader": {"synthesis", "synthesis_audit"},
     "synthesis_models": {"synthesis", "synthesis_audit", "synthesis_loader"},

@@ -62,7 +62,8 @@ facade:
 - `review_packages.py` builds cold-read and evidence-appendix artifacts;
 - `review_decisions.py` finalizes reviewer-owned decisions;
 - `review_repairs.py` applies the guarded wording-only repair pass;
-- `review_schema.py` loads records and enforces freshness and approval.
+- `review_schema.py` strictly loads compatible record versions;
+- `review_approval.py` enforces freshness and release authorization.
 
 Compatibility facades keep every pre-split public symbol importable from its
 original module and list it in `__all__`. A regression test pins that surface so

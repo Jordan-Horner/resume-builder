@@ -9,6 +9,7 @@ from typing import Any
 
 from .atomic import atomic_write_json
 from .layout import contained_path
+from .review_approval import review_freshness
 from .review_schema import (
     EDITORIAL_SCOPE,
     FEEDBACK_DECISIONS,
@@ -17,7 +18,6 @@ from .review_schema import (
     _object,
     _source_input,
     load_review_record,
-    review_freshness,
     sha256_file,
 )
 from .selection_guard import (

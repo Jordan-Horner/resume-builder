@@ -9,6 +9,7 @@ from pathlib import Path
 
 from .evidence_questions import question_plan, resolve_question
 from .layout import contained_path
+from .review_approval import require_editorial_approval, review_freshness
 from .review_blocks import (
     BLOCK_ID,
     NarrativeReviewBlock,
@@ -36,8 +37,6 @@ from .review_schema import (
     ReviewInput,
     ReviewRecord,
     load_review_record,
-    require_editorial_approval,
-    review_freshness,
     sha256_file,
     sha256_text,
 )
