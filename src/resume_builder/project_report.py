@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 import sys
@@ -12,6 +11,21 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
+from .artifact_status import (
+    ArtifactStatus,
+)
+from .artifact_status import (
+    load_json_object as _load_json,
+)
+from .artifact_status import (
+    record_freshness as _record_freshness,
+)
+from .artifact_status import (
+    relative_path as _relative,
+)
+from .artifact_status import (
+    sha256 as _sha256,
+)
 from .directions import parse_direction
 from .evaluations import load_case
 from .feedback_memory import manifest_guidance_freshness, validate_feedback_memory
@@ -33,60 +47,29 @@ __all__ = [
 ]
 
 
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def _relative(path: Path, project_root: Path) -> str:
-    return path.resolve().relative_to(project_root).as_posix()
-
-
-def _load_json(path: Path) -> dict[str, Any]:
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(f"invalid JSON {path}: {exc}") from exc
-    if not isinstance(value, dict):
-        raise ValueError(f"{path} must contain a JSON object")
-    return value
-
-
-def _record_freshness(
-    value: object,
+def _status(
+    status: str,
+    path: Path,
     project_root: Path,
-    owner: str,
-    *,
-    base: Path | None = None,
-) -> str | None:
-    if not isinstance(value, dict):
-        return f"{owner} record is missing"
-    path_value = value.get("path")
-    digest = value.get("sha256")
-    if not isinstance(path_value, str) or not isinstance(digest, str):
-        return f"{owner} record is invalid"
-    try:
-        path = contained_path(base or project_root, path_value, f"{owner} path")
-    except ValueError:
-        return f"{owner} path is unsafe"
-    if not path.is_file():
-        return f"{owner} file is missing"
-    if _sha256(path) != digest:
-        return f"{owner} file changed"
-    return None
+    reasons: Sequence[str] = (),
+    **details: Any,
+) -> dict[str, Any]:
+    return ArtifactStatus(
+        status=status,
+        path=_relative(path, project_root),
+        reasons=tuple(reasons),
+        details=details,
+    ).as_dict()
 
 
 def _build_status(resume: Path, project_root: Path, vault_root: Path) -> dict[str, Any]:
     manifest_path = project_root / "build" / f"{resume.stem}.manifest.json"
     if not manifest_path.is_file():
-        return {"status": "missing", "path": _relative(manifest_path, project_root), "reasons": []}
+        return _status("missing", manifest_path, project_root)
     try:
         manifest = _load_json(manifest_path)
     except ValueError as exc:
-        return {
-            "status": "invalid",
-            "path": _relative(manifest_path, project_root),
-            "reasons": [str(exc)],
-        }
+        return _status("invalid", manifest_path, project_root, [str(exc)])
 
     reasons: list[str] = []
     if (
@@ -129,12 +112,13 @@ def _build_status(resume: Path, project_root: Path, vault_root: Path) -> dict[st
             reason = _record_freshness(output, project_root, f"build output[{index}]")
             if reason:
                 reasons.append(reason)
-    return {
-        "status": "stale" if reasons else "current",
-        "path": _relative(manifest_path, project_root),
-        "reasons": reasons,
-        "warnings": manifest.get("warnings", []),
-    }
+    return _status(
+        "stale" if reasons else "current",
+        manifest_path,
+        project_root,
+        reasons,
+        warnings=manifest.get("warnings", []),
+    )
 
 
 def _review_status(
@@ -145,58 +129,51 @@ def _review_status(
 ) -> dict[str, Any]:
     review_path = project_root / "build" / "reviews" / f"{resume.stem}.json"
     if not review_path.is_file():
-        return {"status": "missing", "path": _relative(review_path, project_root), "reasons": []}
+        return _status("missing", review_path, project_root)
     try:
         record = load_review_record(review_path, project_root)
         reasons = review_freshness(record)
     except ValueError as exc:
-        return {
-            "status": "invalid",
-            "path": _relative(review_path, project_root),
-            "reasons": [str(exc)],
-        }
+        return _status("invalid", review_path, project_root, [str(exc)])
     if record.resume.path != resume.resolve():
         reasons.append("review record names a different resume")
     if record.plan.path != plan.resolve():
         reasons.append("review record names a different synthesis plan")
     if direction is not None and record.direction.path != direction.resolve():
         reasons.append("review record names a different direction")
-    return {
-        "status": "stale" if reasons else "current",
-        "path": _relative(review_path, project_root),
-        "reasons": reasons,
-        "verdict": record.verdict,
-        "hiring_read": record.hiring_read,
-        "findings": record.findings,
-        "reviewed_at": record.reviewed_at,
-        "target": _relative(record.target.path, project_root) if record.target else None,
-        "next_action": {"route": record.next_route, "summary": record.next_summary},
-        "evidence_status": record.evidence_status or "legacy-not-separated",
-        "language_status": record.editorial_status,
-        "language_blocks": {
+    return _status(
+        "stale" if reasons else "current",
+        review_path,
+        project_root,
+        reasons,
+        verdict=record.verdict,
+        hiring_read=record.hiring_read,
+        findings=record.findings,
+        reviewed_at=record.reviewed_at,
+        target=_relative(record.target.path, project_root) if record.target else None,
+        next_action={"route": record.next_route, "summary": record.next_summary},
+        evidence_status=record.evidence_status or "legacy-not-separated",
+        language_status=record.editorial_status,
+        language_blocks={
             "reviewed": len(record.editorial_blocks),
             "revise": sum(block.decision == "revise" for block in record.editorial_blocks),
         },
-        "feedback_status": record.feedback_status,
-        "feedback_rules": {
+        feedback_status=record.feedback_status,
+        feedback_rules={
             "reviewed": len(record.feedback_rules),
             "revise": sum(rule.decision == "revise" for rule in record.feedback_rules),
         },
-    }
+    )
 
 
 def _mint_status(resume: Path, project_root: Path) -> dict[str, Any]:
     mint_path = project_root / "build" / f"{resume.stem}.mint.json"
     if not mint_path.is_file():
-        return {"status": "missing", "path": _relative(mint_path, project_root), "reasons": []}
+        return _status("missing", mint_path, project_root)
     try:
         manifest = _load_json(mint_path)
     except ValueError as exc:
-        return {
-            "status": "invalid",
-            "path": _relative(mint_path, project_root),
-            "reasons": [str(exc)],
-        }
+        return _status("invalid", mint_path, project_root, [str(exc)])
     reasons: list[str] = []
     if (
         manifest.get("version") not in {1, 2}
@@ -245,27 +222,24 @@ def _mint_status(resume: Path, project_root: Path) -> dict[str, Any]:
     pdf_audit = manifest.get("pdf_audit")
     extraction = pdf_audit.get("extraction") if isinstance(pdf_audit, dict) else None
     pages = extraction.get("pages") if isinstance(extraction, dict) else None
-    return {
-        "status": "stale" if reasons else "current",
-        "path": _relative(mint_path, project_root),
-        "reasons": reasons,
-        "pages": pages,
-    }
+    return _status(
+        "stale" if reasons else "current",
+        mint_path,
+        project_root,
+        reasons,
+        pages=pages,
+    )
 
 
 def _preview_status(resume: Path, project_root: Path) -> dict[str, Any]:
     """Report whether the career-professional-reviewed web preview is current."""
     preview_path = project_root / "build" / f"{resume.stem}.preview.json"
     if not preview_path.is_file():
-        return {"status": "missing", "path": _relative(preview_path, project_root), "reasons": []}
+        return _status("missing", preview_path, project_root)
     try:
         manifest = _load_json(preview_path)
     except ValueError as exc:
-        return {
-            "status": "invalid",
-            "path": _relative(preview_path, project_root),
-            "reasons": [str(exc)],
-        }
+        return _status("invalid", preview_path, project_root, [str(exc)])
     reasons: list[str] = []
     if (
         manifest.get("version") not in {1, 2}
@@ -291,27 +265,24 @@ def _preview_status(resume: Path, project_root: Path) -> dict[str, Any]:
         statuses = {}
     elif statuses.get("user_review") != "pending":
         reasons.append("preview user-review status is not pending")
-    return {
-        "status": "stale" if reasons else "current",
-        "path": _relative(preview_path, project_root),
-        "reasons": reasons,
-        "final_review_status": manifest.get("final_review_status"),
-        "review_statuses": statuses,
-    }
+    return _status(
+        "stale" if reasons else "current",
+        preview_path,
+        project_root,
+        reasons,
+        final_review_status=manifest.get("final_review_status"),
+        review_statuses=statuses,
+    )
 
 
 def _match_status(target: Path, resume: Path, project_root: Path) -> dict[str, Any]:
     report_path = project_root / "build" / "matches" / f"{target.stem}--{resume.stem}.json"
     if not report_path.is_file():
-        return {"status": "missing", "path": _relative(report_path, project_root), "reasons": []}
+        return _status("missing", report_path, project_root)
     try:
         report = _load_json(report_path)
     except ValueError as exc:
-        return {
-            "status": "invalid",
-            "path": _relative(report_path, project_root),
-            "reasons": [str(exc)],
-        }
+        return _status("invalid", report_path, project_root, [str(exc)])
     reasons: list[str] = []
     for key, expected in (("target", target), ("resume", resume)):
         value = report.get(key)
@@ -336,11 +307,7 @@ def _match_status(target: Path, resume: Path, project_root: Path) -> dict[str, A
         reason = _record_freshness(comparison.get("baseline"), project_root, "match baseline")
         if reason:
             reasons.append(reason)
-    return {
-        "status": "stale" if reasons else "current",
-        "path": _relative(report_path, project_root),
-        "reasons": reasons,
-    }
+    return _status("stale" if reasons else "current", report_path, project_root, reasons)
 
 
 def _resume_records(

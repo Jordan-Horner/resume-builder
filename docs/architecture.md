@@ -75,6 +75,8 @@ separate boundary modules while its public facade owns retrieval orchestration
 and CLI compatibility.
 Workspace state and remote-privacy inspection are similarly isolated from the
 mutating initialization and connection workflow.
+Project reporting uses typed artifact-status records and shared freshness
+helpers while preserving its stable JSON-facing report contract.
 `resume_parser.py` is independent of build orchestration; feedback recording,
 acceptance, and resolution are separate; synthesis models, loading, and auditing
 are separate; synthesis schema primitives and direction-derived inputs are kept
