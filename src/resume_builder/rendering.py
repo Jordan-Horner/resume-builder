@@ -8,7 +8,7 @@ import html
 import json
 import re
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -134,12 +134,84 @@ def section(title: str, body: str, class_name: str = "") -> str:
     )
 
 
+def review_block_id(block_id: str) -> str:
+    """Return a stable, HTML-safe anchor for one narrative review block."""
+    return "review-block-" + re.sub(r"[^a-z0-9]+", "-", block_id.casefold()).strip("-")
+
+
+def review_label(block_id: str) -> str:
+    """Return a concise reader-facing label for one narrative block ID."""
+    if block_id == "candidate.headline":
+        return "Headline"
+    if block_id == "summary":
+        return "Professional summary"
+    match = re.fullmatch(r"competencies\[(\d+)\]", block_id)
+    if match:
+        return f"Core competency {int(match.group(1)) + 1}"
+    match = re.fullmatch(r"experience\[(\d+)\]\.bullets\[(\d+)\]", block_id)
+    if match:
+        return f"Experience {int(match.group(1)) + 1}, bullet {int(match.group(2)) + 1}"
+    match = re.fullmatch(r"projects\[(\d+)\]\.(name|description|tech)", block_id)
+    if match:
+        field = {"name": "name", "description": "description", "tech": "technology"}[match.group(2)]
+        return f"Project {int(match.group(1)) + 1} {field}"
+    match = re.fullmatch(r"education\[(\d+)\]\.description", block_id)
+    if match:
+        return f"Education {int(match.group(1)) + 1} description"
+    return block_id
+
+
+def review_text(block_id: str, content: str, review_issues: Mapping[str, str]) -> str:
+    """Wrap visible prose with a stable review target and optional screen-only flag."""
+    issue = review_issues.get(block_id)
+    anchor = review_block_id(block_id)
+    block_attribute = html.escape(block_id, quote=True)
+    if issue is None:
+        return (
+            f'<span id="{anchor}" class="review-text" '
+            f'data-review-block="{block_attribute}">{content}</span>'
+        )
+    note_id = f"{anchor}-note"
+    escaped_note = html.escape(issue, quote=True)
+    return (
+        f'<span id="{anchor}" class="review-text review-issue" '
+        f'data-review-block="{block_attribute}" data-review-status="changes-required" '
+        f'aria-describedby="{note_id}">{content}'
+        '<span class="review-issue-badge" aria-hidden="true">Needs review</span>'
+        f'<span id="{note_id}" class="screen-reader-only">Needs review: {escaped_note}</span>'
+        "</span>"
+    )
+
+
+def review_panel(review_issues: Mapping[str, str]) -> str:
+    """Render a concise screen-only index of language issues."""
+    if not review_issues:
+        return ""
+    noun = "item" if len(review_issues) == 1 else "items"
+    items = []
+    for block_id, note in review_issues.items():
+        anchor = review_block_id(block_id)
+        items.append(
+            f'<li><a href="#{anchor}"><span class="review-panel-label">'
+            f"{html.escape(review_label(block_id))}</span>"
+            f'<span class="review-panel-note">{html.escape(note)}</span></a></li>'
+        )
+    return (
+        '<aside class="review-panel" aria-labelledby="review-panel-title">'
+        '<div class="review-panel-kicker">Independent language review</div>'
+        f'<h2 id="review-panel-title">{len(review_issues)} {noun} needs revision</h2>'
+        "<p>Highlighted wording should be revised before minting.</p>"
+        f"<ol>{''.join(items)}</ol></aside>"
+    )
+
+
 def render_payload(
     payload: dict[str, Any],
     template: str,
     fact_ids: set[str],
     *,
     preview_notice: str = "Unreviewed diagnostic render — not approved for final review",
+    review_issues: Mapping[str, str] | None = None,
 ) -> str:
     """Render one validated payload into the supplied template."""
     if payload.get("version") != 1:
@@ -150,18 +222,34 @@ def render_payload(
     page = PAGE_FORMATS[page_format]
     candidate = object_value(payload.get("candidate"), "candidate")
     header_evidence = evidence(candidate.get("evidence"), "candidate", fact_ids)
+    issues = dict(review_issues or {})
+    if not all(
+        isinstance(key, str) and isinstance(value, str) and value.strip()
+        for key, value in issues.items()
+    ):
+        raise ValueError("review issues must map block IDs to non-empty notes")
+    if issues and "{{REVIEW_ISSUES}}" not in template:
+        raise ValueError(
+            "rendering template cannot display language review issues; update it to include "
+            "the {{REVIEW_ISSUES}} placeholder"
+        )
+    rendered_review_blocks: set[str] = {"candidate.headline", "summary"}
 
     summary_value = escaped(payload.get("summary"), "summary")
     summary_evidence = evidence(payload.get("summary_evidence"), "summary", fact_ids)
-    summary_body = f'<p class="summary" {evidence_attribute(summary_evidence)}>{summary_value}</p>'
+    summary_body = (
+        f'<p class="summary" {evidence_attribute(summary_evidence)}>'
+        f"{review_text('summary', summary_value, issues)}</p>"
+    )
 
     competency_parts: list[str] = []
     for index, item in enumerate(object_list(payload.get("competencies"), "competencies")):
         owner = f"competencies[{index}]"
+        rendered_review_blocks.add(owner)
         item_evidence = evidence(item.get("evidence"), owner, fact_ids)
         competency_parts.append(
             f'<span class="competency" {evidence_attribute(item_evidence)}>'
-            f"{escaped(item.get('text'), f'{owner}.text')}</span>"
+            f"{review_text(owner, escaped(item.get('text'), f'{owner}.text'), issues)}</span>"
         )
 
     experience_parts: list[str] = []
@@ -174,10 +262,11 @@ def render_payload(
         bullet_parts: list[str] = []
         for bullet_index, bullet in enumerate(bullets):
             bullet_owner = f"{owner}.bullets[{bullet_index}]"
+            rendered_review_blocks.add(bullet_owner)
             bullet_evidence = evidence(bullet.get("evidence"), bullet_owner, fact_ids)
             bullet_parts.append(
                 f"<li {evidence_attribute(bullet_evidence)}>"
-                f"{escaped(bullet.get('text'), f'{bullet_owner}.text')}</li>"
+                f"{review_text(bullet_owner, escaped(bullet.get('text'), f'{bullet_owner}.text'), issues)}</li>"
             )
         location = escaped(item.get("location"), f"{owner}.location", required=False)
         location_html = f'<div class="location">{location}</div>' if location else ""
@@ -194,14 +283,23 @@ def render_payload(
     project_parts: list[str] = []
     for index, item in enumerate(object_list(payload.get("projects"), "projects")):
         owner = f"projects[{index}]"
+        rendered_review_blocks.update({f"{owner}.name", f"{owner}.description"})
         item_evidence = evidence(item.get("evidence"), owner, fact_ids)
         tech = escaped(item.get("tech"), f"{owner}.tech", required=False)
-        meta = f'<div class="project-meta">{tech}</div>' if tech else ""
+        if tech:
+            rendered_review_blocks.add(f"{owner}.tech")
+        meta = (
+            f'<div class="project-meta">{review_text(f"{owner}.tech", tech, issues)}</div>'
+            if tech
+            else ""
+        )
         project_parts.append(
             f'<article class="project" {evidence_attribute(item_evidence)}>'
-            f'<div class="project-name">{escaped(item.get("name"), f"{owner}.name")}</div>'
+            f'<div class="project-name">'
+            f"{review_text(f'{owner}.name', escaped(item.get('name'), f'{owner}.name'), issues)}</div>"
             f'<div class="project-description">'
-            f"{escaped(item.get('description'), f'{owner}.description')}</div>{meta}</article>"
+            f"{review_text(f'{owner}.description', escaped(item.get('description'), f'{owner}.description'), issues)}"
+            f"</div>{meta}</article>"
         )
 
     education_parts: list[str] = []
@@ -210,8 +308,13 @@ def render_payload(
         item_evidence = evidence(item.get("evidence"), owner, fact_ids)
         year = escaped(item.get("year"), f"{owner}.year", required=False)
         description = escaped(item.get("description"), f"{owner}.description", required=False)
+        if description:
+            rendered_review_blocks.add(f"{owner}.description")
         description_html = (
-            f'<div class="education-description">{description}</div>' if description else ""
+            f'<div class="education-description">'
+            f"{review_text(f'{owner}.description', description, issues)}</div>"
+            if description
+            else ""
         )
         education_parts.append(
             f'<article class="education" {evidence_attribute(item_evidence)}>'
@@ -255,6 +358,9 @@ def render_payload(
         )
 
     lang = text(payload.get("lang", "en"), "lang")
+    unknown_issues = sorted(set(issues) - rendered_review_blocks)
+    if unknown_issues:
+        raise ValueError(f"review issues reference unknown narrative blocks: {unknown_issues}")
     replacements = {
         "{{LANG}}": html.escape(lang, quote=True),
         "{{PAGE_SIZE}}": page["size"],
@@ -263,7 +369,11 @@ def render_payload(
         "{{TITLE}}": f"{escaped(candidate.get('name'), 'candidate.name')} - Resume",
         "{{HEADER_EVIDENCE}}": evidence_attribute(header_evidence),
         "{{NAME}}": escaped(candidate.get("name"), "candidate.name"),
-        "{{HEADLINE}}": escaped(candidate.get("headline"), "candidate.headline"),
+        "{{HEADLINE}}": review_text(
+            "candidate.headline",
+            escaped(candidate.get("headline"), "candidate.headline"),
+            issues,
+        ),
         "{{CONTACT}}": contact_html(candidate),
         "{{SUMMARY_SECTION}}": section(SECTION_TITLES["summary"], summary_body, "summary-section"),
         "{{COMPETENCIES_SECTION}}": section(
@@ -283,6 +393,7 @@ def render_payload(
             f'<div class="skills">{"".join(skill_parts)}</div>' if skill_parts else "",
         ),
         "{{PREVIEW_NOTICE}}": html.escape(preview_notice),
+        "{{REVIEW_ISSUES}}": review_panel(issues),
     }
     rendered = template
     for placeholder, replacement in replacements.items():

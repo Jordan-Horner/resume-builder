@@ -15,6 +15,9 @@
       --accent-dark: #087f8c;
       --secondary: #245f8f;
       --tag-bg: #f0f7f8;
+      --review-bg: #fff6dc;
+      --review-line: #d49a21;
+      --review-ink: #65450a;
       --font: "Liberation Sans", "Helvetica Neue", Arial, "DejaVu Sans", sans-serif;
     }
 
@@ -57,6 +60,12 @@
     }
 
     .draft-notice {
+      display: none;
+    }
+
+    .review-panel,
+    .review-issue-badge,
+    .screen-reader-only {
       display: none;
     }
 
@@ -279,6 +288,99 @@
         font-weight: 500;
         margin-top: 2px;
       }
+
+      .review-panel {
+        background: var(--review-bg);
+        border-bottom: 1px solid var(--review-line);
+        border-top: 3px solid var(--review-line);
+        color: var(--review-ink);
+        display: block;
+        margin: 0 auto 14px;
+        max-width: {{PAGE_WIDTH}};
+        padding: 12px 16px 13px;
+      }
+
+      .review-panel-kicker {
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .review-panel h2 {
+        font-size: 15px;
+        line-height: 1.25;
+        margin-top: 2px;
+      }
+
+      .review-panel p {
+        font-size: 11px;
+        margin-top: 2px;
+      }
+
+      .review-panel ol {
+        margin-top: 8px;
+        padding-left: 20px;
+      }
+
+      .review-panel li {
+        line-height: 1.35;
+        margin-bottom: 5px;
+      }
+
+      .review-panel a {
+        text-decoration: underline;
+        text-decoration-color: rgb(101 69 10 / 35%);
+        text-underline-offset: 2px;
+        white-space: normal;
+      }
+
+      .review-panel-label {
+        font-weight: 700;
+        margin-right: 5px;
+      }
+
+      .review-panel-note::before {
+        content: "— ";
+      }
+
+      .review-text {
+        scroll-margin-top: 24px;
+      }
+
+      .review-issue {
+        background: var(--review-bg);
+        box-decoration-break: clone;
+        border-radius: 2px;
+        outline: 2px solid rgb(212 154 33 / 58%);
+        outline-offset: 1px;
+        -webkit-box-decoration-break: clone;
+      }
+
+      .review-issue-badge {
+        background: var(--review-ink);
+        border-radius: 2px;
+        color: #fffaf0;
+        display: inline-block;
+        font-size: 7.5px;
+        font-weight: 700;
+        letter-spacing: 0.045em;
+        line-height: 1;
+        margin-left: 5px;
+        padding: 3px 4px 2px;
+        text-transform: uppercase;
+        vertical-align: 1px;
+      }
+
+      .screen-reader-only {
+        clip: rect(0 0 0 0);
+        clip-path: inset(50%);
+        display: block;
+        height: 1px;
+        overflow: hidden;
+        position: absolute;
+        width: 1px;
+      }
     }
 
     @media print {
@@ -297,6 +399,7 @@
     {{PREVIEW_NOTICE}}
     <span class="preview-mode">Continuous web preview · PDF pagination is checked during minting</span>
   </aside>
+  {{REVIEW_ISSUES}}
   <main class="page">
     <header class="header" {{HEADER_EVIDENCE}}>
       <h1 class="name">{{NAME}}</h1>

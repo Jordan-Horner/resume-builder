@@ -38,17 +38,33 @@ PRESENTATION_POLICY = {
 
 
 def _handoff_presentation(
-    *, tailored: bool, language_status: str, language_issues: int
+    *,
+    tailored: bool,
+    language_status: str,
+    language_issues: int,
+    career_verdict: str = "not-reviewed",
+    career_note: str | None = None,
 ) -> dict[str, Any]:
     """Return the user-facing structure for the preview/edit loop."""
     resume_label = "tailored resume" if tailored else "resume"
     if language_status == "approved":
-        summary = (
-            f"Your {resume_label} passed its independent language review. Review it and tell "
-            'me what to change. When it looks right, reply "Mint" to create the PDF.'
-        )
-        guidance = "Confirm that the content feels accurate and sounds like you."
-        response_prompt = 'Reply "Mint" to create the PDF, or tell me what to change.'
+        if career_verdict == "needs-revision" and career_note:
+            summary = (
+                f"Your {resume_label} passed its independent language review. The career "
+                f"review still flags one positioning tradeoff: {career_note}"
+            )
+            guidance = "Confirm that the content feels accurate and that you accept this tradeoff."
+            response_prompt = (
+                'Tell me what to change, or reply "Mint" if you accept the tradeoff and want '
+                "the PDF."
+            )
+        else:
+            summary = (
+                f"Your {resume_label} passed its independent language review. Review it and tell "
+                'me what to change. When it looks right, reply "Mint" to create the PDF.'
+            )
+            guidance = "Confirm that the content feels accurate and sounds like you."
+            response_prompt = 'Reply "Mint" to create the PDF, or tell me what to change.'
     else:
         noun = "item" if language_issues == 1 else "items"
         summary = (
@@ -119,7 +135,13 @@ def _current_career_review(
     return (
         record.hiring_read,
         record.verdict,
-        {"path": relative_output(path, project_root), "sha256": sha256_file(path)},
+        {
+            "path": relative_output(path, project_root),
+            "sha256": sha256_file(path),
+            "verdict": record.verdict,
+            "hiring_read": record.hiring_read,
+            "next_action": record.next_summary,
+        },
     )
 
 
@@ -312,6 +334,7 @@ def preview_resume(
         template_text,
         known_fact_ids(vault_root.resolve()),
         preview_notice=(APPROVED_NOTICE if language["status"] == "approved" else ATTENTION_NOTICE),
+        review_issues={str(issue["id"]): str(issue["note"]) for issue in language["issues"]},
     )
     atomic_write_text(html_path, rendered)
 
@@ -326,6 +349,8 @@ def preview_resume(
         tailored=resume_path.parent.name == "tailored",
         language_status=str(language["status"]),
         language_issues=len(language["issues"]),
+        career_verdict=career_verdict,
+        career_note=career_record.get("next_action") if career_record else None,
     )
     user_handoff: dict[str, Any] = {
         "required": True,

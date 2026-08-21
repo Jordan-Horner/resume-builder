@@ -107,7 +107,10 @@ their reviewed budgets.
 - Preview requires a current standalone natural-language record, and mint
   requires it to be approved.
 - A current preview whose language verdict requires changes remains visible for
-  editing but is reported as revision-required, never release-ready.
+  editing but is reported as revision-required, never release-ready. Its web
+  preview indexes and highlights the exact rejected narrative blocks; those
+  annotations are screen-only and cannot enter the minted PDF. A template that
+  cannot render the issue index fails explicitly instead of hiding the review.
 - The deeper critique record is required only when hybrid routing selects it;
   it must be a current version 4 or 5 independent review that pins the current
   approved standalone language record and approved selection review.

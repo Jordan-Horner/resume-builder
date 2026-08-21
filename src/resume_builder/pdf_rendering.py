@@ -170,7 +170,9 @@ def render_pdf(
                         """() => {
                           const root = document.documentElement;
                           const body = document.body;
-                          const overflowing = [...document.querySelectorAll('body *')]
+                          const overflowing = [
+                            ...document.querySelectorAll('body *:not(.screen-reader-only)')
+                          ]
                             .filter((el) => el.scrollWidth > el.clientWidth + 1)
                             .map((el) => el.tagName.toLowerCase() + '.' + el.className)
                             .slice(0, 10);

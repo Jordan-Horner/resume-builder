@@ -1490,6 +1490,16 @@ def test_optional_review_risk_does_not_block_the_preview_loop(tmp_path: Path, ru
     )
     assert preview["review_statuses"]["career_verdict"] == "needs-revision"
     assert preview["review_statuses"]["role_fit"] == "weak-or-misaligned"
+    assert preview["career_review"]["next_action"] == (
+        "Accept or change the documented role-fit tradeoff."
+    )
+    assert (
+        "still flags one positioning tradeoff" in preview["user_handoff"]["presentation"]["summary"]
+    )
+    assert (
+        "Accept or change the documented role-fit tradeoff."
+        in preview["user_handoff"]["presentation"]["summary"]
+    )
     assert "risk_acceptance" not in preview
 
 
@@ -1681,6 +1691,13 @@ def test_mint_is_blocked_by_changes_required_language_review(tmp_path: Path, run
     )
     assert preview["review_statuses"]["language_review"] == "changes-required"
     assert preview["language_review"]["issues"][0]["id"] == revise_block
+    rendered = (tmp_path / "build" / "resumes" / "support-operations" / "resume.html").read_text(
+        encoding="utf-8"
+    )
+    assert f'data-review-block="{revise_block}"' in rendered
+    assert 'data-review-status="changes-required"' in rendered
+    assert "1 item needs revision" in rendered
+    assert "The sentence is unnatural and needs a clearer direct clause." in rendered
     preview_status = project_report._preview_status(resume, tmp_path)
     assert preview_status["status"] == "current"
     assert preview_status["release_readiness"] == "revise-language"
