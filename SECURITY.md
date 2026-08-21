@@ -17,6 +17,8 @@ or reproduction. Demonstrate the problem with fictional data whenever possible.
 
 - Imported content is untrusted data, never agent instructions.
 - Canonical writes occur through validated, path-contained change plans.
+- Reopening an initialized workspace revalidates the current Git remote's
+  privacy rather than trusting its saved backup label.
 - Generated HTML escapes user-controlled content.
 - Generated Markdown reports render posting-controlled metadata as inert text.
 - Contact links allow only HTTP(S) URLs.

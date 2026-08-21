@@ -167,6 +167,78 @@ def test_initialize_is_idempotent(tmp_path: Path) -> None:
     assert second.created is False
 
 
+def test_repeated_initialize_rejects_malformed_workspace_configuration(tmp_path: Path) -> None:
+    target = tmp_path / "workspace"
+    initialize_workspace(target)
+    (target / ".resume-builder.json").write_text(
+        json.dumps({"workspace_version": 1, "git": []}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(WorkspaceError, match="configuration git must be an object"):
+        initialize_workspace(target)
+
+
+def test_repeated_initialize_revalidates_remote_privacy(tmp_path: Path) -> None:
+    target = tmp_path / "workspace"
+    initialize_workspace(target)
+
+    def private_runner(arguments: tuple[str, ...] | list[str], cwd: Path) -> CommandResult:
+        command = tuple(arguments)
+        if command == ("git", "rev-parse", "--is-inside-work-tree"):
+            return CommandResult(0, "true\n")
+        if command == ("git", "remote", "get-url", "origin"):
+            return CommandResult(0, "git@github.com:example/resume-vault.git\n")
+        if command[:3] == ("gh", "repo", "view"):
+            return CommandResult(0, "PRIVATE\n")
+        if command == ("git", "rev-parse", "--verify", "HEAD"):
+            return CommandResult(0)
+        return CommandResult(1)
+
+    result = initialize_workspace(target, runner=private_runner)
+
+    assert result.backup == "github"
+    assert result.github_repository == "example/resume-vault"
+
+
+def test_repeated_initialize_rejects_origin_that_became_public(tmp_path: Path) -> None:
+    target = tmp_path / "workspace"
+    initialize_workspace(target)
+
+    def public_runner(arguments: tuple[str, ...] | list[str], cwd: Path) -> CommandResult:
+        command = tuple(arguments)
+        if command == ("git", "rev-parse", "--is-inside-work-tree"):
+            return CommandResult(0, "true\n")
+        if command == ("git", "remote", "get-url", "origin"):
+            return CommandResult(0, "https://github.com/example/resume-vault.git\n")
+        if command[:3] == ("gh", "repo", "view"):
+            return CommandResult(0, "PUBLIC\n")
+        return CommandResult(1)
+
+    with pytest.raises(WorkspaceError, match="origin is PUBLIC"):
+        initialize_workspace(target, runner=public_runner)
+
+
+def test_repeated_initialize_uses_actual_local_state_over_stale_metadata(tmp_path: Path) -> None:
+    target = tmp_path / "workspace"
+    initialize_workspace(target)
+    configuration = json.loads((target / ".resume-builder.json").read_text(encoding="utf-8"))
+    configuration["git"] = {
+        "backup": "github",
+        "auto_checkpoint": False,
+        "github_repository": "example/resume-vault",
+    }
+    (target / ".resume-builder.json").write_text(
+        json.dumps(configuration),
+        encoding="utf-8",
+    )
+
+    result = initialize_workspace(target)
+
+    assert result.backup == "local"
+    assert result.github_repository is None
+
+
 def test_connect_existing_workspace_preserves_data_and_adds_configuration(
     tmp_path: Path,
 ) -> None:

@@ -183,6 +183,38 @@ def _workspace_configuration(backup: str, github_repository: str | None) -> dict
     }
 
 
+def _load_workspace_configuration(path: Path) -> dict[str, object]:
+    """Load the configuration fields needed to trust an existing workspace."""
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise WorkspaceError(f"invalid workspace configuration: {exc}") from exc
+    if not isinstance(raw, dict):
+        raise WorkspaceError("workspace configuration must be a JSON object")
+    if raw.get("workspace_version") != WORKSPACE_VERSION:
+        raise WorkspaceError(
+            f"workspace configuration must declare workspace_version {WORKSPACE_VERSION}"
+        )
+    git = raw.get("git")
+    if not isinstance(git, dict):
+        raise WorkspaceError("workspace configuration git must be an object")
+    backup = git.get("backup")
+    if backup not in {"local", "github", "unverified"}:
+        raise WorkspaceError(
+            "workspace configuration git.backup must be local, github, or unverified"
+        )
+    repository = git.get("github_repository")
+    if repository is not None and (
+        not isinstance(repository, str) or GITHUB_REPOSITORY.fullmatch(repository) is None
+    ):
+        raise WorkspaceError("workspace configuration git.github_repository must be OWNER/NAME")
+    if backup == "github" and repository is None:
+        raise WorkspaceError(
+            "workspace configuration with GitHub backup requires git.github_repository"
+        )
+    return raw
+
+
 def _write_workspace_files(
     root: Path,
     *,
@@ -308,10 +340,21 @@ def initialize_workspace(
     resolved = target.expanduser().resolve()
     config_path = resolved / WORKSPACE_CONFIG
     if config_path.is_file() and _is_git_repository(resolved, runner):
-        data = json.loads(config_path.read_text(encoding="utf-8"))
-        configured_backup = str(data.get("git", {}).get("backup", "local"))
+        _load_workspace_configuration(config_path)
+        actual_backup, remote, actual_repository = _remote_privacy(resolved, runner=runner)
+        if actual_backup == "public":
+            raise WorkspaceError(
+                f"existing workspace origin is PUBLIC ({remote}); disconnect it or make it "
+                "private before continuing"
+            )
         committed = runner(("git", "rev-parse", "--verify", "HEAD"), resolved).returncode == 0
-        return WorkspaceInitResult(resolved, False, committed, configured_backup)
+        return WorkspaceInitResult(
+            resolved,
+            False,
+            committed,
+            actual_backup,
+            actual_repository,
+        )
     if resolved.exists() and any(resolved.iterdir()):
         raise WorkspaceError(f"workspace directory is not empty: {resolved}")
 
@@ -397,7 +440,7 @@ def connect_existing_workspace(
 
     config_path = resolved / WORKSPACE_CONFIG
     if config_path.is_file():
-        json.loads(config_path.read_text(encoding="utf-8"))
+        _load_workspace_configuration(config_path)
     else:
         atomic_write_json(
             config_path,

@@ -39,6 +39,8 @@ changes.
 
 ### Fixed
 
+- Repeated workspace initialization now validates its configuration and
+  rechecks the origin's current privacy instead of trusting stale metadata
 - Preview and minting no longer accept legacy review records that omit current
   evidence or feedback-compliance release gates
 - Job-match Markdown reports now neutralize markup and line-structure injection
