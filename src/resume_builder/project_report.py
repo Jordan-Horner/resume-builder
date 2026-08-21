@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
+from .artifact_paths import resume_output_base
 from .artifact_status import (
     ArtifactStatus,
 )
@@ -63,7 +64,7 @@ def _status(
 
 
 def _build_status(resume: Path, project_root: Path, vault_root: Path) -> dict[str, Any]:
-    manifest_path = project_root / "build" / f"{resume.stem}.manifest.json"
+    manifest_path = resume_output_base(project_root, resume).with_suffix(".manifest.json")
     if not manifest_path.is_file():
         return _status("missing", manifest_path, project_root)
     try:
@@ -167,7 +168,7 @@ def _review_status(
 
 
 def _mint_status(resume: Path, project_root: Path) -> dict[str, Any]:
-    mint_path = project_root / "build" / f"{resume.stem}.mint.json"
+    mint_path = resume_output_base(project_root, resume).with_suffix(".mint.json")
     if not mint_path.is_file():
         return _status("missing", mint_path, project_root)
     try:
@@ -187,6 +188,8 @@ def _mint_status(resume: Path, project_root: Path) -> dict[str, Any]:
     if manifest.get("source") != _relative(resume, project_root):
         reasons.append("mint names a different resume source")
     pinned_keys = ["build_manifest", "preview_manifest", "output"]
+    if manifest.get("submission_output") is not None:
+        pinned_keys.append("submission_output")
     if manifest.get("version") in {1, 2}:
         pinned_keys.append("review_record" if manifest.get("version") == 2 else "editorial_review")
     for key in pinned_keys:
@@ -235,7 +238,7 @@ def _mint_status(resume: Path, project_root: Path) -> dict[str, Any]:
 
 def _preview_status(resume: Path, project_root: Path) -> dict[str, Any]:
     """Report whether the career-professional-reviewed web preview is current."""
-    preview_path = project_root / "build" / f"{resume.stem}.preview.json"
+    preview_path = resume_output_base(project_root, resume).with_suffix(".preview.json")
     if not preview_path.is_file():
         return _status("missing", preview_path, project_root)
     try:

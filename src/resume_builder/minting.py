@@ -5,18 +5,38 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
+import unicodedata
 from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from . import __version__
-from .atomic import atomic_write_json
+from .artifact_paths import default_resume_output_base
+from .atomic import atomic_write_bytes, atomic_write_json
 from .compilation import relative_output, sha256_file
 from .pdf_rendering import render_pdf
 from .previewing import _current_build
 from .rendering import contained_project_path
+
+
+def _filename_part(value: str) -> str:
+    """Return a portable, employer-safe filename component."""
+    normalized = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^A-Za-z0-9]+", "-", normalized).strip("-")
+
+
+def _submission_path(resume_path: Path, payload: dict[str, Any], project_root: Path) -> Path:
+    """Place the upload-ready PDF outside the internal build workspace."""
+    candidate = payload.get("candidate")
+    name = candidate.get("name") if isinstance(candidate, dict) else None
+    safe_name = _filename_part(name) if isinstance(name, str) else ""
+    if not safe_name:
+        safe_name = "Candidate"
+    folder = _filename_part(resume_path.stem) or "resume"
+    return project_root / "exports" / "resumes" / folder / f"{safe_name}-Resume.pdf"
 
 
 def mint_resume(
@@ -35,7 +55,7 @@ def mint_resume(
         raise ValueError("--max-pages must be a positive integer")
     project_root = vault_root.expanduser().resolve().parent
     resume_path = contained_project_path(resume, project_root, "resumes", "resume")
-    base_argument = output_base or Path("build") / resume_path.stem
+    base_argument = output_base or default_resume_output_base(resume_path)
     resolved_base = contained_project_path(base_argument, project_root, "build", "output base")
     if resolved_base.suffix:
         raise ValueError("output base must not have a file extension")
@@ -123,6 +143,9 @@ def mint_resume(
             f"PDF has {pages} pages; configured maximum is {resolved_max_pages}; "
             "draft PDF was retained for inspection"
         )
+    submission_path = _submission_path(resume_path, payload, project_root)
+    if page_error is None:
+        atomic_write_bytes(submission_path, pdf_path.read_bytes())
     manifest = {
         "version": 3,
         "phase": "mint",
@@ -149,6 +172,14 @@ def mint_resume(
             "path": relative_output(pdf_path, project_root),
             "sha256": sha256_file(pdf_path),
         },
+        "submission_output": (
+            {
+                "path": relative_output(submission_path, project_root),
+                "sha256": sha256_file(submission_path),
+            }
+            if page_error is None
+            else None
+        ),
         "warnings": [page_error] if page_error else [],
         "errors": [page_error] if page_error else [],
     }
@@ -159,9 +190,15 @@ def mint_resume(
         "valid": True,
         "source": relative_output(resume_path, project_root),
         "outputs": [
-            relative_output(pdf_path, project_root),
+            relative_output(submission_path, project_root),
             relative_output(mint_manifest_path, project_root),
         ],
+        "internal_pdf": relative_output(pdf_path, project_root),
+        "submission": {
+            "path": relative_output(submission_path, project_root),
+            "absolute_path": str(submission_path.resolve()),
+            "filename": submission_path.name,
+        },
         "pages": pages,
         "warnings": list(build_manifest.get("warnings", [])),
     }

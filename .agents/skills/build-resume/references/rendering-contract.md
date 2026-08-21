@@ -133,15 +133,23 @@ an AI-branded gradient. Original resume artifacts may inform presentation only
 when the user explicitly asks to preserve their visual identity; they remain
 out of scope for resume wording and factual claims.
 
-`build/<slug>.manifest.json` records the build's source, template, cited-fact
+`build/resumes/<slug>/resume.manifest.json` records the build's source, template, cited-fact
 hashes, compiler version, ATS replacements, evidence findings, warnings, and
 generated JSON hash. `build/reviews/<slug>.cold.json` is the isolated
 provisional review input, and `build/reviews/<slug>.package.json` is its later
 evidence and selection appendix; these exist only after an explicit critique
-request. `build/<slug>.preview.json` pins the current build manifest, HTML, and
+request. `build/resumes/<slug>/resume.preview.json` pins the current build manifest, HTML, and
 pending user-approval state.
-`build/<slug>.mint.json` separately records the
+`build/resumes/<slug>/resume.mint.json` separately records the
 build and preview-manifest hashes, explicit user approval, page budget, PDF
-audit, and PDF hash. The manifests make
+audit, internal PDF hash, and submission-export hash. Successful minting copies
+the upload-ready PDF to
+`exports/resumes/<resume-slug>/<candidate-name>-Resume.pdf`. Each resume's
+internal JSON, HTML, manifests, diagnostics, and audited PDF stay together under
+`build/resumes/<resume-slug>/`; the folder retains
+the internal targeting context, while the employer-visible filename remains
+neutral and never includes the target company. `build/` remains an internal,
+disposable workspace; users should retrieve application files from `exports/`.
+The manifests make
 draft and finalization stages explainable without making generated files
 canonical.

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
+from .artifact_paths import resume_output_base
 from .atomic import atomic_write_json
 from .compilation import build_resume, relative_output, sha256_file
 from .directions import audit_direction, parse_direction
@@ -126,7 +127,7 @@ def build_manifest_freshness(manifest_path: Path, project_root: Path) -> list[st
 
 
 def _preview_freshness(resume: Path, project_root: Path) -> list[str]:
-    path = project_root / "build" / f"{resume.stem}.preview.json"
+    path = resume_output_base(project_root, resume).with_suffix(".preview.json")
     if not path.is_file():
         return ["published preview is missing"]
     try:
@@ -146,7 +147,7 @@ def _preview_freshness(resume: Path, project_root: Path) -> list[str]:
 
 def workflow_state(resume: Path, project_root: Path) -> dict[str, Any]:
     """Return the current Draft → Preview → Published lifecycle state."""
-    manifest = project_root / "build" / f"{resume.stem}.manifest.json"
+    manifest = resume_output_base(project_root, resume).with_suffix(".manifest.json")
     build_reasons = build_manifest_freshness(manifest, project_root)
     if build_reasons:
         return {"state": "draft", "reasons": build_reasons}
@@ -182,7 +183,7 @@ def _cached_receipt(
         return None
     if any(_record_freshness(item, project_root, "verification artifact") for item in artifacts):
         return None
-    manifest_path = project_root / "build" / f"{resume.stem}.manifest.json"
+    manifest_path = resume_output_base(project_root, resume).with_suffix(".manifest.json")
     if build_manifest_freshness(manifest_path, project_root):
         return None
     selection_reasons = selection_review_freshness(
@@ -235,7 +236,8 @@ def verify_resume(
         "baseline": _optional_path_record(baseline_path, project_root),
         "vault_validation": "skipped" if skip_vault_validation else "strict",
     }
-    receipt_path = project_root / "build" / f"{resume_path.stem}.verify.json"
+    output_base = resume_output_base(project_root, resume_path)
+    receipt_path = output_base.with_suffix(".verify.json")
     cached = (
         None
         if refresh
@@ -269,8 +271,8 @@ def verify_resume(
         template=template_path,
         synthesis_plan=plan.source,
     )
-    manifest_path = project_root / "build" / f"{resume_path.stem}.manifest.json"
-    payload_path = project_root / "build" / f"{resume_path.stem}.json"
+    manifest_path = output_base.with_suffix(".manifest.json")
+    payload_path = output_base.with_suffix(".json")
     manifest = _load_json(manifest_path, "compiled build manifest")
     payload = _load_json(payload_path, "compiled resume payload")
     profile, _ = parse_direction(plan.direction)

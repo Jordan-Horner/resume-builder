@@ -92,6 +92,7 @@ def _workspace_configuration(backup: str, github_repository: str | None) -> dict
             "targets": "targets",
             "editorial": "editorial",
             "build": "build",
+            "exports": "exports",
         },
         "git": git_config,
     }
@@ -147,11 +148,20 @@ def _write_workspace_files(
         root / "README.md",
         "# Private Resume Builder Workspace\n\n"
         "This repository contains private career information. Keep every remote private.\n"
-        "Local Git history is not an off-device backup.\n",
+        "Local Git history is not an off-device backup.\n\n"
+        "## Where to find finished resumes\n\n"
+        "Use `exports/resumes/` for PDFs that are ready to upload with job applications.\n"
+        "Targeting context stays in the folder name, while the PDF itself uses a neutral\n"
+        "filename such as `<candidate-name>-Resume.pdf`.\n\n"
+        "The ignored `build/` directory contains internal previews, manifests, reviews,\n"
+        "diagnostics, and audited working files. You normally do not need to open it.\n\n"
+        "Canonical career facts and editable resume sources remain under `vault/` and\n"
+        "`resumes/`. Files under `exports/` and `build/` can be regenerated from those\n"
+        "sources.\n",
     )
     VaultLayout.load(root / "vault", allow_missing=True).initialize()
     workspace_resources = files("resume_builder.resources").joinpath("workspace")
-    for directory in ("vault", "resumes", "directions", "targets", "editorial"):
+    for directory in ("vault", "resumes", "directions", "targets", "editorial", "exports"):
         readme = workspace_resources.joinpath(directory).joinpath("README.md")
         atomic_write_text(root / directory / "README.md", readme.read_text(encoding="utf-8"))
     for directory in (
@@ -313,13 +323,8 @@ def initialize_workspace(
         except BaseException:
             atomic_write_json(resolved / WORKSPACE_CONFIG, _workspace_configuration("local", None))
             raise
-    return WorkspaceInitResult(
-        resolved,
-        True,
-        committed,
-        backup,
-        github_repository if backup == "github" else None,
-    )
+    result_repository = github_repository if backup == "github" else None
+    return WorkspaceInitResult(resolved, True, committed, backup, result_repository)
 
 
 def connect_existing_workspace(

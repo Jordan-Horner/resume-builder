@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
+from .artifact_paths import resume_output_base
 from .atomic import atomic_write_json
 from .layout import contained_path
 from .review_blocks import (
@@ -49,7 +50,9 @@ def build_review_package(
     if not resume_path.is_relative_to(resumes_root) or not resume_path.is_file():
         raise ValueError("resume must name an existing file under resumes/")
     require_approved_selection_review(resolved_root, resume_path)
-    build_manifest_path = resolved_root / "build" / f"{resume_path.stem}.manifest.json"
+    build_manifest_path = resume_output_base(resolved_root, resume_path).with_suffix(
+        ".manifest.json"
+    )
     try:
         build_manifest = json.loads(build_manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:

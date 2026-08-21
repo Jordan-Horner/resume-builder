@@ -283,8 +283,9 @@ Git tools do not. Never write candidate data into same-named engine folders.
     asks for an independent critique or readiness opinion; optional review
     findings never gate preview or mint.
 12. Run `resume-builder direction validate`, then `resume-builder validate
-    --vault-root <repo>/vault --strict`, inspect the Git diff, and leave rendered
-    files under `build/`.
+    --vault-root <repo>/vault --strict`, inspect the Git diff, and keep internal
+    per-resume artifacts under `build/resumes/<resume-slug>/` while handing off the upload-ready PDF from
+    `exports/resumes/<resume-slug>/`.
 
 ## Guardrails
 

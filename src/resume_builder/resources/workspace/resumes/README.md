@@ -14,9 +14,12 @@ revisions. Direct user criticism is first recorded as a temporary session.
 Apply the edit and run `resume-builder preview` immediately; repeat that
 preview/edit loop until the user says `Mint`. Then promote each intended session with
 `resume-builder feedback accept FB-<session> --preview
-build/<resume>.preview.json`, then create the audited PDF with
+build/resumes/<resume>/resume.preview.json`, then create the audited PDF with
 `resume-builder mint`. The mint request is approval of that exact current
-preview. Leave every generated artifact under `build/`. Use
+preview. Internal manifests, diagnostics, previews, and the audited working PDF
+remain together under `build/resumes/<resume-slug>/`. Retrieve the employer-ready PDF from
+`exports/resumes/<resume-slug>/<candidate-name>-Resume.pdf`; the folder retains
+the target context while the upload-visible filename remains neutral. Use
 `resume-builder verify` and `critique-resume` only for an explicitly requested
 independent critique; their records do not gate preview or mint.
 

@@ -62,7 +62,9 @@ def test_phoenix_fixture_validates_compiles_and_prepares_review(tmp_path: Path) 
     assert verification.returncode == 0, verification.stderr or verification.stdout
     verification_result = json.loads(verification.stdout)
     assert verification_result["state"]["state"] == "awaiting-selection-review"
-    assert (workspace / "build" / "senior-defense-attorney.verify.json").is_file()
+    assert (
+        workspace / "build" / "resumes" / "senior-defense-attorney" / "resume.verify.json"
+    ).is_file()
     assert not (workspace / "build" / "reviews" / "senior-defense-attorney.cold.json").exists()
 
     decisions_path = (

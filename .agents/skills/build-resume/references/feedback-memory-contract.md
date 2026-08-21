@@ -22,7 +22,7 @@ Run:
 ```text
 resume-builder feedback record build/<feedback-plan>.json [--session FB-...]
 resume-builder feedback resolve resumes/plans/<resume>.yaml --include-open
-resume-builder feedback accept FB-... --preview build/<resume>.preview.json
+resume-builder feedback accept FB-... --preview build/resumes/<resume>/resume.preview.json
 ```
 
 For a factual correction whose final sentence the user explicitly approves for

@@ -269,7 +269,7 @@ def approve_selection_review(tmp_path: Path, resume: Path) -> Path:
     plan = synthesis.load_synthesis_plan(
         tmp_path / "resumes" / "plans" / f"{resume.stem}.yaml", tmp_path, tmp_path / "vault"
     )
-    manifest_path = tmp_path / "build" / f"{resume.stem}.manifest.json"
+    manifest_path = tmp_path / "build" / "resumes" / resume.stem / "resume.manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     selected = selection_guard.build_selection(plan, manifest["synthesis"])
     selection_review.build_selection_review_package(
@@ -338,7 +338,7 @@ def write_approved_review(tmp_path: Path, resume: Path) -> Path:
     direction = tmp_path / "directions" / "support-operations.md"
     review = tmp_path / "build" / "reviews" / "support-operations.json"
     review.parent.mkdir(parents=True, exist_ok=True)
-    build_manifest = tmp_path / "build" / "support-operations.manifest.json"
+    build_manifest = tmp_path / "build" / "resumes" / "support-operations" / "resume.manifest.json"
     package = build_language_package(resume, tmp_path)
     cold_read = tmp_path / "build" / "reviews" / "support-operations.cold.json"
     evidence = json.loads(build_manifest.read_text(encoding="utf-8"))["evidence"]
@@ -365,7 +365,7 @@ def write_approved_review(tmp_path: Path, resume: Path) -> Path:
                 },
                 "target": None,
                 "build_manifest": {
-                    "path": "build/support-operations.manifest.json",
+                    "path": "build/resumes/support-operations/resume.manifest.json",
                     "sha256": review_records.sha256_file(build_manifest),
                 },
                 "cold_read": {
@@ -437,23 +437,25 @@ def test_compile_markdown_rejects_ungrounded_or_unrecognized_content() -> None:
 
 def test_compile_command_writes_review_input_without_web_preview(tmp_path: Path, run_main) -> None:
     vault, resume = project(tmp_path)
-    stale_pdf = tmp_path / "build" / "support-operations.pdf"
-    stale_pdf.parent.mkdir()
+    stale_pdf = tmp_path / "build" / "resumes" / "support-operations" / "resume.pdf"
+    stale_pdf.parent.mkdir(parents=True)
     stale_pdf.write_bytes(b"stale")
-    stale_mint = tmp_path / "build" / "support-operations.mint.json"
+    stale_mint = tmp_path / "build" / "resumes" / "support-operations" / "resume.mint.json"
     stale_mint.write_text("{}", encoding="utf-8")
-    published_html = tmp_path / "build" / "support-operations.html"
+    published_html = tmp_path / "build" / "resumes" / "support-operations" / "resume.html"
     published_html.write_text("last published preview", encoding="utf-8")
-    published_preview = tmp_path / "build" / "support-operations.preview.json"
+    published_preview = (
+        tmp_path / "build" / "resumes" / "support-operations" / "resume.preview.json"
+    )
     published_preview.write_text("{}", encoding="utf-8")
 
     assert run_main(compilation.main, resume, "--vault-root", vault) == 0
 
-    payload_path = tmp_path / "build" / "support-operations.json"
-    html_path = tmp_path / "build" / "support-operations.html"
+    payload_path = tmp_path / "build" / "resumes" / "support-operations" / "resume.json"
+    html_path = tmp_path / "build" / "resumes" / "support-operations" / "resume.html"
     assert payload_path.is_file()
     assert html_path.read_text(encoding="utf-8") == "last published preview"
-    manifest_path = tmp_path / "build" / "support-operations.manifest.json"
+    manifest_path = tmp_path / "build" / "resumes" / "support-operations" / "resume.manifest.json"
     assert manifest_path.is_file()
     assert stale_pdf.read_bytes() == b"stale"
     assert stale_mint.is_file()
@@ -493,7 +495,7 @@ def test_preview_compiles_current_draft_and_publishes_html_for_editing(
 
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
 
-    html_path = tmp_path / "build" / "support-operations.html"
+    html_path = tmp_path / "build" / "resumes" / "support-operations" / "resume.html"
     rendered = html_path.read_text(encoding="utf-8")
     assert "Test Candidate" in rendered
     assert "Draft preview" in rendered
@@ -502,7 +504,9 @@ def test_preview_compiles_current_draft_and_publishes_html_for_editing(
     assert ' - <span class="certification-org">Example Issuer</span>' in rendered
     assert "<!-- evidence:" not in rendered
     preview_manifest = json.loads(
-        (tmp_path / "build" / "support-operations.preview.json").read_text(encoding="utf-8")
+        (tmp_path / "build" / "resumes" / "support-operations" / "resume.preview.json").read_text(
+            encoding="utf-8"
+        )
     )
     assert preview_manifest["phase"] == "preview"
     assert preview_manifest["version"] == 3
@@ -515,7 +519,7 @@ def test_preview_compiles_current_draft_and_publishes_html_for_editing(
         "user_review": "pending",
     }
     assert preview_manifest["final_review_status"] == "awaiting-user-approval"
-    assert preview_manifest["output"]["path"] == "build/support-operations.html"
+    assert preview_manifest["output"]["path"] == "build/resumes/support-operations/resume.html"
     assert preview_manifest["user_handoff"] == {
         "required": True,
         "action": "present-preview",
@@ -525,7 +529,7 @@ def test_preview_compiles_current_draft_and_publishes_html_for_editing(
             "append_to_rendered_markdown": False,
         },
         "artifact": {
-            "path": "build/support-operations.html",
+            "path": "build/resumes/support-operations/resume.html",
             "media_type": "text/html",
             "label": "Open the current resume preview",
         },
@@ -611,7 +615,7 @@ def test_compile_preserves_published_preview_but_marks_it_stale(tmp_path: Path, 
     assert run_main(compilation.main, resume, "--vault-root", vault) == 0
     write_approved_review(tmp_path, resume)
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
-    html_path = tmp_path / "build" / "support-operations.html"
+    html_path = tmp_path / "build" / "resumes" / "support-operations" / "resume.html"
     published_html = html_path.read_text(encoding="utf-8")
 
     assert run_main(compilation.main, resume, "--vault-root", vault) == 0
@@ -641,17 +645,17 @@ def test_preview_rebuilds_a_changed_compiled_payload(tmp_path: Path, run_main) -
     vault, resume = project(tmp_path)
     assert run_main(compilation.main, resume, "--vault-root", vault) == 0
     review_path = write_approved_review(tmp_path, resume)
-    payload_path = tmp_path / "build" / "support-operations.json"
+    payload_path = tmp_path / "build" / "resumes" / "support-operations" / "resume.json"
     payload_path.write_text(payload_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
 
     record = review_records.load_review_record(review_path, tmp_path)
 
-    assert "support-operations.json changed after evidence review" in (
-        review_records.review_freshness(record)
-    )
+    assert "resume.json changed after evidence review" in (review_records.review_freshness(record))
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
     manifest = json.loads(
-        (tmp_path / "build" / "support-operations.manifest.json").read_text(encoding="utf-8")
+        (tmp_path / "build" / "resumes" / "support-operations" / "resume.manifest.json").read_text(
+            encoding="utf-8"
+        )
     )
     assert manifest["outputs"][0]["sha256"] == compilation.sha256_file(payload_path)
 
@@ -684,7 +688,7 @@ def test_review_package_separates_cold_read_and_rejects_changed_build_output(
         "Review is in progress."
     )
 
-    payload_path = tmp_path / "build" / "support-operations.json"
+    payload_path = tmp_path / "build" / "resumes" / "support-operations" / "resume.json"
     payload_path.write_text(payload_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match="output changed after compilation"):
         review_records.build_review_package(resume, tmp_path)
@@ -878,12 +882,12 @@ def test_applicable_feedback_memory_requires_post_cold_review_compliance(
     accepted = feedback_memory.accept_feedback(
         tmp_path,
         session_id=str(session["session_id"]),
-        preview=Path("build/support-operations.preview.json"),
+        preview=Path("build/resumes/support-operations/resume.preview.json"),
     )
     assert accepted["accepted"][0]["route"] == "memory"
     assert (
         verification.build_manifest_freshness(
-            tmp_path / "build" / "support-operations.manifest.json",
+            tmp_path / "build" / "resumes" / "support-operations" / "resume.manifest.json",
             tmp_path,
         )
         == []
@@ -895,7 +899,7 @@ def test_applicable_feedback_memory_requires_post_cold_review_compliance(
     )
     assert "applicable feedback guidance changed after compilation" in (
         verification.build_manifest_freshness(
-            tmp_path / "build" / "support-operations.manifest.json",
+            tmp_path / "build" / "resumes" / "support-operations" / "resume.manifest.json",
             tmp_path,
         )
     )
@@ -904,7 +908,7 @@ def test_applicable_feedback_memory_requires_post_cold_review_compliance(
 def test_new_applicable_open_feedback_invalidates_an_existing_build(tmp_path: Path) -> None:
     vault, resume = project(tmp_path)
     compilation.build_resume(resume, vault_root=vault)
-    manifest = tmp_path / "build" / "support-operations.manifest.json"
+    manifest = tmp_path / "build" / "resumes" / "support-operations" / "resume.manifest.json"
     assert verification.build_manifest_freshness(manifest, tmp_path) == []
 
     feedback_plan = tmp_path / "build" / "feedback-plan.json"
@@ -1253,7 +1257,9 @@ def test_optional_review_risk_does_not_block_the_preview_loop(tmp_path: Path, ru
 
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
     preview = json.loads(
-        (tmp_path / "build" / "support-operations.preview.json").read_text(encoding="utf-8")
+        (tmp_path / "build" / "resumes" / "support-operations" / "resume.preview.json").read_text(
+            encoding="utf-8"
+        )
     )
     assert preview["review_statuses"]["career_verdict"] == "not-reviewed"
     assert preview["review_statuses"]["role_fit"] == "not-reviewed"
@@ -1391,19 +1397,32 @@ def test_mint_command_creates_audited_pdf(tmp_path: Path, run_main, monkeypatch)
     monkeypatch.setattr(minting, "render_pdf", fake_render_pdf)
 
     assert run_main(minting.main, resume, "--vault-root", vault) == 0
-    assert called["html"] == tmp_path / "build" / "support-operations.html"
-    assert called["pdf"] == tmp_path / "build" / "support-operations.pdf"
+    assert called["html"] == tmp_path / "build" / "resumes" / "support-operations" / "resume.html"
+    assert called["pdf"] == tmp_path / "build" / "resumes" / "support-operations" / "resume.pdf"
+    submission = (
+        tmp_path / "exports" / "resumes" / "support-operations" / "Test-Candidate-Resume.pdf"
+    )
+    assert submission.read_bytes() == b"%PDF-compiled-test"
+    assert "support-operations" not in submission.name.lower()
     manifest = json.loads(
-        (tmp_path / "build" / "support-operations.mint.json").read_text(encoding="utf-8")
+        (tmp_path / "build" / "resumes" / "support-operations" / "resume.mint.json").read_text(
+            encoding="utf-8"
+        )
     )
     assert manifest["phase"] == "mint"
     assert manifest["valid"] is True
     assert manifest["version"] == 3
     assert "review_record" not in manifest
-    assert manifest["preview_manifest"]["path"] == "build/support-operations.preview.json"
+    assert (
+        manifest["preview_manifest"]["path"]
+        == "build/resumes/support-operations/resume.preview.json"
+    )
     assert manifest["user_approval"]["status"] == "approved-for-mint"
+    assert manifest["submission_output"]["path"] == (
+        "exports/resumes/support-operations/Test-Candidate-Resume.pdf"
+    )
     assert project_report._mint_status(resume, tmp_path)["status"] == "current"
-    html_path = tmp_path / "build" / "support-operations.html"
+    html_path = tmp_path / "build" / "resumes" / "support-operations" / "resume.html"
     html_path.write_text(html_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
     assert project_report._mint_status(resume, tmp_path)["status"] == "stale"
 
@@ -1448,7 +1467,10 @@ def test_user_mint_is_not_blocked_by_an_optional_language_review(
     monkeypatch.setattr(minting, "render_pdf", fake_render_pdf)
 
     assert run_main(minting.main, resume, "--vault-root", vault) == 0
-    assert (tmp_path / "build" / "support-operations.pdf").exists()
+    assert (tmp_path / "build" / "resumes" / "support-operations" / "resume.pdf").exists()
+    assert (
+        tmp_path / "exports" / "resumes" / "support-operations" / "Test-Candidate-Resume.pdf"
+    ).exists()
 
 
 def test_pdf_renderer_rejects_missing_explicit_browser(tmp_path: Path) -> None:
@@ -1466,7 +1488,7 @@ def test_compile_rejects_unsupported_numeric_claim(tmp_path: Path, run_main) -> 
     resume.write_text(resume_markdown().replace("Reduced processing", "Reduced 73% processing"))
 
     assert run_main(compilation.main, resume, "--vault-root", vault) == 2
-    assert not (tmp_path / "build" / "support-operations.html").exists()
+    assert not (tmp_path / "build" / "resumes" / "support-operations" / "resume.html").exists()
 
 
 def test_compile_normalizes_ats_characters(tmp_path: Path, run_main) -> None:
@@ -1474,8 +1496,12 @@ def test_compile_normalizes_ats_characters(tmp_path: Path, run_main) -> None:
     resume.write_text(resume_markdown().replace("Support engineer", "Support engineer—operator"))
 
     assert run_main(compilation.main, resume, "--vault-root", vault) == 0
-    payload = json.loads((tmp_path / "build" / "support-operations.json").read_text())
-    manifest = json.loads((tmp_path / "build" / "support-operations.manifest.json").read_text())
+    payload = json.loads(
+        (tmp_path / "build" / "resumes" / "support-operations" / "resume.json").read_text()
+    )
+    manifest = json.loads(
+        (tmp_path / "build" / "resumes" / "support-operations" / "resume.manifest.json").read_text()
+    )
     assert payload["summary"].startswith("Support engineer-operator")
     assert manifest["ats_replacements"] == {"U+2014": 1}
 
@@ -1494,9 +1520,11 @@ def test_mint_pdf_end_to_end(tmp_path: Path, run_main) -> None:
         )
         == 0
     )
-    pdf = tmp_path / "build" / "support-operations.pdf"
+    pdf = tmp_path / "exports" / "resumes" / "support-operations" / "Test-Candidate-Resume.pdf"
     manifest = json.loads(
-        (tmp_path / "build" / "support-operations.mint.json").read_text(encoding="utf-8")
+        (tmp_path / "build" / "resumes" / "support-operations" / "resume.mint.json").read_text(
+            encoding="utf-8"
+        )
     )
     assert pdf.read_bytes().startswith(b"%PDF")
     assert manifest["pdf_audit"]["extraction"]["pages"] <= 2
@@ -1529,9 +1557,12 @@ def test_strict_page_budget_retains_audited_draft(tmp_path: Path, run_main, monk
         )
         == 2
     )
-    assert (tmp_path / "build" / "support-operations.pdf").is_file()
+    assert (tmp_path / "build" / "resumes" / "support-operations" / "resume.pdf").is_file()
+    assert not (tmp_path / "exports").exists()
     manifest = json.loads(
-        (tmp_path / "build" / "support-operations.mint.json").read_text(encoding="utf-8")
+        (tmp_path / "build" / "resumes" / "support-operations" / "resume.mint.json").read_text(
+            encoding="utf-8"
+        )
     )
     assert manifest["valid"] is False
     assert "draft PDF was retained" in manifest["errors"][0]

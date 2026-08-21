@@ -100,7 +100,11 @@ career record is the foundation; each resume is a focused view of that record.
    creates a final, format-checked PDF. The preview step returns a structured,
    required handoff with organized, ready-to-post Markdown so the agent presents
    the complete review prompt instead of merely generating a file in the
-   background.
+   background. Final application PDFs are collected under `exports/resumes/`;
+   company targeting stays in the folder name, while the upload-visible PDF uses
+   the neutral `<candidate-name>-Resume.pdf` filename. Internal manifests,
+   previews, and diagnostics stay grouped under
+   `build/resumes/<resume-slug>/`.
 
 If a draft is weak, the agent checks your saved career evidence and imported
 sources before asking a question. It asks only focused questions that could

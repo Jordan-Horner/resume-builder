@@ -98,14 +98,19 @@ resume-builder preview resumes/baselines/<direction>.md
 resume-builder mint resumes/baselines/<direction>.md
 ```
 
-The first command writes review-input JSON and a build manifest under `build/`;
+The first command writes review-input JSON and a build manifest under
+`build/resumes/<resume-slug>/`;
 it publishes neither HTML nor PDF. The review-package command writes a cold-read
 input and a separate evidence appendix. After a fresh career-professional
 review is approved and validated, `preview` publishes the exact reviewed build
 as HTML for the user's final review. The separate `mint` command renders that
 exact reviewed HTML after explicit final approval,
 uses pinned Playwright Chromium, and audits layout, page count, and text
-extraction. Install Chromium once with `python -m playwright install chromium`.
+extraction. A successful mint keeps its per-resume diagnostics under
+`build/resumes/<resume-slug>/` and publishes
+the upload-ready PDF under `exports/resumes/<resume-slug>/` with the neutral
+`<candidate-name>-Resume.pdf` filename. Install Chromium once with
+`python -m playwright install chromium`.
 Use `--browser PATH` only to test a specific Chromium executable. Mint enforces
 the page budget resolved in a version 6 synthesis plan; an explicit
 `--max-pages N` must agree with that plan.

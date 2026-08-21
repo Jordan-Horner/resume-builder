@@ -50,13 +50,13 @@ resume-builder review finalize build/reviews/<direction>.decisions.json
 resume-builder review validate build/reviews/<direction>.json
 resume-builder feedback record build/<feedback-plan>.json [--session FB-...]
 resume-builder feedback resolve resumes/plans/<resume>.yaml --include-open
-resume-builder feedback accept FB-<session> --preview build/<resume>.preview.json
-resume-builder feedback accept FB-<session> --preview build/<resume>.preview.json \
+resume-builder feedback accept FB-<session> --preview build/resumes/<resume>/resume.preview.json
+resume-builder feedback accept FB-<session> --preview build/resumes/<resume>/resume.preview.json \
   --remember-approved-wording
 resume-builder preview resumes/baselines/<direction>.md
 resume-builder mint resumes/baselines/<direction>.md
 resume-builder mint resumes/baselines/<direction>.md --max-pages 1
-resume-builder render <payload.json> --output build/<resume>.html
+resume-builder render <payload.json> --output build/resumes/<resume>/resume.html
 resume-builder direction validate
 resume-builder match validate
 resume-builder direction audit directions/<direction>.md resumes/baselines/<direction>.md
@@ -229,7 +229,7 @@ indexes. The scripts under
 - Apply the requested edit and immediately regenerate the web preview. Do not
   run verification, selection review, or independent critique during the
   preview/edit loop. Run
-  `resume-builder feedback accept FB-<session> --preview build/<resume>.preview.json`
+  `resume-builder feedback accept FB-<session> --preview build/resumes/<resume>/resume.preview.json`
   only after the user accepts that revised sentence in the preview or
   explicitly asks to mint it. Accept each intended session explicitly and promote only
   the latest revision: reusable guidance becomes the narrowest applicable
@@ -376,7 +376,10 @@ indexes. The scripts under
   renderer development or diagnostics.
 - Mint a final PDF only through `resume-builder mint`, after the user has seen
   the current preview. Saying `Mint` is explicit approval of that preview.
-  Building a resume must not create HTML or PDF as a side effect.
+  Building a resume must not create HTML or PDF as a side effect. Treat
+  `build/` as the internal artifact workspace and hand off the employer-ready
+  PDF from `exports/resumes/<resume-slug>/<candidate-name>-Resume.pdf`; target
+  company context belongs in the folder, not the upload-visible filename.
 - Never hand-edit generated JSON, HTML, or PDF or treat any of them as
   canonical.
 - Treat the compiler's deterministic grounding and extraction audits as release

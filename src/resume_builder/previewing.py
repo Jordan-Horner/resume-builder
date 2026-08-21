@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
+from .artifact_paths import default_resume_output_base
 from .atomic import atomic_write_json, atomic_write_text
 from .compilation import build_resume, relative_output, sha256_file
 from .rendering import contained_project_path, known_fact_ids, load_payload, render_payload
@@ -158,7 +159,7 @@ def preview_resume(
     project_root = vault_root.expanduser().resolve().parent
     resume_path = contained_project_path(resume, project_root, "resumes", "resume")
     template_path = contained_project_path(template, project_root, "templates", "template")
-    base_argument = output_base or Path("build") / resume_path.stem
+    base_argument = output_base or default_resume_output_base(resume_path)
     resolved_base = contained_project_path(base_argument, project_root, "build", "output base")
     if resolved_base.suffix:
         raise ValueError("output base must not have a file extension")
