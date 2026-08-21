@@ -10,6 +10,7 @@ FACADE_LINE_BUDGETS = {
     "compilation": 250,
     "directions": 450,
     "feedback_memory": 250,
+    "job_matching": 400,
     "project_report": 650,
     "review_records": 300,
     "synthesis": 180,
