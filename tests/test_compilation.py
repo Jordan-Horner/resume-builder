@@ -1319,6 +1319,23 @@ def test_project_report_tracks_current_and_stale_builds(
     assert stale["next_action"]["route"] == "compile"
 
 
+def test_project_report_rejects_same_stem_build_owned_by_another_resume(
+    tmp_path: Path, run_main
+) -> None:
+    vault, baseline = project(tmp_path)
+    assert run_main(compilation.main, baseline, "--vault-root", vault) == 0
+    tailored = tmp_path / "resumes" / "tailored" / baseline.name
+    tailored.parent.mkdir(parents=True, exist_ok=True)
+    tailored.write_text(baseline.read_text(encoding="utf-8"), encoding="utf-8")
+
+    baseline_status = project_report._build_status(baseline, tmp_path, vault)
+    tailored_status = project_report._build_status(tailored, tmp_path, vault)
+
+    assert baseline_status["status"] == "current"
+    assert tailored_status["status"] == "stale"
+    assert "build names a different resume source" in tailored_status["reasons"]
+
+
 def test_project_report_routes_progressive_onboarding_before_first_baseline() -> None:
     empty_vault = {"valid": False, "registered_sources": 0, "facts": 0}
     registered_vault = {"valid": False, "registered_sources": 1, "facts": 0}

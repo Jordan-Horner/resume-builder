@@ -102,6 +102,10 @@ def _build_status(resume: Path, project_root: Path, vault_root: Path) -> dict[st
         reason = _record_freshness(manifest.get(key), project_root, f"build {key}")
         if reason:
             reasons.append(reason)
+    source = manifest.get("source")
+    if isinstance(source, dict) and isinstance(source.get("path"), str):
+        if source["path"] != _relative(resume, project_root):
+            reasons.append("build names a different resume source")
     evidence = manifest.get("evidence")
     facts = evidence.get("facts") if isinstance(evidence, dict) else None
     if not isinstance(facts, list):

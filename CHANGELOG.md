@@ -39,6 +39,8 @@ changes.
 
 ### Fixed
 
+- Project reports no longer attribute a same-stem build manifest to a different
+  baseline or tailored resume
 - Repeated workspace initialization now validates its configuration and
   rechecks the origin's current privacy instead of trusting stale metadata
 - Preview and minting no longer accept legacy review records that omit current
