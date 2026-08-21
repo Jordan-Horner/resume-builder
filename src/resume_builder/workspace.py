@@ -5,73 +5,48 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import shutil
-import subprocess
 import sys
 import tempfile
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from collections.abc import Sequence
 from importlib.resources import files
 from pathlib import Path
 
 from .atomic import atomic_write_json, atomic_write_text
 from .layout import VaultLayout
-
-WORKSPACE_CONFIG = ".resume-builder.json"
-WORKSPACE_VERSION = 1
-DEFAULT_WORKSPACE = Path("workspace")
-DEFAULT_VAULT_REPOSITORY_NAME = "resume-vault"
-GITHUB_REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
-GITHUB_OWNER = re.compile(r"[A-Za-z0-9-]+")
-GITHUB_REMOTES = (
-    re.compile(
-        r"https?://github\.com/(?P<repository>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?/?$"
-    ),
-    re.compile(r"git@github\.com:(?P<repository>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?$"),
-    re.compile(
-        r"ssh://git@github\.com/(?P<repository>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?/?$"
-    ),
+from .workspace_state import (
+    DEFAULT_VAULT_REPOSITORY_NAME,
+    DEFAULT_WORKSPACE,
+    GITHUB_REPOSITORY,
+    WORKSPACE_CONFIG,
+    WORKSPACE_VERSION,
+    CommandResult,
+    Runner,
+    WorkspaceError,
+    WorkspaceInitResult,
+    _is_git_repository,
+    _remote_privacy,
+    default_github_repository,
+    discover_workspace,
+    github_repository_from_remote,
+    run_command,
+    workspace_status,
 )
 
-
-class WorkspaceError(RuntimeError):
-    """Raised when a private workspace cannot be discovered or initialized safely."""
-
-
-@dataclass(frozen=True)
-class CommandResult:
-    """Small command result used to make Git and GitHub operations testable."""
-
-    returncode: int
-    stdout: str = ""
-    stderr: str = ""
-
-
-Runner = Callable[[Sequence[str], Path], CommandResult]
-
-
-@dataclass(frozen=True)
-class WorkspaceInitResult:
-    """Outcome of a workspace initialization attempt."""
-
-    root: Path
-    created: bool
-    committed: bool
-    backup: str
-    github_repository: str | None = None
-
-
-def run_command(arguments: Sequence[str], cwd: Path) -> CommandResult:
-    """Run one argument-safe child process without invoking a shell."""
-    completed = subprocess.run(
-        list(arguments),
-        cwd=cwd,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    return CommandResult(completed.returncode, completed.stdout, completed.stderr)
+__all__ = [
+    "CommandResult",
+    "WorkspaceError",
+    "WorkspaceInitResult",
+    "connect_existing_workspace",
+    "default_github_repository",
+    "discover_workspace",
+    "github_repository_from_remote",
+    "initialize_workspace",
+    "main",
+    "run_command",
+    "status_main",
+    "workspace_status",
+]
 
 
 def _require_success(result: CommandResult, action: str) -> None:
@@ -79,67 +54,6 @@ def _require_success(result: CommandResult, action: str) -> None:
         return
     detail = result.stderr.strip() or result.stdout.strip() or "unknown error"
     raise WorkspaceError(f"{action} failed: {detail}")
-
-
-def default_github_repository(
-    *,
-    runner: Runner = run_command,
-    cwd: Path | None = None,
-) -> str | None:
-    """Return the authenticated owner's conventional private vault repository."""
-    result = runner(("gh", "api", "user", "--jq", ".login"), (cwd or Path.cwd()).resolve())
-    owner = result.stdout.strip()
-    if result.returncode != 0 or GITHUB_OWNER.fullmatch(owner) is None:
-        return None
-    return f"{owner}/{DEFAULT_VAULT_REPOSITORY_NAME}"
-
-
-def github_repository_from_remote(remote: str) -> str | None:
-    """Return OWNER/NAME for a supported GitHub remote URL."""
-    value = remote.strip()
-    for pattern in GITHUB_REMOTES:
-        match = pattern.fullmatch(value)
-        if match is not None:
-            return match.group("repository")
-    return None
-
-
-def _origin_remote(root: Path, runner: Runner) -> str | None:
-    result = runner(("git", "remote", "get-url", "origin"), root)
-    if result.returncode != 0 or not result.stdout.strip():
-        return None
-    return result.stdout.strip()
-
-
-def _remote_privacy(
-    root: Path,
-    *,
-    runner: Runner,
-) -> tuple[str, str | None, str | None]:
-    """Classify an existing workspace origin without pushing or changing it."""
-    remote = _origin_remote(root, runner)
-    if remote is None:
-        return "local", None, None
-    repository = github_repository_from_remote(remote)
-    if repository is None:
-        return "unverified", remote, None
-    visibility = runner(
-        ("gh", "repo", "view", repository, "--json", "visibility", "--jq", ".visibility"),
-        root,
-    )
-    if visibility.returncode != 0:
-        return "unverified", remote, repository
-    normalized = visibility.stdout.strip().upper()
-    if normalized == "PRIVATE":
-        return "github", remote, repository
-    if normalized == "PUBLIC":
-        return "public", remote, repository
-    return "unverified", remote, repository
-
-
-def _is_git_repository(path: Path, runner: Runner) -> bool:
-    result = runner(("git", "rev-parse", "--is-inside-work-tree"), path)
-    return result.returncode == 0 and result.stdout.strip() == "true"
 
 
 def _require_parent_ignore(target: Path, runner: Runner) -> None:
@@ -448,56 +362,6 @@ def connect_existing_workspace(
         )
     committed = runner(("git", "rev-parse", "--verify", "HEAD"), resolved).returncode == 0
     return WorkspaceInitResult(resolved, False, committed, backup, github_repository)
-
-
-def discover_workspace(start: Path | None = None) -> Path | None:
-    """Find a configured workspace or a compatible legacy workspace."""
-    environment = os.environ.get("RESUME_BUILDER_WORKSPACE")
-    if environment:
-        candidate = Path(environment).expanduser().resolve()
-        if (candidate / WORKSPACE_CONFIG).is_file() or (
-            candidate / "vault" / "vault.json"
-        ).is_file():
-            return candidate
-        raise WorkspaceError(f"configured workspace does not exist: {candidate}")
-
-    origin = (start or Path.cwd()).expanduser().resolve()
-    for directory in (origin, *origin.parents):
-        if (directory / WORKSPACE_CONFIG).is_file():
-            return directory
-        nested = directory / DEFAULT_WORKSPACE
-        if (nested / WORKSPACE_CONFIG).is_file():
-            return nested
-        if (directory / "vault" / "vault.json").is_file():
-            return directory
-    return None
-
-
-def workspace_status(
-    root: Path | None = None,
-    *,
-    runner: Runner = run_command,
-) -> dict[str, object]:
-    """Describe the resolved private workspace and its actual backup boundary."""
-    resolved = root.expanduser().resolve() if root is not None else discover_workspace()
-    if resolved is None:
-        raise WorkspaceError("no Resume Builder workspace could be discovered")
-    if (
-        not (resolved / WORKSPACE_CONFIG).is_file()
-        and not (resolved / "vault" / "vault.json").is_file()
-    ):
-        raise WorkspaceError(f"configured workspace does not exist: {resolved}")
-    if not _is_git_repository(resolved, runner):
-        raise WorkspaceError(f"workspace is not an independent Git repository: {resolved}")
-    backup, remote, repository = _remote_privacy(resolved, runner=runner)
-    return {
-        "workspace": str(resolved),
-        "independent_git": True,
-        "backup": backup,
-        "origin": remote,
-        "github_repository": repository,
-        "privacy_verified": backup in {"local", "github"},
-    }
 
 
 def status_main(argv: Sequence[str] | None = None) -> int:

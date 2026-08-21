@@ -15,6 +15,7 @@ FACADE_LINE_BUDGETS = {
     "review_records": 300,
     "synthesis": 180,
     "synthesis_loader": 750,
+    "workspace": 510,
 }
 
 FORBIDDEN_IMPORTS = {

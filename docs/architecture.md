@@ -73,6 +73,8 @@ The same dependency direction applies to the other orchestration domains.
 Job matching keeps untrusted posting validation and Markdown rendering in
 separate boundary modules while its public facade owns retrieval orchestration
 and CLI compatibility.
+Workspace state and remote-privacy inspection are similarly isolated from the
+mutating initialization and connection workflow.
 `resume_parser.py` is independent of build orchestration; feedback recording,
 acceptance, and resolution are separate; synthesis models, loading, and auditing
 are separate; synthesis schema primitives and direction-derived inputs are kept
