@@ -425,6 +425,9 @@ def test_screen_job_skill_is_compact_read_only_triage() -> None:
     assert "screen this job" in skill_text
     assert "read-only" in normalized_skill
     assert "do not create one merely to screen" in normalized_skill
+    assert "scripts/fetch_posting.py" in skill_text
+    assert "public job-board API" in normalized_skill
+    assert "use browser rendering only" in normalized_skill
     assert "one-page" in normalized_skill
     assert "Match" in contract
     assert "Closest resume" in contract
