@@ -41,21 +41,12 @@ def _handoff_presentation(*, tailored: bool) -> dict[str, Any]:
         "review_heading": "Review your resume",
         "guidance_heading": "What to check",
         "guidance": "Confirm that the content feels accurate and sounds like you.",
-        "status_heading": "Current status",
-        "status_items": [
-            {"label": "Preview", "value": "Current"},
-            {"label": "Your approval", "value": "Still needed"},
-            {"label": "Final PDF", "value": "Not created"},
-        ],
         "response_prompt": 'Reply "Mint" to create the PDF, or tell me what to change.',
     }
 
 
 def _render_handoff_markdown(presentation: dict[str, Any], artifact_markdown: str) -> str:
     """Render the structured preview handoff for direct presentation."""
-    status_rows = "\n".join(
-        f"| {item['label']} | {item['value']} |" for item in presentation["status_items"]
-    )
     return "\n\n".join(
         [
             f"## {presentation['title']}",
@@ -64,8 +55,6 @@ def _render_handoff_markdown(presentation: dict[str, Any], artifact_markdown: st
             artifact_markdown,
             f"### {presentation['guidance_heading']}",
             presentation["guidance"],
-            f"### {presentation['status_heading']}",
-            f"| Review area | Result |\n|---|---|\n{status_rows}",
             presentation["response_prompt"],
         ]
     )

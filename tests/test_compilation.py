@@ -547,12 +547,6 @@ def test_preview_compiles_current_draft_and_publishes_html_for_editing(
             "review_heading": "Review your resume",
             "guidance_heading": "What to check",
             "guidance": ("Confirm that the content feels accurate and sounds like you."),
-            "status_heading": "Current status",
-            "status_items": [
-                {"label": "Preview", "value": "Current"},
-                {"label": "Your approval", "value": "Still needed"},
-                {"label": "Final PDF", "value": "Not created"},
-            ],
             "response_prompt": 'Reply "Mint" to create the PDF, or tell me what to change.',
         },
     }
@@ -576,12 +570,6 @@ def test_preview_compiles_current_draft_and_publishes_html_for_editing(
         f"[Open the full resume preview](<{html_path.resolve()}>)\n\n"
         "### What to check\n\n"
         "Confirm that the content feels accurate and sounds like you.\n\n"
-        "### Current status\n\n"
-        "| Review area | Result |\n"
-        "|---|---|\n"
-        "| Preview | Current |\n"
-        "| Your approval | Still needed |\n"
-        "| Final PDF | Not created |\n\n"
         'Reply "Mint" to create the PDF, or tell me what to change.'
     )
     assert handoff["approval"] == {
@@ -603,11 +591,8 @@ def test_preview_handoff_identifies_a_tailored_resume() -> None:
     )
 
     assert presentation["summary"].startswith("Your tailored resume")
-    assert presentation["status_items"] == [
-        {"label": "Preview", "value": "Current"},
-        {"label": "Your approval", "value": "Still needed"},
-        {"label": "Final PDF", "value": "Not created"},
-    ]
+    assert "status_heading" not in presentation
+    assert "status_items" not in presentation
 
 
 def test_compile_preserves_published_preview_but_marks_it_stale(tmp_path: Path, run_main) -> None:
