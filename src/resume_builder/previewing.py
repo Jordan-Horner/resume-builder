@@ -13,6 +13,7 @@ from typing import Any
 
 from . import __version__
 from .artifact_paths import default_resume_output_base
+from .artifact_status import build_manifest_freshness
 from .atomic import atomic_write_json, atomic_write_text
 from .compilation import build_resume, relative_output, sha256_file
 from .language_review import current_language_review
@@ -20,6 +21,7 @@ from .rendering import contained_project_path, known_fact_ids, load_payload, ren
 from .review_approval import review_freshness
 from .review_policy import hybrid_review_route
 from .review_schema import load_review_record
+from .selection_review import require_approved_selection_review
 from .synthesis import load_synthesis_plan
 
 APPROVED_NOTICE = "Language reviewed · Edit or mint when ready"
@@ -66,9 +68,11 @@ def _handoff_presentation(
 
 
 def _current_career_review(
-    resume: Path, project_root: Path
+    resume: Path,
+    project_root: Path,
+    language: dict[str, Any],
 ) -> tuple[str, str, dict[str, str] | None]:
-    """Return the current optional deep-review statuses without treating them as language QA."""
+    """Return only a current review that satisfies the hybrid deep-review contract."""
     path = project_root / "build" / "reviews" / f"{resume.stem}.json"
     if not path.is_file():
         return "not-reviewed", "not-reviewed", None
@@ -76,7 +80,41 @@ def _current_career_review(
         record = load_review_record(path, project_root)
     except ValueError:
         return "not-reviewed", "not-reviewed", None
-    if review_freshness(record):
+    if (
+        record.resume.path != resume.resolve()
+        or record.version not in {4, 5}
+        or record.reviewer_method != "independent-cold-review"
+        or record.evidence_status != "claim-checked"
+        or record.editorial_status != "approved"
+        or record.build_manifest is None
+        or record.cold_read is None
+        or record.review_package is None
+        or (record.version >= 5 and record.feedback_status != "approved")
+        or review_freshness(record)
+    ):
+        return "not-reviewed", "not-reviewed", None
+    if record.version == 4:
+        try:
+            build = json.loads(record.build_manifest.path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return "not-reviewed", "not-reviewed", None
+        memory = build.get("feedback_memory") if isinstance(build, dict) else None
+        rules = memory.get("rules") if isinstance(memory, dict) else None
+        if isinstance(rules, list) and rules:
+            return "not-reviewed", "not-reviewed", None
+    try:
+        package = json.loads(record.review_package.path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return "not-reviewed", "not-reviewed", None
+    expected_language = {
+        "path": relative_output(language["path"], project_root),
+        "sha256": language["sha256"],
+    }
+    if not isinstance(package, dict) or package.get("language_review") != expected_language:
+        return "not-reviewed", "not-reviewed", None
+    try:
+        require_approved_selection_review(project_root, resume)
+    except ValueError:
         return "not-reviewed", "not-reviewed", None
     return (
         record.hiring_read,
@@ -115,6 +153,9 @@ def _current_build(
         raise ValueError("preview requires a current compiled build") from exc
     if not isinstance(manifest, dict) or manifest.get("phase") != "build":
         raise ValueError("preview requires a valid build manifest")
+    freshness = build_manifest_freshness(manifest_path, project_root)
+    if freshness:
+        raise ValueError("preview compiled build is stale: " + "; ".join(freshness))
     source = manifest.get("source")
     if (
         not isinstance(source, dict)
@@ -193,11 +234,30 @@ def preview_resume(
     if resolved_base.suffix:
         raise ValueError("output base must not have a file extension")
 
+    requested_plan_argument = synthesis_plan or Path("resumes/plans") / f"{resume_path.stem}.yaml"
+    requested_plan = contained_project_path(
+        requested_plan_argument,
+        project_root,
+        "resumes/plans",
+        "synthesis plan",
+    )
+    needs_build = False
     try:
         json_path, build_manifest_path, build_manifest = _current_build(
             resume_path, project_root, vault_root, resolved_base
         )
     except ValueError:
+        needs_build = True
+    else:
+        build_template = build_manifest.get("template")
+        build_synthesis = build_manifest.get("synthesis")
+        needs_build = (
+            not isinstance(build_template, dict)
+            or build_template.get("path") != relative_output(template_path, project_root)
+            or not isinstance(build_synthesis, dict)
+            or build_synthesis.get("path") != relative_output(requested_plan, project_root)
+        )
+    if needs_build:
         build_resume(
             resume_path,
             output_base=resolved_base,
@@ -213,22 +273,20 @@ def preview_resume(
         template_path, project_root
     ):
         raise ValueError("preview build uses a different rendering template")
-    if synthesis_plan is not None:
-        requested_plan = contained_project_path(
-            synthesis_plan, project_root, "resumes/plans", "synthesis plan"
-        )
-        synthesis = build_manifest.get("synthesis")
-        if not isinstance(synthesis, dict) or synthesis.get("path") != relative_output(
-            requested_plan, project_root
-        ):
-            raise ValueError("preview build uses a different synthesis plan")
+    synthesis = build_manifest.get("synthesis")
+    if not isinstance(synthesis, dict) or synthesis.get("path") != relative_output(
+        requested_plan, project_root
+    ):
+        raise ValueError("preview build uses a different synthesis plan")
     language = current_language_review(resume_path, project_root)
     synthesis_record = build_manifest.get("synthesis")
     if not isinstance(synthesis_record, dict) or not isinstance(synthesis_record.get("path"), str):
         raise ValueError("preview build synthesis record is missing")
     plan = load_synthesis_plan(Path(synthesis_record["path"]), project_root, project_root / "vault")
     route = hybrid_review_route(plan)
-    role_fit, career_verdict, career_record = _current_career_review(resume_path, project_root)
+    role_fit, career_verdict, career_record = _current_career_review(
+        resume_path, project_root, language
+    )
     career_required = bool(route["career_review"]["run"])
     if career_required and career_record is None:
         raise ValueError(

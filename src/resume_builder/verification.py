@@ -12,10 +12,10 @@ from typing import Any
 
 from . import __version__
 from .artifact_paths import resume_output_base
+from .artifact_status import build_manifest_freshness
 from .atomic import atomic_write_json
 from .compilation import build_resume, relative_output, sha256_file
 from .directions import audit_direction, parse_direction
-from .feedback_resolution import manifest_guidance_freshness
 from .job_matching import match_job, project_target_path
 from .rendering import contained_project_path
 from .review_records import (
@@ -80,52 +80,6 @@ def _record_freshness(
     return []
 
 
-def build_manifest_freshness(manifest_path: Path, project_root: Path) -> list[str]:
-    """Return deterministic reasons a compiled build can no longer be reused."""
-    if not manifest_path.is_file():
-        return ["compiled build manifest is missing"]
-    try:
-        manifest = _load_json(manifest_path, "compiled build manifest")
-    except ValueError as exc:
-        return [str(exc)]
-    reasons: list[str] = []
-    if manifest.get("version") != 1 or manifest.get("phase") != "build":
-        reasons.append("compiled build manifest has an unsupported schema")
-    compiler = manifest.get("compiler")
-    if not isinstance(compiler, dict) or compiler.get("version") != __version__:
-        reasons.append("compiled build uses a different builder version")
-    for owner in ("source", "template", "synthesis"):
-        reasons.extend(_record_freshness(manifest.get(owner), project_root, f"build {owner}"))
-    outputs = manifest.get("outputs")
-    if not isinstance(outputs, list) or not outputs:
-        reasons.append("compiled build output inventory is missing")
-    else:
-        for index, output in enumerate(outputs):
-            reasons.extend(_record_freshness(output, project_root, f"build output[{index}]"))
-    evidence = manifest.get("evidence")
-    facts = evidence.get("facts") if isinstance(evidence, dict) else None
-    if not isinstance(facts, list):
-        reasons.append("compiled build fact inventory is missing")
-    else:
-        vault_root = project_root / "vault"
-        for index, fact in enumerate(facts):
-            if not isinstance(fact, dict):
-                reasons.append(f"build fact[{index}] record is invalid")
-                continue
-            path_value = fact.get("path")
-            digest = fact.get("sha256")
-            if not isinstance(path_value, str) or not isinstance(digest, str):
-                reasons.append(f"build fact[{index}] record is invalid")
-                continue
-            path = (vault_root / path_value).resolve()
-            if not path.is_relative_to(vault_root.resolve()) or not path.is_file():
-                reasons.append(f"build fact[{index}] file is missing")
-            elif sha256_file(path) != digest:
-                reasons.append(f"{path.name} changed after compilation")
-    reasons.extend(manifest_guidance_freshness(manifest, project_root, project_root / "vault"))
-    return reasons
-
-
 def _preview_freshness(resume: Path, project_root: Path) -> list[str]:
     path = resume_output_base(project_root, resume).with_suffix(".preview.json")
     if not path.is_file():
@@ -135,7 +89,11 @@ def _preview_freshness(resume: Path, project_root: Path) -> list[str]:
     except ValueError as exc:
         return [str(exc)]
     reasons: list[str] = []
-    if preview.get("phase") != "preview" or preview.get("valid") is not True:
+    if (
+        preview.get("version") != 4
+        or preview.get("phase") != "preview"
+        or preview.get("valid") is not True
+    ):
         reasons.append("preview manifest is not a successful preview")
     owners = ["build_manifest", "output"]
     if preview.get("version") in {1, 2}:
@@ -148,7 +106,7 @@ def _preview_freshness(resume: Path, project_root: Path) -> list[str]:
 
 
 def workflow_state(resume: Path, project_root: Path) -> dict[str, Any]:
-    """Return the current Draft → Preview → Published lifecycle state."""
+    """Return the current draft, review, preview, or published lifecycle state."""
     manifest = resume_output_base(project_root, resume).with_suffix(".manifest.json")
     build_reasons = build_manifest_freshness(manifest, project_root)
     if build_reasons:
@@ -156,6 +114,15 @@ def workflow_state(resume: Path, project_root: Path) -> dict[str, Any]:
     preview_reasons = _preview_freshness(resume, project_root)
     if preview_reasons:
         return {"state": "preview-ready", "reasons": preview_reasons}
+    preview_path = resume_output_base(project_root, resume).with_suffix(".preview.json")
+    preview = _load_json(preview_path, "preview manifest")
+    statuses = preview.get("review_statuses")
+    language_status = statuses.get("language_review") if isinstance(statuses, dict) else None
+    if language_status != "approved":
+        return {
+            "state": "revision-required",
+            "reasons": ["independent language review requires changes"],
+        }
     return {"state": "published", "reasons": []}
 
 
@@ -267,14 +234,29 @@ def verify_resume(
         if vault_result.get("valid") is not True:
             raise ValueError(f"strict vault validation failed: {vault_result.get('errors', [])}")
 
-    build_result = build_resume(
-        resume_path,
-        vault_root=resolved_vault,
-        template=template_path,
-        synthesis_plan=plan.source,
-    )
     manifest_path = output_base.with_suffix(".manifest.json")
     payload_path = output_base.with_suffix(".json")
+    build_reasons = build_manifest_freshness(manifest_path, project_root)
+    if not build_reasons:
+        current_manifest = _load_json(manifest_path, "compiled build manifest")
+        current_template = current_manifest.get("template")
+        current_synthesis = current_manifest.get("synthesis")
+        if (
+            not isinstance(current_template, dict)
+            or current_template.get("path") != relative_output(template_path, project_root)
+            or not isinstance(current_synthesis, dict)
+            or current_synthesis.get("path") != relative_output(plan.source, project_root)
+        ):
+            build_reasons.append("compiled build uses different requested inputs")
+    if build_reasons:
+        build_result = build_resume(
+            resume_path,
+            vault_root=resolved_vault,
+            template=template_path,
+            synthesis_plan=plan.source,
+        )
+    else:
+        build_result = {"warnings": current_manifest.get("warnings", [])}
     manifest = _load_json(manifest_path, "compiled build manifest")
     payload = _load_json(payload_path, "compiled resume payload")
     profile, _ = parse_direction(plan.direction)

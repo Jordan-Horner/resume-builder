@@ -249,6 +249,9 @@ Git tools do not. Never write candidate data into same-named engine folders.
     `critique-resume` automatically for the career-strategist and hiring-
     manager review before preview; the full package reuses the exact approved
     standalone language decisions instead of reviewing the same prose again.
+    Build that deeper package only after the standalone language review is
+    approved. A legacy, stale, self-reviewed, or differently pinned career
+    record does not satisfy the route.
     For `weak-or-exploratory`, explain the genuine evidence gap and continue
     after language review unless the user explicitly requests the deeper
     critique. A real posting's semantic criterion review may refine the route:
@@ -272,6 +275,9 @@ Git tools do not. Never write candidate data into same-named engine folders.
     a factual-correction session, pass `--remember-approved-wording` so the
     final sentence becomes a fact-scoped preferred example. Never infer
     sentence approval from untouched prose, whole-resume approval, or minting.
+    A preview with `changes-required` language is an editable revision state,
+    not a release-ready preview: surface its flagged blocks, revise them, and
+    repeat the changed-block language check before offering mint.
     When the user adds content during preview, use canonical vault evidence
     immediately when it exists. For a new or changed factual claim, do not place
     the claim into the resume first. Show the current canonical fact and handle

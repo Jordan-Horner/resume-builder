@@ -14,6 +14,7 @@ from . import __version__
 from .artifact_paths import resume_output_base
 from .artifact_status import (
     ArtifactStatus,
+    build_manifest_freshness,
 )
 from .artifact_status import (
     load_json_object as _load_json,
@@ -29,7 +30,7 @@ from .artifact_status import (
 )
 from .directions import parse_direction
 from .evaluations import load_case
-from .feedback_memory import manifest_guidance_freshness, validate_feedback_memory
+from .feedback_memory import validate_feedback_memory
 from .job_matching import validate_target
 from .layout import contained_path
 from .report_policy import _initial_draft_readiness, _next_action, _onboarding_status
@@ -72,47 +73,11 @@ def _build_status(resume: Path, project_root: Path, vault_root: Path) -> dict[st
     except ValueError as exc:
         return _status("invalid", manifest_path, project_root, [str(exc)])
 
-    reasons: list[str] = []
-    if (
-        manifest.get("version") != 1
-        or manifest.get("phase") != "build"
-        or not manifest.get("valid")
-    ):
-        reasons.append("build manifest does not describe a valid version 1 build")
-    compiler = manifest.get("compiler")
-    if not isinstance(compiler, dict) or compiler.get("version") != __version__:
-        reasons.append("build uses a different compiler version")
-    for key in ("source", "template", "synthesis"):
-        reason = _record_freshness(manifest.get(key), project_root, f"build {key}")
-        if reason:
-            reasons.append(reason)
+    reasons = build_manifest_freshness(manifest_path, project_root)
     source = manifest.get("source")
     if isinstance(source, dict) and isinstance(source.get("path"), str):
         if source["path"] != _relative(resume, project_root):
             reasons.append("build names a different resume source")
-    evidence = manifest.get("evidence")
-    facts = evidence.get("facts") if isinstance(evidence, dict) else None
-    if not isinstance(facts, list):
-        reasons.append("build evidence records are missing")
-    else:
-        for index, fact in enumerate(facts):
-            reason = _record_freshness(
-                fact,
-                project_root,
-                f"build fact[{index}]",
-                base=vault_root,
-            )
-            if reason:
-                reasons.append(reason)
-    reasons.extend(manifest_guidance_freshness(manifest, project_root, vault_root))
-    outputs = manifest.get("outputs")
-    if not isinstance(outputs, list) or not outputs:
-        reasons.append("build output records are missing")
-    else:
-        for index, output in enumerate(outputs):
-            reason = _record_freshness(output, project_root, f"build output[{index}]")
-            if reason:
-                reasons.append(reason)
     return _status(
         "stale" if reasons else "current",
         manifest_path,
@@ -176,11 +141,7 @@ def _mint_status(resume: Path, project_root: Path) -> dict[str, Any]:
     except ValueError as exc:
         return _status("invalid", mint_path, project_root, [str(exc)])
     reasons: list[str] = []
-    if (
-        manifest.get("version") not in {1, 2, 3, 4}
-        or manifest.get("phase") != "mint"
-        or not manifest.get("valid")
-    ):
+    if manifest.get("version") != 4 or manifest.get("phase") != "mint" or not manifest.get("valid"):
         reasons.append("mint manifest does not describe a successful supported mint")
     compiler = manifest.get("compiler")
     if not isinstance(compiler, dict) or compiler.get("version") != __version__:
@@ -249,7 +210,7 @@ def _preview_status(resume: Path, project_root: Path) -> dict[str, Any]:
         return _status("invalid", preview_path, project_root, [str(exc)])
     reasons: list[str] = []
     if (
-        manifest.get("version") not in {1, 2, 3, 4}
+        manifest.get("version") != 4
         or manifest.get("phase") != "preview"
         or not manifest.get("valid")
     ):
@@ -276,6 +237,10 @@ def _preview_status(resume: Path, project_root: Path) -> dict[str, Any]:
         statuses = {}
     elif statuses.get("user_review") != "pending":
         reasons.append("preview user-review status is not pending")
+    language_status = statuses.get("language_review")
+    release_readiness = (
+        "ready-for-user-approval" if language_status == "approved" else "revise-language"
+    )
     return _status(
         "stale" if reasons else "current",
         preview_path,
@@ -283,6 +248,7 @@ def _preview_status(resume: Path, project_root: Path) -> dict[str, Any]:
         reasons,
         final_review_status=manifest.get("final_review_status"),
         review_statuses=statuses,
+        release_readiness=release_readiness,
     )
 
 
@@ -501,6 +467,7 @@ def format_summary(result: dict[str, Any]) -> str:
         for state in (
             "draft",
             "preview-ready",
+            "revision-required",
             "published",
         )
     }
@@ -523,6 +490,7 @@ def format_summary(result: dict[str, Any]) -> str:
             "Workflow: "
             f"{workflow_counts['draft']} draft, "
             f"{workflow_counts['preview-ready']} ready for preview, "
+            f"{workflow_counts['revision-required']} needs revision, "
             f"{workflow_counts['published']} published"
         ),
         f"Fresh artifacts: {current('build')} builds, {current('critique')} critiques, {current('mint')} mints",

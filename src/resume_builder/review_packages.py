@@ -9,6 +9,7 @@ from typing import Any
 
 from . import __version__
 from .artifact_paths import resume_output_base
+from .artifact_status import build_manifest_freshness
 from .atomic import atomic_write_json
 from .language_review import current_language_review
 from .layout import contained_path
@@ -60,6 +61,9 @@ def build_review_package(
         raise ValueError("review package requires a current compiled build manifest") from exc
     if not isinstance(build_manifest, dict) or build_manifest.get("phase") != "build":
         raise ValueError("review package requires a valid build manifest")
+    build_reasons = build_manifest_freshness(build_manifest_path, resolved_root)
+    if build_reasons:
+        raise ValueError("review package build is stale: " + "; ".join(build_reasons))
     if build_manifest.get("version") != 1 or build_manifest.get("valid") is not True:
         raise ValueError("review package requires a successful version 1 build")
     compiler = build_manifest.get("compiler")
@@ -126,28 +130,26 @@ def build_review_package(
     cold_read_output = resolved_root / "build" / "reviews" / f"{resume_path.stem}.cold.json"
     output = resolved_root / "build" / "reviews" / f"{resume_path.stem}.package.json"
     decisions_output = resolved_root / "build" / "reviews" / f"{resume_path.stem}.decisions.json"
-    language_record: dict[str, str] | None = None
+    language_record: dict[str, str]
     language_blocks: dict[str, dict[str, Any]] = {}
-    try:
-        current_language = current_language_review(resume_path, resolved_root)
-    except ValueError:
-        current_language = None
-    if current_language is not None and current_language["status"] == "approved":
-        language_record = {
-            "path": current_language["path"].relative_to(resolved_root).as_posix(),
-            "sha256": str(current_language["sha256"]),
-        }
-        language_data = json.loads(current_language["path"].read_text(encoding="utf-8"))
-        language_review = language_data.get("language_review")
-        language_values = (
-            language_review.get("blocks") if isinstance(language_review, dict) else None
+    current_language = current_language_review(resume_path, resolved_root)
+    if current_language["status"] != "approved":
+        raise ValueError(
+            "career review requires the current standalone language review to be approved"
         )
-        if isinstance(language_values, list):
-            language_blocks = {
-                str(block.get("id")): block
-                for block in language_values
-                if isinstance(block, dict) and block.get("decision") == "approved"
-            }
+    language_record = {
+        "path": current_language["path"].relative_to(resolved_root).as_posix(),
+        "sha256": str(current_language["sha256"]),
+    }
+    language_data = json.loads(current_language["path"].read_text(encoding="utf-8"))
+    language_review = language_data.get("language_review")
+    language_values = language_review.get("blocks") if isinstance(language_review, dict) else None
+    if isinstance(language_values, list):
+        language_blocks = {
+            str(block.get("id")): block
+            for block in language_values
+            if isinstance(block, dict) and block.get("decision") == "approved"
+        }
 
     if cold_read_output.is_file() and output.is_file() and decisions_output.is_file():
         try:

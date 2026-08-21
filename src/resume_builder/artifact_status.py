@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from . import __version__
+from .feedback_resolution import manifest_guidance_freshness
 from .layout import contained_path
 
 
@@ -76,3 +78,57 @@ def record_freshness(
     if sha256(path) != digest:
         return f"{owner} file changed"
     return None
+
+
+def build_manifest_freshness(manifest_path: Path, project_root: Path) -> list[str]:
+    """Return every reason a compiled build can no longer be reused."""
+    if not manifest_path.is_file():
+        return ["compiled build manifest is missing"]
+    try:
+        manifest = load_json_object(manifest_path)
+    except ValueError as exc:
+        return [str(exc)]
+
+    reasons: list[str] = []
+    if (
+        manifest.get("version") != 1
+        or manifest.get("phase") != "build"
+        or manifest.get("valid") is not True
+    ):
+        reasons.append("compiled build manifest has an unsupported schema")
+    compiler = manifest.get("compiler")
+    if not isinstance(compiler, dict) or compiler.get("version") != __version__:
+        reasons.append("compiled build uses a different builder version")
+
+    for owner in ("source", "template", "synthesis"):
+        reason = record_freshness(manifest.get(owner), project_root, f"build {owner}")
+        if reason:
+            reasons.append(reason)
+
+    outputs = manifest.get("outputs")
+    if not isinstance(outputs, list) or not outputs:
+        reasons.append("compiled build output inventory is missing")
+    else:
+        for index, output in enumerate(outputs):
+            reason = record_freshness(output, project_root, f"build output[{index}]")
+            if reason:
+                reasons.append(reason)
+
+    evidence = manifest.get("evidence")
+    facts = evidence.get("facts") if isinstance(evidence, dict) else None
+    vault_root = project_root / "vault"
+    if not isinstance(facts, list):
+        reasons.append("compiled build fact inventory is missing")
+    else:
+        for index, fact in enumerate(facts):
+            reason = record_freshness(
+                fact,
+                project_root,
+                f"build fact[{index}]",
+                base=vault_root,
+            )
+            if reason:
+                reasons.append(reason)
+
+    reasons.extend(manifest_guidance_freshness(manifest, project_root, vault_root))
+    return list(dict.fromkeys(reasons))

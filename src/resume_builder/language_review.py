@@ -7,8 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from . import __version__
 from .artifact_paths import resume_output_base
+from .artifact_status import build_manifest_freshness
 from .atomic import atomic_write_json
 from .compilation import relative_output, sha256_file
 from .layout import contained_path
@@ -45,60 +45,6 @@ def _load_json(path: Path, owner: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{owner} must be a JSON object")
     return value
-
-
-def _build_manifest_freshness(manifest_path: Path, project_root: Path) -> list[str]:
-    """Check the build pins required by the standalone language-review boundary."""
-    if not manifest_path.is_file():
-        return ["compiled build manifest is missing"]
-    try:
-        manifest = _load_json(manifest_path, "compiled build manifest")
-    except ValueError as exc:
-        return [str(exc)]
-    reasons: list[str] = []
-    if (
-        manifest.get("version") != 1
-        or manifest.get("phase") != "build"
-        or manifest.get("valid") is not True
-    ):
-        reasons.append("compiled build manifest is not a successful version 1 build")
-    compiler = manifest.get("compiler")
-    if not isinstance(compiler, dict) or compiler.get("version") != __version__:
-        reasons.append("compiled build uses a different builder version")
-    for owner in ("source", "template", "synthesis"):
-        pin = manifest.get(owner)
-        if not isinstance(pin, dict):
-            reasons.append(f"build {owner} record is missing")
-            continue
-        path_value = pin.get("path")
-        digest = pin.get("sha256")
-        if not isinstance(path_value, str) or not isinstance(digest, str):
-            reasons.append(f"build {owner} record is invalid")
-            continue
-        try:
-            path = contained_path(project_root, path_value, f"build {owner}")
-        except ValueError as exc:
-            reasons.append(str(exc))
-            continue
-        if not path.is_file() or sha256_file(path) != digest:
-            reasons.append(f"build {owner} changed")
-    outputs = manifest.get("outputs")
-    if not isinstance(outputs, list) or not outputs:
-        reasons.append("compiled build output inventory is missing")
-    else:
-        for index, pin in enumerate(outputs):
-            if not isinstance(pin, dict):
-                reasons.append(f"build output[{index}] record is invalid")
-                continue
-            path_value = pin.get("path")
-            digest = pin.get("sha256")
-            if not isinstance(path_value, str) or not isinstance(digest, str):
-                reasons.append(f"build output[{index}] record is invalid")
-                continue
-            path = contained_path(project_root, path_value, f"build output[{index}]")
-            if not path.is_file() or sha256_file(path) != digest:
-                reasons.append(f"build output[{index}] changed")
-    return reasons
 
 
 def _exact_fields(value: dict[str, Any], expected: set[str], owner: str) -> None:
@@ -162,7 +108,7 @@ def prepare_language_review(
     target_path = _resolve_target(target, resolved_root)
     paths = language_review_paths(resolved_root, resume_path)
     manifest_path = resume_output_base(resolved_root, resume_path).with_suffix(".manifest.json")
-    build_reasons = _build_manifest_freshness(manifest_path, resolved_root)
+    build_reasons = build_manifest_freshness(manifest_path, resolved_root)
     if build_reasons:
         raise ValueError(
             "language review requires a current compiled build: " + "; ".join(build_reasons)
@@ -544,7 +490,7 @@ def language_review_freshness(
     manifest_path = contained_path(
         resolved_root, record["build_manifest"]["path"], "language build manifest"
     )
-    reasons.extend(_build_manifest_freshness(manifest_path, resolved_root))
+    reasons.extend(build_manifest_freshness(manifest_path, resolved_root))
     expected = {
         block.id: sha256_text(block.text) for block in narrative_block_inventory(resume_path)
     }

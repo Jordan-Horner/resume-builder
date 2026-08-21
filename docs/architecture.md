@@ -84,6 +84,11 @@ Workspace state and remote-privacy inspection are similarly isolated from the
 mutating initialization and connection workflow.
 Project reporting uses typed artifact-status records and shared freshness
 helpers while preserving its stable JSON-facing report contract.
+The same compiled-build freshness check is shared by language review, career
+review packaging, verification, preview, and project reporting. It covers the
+resume source, template, synthesis plan, generated payload, canonical facts,
+builder version, and applicable feedback guidance so one workflow cannot reuse
+an artifact another workflow considers stale.
 `resume_parser.py` is independent of build orchestration; feedback recording,
 acceptance, and resolution are separate; synthesis models, loading, and auditing
 are separate; synthesis schema primitives and direction-derived inputs are kept
@@ -101,6 +106,10 @@ their reviewed budgets.
   `preview` recompiles it.
 - Preview requires a current standalone natural-language record, and mint
   requires it to be approved.
-- The deeper critique record is required only when hybrid routing selects it.
+- A current preview whose language verdict requires changes remains visible for
+  editing but is reported as revision-required, never release-ready.
+- The deeper critique record is required only when hybrid routing selects it;
+  it must be a current version 4 or 5 independent review that pins the current
+  approved standalone language record and approved selection review.
 - An explicit mint invocation approves only the exact current preview.
 - PDF minting cannot bypass page-budget or extraction failures.

@@ -56,6 +56,11 @@ def _next_action(
                 "route": "preview",
                 "message": f"Preview {record['path']} for user edits.",
             }
+        if record["preview"].get("release_readiness") == "revise-language":
+            return {
+                "route": "revise-language",
+                "message": f"Revise the flagged language in {record['path']}.",
+            }
     for target in targets:
         if target["tailored_resume"] is None:
             return {
@@ -72,6 +77,11 @@ def _next_action(
             return {
                 "route": "preview",
                 "message": f"Preview {tailored['path']} for user edits.",
+            }
+        if tailored["preview"].get("release_readiness") == "revise-language":
+            return {
+                "route": "revise-language",
+                "message": f"Revise the flagged language in {tailored['path']}.",
             }
         if tailored["mint"]["status"] != "current":
             return {

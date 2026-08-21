@@ -298,6 +298,7 @@ def approve_selection_review(tmp_path: Path, resume: Path) -> Path:
 
 
 def build_language_package(resume: Path, tmp_path: Path) -> Path:
+    write_language_review(tmp_path, resume)
     approve_selection_review(tmp_path, resume)
     return review_records.build_review_package(resume, tmp_path)
 
@@ -703,6 +704,15 @@ def test_language_review_reuses_unchanged_approved_blocks(tmp_path: Path) -> Non
     assert language_review.language_review_freshness(paths["record"], tmp_path, resume) == []
 
 
+def test_career_review_package_requires_approved_standalone_language(tmp_path: Path) -> None:
+    vault, resume = project(tmp_path)
+    compilation.build_resume(resume, vault_root=vault)
+    approve_selection_review(tmp_path, resume)
+
+    with pytest.raises(ValueError, match="current independent natural-language review"):
+        review_records.build_review_package(resume, tmp_path)
+
+
 def test_improvable_fit_requires_deeper_career_review_before_preview(
     tmp_path: Path, run_main
 ) -> None:
@@ -726,6 +736,70 @@ def test_improvable_fit_requires_deeper_career_review_before_preview(
     assert carried["language_review"]["status"] == "approved"
     assert all(block["decision"] == "approved" for block in carried["language_review"]["blocks"])
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
+
+
+def test_legacy_career_review_cannot_satisfy_improvable_route(tmp_path: Path, run_main) -> None:
+    vault, resume = project(tmp_path)
+    plan_path = tmp_path / "resumes" / "plans" / "support-operations.yaml"
+    plan_path.write_text(
+        plan_path.read_text(encoding="utf-8").replace(
+            "target_mode: direct", "target_mode: adjacent"
+        ),
+        encoding="utf-8",
+    )
+    write_language_review(tmp_path, resume)
+    review_path = write_approved_review(tmp_path, resume)
+    review = json.loads(review_path.read_text(encoding="utf-8"))
+    review["version"] = 3
+    review["editorial_review"] = review.pop("language_review")
+    review.pop("build_manifest")
+    review.pop("cold_read")
+    review.pop("review_package")
+    review.pop("evidence_integrity")
+    review_path.write_text(json.dumps(review), encoding="utf-8")
+
+    assert run_main(previewing.main, resume, "--vault-root", vault) == 2
+
+
+def test_preview_rebuilds_for_a_different_template_before_requiring_review(
+    tmp_path: Path,
+) -> None:
+    vault, resume = project(tmp_path)
+    write_language_review(tmp_path, resume)
+    alternate = tmp_path / "templates" / "alternate.html"
+    alternate.write_text(
+        (tmp_path / "templates" / "resume-template.html").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="language review build_manifest changed"):
+        previewing.preview_resume(resume, vault_root=vault, template=alternate)
+
+    manifest = json.loads(
+        (tmp_path / "build" / "resumes" / resume.stem / "resume.manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert manifest["template"]["path"] == "templates/alternate.html"
+
+
+def test_preview_rebuilds_for_a_different_plan_before_requiring_review(tmp_path: Path) -> None:
+    vault, resume = project(tmp_path)
+    write_language_review(tmp_path, resume)
+    original = tmp_path / "resumes" / "plans" / "support-operations.yaml"
+    alternate = original.parent / "alternate" / original.name
+    alternate.parent.mkdir()
+    alternate.write_text(original.read_text(encoding="utf-8"), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="language review build_manifest changed"):
+        previewing.preview_resume(resume, vault_root=vault, synthesis_plan=alternate)
+
+    manifest = json.loads(
+        (tmp_path / "build" / "resumes" / resume.stem / "resume.manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert manifest["synthesis"]["path"] == "resumes/plans/alternate/support-operations.yaml"
 
 
 def test_preview_handoff_identifies_a_tailored_resume() -> None:
@@ -770,6 +844,15 @@ def test_review_becomes_stale_when_one_reviewed_fact_changes(tmp_path: Path, run
     record = review_records.load_review_record(review_path, tmp_path)
 
     assert "EX-005.md changed after evidence review" in review_records.review_freshness(record)
+    language_path = language_review.language_review_paths(tmp_path, resume)["record"]
+    assert any(
+        "build fact" in reason and "changed" in reason
+        for reason in language_review.language_review_freshness(
+            language_path,
+            tmp_path,
+            resume,
+        )
+    )
 
 
 def test_preview_rebuild_requires_a_fresh_language_review(tmp_path: Path, run_main) -> None:
@@ -824,7 +907,7 @@ def test_review_package_separates_cold_read_and_rejects_changed_build_output(
 
     payload_path = tmp_path / "build" / "resumes" / "support-operations" / "resume.json"
     payload_path.write_text(payload_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
-    with pytest.raises(ValueError, match="output changed after compilation"):
+    with pytest.raises(ValueError, match=r"build is stale: .*output\[0\].*changed"):
         review_records.build_review_package(resume, tmp_path)
 
 
@@ -892,7 +975,8 @@ def test_review_wording_repair_applies_exact_block_and_preserves_evidence(
         for block in next_decisions["language_review"]["blocks"]
         if block["id"] == "candidate.headline"
     )
-    assert changed["decision"] is None
+    assert changed["decision"] == "approved"
+    assert changed["repair"] is None
     assert unchanged["decision"] == "approved"
 
     changed["decision"] = "approved"
@@ -904,7 +988,7 @@ def test_review_wording_repair_applies_exact_block_and_preserves_evidence(
     next_decisions["next_action"] = {"route": "rebuild", "summary": "Reopen headline."}
     next_decisions["language_review"]["status"] = "changes-required"
     decisions_path.write_text(json.dumps(next_decisions), encoding="utf-8")
-    with pytest.raises(ValueError, match="cannot reopen unchanged approved block"):
+    with pytest.raises(ValueError, match=r"cannot reopen .*approved.*block"):
         review_records.finalize_review_record(decisions_path, tmp_path)
 
 
@@ -1038,6 +1122,10 @@ def test_applicable_feedback_memory_requires_post_cold_review_compliance(
             tmp_path,
         )
     )
+    language_path = language_review.language_review_paths(tmp_path, resume)["record"]
+    assert "applicable feedback guidance changed after compilation" in (
+        language_review.language_review_freshness(language_path, tmp_path, resume)
+    )
 
 
 def test_new_applicable_open_feedback_invalidates_an_existing_build(tmp_path: Path) -> None:
@@ -1128,6 +1216,7 @@ def test_verify_caches_checks_and_drives_review_to_published_state(
     assert second["cached"] is True
     assert review_records.sha256_file(selection_case) == package_digest
 
+    write_language_review(tmp_path, resume)
     approve_selection_review(tmp_path, resume)
     assert (
         run_main(
@@ -1307,6 +1396,7 @@ def test_verify_blocks_a_new_review_cycle_that_silently_removes_a_reviewed_story
     )
     verified = json.loads(capsys.readouterr().out)
     assert verified["state"]["state"] == "awaiting-selection-review"
+    write_language_review(tmp_path, resume)
     approve_selection_review(tmp_path, resume)
     assert (
         run_main(
@@ -1591,6 +1681,32 @@ def test_mint_is_blocked_by_changes_required_language_review(tmp_path: Path, run
     )
     assert preview["review_statuses"]["language_review"] == "changes-required"
     assert preview["language_review"]["issues"][0]["id"] == revise_block
+    preview_status = project_report._preview_status(resume, tmp_path)
+    assert preview_status["status"] == "current"
+    assert preview_status["release_readiness"] == "revise-language"
+    assert verification.workflow_state(resume, tmp_path)["state"] == "revision-required"
+    next_action = project_report._next_action(
+        {
+            "valid": True,
+            "registered_sources": 1,
+            "facts": 2,
+            "types": {"role": 1, "accomplishment": 1},
+        },
+        [{"slug": "support-operations"}],
+        [
+            {
+                "kind": "baseline",
+                "path": "resumes/baselines/support-operations.md",
+                "plan": {"status": "valid"},
+                "build": {"status": "current"},
+                "preview": preview_status,
+            }
+        ],
+        [],
+        {"unsealed": 0, "uncovered_baselines": []},
+        [],
+    )
+    assert next_action["route"] == "revise-language"
     assert run_main(minting.main, resume, "--vault-root", vault) == 2
     assert not (tmp_path / "build" / "resumes" / "support-operations" / "resume.pdf").exists()
 

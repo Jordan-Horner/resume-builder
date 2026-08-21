@@ -86,6 +86,35 @@ def test_phoenix_fixture_validates_compiles_and_prepares_review(tmp_path: Path) 
         "build/reviews/senior-defense-attorney.selection.decisions.json",
     )
     assert finalized.returncode == 0, finalized.stderr or finalized.stdout
+
+    language_package = _run(
+        workspace,
+        "review",
+        "language-package",
+        "resumes/baselines/senior-defense-attorney.md",
+    )
+    assert language_package.returncode == 0, language_package.stderr or language_package.stdout
+    language_decisions_path = (
+        workspace / "build" / "reviews" / "senior-defense-attorney.language.decisions.json"
+    )
+    language_decisions = json.loads(language_decisions_path.read_text(encoding="utf-8"))
+    language_decisions["reviewer"]["context"] = (
+        "Independent fixture reviewer saw only the frozen language package."
+    )
+    language_decisions["language_review"]["status"] = "approved"
+    for block in language_decisions["language_review"]["blocks"]:
+        block["decision"] = "approved"
+    language_decisions_path.write_text(json.dumps(language_decisions), encoding="utf-8")
+    language_finalized = _run(
+        workspace,
+        "review",
+        "language-finalize",
+        "build/reviews/senior-defense-attorney.language.decisions.json",
+    )
+    assert language_finalized.returncode == 0, (
+        language_finalized.stderr or language_finalized.stdout
+    )
+
     language_handoff = _run(
         workspace,
         "verify",
