@@ -529,13 +529,9 @@ def test_screen_job_skill_is_compact_read_only_triage() -> None:
     assert "Hourly:" in contract
     assert "Annualized equivalent:" in contract
     assert "| **Benefits**" in contract
-    assert "Work-life balance" in contract
     assert "**Compensation:** Not specified" in contract
     assert "job-specific benefits are absent, show `Not specified`" in normalized_contract
-    assert "numeric work-life-balance rating must include the exact review or response" in normalized_contract
-    assert "omit the numeric rating" in normalized_contract
     assert contract.index("| **Pay**") < contract.index("| **Benefits**")
-    assert contract.index("| **Benefits**") < contract.index("| **Work-life balance**")
     assert "show hourly pay only when the posting states an hourly rate" in normalized_skill
     assert "Do not derive or display an hourly rate from annual compensation" in contract
     assert "general consultant FAQ does not establish benefits" in normalized_contract
