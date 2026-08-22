@@ -5,7 +5,7 @@ never hand-author final JSON, HTML, or PDF. The Markdown file under `resumes/`
 remains the editable source. Everything under `build/` is disposable. Building
 and minting are separate lifecycle stages.
 
-Version 7 synthesis plans select a named content template and a separate visual
+Version 7 or later synthesis plans select a named content template and a separate visual
 theme. The content template supplies the compiled `section_order`; the theme
 must retain every required document and print-style placeholder, render exactly
 one of each data-bearing header, preview, and `{{RESUME_SECTIONS}}` placeholder,
@@ -194,6 +194,11 @@ internal JSON, HTML, manifests, diagnostics, and audited PDF stay together under
 the internal targeting context, while the employer-visible filename remains
 neutral and never includes the target company. `build/` remains an internal,
 disposable workspace; users should retrieve application files from `exports/`.
+When a preview is pinned to a real posting, its browser title, preview handoff,
+and mint result identify the target as `<company> — <role>`. The preview stores
+that validated job context for minting, and the job-aware HTML title flows into
+PDF metadata without adding targeting text to the visible resume. The neutral
+employer-upload filename remains unchanged.
 The manifests make
 draft and finalization stages explainable without making generated files
 canonical.

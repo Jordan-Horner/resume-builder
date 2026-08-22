@@ -75,6 +75,23 @@ def role_arc_payloads(
                     "optional_story_ids": list(arc.optional_story_ids),
                 }
             )
+        if plan.version >= 8:
+            payload["role_anchor_story_ids"] = list(arc.role_anchor_story_ids)
+        if plan.version >= 9:
+            payload["role_selling_story_ids"] = list(arc.role_selling_story_ids)
+        if plan.version >= 10:
+            payload["core_job"] = {
+                "selected_id": arc.selected_core_job_id,
+                "decision": arc.core_job_decision,
+                "candidates": [
+                    {
+                        "id": candidate.candidate_id,
+                        "description": candidate.description,
+                        "confidence": candidate.confidence,
+                    }
+                    for candidate in arc.core_job_candidates
+                ],
+            }
         if used_story_ids is not None:
             used = [story_id for story_id in arc.story_ids if story_id in used_story_ids]
             payload.update(

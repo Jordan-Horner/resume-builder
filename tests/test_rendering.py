@@ -88,6 +88,17 @@ def test_render_payload_is_escaped_grounded_and_omits_empty_sections() -> None:
     assert not rendering.PLACEHOLDER.search(rendered)
 
 
+def test_render_payload_accepts_an_escaped_job_aware_document_title() -> None:
+    rendered = rendering.render_payload(
+        payload(),
+        TEMPLATE,
+        fact_ids(),
+        document_title="Example & Co — Support Lead — Resume Preview",
+    )
+
+    assert "<title>Example &amp; Co — Support Lead — Resume Preview</title>" in rendered
+
+
 def test_render_payload_highlights_and_indexes_language_issues_on_screen() -> None:
     rendered = rendering.render_payload(
         payload(),

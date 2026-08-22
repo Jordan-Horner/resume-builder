@@ -444,6 +444,8 @@ def test_build_resume_references_define_evidence_and_regression_contracts() -> N
     assert "Version 4" in synthesis
     assert "Version 5" in synthesis
     assert "Version 6" in synthesis
+    assert "Version 8" in synthesis
+    assert "Version 9" in synthesis
     assert "Supporting stories may be omitted" in normalized_synthesis
     assert "summary_fact_ids" in synthesis
     assert "complete evidence set" in normalized_synthesis
@@ -462,6 +464,8 @@ def test_build_resume_references_define_evidence_and_regression_contracts() -> N
     assert "structured action/object/scope/outcome boundary" in normalized_synthesis
     assert "resolved page budget" in normalized_synthesis
     assert "required_story_ids" in synthesis
+    assert "role_anchor_story_ids" in synthesis
+    assert "role_selling_story_ids" in synthesis
     assert "not minimum or maximum bullet counts" in normalized_synthesis
     assert "Follow subtraction with redistribution" in synthesis
     assert "not a visible summary of every detail inside the fact" in normalized_synthesis

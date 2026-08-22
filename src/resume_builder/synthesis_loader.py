@@ -31,6 +31,7 @@ from .synthesis_models import (
     SynthesisStory,
 )
 from .synthesis_schema import (
+    core_job_assessment,
     direction_concept_ids,
     direction_page_budget,
     exact_fields,
@@ -38,6 +39,8 @@ from .synthesis_schema import (
     nonempty_string,
     object_value,
     optional_string,
+    role_arc_fields,
+    role_story_classes,
     string_list,
 )
 
@@ -51,12 +54,8 @@ def load_synthesis_plan(path: Path, project_root: Path, vault_root: Path) -> Syn
         raise ValueError(f"invalid synthesis plan {source}: {exc}") from exc
     data = object_value(raw, "synthesis plan")
     version = data.get("version")
-    if (
-        not isinstance(version, int)
-        or isinstance(version, bool)
-        or version not in {1, 2, 3, 4, 5, 6, 7}
-    ):
-        raise ValueError("synthesis plan must declare version 1, 2, 3, 4, 5, 6, or 7")
+    if not isinstance(version, int) or isinstance(version, bool) or version not in range(1, 11):
+        raise ValueError("synthesis plan must declare version 1, 2, 3, 4, 5, 6, 7, 8, 9, or 10")
     fields = {
         "version",
         "resume",
@@ -541,20 +540,7 @@ def load_synthesis_plan(path: Path, project_root: Path, vault_root: Path) -> Syn
         for index, raw_arc in enumerate(raw_role_arcs):
             owner = f"synthesis role_arcs[{index}]"
             arc = object_value(raw_arc, owner)
-            arc_fields = {
-                "role_ids",
-                "emphasis",
-                "arc_focus",
-                "selection_rationale",
-                "omitted_signals",
-            }
-            if version >= 6:
-                arc_fields.update(
-                    {"required_dimensions", "required_story_ids", "optional_story_ids"}
-                )
-            else:
-                arc_fields.add("story_ids")
-            exact_fields(arc, arc_fields, owner)
+            exact_fields(arc, role_arc_fields(version), owner)
             arc_role_ids = string_list(arc["role_ids"], f"{owner}.role_ids")
             unknown_arc_roles = sorted(set(arc_role_ids) - set(progression))
             if unknown_arc_roles:
@@ -601,6 +587,12 @@ def load_synthesis_plan(path: Path, project_root: Path, vault_root: Path) -> Syn
                 arc_story_ids = [*required_story_ids, *optional_story_ids]
             else:
                 arc_story_ids = string_list(arc["story_ids"], f"{owner}.story_ids")
+            role_anchor_story_ids, role_selling_story_ids = role_story_classes(
+                arc, owner, required_story_ids, version
+            )
+            core_job_candidates, selected_core_job_id, core_job_decision = core_job_assessment(
+                arc, owner, version
+            )
             unknown_arc_stories = sorted(set(arc_story_ids) - experience_story_ids)
             if unknown_arc_stories:
                 raise ValueError(
@@ -697,6 +689,11 @@ def load_synthesis_plan(path: Path, project_root: Path, vault_root: Path) -> Syn
                     required_dimensions=tuple(required_dimensions),
                     required_story_ids=tuple(required_story_ids),
                     optional_story_ids=tuple(optional_story_ids),
+                    role_anchor_story_ids=tuple(role_anchor_story_ids),
+                    role_selling_story_ids=tuple(role_selling_story_ids),
+                    core_job_candidates=tuple(core_job_candidates),
+                    selected_core_job_id=selected_core_job_id,
+                    core_job_decision=core_job_decision,
                 )
             )
 

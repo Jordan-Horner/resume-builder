@@ -191,6 +191,16 @@ the resume and do not silently forget it.
   execution, collaboration, and durable improvement where supported. Each
   bullet must advance the case rather than restate a duty or quality already
   demonstrated.
+- Read every experience placement as a title-plus-bullets unit. At least one
+  required story must anchor the visible title by showing the role's core
+  function. Do not compress an older role to a leadership-only,
+  coordination-only, or target-adjacent signal that makes the reader infer what
+  the job itself involved.
+- Preserve at least one different required selling story in every experience
+  placement. The role anchor answers what the job was; the selling story must
+  answer why the candidate was effective, distinctive, or worth interviewing.
+  Never improve title legibility by replacing the role's strongest supported
+  differentiator with a generic core responsibility.
 - Judge bullet count through role-arc completeness, not a universal minimum or
   maximum. A recent, promoted, target-critical, or high-scope role should show
   each distinct supported reason to hire that materially advances the target

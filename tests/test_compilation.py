@@ -889,6 +889,18 @@ def test_preview_handoff_identifies_a_tailored_resume() -> None:
     assert "status_items" not in presentation
 
 
+def test_preview_handoff_identifies_the_company_and_role() -> None:
+    presentation = previewing._handoff_presentation(
+        tailored=True,
+        language_status="approved",
+        language_issues=0,
+        job_label="Cursor — Support Operations Systems Lead",
+    )
+
+    assert presentation["title"] == "Cursor — Support Operations Systems Lead Resume Preview"
+    assert "tailored resume for Cursor — Support Operations Systems Lead" in presentation["summary"]
+
+
 def test_compile_preserves_published_preview_but_marks_it_stale(tmp_path: Path, run_main) -> None:
     vault, resume = project(tmp_path)
     assert run_main(compilation.main, resume, "--vault-root", vault) == 0
@@ -1641,6 +1653,33 @@ def test_plan_prose_and_role_word_counts_do_not_reopen_selection_review(
     )
 
 
+def test_semantically_identical_package_rewrite_does_not_reopen_selection_review(
+    tmp_path: Path,
+) -> None:
+    vault, resume = project(tmp_path)
+    compilation.build_resume(resume, vault_root=vault)
+    record = approve_selection_review(tmp_path, resume)
+    package_path = selection_review.selection_review_paths(tmp_path, resume)["package"]
+    package = json.loads(package_path.read_text(encoding="utf-8"))
+    package["review_context"]["target_argument"] = "Updated planning rationale only."
+    package_path.write_text(json.dumps(package), encoding="utf-8")
+    plan_path = tmp_path / "resumes" / "plans" / "support-operations.yaml"
+    plan = synthesis.load_synthesis_plan(plan_path, tmp_path, vault)
+    manifest_path = tmp_path / "build" / "resumes" / resume.stem / "resume.manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    selected = selection_guard.build_selection(plan, manifest["synthesis"])
+
+    assert (
+        selection_review.selection_review_freshness(
+            record,
+            tmp_path,
+            strategy_sha256=selection_review.selection_strategy_digest(plan, selected),
+        )
+        == []
+    )
+    assert selection_review.selection_review_freshness(record, tmp_path) == []
+
+
 def test_wording_only_edit_carries_forward_sealed_career_judgment(
     tmp_path: Path,
 ) -> None:
@@ -1965,6 +2004,18 @@ def test_mint_command_creates_audited_pdf(tmp_path: Path, run_main, monkeypatch)
     vault, resume = project(tmp_path)
     write_language_review(tmp_path, resume)
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
+    preview_manifest_path = (
+        tmp_path / "build" / "resumes" / "support-operations" / "resume.preview.json"
+    )
+    preview_manifest = json.loads(preview_manifest_path.read_text(encoding="utf-8"))
+    preview_manifest["job_context"] = {
+        "company": "Example",
+        "role": "Example Operations Lead",
+        "label": "Example — Example Operations Lead",
+        "target_path": "targets/example.md",
+        "target_sha256": "a" * 64,
+    }
+    preview_manifest_path.write_text(json.dumps(preview_manifest), encoding="utf-8")
     called: dict[str, Path] = {}
 
     def fake_render_pdf(
@@ -2005,9 +2056,11 @@ def test_mint_command_creates_audited_pdf(tmp_path: Path, run_main, monkeypatch)
         == "build/resumes/support-operations/resume.preview.json"
     )
     assert manifest["user_approval"]["status"] == "approved-for-mint"
+    assert manifest["job_context"]["label"] == "Example — Example Operations Lead"
     assert manifest["submission_output"]["path"] == (
         "exports/resumes/support-operations/Test-Candidate-Resume.pdf"
     )
+    assert manifest["submission_output"]["label"] == "Example — Example Operations Lead resume"
     assert project_report._mint_status(resume, tmp_path)["status"] == "current"
     html_path = tmp_path / "build" / "resumes" / "support-operations" / "resume.html"
     html_path.write_text(html_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")

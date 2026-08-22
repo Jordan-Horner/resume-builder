@@ -355,6 +355,65 @@ resume_template:
     path.write_text(text, encoding="utf-8")
 
 
+def upgrade_to_v8(path: Path) -> None:
+    """Require a visible role anchor for every experience placement."""
+    upgrade_to_v7(path)
+    text = path.read_text(encoding="utf-8")
+    text = text.replace("version: 7", "version: 8", 1)
+    text = text.replace(
+        "    required_story_ids: [operational-improvement]",
+        """    required_story_ids: [operational-improvement]
+    role_anchor_story_ids: [operational-improvement]""",
+        1,
+    )
+    path.write_text(text, encoding="utf-8")
+
+
+def upgrade_to_v9(path: Path) -> None:
+    """Require distinct role-anchor and selling stories for every placement."""
+    upgrade_to_v8(path)
+    text = path.read_text(encoding="utf-8")
+    text = text.replace("version: 8", "version: 9", 1)
+    text = text.replace(
+        "    required_story_ids: [operational-improvement]",
+        "    required_story_ids: [operational-improvement, supporting-detail]",
+        1,
+    )
+    text = text.replace(
+        "    optional_story_ids: [supporting-detail]", "    optional_story_ids: []", 1
+    )
+    text = text.replace("    importance: supporting", "    importance: core", 1)
+    text = text.replace(
+        "    role_anchor_story_ids: [operational-improvement]",
+        """    role_anchor_story_ids: [operational-improvement]
+    role_selling_story_ids: [supporting-detail]""",
+        1,
+    )
+    path.write_text(text, encoding="utf-8")
+
+
+def upgrade_to_v10(path: Path) -> None:
+    """Expose scored core-job interpretations and their decision source."""
+    upgrade_to_v9(path)
+    text = path.read_text(encoding="utf-8")
+    text = text.replace("version: 9", "version: 10", 1)
+    text = text.replace(
+        "    role_selling_story_ids: [supporting-detail]",
+        """    role_selling_story_ids: [supporting-detail]
+    core_job_candidates:
+      - id: operational-owner
+        description: Own the core operational workflow.
+        confidence: 86
+      - id: technical-specialist
+        description: Provide technical depth within the workflow.
+        confidence: 70
+    selected_core_job_id: operational-owner
+    core_job_decision: model-selected""",
+        1,
+    )
+    path.write_text(text, encoding="utf-8")
+
+
 def test_synthesis_plan_validates_and_audits_compiled_stories(tmp_path: Path) -> None:
     vault, path = project(tmp_path)
     plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
@@ -993,6 +1052,154 @@ def test_v7_loads_named_content_template_and_theme(tmp_path: Path) -> None:
     assert plan.resume_template.content.template_id == "technical-classic"
     assert plan.resume_template.content.section_order[-1] == "skills"
     assert plan.resume_template.theme.theme_id == "clean-teal"
+
+
+def test_v8_requires_role_anchor_from_required_stories(tmp_path: Path) -> None:
+    vault, path = project(tmp_path)
+    upgrade_to_v8(path)
+
+    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+
+    assert plan.role_arcs[0].role_anchor_story_ids == ("operational-improvement",)
+
+
+def test_v8_rejects_optional_story_as_role_anchor(tmp_path: Path) -> None:
+    vault, path = project(tmp_path)
+    upgrade_to_v8(path)
+    path.write_text(
+        path.read_text(encoding="utf-8").replace(
+            "role_anchor_story_ids: [operational-improvement]",
+            "role_anchor_story_ids: [supporting-detail]",
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="role_anchor_story_ids must reference required"):
+        synthesis.load_synthesis_plan(path, tmp_path, vault)
+
+
+def test_v8_rejects_missing_role_anchor_field(tmp_path: Path) -> None:
+    vault, path = project(tmp_path)
+    upgrade_to_v8(path)
+    path.write_text(
+        path.read_text(encoding="utf-8").replace(
+            "    role_anchor_story_ids: [operational-improvement]\n",
+            "",
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="role_anchor_story_ids"):
+        synthesis.load_synthesis_plan(path, tmp_path, vault)
+
+
+def test_v9_requires_distinct_selling_story_from_required_stories(tmp_path: Path) -> None:
+    vault, path = project(tmp_path)
+    upgrade_to_v9(path)
+
+    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+
+    assert plan.role_arcs[0].role_anchor_story_ids == ("operational-improvement",)
+    assert plan.role_arcs[0].role_selling_story_ids == ("supporting-detail",)
+
+
+def test_v9_rejects_role_anchor_reused_as_selling_story(tmp_path: Path) -> None:
+    vault, path = project(tmp_path)
+    upgrade_to_v9(path)
+    path.write_text(
+        path.read_text(encoding="utf-8").replace(
+            "role_selling_story_ids: [supporting-detail]",
+            "role_selling_story_ids: [operational-improvement]",
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="both role anchors and selling stories"):
+        synthesis.load_synthesis_plan(path, tmp_path, vault)
+
+
+def test_v9_rejects_missing_selling_story_field(tmp_path: Path) -> None:
+    vault, path = project(tmp_path)
+    upgrade_to_v9(path)
+    path.write_text(
+        path.read_text(encoding="utf-8").replace(
+            "    role_selling_story_ids: [supporting-detail]\n",
+            "",
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="role_selling_story_ids"):
+        synthesis.load_synthesis_plan(path, tmp_path, vault)
+
+
+def test_v10_loads_scored_core_job_candidates(tmp_path: Path) -> None:
+    vault, path = project(tmp_path)
+    upgrade_to_v10(path)
+
+    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+
+    arc = plan.role_arcs[0]
+    assert arc.selected_core_job_id == "operational-owner"
+    assert arc.core_job_decision == "model-selected"
+    assert [(item.candidate_id, item.confidence) for item in arc.core_job_candidates] == [
+        ("operational-owner", 86),
+        ("technical-specialist", 70),
+    ]
+
+
+def test_v10_requires_user_confirmation_when_core_job_scores_are_close(
+    tmp_path: Path,
+) -> None:
+    vault, path = project(tmp_path)
+    upgrade_to_v10(path)
+    path.write_text(
+        path.read_text(encoding="utf-8").replace("confidence: 70", "confidence: 80", 1),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=r"core job candidates are close \(6 point margin\)"):
+        synthesis.load_synthesis_plan(path, tmp_path, vault)
+
+
+def test_v10_accepts_user_confirmed_close_core_job_scores(tmp_path: Path) -> None:
+    vault, path = project(tmp_path)
+    upgrade_to_v10(path)
+    path.write_text(
+        path.read_text(encoding="utf-8")
+        .replace("confidence: 70", "confidence: 80", 1)
+        .replace("core_job_decision: model-selected", "core_job_decision: user-confirmed", 1),
+        encoding="utf-8",
+    )
+
+    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+
+    assert plan.role_arcs[0].core_job_decision == "user-confirmed"
+
+
+def test_v10_reports_core_job_scores_in_role_arc_payload(tmp_path: Path) -> None:
+    vault, path = project(tmp_path)
+    upgrade_to_v10(path)
+    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+
+    payload = synthesis.role_arc_payloads(plan)[0]
+
+    assert payload["core_job"] == {
+        "selected_id": "operational-owner",
+        "decision": "model-selected",
+        "candidates": [
+            {
+                "id": "operational-owner",
+                "description": "Own the core operational workflow.",
+                "confidence": 86,
+            },
+            {
+                "id": "technical-specialist",
+                "description": "Provide technical depth within the workflow.",
+                "confidence": 70,
+            },
+        ],
+    }
 
 
 def test_v7_rejects_duplicate_content_template_sections(tmp_path: Path) -> None:

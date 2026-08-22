@@ -78,6 +78,16 @@ def mint_resume(
     preview_build = preview_manifest.get("build_manifest")
     preview_output = preview_manifest.get("output")
     preview_language = preview_manifest.get("language_review")
+    job_context = preview_manifest.get("job_context")
+    if job_context is not None and not (
+        isinstance(job_context, dict)
+        and isinstance(job_context.get("company"), str)
+        and isinstance(job_context.get("role"), str)
+        and isinstance(job_context.get("label"), str)
+        and isinstance(job_context.get("target_path"), str)
+        and isinstance(job_context.get("target_sha256"), str)
+    ):
+        raise ValueError("mint preview contains invalid job context")
     if (
         preview_manifest.get("version") != 4
         or preview_manifest.get("phase") != "preview"
@@ -159,6 +169,9 @@ def mint_resume(
             "draft PDF was retained for inspection"
         )
     submission_path = _submission_path(resume_path, payload, project_root)
+    submission_label = (
+        f"{job_context['label']} resume" if isinstance(job_context, dict) else "Resume"
+    )
     if page_error is None:
         atomic_write_bytes(submission_path, pdf_path.read_bytes())
     manifest = {
@@ -186,6 +199,7 @@ def mint_resume(
             "preview_sha256": sha256_file(html_path),
             "recorded_by": "explicit-mint-invocation",
         },
+        "job_context": job_context,
         "max_pages": resolved_max_pages,
         "pdf_audit": pdf_audit,
         "output": {
@@ -196,6 +210,7 @@ def mint_resume(
             {
                 "path": relative_output(submission_path, project_root),
                 "sha256": sha256_file(submission_path),
+                "label": submission_label,
             }
             if page_error is None
             else None
@@ -218,7 +233,9 @@ def mint_resume(
             "path": relative_output(submission_path, project_root),
             "absolute_path": str(submission_path.resolve()),
             "filename": submission_path.name,
+            "label": submission_label,
         },
+        "job_context": job_context,
         "pages": pages,
         "warnings": list(build_manifest.get("warnings", [])),
     }

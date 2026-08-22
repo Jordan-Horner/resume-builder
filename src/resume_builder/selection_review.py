@@ -128,6 +128,37 @@ def selection_strategy_payload(
                 "required_dimensions": sorted(arc.required_dimensions),
                 "required_story_ids": sorted(arc.required_story_ids),
                 "optional_story_ids": sorted(arc.optional_story_ids),
+                **(
+                    {"role_anchor_story_ids": sorted(arc.role_anchor_story_ids)}
+                    if plan.version >= 8
+                    else {}
+                ),
+                **(
+                    {"role_selling_story_ids": sorted(arc.role_selling_story_ids)}
+                    if plan.version >= 9
+                    else {}
+                ),
+                **(
+                    {
+                        "core_job": {
+                            "selected_id": arc.selected_core_job_id,
+                            "decision": arc.core_job_decision,
+                            "candidates": sorted(
+                                [
+                                    {
+                                        "id": candidate.candidate_id,
+                                        "description": candidate.description,
+                                        "confidence": candidate.confidence,
+                                    }
+                                    for candidate in arc.core_job_candidates
+                                ],
+                                key=lambda item: str(item["id"]),
+                            ),
+                        }
+                    }
+                    if plan.version >= 10
+                    else {}
+                ),
                 "omitted_signal_fact_ids": sorted(
                     fact_id for signal in arc.omitted_signals for fact_id in signal.fact_ids
                 ),
@@ -140,6 +171,23 @@ def selection_strategy_payload(
 def selection_strategy_digest(plan: SynthesisPlan, selection: dict[str, Any]) -> str:
     """Hash selection meaning while ignoring wording and prose-derived diagnostics."""
     return selection_digest(selection_strategy_payload(plan, selection))
+
+
+def _normalized_core_job(value: object) -> object:
+    """Normalize candidate order in a package's inspectable core-job assessment."""
+    if not isinstance(value, dict):
+        return value
+    candidates = value.get("candidates")
+    normalized_candidates = (
+        sorted(candidates, key=lambda item: str(item.get("id", "")))
+        if isinstance(candidates, list) and all(isinstance(item, dict) for item in candidates)
+        else candidates
+    )
+    return {
+        "selected_id": value.get("selected_id"),
+        "decision": value.get("decision"),
+        "candidates": normalized_candidates,
+    }
 
 
 def _package_strategy_payload(package: dict[str, Any]) -> dict[str, Any] | None:
@@ -213,6 +261,21 @@ def _package_strategy_payload(package: dict[str, Any]) -> dict[str, Any] | None:
                     "required_dimensions": sorted(item.get("required_dimensions", [])),
                     "required_story_ids": sorted(item.get("required_story_ids", [])),
                     "optional_story_ids": sorted(item.get("optional_story_ids", [])),
+                    **(
+                        {"role_anchor_story_ids": sorted(item.get("role_anchor_story_ids", []))}
+                        if "role_anchor_story_ids" in item
+                        else {}
+                    ),
+                    **(
+                        {"role_selling_story_ids": sorted(item.get("role_selling_story_ids", []))}
+                        if "role_selling_story_ids" in item
+                        else {}
+                    ),
+                    **(
+                        {"core_job": _normalized_core_job(item.get("core_job"))}
+                        if "core_job" in item
+                        else {}
+                    ),
                     "omitted_signal_fact_ids": sorted(
                         fact_id
                         for signal in item.get("omitted_signals", [])
@@ -285,6 +348,34 @@ def build_selection_review_package(
             "required_dimensions": list(arc.required_dimensions),
             "required_story_ids": list(arc.required_story_ids),
             "optional_story_ids": list(arc.optional_story_ids),
+            **(
+                {"role_anchor_story_ids": list(arc.role_anchor_story_ids)}
+                if plan.version >= 8
+                else {}
+            ),
+            **(
+                {"role_selling_story_ids": list(arc.role_selling_story_ids)}
+                if plan.version >= 9
+                else {}
+            ),
+            **(
+                {
+                    "core_job": {
+                        "selected_id": arc.selected_core_job_id,
+                        "decision": arc.core_job_decision,
+                        "candidates": [
+                            {
+                                "id": candidate.candidate_id,
+                                "description": candidate.description,
+                                "confidence": candidate.confidence,
+                            }
+                            for candidate in arc.core_job_candidates
+                        ],
+                    }
+                }
+                if plan.version >= 10
+                else {}
+            ),
             "selection_rationale": arc.selection_rationale,
             "omitted_signals": [
                 {
@@ -367,6 +458,11 @@ def build_selection_review_package(
                 "Use strategy-revise when the inversion can be resolved by omitting selected supporting stories already declared optional.",
                 "Use needs-user-decision when the preferred correction would remove, demote, or displace a core, required, or previously approved hiring signal.",
                 "An approved flagged role arc requires a contextual reason that its extra space earns a distinct target-relevant hiring contribution.",
+            ],
+            "core_job_test": [
+                "Inspect the selected core-job interpretation and every confidence-rated alternative before judging its role anchor.",
+                "Treat confidence values as comparative evidence estimates, not calibrated probabilities.",
+                "When the selected interpretation is within 10 points of an alternative, require a recorded user-confirmed decision before approval.",
             ],
             "adverse_or_sensitive_context_may_be_selected_only_when": [
                 "the target requires the disclosure",
@@ -613,9 +709,11 @@ def selection_review_freshness(
         reasons.append(str(exc))
         return reasons
     package_data: dict[str, Any] | None = None
-    if not package.is_file() or package_ref.get("sha256") != sha256_file(package):
+    package_hash_matches = False
+    if not package.is_file():
         reasons.append("selection review package changed or is missing")
     else:
+        package_hash_matches = package_ref.get("sha256") == sha256_file(package)
         try:
             package_data = _load_json(package, "selection package")
         except ValueError as exc:
@@ -624,6 +722,8 @@ def selection_review_freshness(
     if not isinstance(inputs, dict):
         reasons.append("selection review inputs are invalid")
         return reasons
+    reviewed_strategy_sha256 = inputs.get("strategy_sha256")
+    reviewed_selection_sha256 = inputs.get("selection_sha256")
     for owner in ("resume", "plan", "direction"):
         ref = inputs.get(owner)
         if not isinstance(ref, dict) or not isinstance(ref.get("path"), str):
@@ -645,8 +745,38 @@ def selection_review_freshness(
         package_digest = (
             selection_digest(package_strategy) if package_strategy is not None else None
         )
-        if package_digest != strategy_sha256:
+        package_inputs = package_data.get("inputs")
+        package_selection_sha256 = (
+            package_inputs.get("selection_sha256") if isinstance(package_inputs, dict) else None
+        )
+        reviewed_strategy_matches = (
+            reviewed_strategy_sha256 == strategy_sha256
+            if isinstance(reviewed_strategy_sha256, str)
+            else reviewed_selection_sha256 == package_selection_sha256
+        )
+        if package_digest != strategy_sha256 or not reviewed_strategy_matches:
             reasons.append("selection review strategy changed")
+        elif not package_hash_matches:
+            # Verification rebuilds the package from current prose-independent
+            # inputs. A wording or planning-rationale change may alter the raw
+            # package without changing any selection decision the reviewer
+            # approved, so the semantic strategy digest is the controlling pin.
+            pass
+    elif not package_hash_matches:
+        package_inputs = package_data.get("inputs")
+        package_strategy_sha256 = (
+            package_inputs.get("strategy_sha256") if isinstance(package_inputs, dict) else None
+        )
+        package_selection_sha256 = (
+            package_inputs.get("selection_sha256") if isinstance(package_inputs, dict) else None
+        )
+        reviewed_strategy_matches = (
+            reviewed_strategy_sha256 == package_strategy_sha256
+            if isinstance(reviewed_strategy_sha256, str)
+            else reviewed_selection_sha256 == package_selection_sha256
+        )
+        if not reviewed_strategy_matches:
+            reasons.append("selection review package changed or is missing")
     selection = package_data.get("selection")
     target = selection.get("target") if isinstance(selection, dict) else None
     if target is not None:

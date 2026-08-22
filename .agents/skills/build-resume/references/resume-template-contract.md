@@ -16,7 +16,7 @@ independent layers:
    and `{{RESUME_SECTIONS}}` placeholder, and no legacy per-section placeholders,
    so it cannot discard resume data or choose a new content hierarchy.
 
-Version 7 synthesis plans declare both choices:
+Version 7 or later synthesis plans declare both choices:
 
 ```yaml
 resume_template:

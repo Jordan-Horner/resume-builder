@@ -75,6 +75,34 @@ def test_structural_losses_require_approval_but_wording_is_not_scored() -> None:
     assert delta["blocking"]["removed_summary_fact_ids"] == ["FACT-001"]
 
 
+def test_removing_role_anchor_assignment_requires_approval() -> None:
+    previous = selection()
+    previous["role_arcs"][0]["role_anchor_story_ids"] = ["courtroom-win"]
+    current = json.loads(json.dumps(previous))
+    current["role_arcs"][0]["role_anchor_story_ids"] = []
+
+    delta = selection_guard.compare_selections(previous, current)
+
+    assert delta["requires_approval"] is True
+    assert delta["blocking"]["removed_role_anchor_story_ids"] == [
+        {"role_ids": ["ROLE-001"], "story_ids": ["courtroom-win"]}
+    ]
+
+
+def test_removing_role_selling_assignment_requires_approval() -> None:
+    previous = selection()
+    previous["role_arcs"][0]["role_selling_story_ids"] = ["courtroom-win"]
+    current = json.loads(json.dumps(previous))
+    current["role_arcs"][0]["role_selling_story_ids"] = []
+
+    delta = selection_guard.compare_selections(previous, current)
+
+    assert delta["requires_approval"] is True
+    assert delta["blocking"]["removed_role_selling_story_ids"] == [
+        {"role_ids": ["ROLE-001"], "story_ids": ["courtroom-win"]}
+    ]
+
+
 def test_strategy_change_is_grouped_and_exact_approval_unblocks_it(tmp_path: Path) -> None:
     resume = tmp_path / "resumes" / "baselines" / "defense.md"
     resume.parent.mkdir(parents=True)

@@ -8,7 +8,7 @@ from typing import Any
 import yaml
 
 from .layout import VaultLayout
-from .synthesis_models import STORY_ID
+from .synthesis_models import STORY_ID, CoreJobCandidate
 from .validation import parse_frontmatter
 
 
@@ -57,6 +57,112 @@ def string_list(value: object, owner: str, *, required: bool = True) -> list[str
     if len(set(normalized)) != len(normalized):
         raise ValueError(f"{owner} must not contain duplicates")
     return normalized
+
+
+def string_subset(value: object, owner: str, candidates: list[str]) -> list[str]:
+    """Return a required string list whose values all belong to candidates."""
+    items = string_list(value, owner)
+    unknown = sorted(set(items) - set(candidates))
+    if unknown:
+        raise ValueError(f"{owner} must reference required stories: {unknown}")
+    return items
+
+
+def role_story_classes(
+    arc: dict[str, object], owner: str, required: list[str], version: int
+) -> tuple[list[str], list[str]]:
+    """Return required role-anchor and distinct selling-story assignments."""
+    anchors = (
+        string_subset(arc["role_anchor_story_ids"], f"{owner}.role_anchor_story_ids", required)
+        if version >= 8
+        else []
+    )
+    sellers = (
+        string_subset(arc["role_selling_story_ids"], f"{owner}.role_selling_story_ids", required)
+        if version >= 9
+        else []
+    )
+    overlap = sorted(set(anchors) & set(sellers))
+    if overlap:
+        raise ValueError(
+            f"{owner} assigns stories as both role anchors and selling stories: {overlap}"
+        )
+    return anchors, sellers
+
+
+def role_arc_fields(version: int) -> set[str]:
+    """Return the exact role-arc fields for one synthesis schema version."""
+    fields = {"role_ids", "emphasis", "arc_focus", "selection_rationale", "omitted_signals"}
+    if version >= 6:
+        fields.update({"required_dimensions", "required_story_ids", "optional_story_ids"})
+    else:
+        fields.add("story_ids")
+    if version >= 8:
+        fields.add("role_anchor_story_ids")
+    if version >= 9:
+        fields.add("role_selling_story_ids")
+    if version >= 10:
+        fields.update({"core_job_candidates", "selected_core_job_id", "core_job_decision"})
+    return fields
+
+
+def confidence_score(value: object, owner: str) -> int:
+    """Return an integer confidence estimate from zero through one hundred."""
+    if not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= 100:
+        raise ValueError(f"{owner} must be an integer from 0 through 100")
+    return value
+
+
+def core_job_assessment(
+    arc: dict[str, object], owner: str, version: int
+) -> tuple[list[CoreJobCandidate], str | None, str | None]:
+    """Parse scored core-job candidates and enforce the close-score user gate."""
+    if version < 10:
+        return [], None, None
+    raw_candidates = arc["core_job_candidates"]
+    if not isinstance(raw_candidates, list) or not 2 <= len(raw_candidates) <= 3:
+        raise ValueError(f"{owner}.core_job_candidates must contain two or three items")
+    candidates: list[CoreJobCandidate] = []
+    seen_ids: set[str] = set()
+    seen_descriptions: set[str] = set()
+    for index, raw_candidate in enumerate(raw_candidates):
+        candidate_owner = f"{owner}.core_job_candidates[{index}]"
+        candidate = object_value(raw_candidate, candidate_owner)
+        exact_fields(candidate, {"id", "description", "confidence"}, candidate_owner)
+        candidate_id = nonempty_string(candidate["id"], f"{candidate_owner}.id")
+        if not STORY_ID.fullmatch(candidate_id):
+            raise ValueError(f"{candidate_owner}.id must use a lowercase hyphenated identifier")
+        if candidate_id in seen_ids:
+            raise ValueError(f"duplicate core job candidate id in {owner}: {candidate_id}")
+        description = nonempty_string(candidate["description"], f"{candidate_owner}.description")
+        if description in seen_descriptions:
+            raise ValueError(f"duplicate core job candidate description in {owner}: {description}")
+        seen_ids.add(candidate_id)
+        seen_descriptions.add(description)
+        candidates.append(
+            CoreJobCandidate(
+                candidate_id=candidate_id,
+                description=description,
+                confidence=confidence_score(
+                    candidate["confidence"], f"{candidate_owner}.confidence"
+                ),
+            )
+        )
+    selected_id = nonempty_string(arc["selected_core_job_id"], f"{owner}.selected_core_job_id")
+    if selected_id not in seen_ids:
+        raise ValueError(f"{owner}.selected_core_job_id must reference a core job candidate")
+    decision = nonempty_string(arc["core_job_decision"], f"{owner}.core_job_decision")
+    if decision not in {"model-selected", "user-confirmed"}:
+        raise ValueError(f"{owner}.core_job_decision must be model-selected or user-confirmed")
+    selected = next(item for item in candidates if item.candidate_id == selected_id)
+    competitor = max(item.confidence for item in candidates if item.candidate_id != selected_id)
+    margin = selected.confidence - competitor
+    if decision == "model-selected" and margin <= 10:
+        raise ValueError(
+            f"{owner} core job candidates are close ({margin} point margin); "
+            "ask the user and record core_job_decision as user-confirmed"
+        )
+    return candidates, selected_id, decision
 
 
 def fact_metadata(vault_root: Path) -> dict[str, dict[str, object]]:

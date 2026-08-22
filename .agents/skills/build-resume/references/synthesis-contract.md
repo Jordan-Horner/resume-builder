@@ -41,8 +41,22 @@ The loader accepts all published schema versions so existing Git history remains
   reusable content architecture and a separate visual theme so section order
   cannot drift during tailoring and visual preferences cannot change evidence
   strategy.
+- **Version 8:** requires every role arc to identify one or more required
+  `role_anchor_story_ids`. These stories make the visible title and core role
+  function understandable before the plan spends remaining space on
+  target-specific supporting signals.
+- **Version 9:** requires every role arc to identify one or more different
+  required `role_selling_story_ids`. The anchor explains the job; the selling
+  story preserves a separate reason to hire instead of letting core-function
+  evidence replace the role's strongest differentiator.
+- **Version 10:** makes the core-job interpretation inspectable. Every role arc
+  records two or three evidence-based candidates with integer confidence
+  estimates, the selected candidate, and whether the model or user made the
+  selection. These are comparative planning estimates, not calibrated
+  probabilities. When the selected candidate is within 10 points of another
+  candidate, the agent must show the choices and ask the user before drafting.
 
-Use version 7 for new plans and substantial rewrites. Do not rename the plan or
+Use version 10 for new plans and substantial rewrites. Do not rename the plan or
 resume with a version suffix; the schema field and Git history carry the version.
 
 ## Required plan
@@ -143,6 +157,36 @@ Version 7 also records:
     `resume_template.theme` names a visual theme under `templates/themes/`.
     The compiler enforces required, optional, and forbidden sections, visible
     section order, and the selected theme's renderer.
+
+Version 8 also records:
+
+24. **Role anchors:** every role arc lists a non-empty
+    `role_anchor_story_ids` subset of its required stories. Read with the role
+    heading, those stories must establish the role's core technical,
+    operational, customer, leadership, or delivery function. An adjacent
+    leadership or coordination signal cannot be the only anchor when it leaves
+    the title unexplained.
+
+Version 9 also records:
+
+25. **Selling stories:** every role arc lists a non-empty
+    `role_selling_story_ids` subset of its required stories. Selling stories
+    must be distinct from role anchors and demonstrate a separate outcome,
+    scope, leadership, technical depth, customer impact, or durable improvement
+    that gives the reader a reason to hire.
+
+Version 10 also records:
+
+26. **Core-job candidates:** every role arc lists two or three
+    `core_job_candidates`, each with a stable lowercase-hyphenated `id`, a
+    plain-language `description`, and an integer `confidence` from 0 to 100.
+    Confidence expresses the model's comparative evidence read; it is not a
+    measured probability of correctness.
+27. **Core-job decision:** `selected_core_job_id` identifies the interpretation
+    that the role anchor must explain. `core_job_decision` is `model-selected`
+    only when that candidate leads every alternative by more than 10 points.
+    Otherwise show the candidates and scores to the user, ask which best
+    describes the actual job, and record `user-confirmed` after the answer.
 
 Every experience story must belong to exactly one role arc and agree with that
 arc's role placement. Every progression role must appear in an arc, at least one
@@ -353,6 +397,8 @@ Do not begin resume prose until the plan shows:
 - a presentation choice that gives each retained section a distinct job;
 - a resolved page budget; and
 - explicit required-versus-optional stories for every role arc.
+- at least one required role-anchor story for every experience placement.
+- at least one distinct required selling story for every experience placement.
 - no unexplained material backward allocation across visible role arcs.
 
 If the plan cannot meet those conditions, route the gap to the direction or

@@ -17,6 +17,7 @@ from .artifact_paths import default_resume_output_base
 from .artifact_status import build_manifest_freshness
 from .atomic import atomic_write_json, atomic_write_text
 from .compilation import build_resume, relative_output, sha256_file
+from .job_target import parse_target, project_target_path
 from .language_review import current_language_review
 from .rendering import contained_project_path, known_fact_ids, load_payload, render_payload
 from .resume_templates import rendering_theme_text
@@ -51,9 +52,12 @@ def _handoff_presentation(
     language_issues: int,
     career_verdict: str = "not-reviewed",
     career_note: str | None = None,
+    job_label: str | None = None,
 ) -> dict[str, Any]:
     """Return the user-facing structure for the preview/edit loop."""
     resume_label = "tailored resume" if tailored else "resume"
+    if job_label:
+        resume_label = f"{resume_label} for {job_label}"
     if language_status == "approved":
         if career_verdict == "needs-revision" and career_note:
             summary = (
@@ -81,12 +85,37 @@ def _handoff_presentation(
         guidance = "Review the flagged wording before creating the final PDF."
         response_prompt = "Tell me how you want to revise the flagged wording."
     return {
-        "title": "Resume Preview",
+        "title": f"{job_label} Resume Preview" if job_label else "Resume Preview",
         "summary": summary,
         "review_heading": "Review your resume",
         "guidance_heading": "What to check",
         "guidance": guidance,
         "response_prompt": response_prompt,
+    }
+
+
+def _job_context(target: dict[str, Any] | None, project_root: Path) -> dict[str, str] | None:
+    """Resolve a pinned target into safe, user-facing application context."""
+    if target is None:
+        return None
+    path_value = target.get("path")
+    digest = target.get("sha256")
+    if not isinstance(path_value, str) or not path_value.strip():
+        raise ValueError("preview target context is missing its path")
+    if not isinstance(digest, str) or not digest.strip():
+        raise ValueError("preview target context is missing its SHA-256 pin")
+    target_path = project_target_path(Path(path_value), project_root)
+    if sha256_file(target_path) != digest:
+        raise ValueError("preview target context is stale; the pinned job posting changed")
+    metadata, _ = parse_target(target_path)
+    company = str(metadata["company"])
+    role = str(metadata["role"])
+    return {
+        "company": company,
+        "role": role,
+        "label": f"{company} — {role}",
+        "target_path": relative_output(target_path, project_root),
+        "target_sha256": digest,
     }
 
 
@@ -377,7 +406,7 @@ def preview_resume(
         raise ValueError("preview build synthesis record is missing")
     plan = load_synthesis_plan(Path(synthesis_record["path"]), project_root, project_root / "vault")
     route = hybrid_review_route(plan)
-    selection_target: dict[str, str] | None = None
+    selection_target: dict[str, Any] | None = None
     selection_package_path = selection_review_paths(project_root, resume_path)["package"]
     if selection_package_path.is_file():
         try:
@@ -392,6 +421,7 @@ def preview_resume(
         )
         if isinstance(package_target, dict):
             selection_target = package_target
+    job_context = _job_context(selection_target, project_root)
     selection = build_selection(plan, synthesis_record, target=selection_target)
     strategy_sha256 = selection_strategy_digest(plan, selection)
     role_fit, career_verdict, career_record = _current_career_review(
@@ -431,6 +461,9 @@ def preview_resume(
         known_fact_ids(vault_root.resolve()),
         preview_notice=(APPROVED_NOTICE if language["status"] == "approved" else ATTENTION_NOTICE),
         review_issues={str(issue["id"]): str(issue["note"]) for issue in language["issues"]},
+        document_title=(
+            f"{job_context['label']} — Resume Preview" if job_context is not None else None
+        ),
     )
     atomic_write_text(html_path, rendered)
 
@@ -447,6 +480,7 @@ def preview_resume(
         language_issues=len(language["issues"]),
         career_verdict=career_verdict,
         career_note=career_record.get("next_action") if career_record else None,
+        job_label=job_context["label"] if job_context is not None else None,
     )
     user_handoff: dict[str, Any] = {
         "required": True,
@@ -455,7 +489,11 @@ def preview_resume(
         "artifact": {
             "path": relative_html_path,
             "media_type": "text/html",
-            "label": "Open the current resume preview",
+            "label": (
+                f"Open the {job_context['label']} resume preview"
+                if job_context is not None
+                else "Open the current resume preview"
+            ),
         },
         "approval": {
             "required": True,
@@ -492,6 +530,7 @@ def preview_resume(
             **PREVIEW_MODE,
             "experience_bullets": experience_bullets,
         },
+        "job_context": job_context,
         "build_manifest": {
             "path": relative_output(build_manifest_path, project_root),
             "sha256": sha256_file(build_manifest_path),
@@ -507,7 +546,12 @@ def preview_resume(
     }
     atomic_write_json(preview_manifest_path, manifest)
     absolute_html_path = str(html_path.resolve())
-    artifact_markdown = f"[Open the full resume preview](<{absolute_html_path}>)"
+    artifact_link_label = (
+        f"Open the {job_context['label']} resume preview"
+        if job_context is not None
+        else "Open the full resume preview"
+    )
+    artifact_markdown = f"[{artifact_link_label}](<{absolute_html_path}>)"
     return {
         "valid": True,
         "source": relative_output(resume_path, project_root),

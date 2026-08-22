@@ -354,14 +354,17 @@ indexes. The scripts under
 - Follow `.agents/skills/build-resume/SKILL.md` when generating or changing a
   resume.
 - Before drafting a fresh baseline or substantial rewrite, create the build
-  skill's versioned synthesis plan under `resumes/plans/`. Use schema v7 and
+  skill's versioned synthesis plan under `resumes/plans/`. Use schema v10 and
   select a named content template plus a separate visual theme under its
   `resume_template` section. Keep section architecture independent from
   evidence selection and bullet allocation. Group facts into coherent career stories,
   assign each proposed bullet a distinct job, preserve supported progression,
   distinguish core stories from optional supporting stories, define the
   summary's job and evidence, and record intentional omissions. For new work,
-  use plan schema v7 to select the resume template and resolve the page budget;
+  use plan schema v10 to select the resume template, resolve the page budget,
+  identify required role-anchor and distinct selling stories, and expose scored
+  core-job interpretations; when the selected interpretation is within 10
+  points of another, ask the user before drafting and record the answer;
   declare `direct`, `adjacent`,
   or `exploratory` targeting,
   the complete concept-fit map, reviewer risks, and the presentation strategy;
@@ -371,7 +374,10 @@ indexes. The scripts under
   relationship, and exact evidence for each part. Give every experience
   placement a role arc that states its emphasis, career-story job, required
   dimensions, required and optional stories, allocation rationale, and supported signals considered
-  but omitted. Use that arc to preserve distinct reasons to hire after prose
+  but omitted. Give every placement at least one required role-anchor story so
+  its visible title and core function remain understandable after compression,
+  plus a different required selling story that preserves a reason to hire.
+  Use that arc to preserve distinct reasons to hire after prose
   subtraction. Do not impose a universal bullet count, and do not mechanically
   convert one fact into one bullet.
 - Before story selection, classify every direction concept as directly

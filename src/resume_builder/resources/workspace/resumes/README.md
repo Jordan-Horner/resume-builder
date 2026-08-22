@@ -46,9 +46,16 @@ budget, separates required role dimensions and stories from optional stories,
 and assigns exact evidence to each claim's action, object, scope, and outcome.
 This prevents one cited fact from lending unsupported authorship or impact to
 another fact in the same bullet.
-Version 7 is the default for new work. It adds a named content template and a
-separate visual theme, making section architecture explicit and reusable while
-leaving evidence selection and role depth in the synthesis plan.
+Version 7 added a named content template and a separate visual theme, making
+section architecture explicit and reusable while leaving evidence selection
+and role depth in the synthesis plan. Version 8 added required role anchors so
+target-specific supporting evidence cannot make the job title or core function
+unintelligible. Version 9 also requires a
+different selling story per role so adding core-function context cannot replace
+the strongest reason to hire. Version 10 is the default for new work. It exposes
+two or three scored core-job interpretations for each role and requires a user
+decision when the selected interpretation is within 10 points of an alternative.
+The scores are comparative evidence estimates, not calibrated probabilities.
 
 Job-specific tailoring also requires a preserved posting under `targets/`.
 Never overwrite the baseline with the tailored version; Git history preserves

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from resume_builder import job_matching
+from resume_builder import job_matching, previewing
 
 
 def direction_markdown() -> str:
@@ -213,6 +214,33 @@ def test_target_contract_validates_snapshot_and_semantic_boundary(tmp_path: Path
     target.write_text(target_markdown(digest="0" * 64), encoding="utf-8")
     with pytest.raises(ValueError, match=r"does not match source\.body_sha256"):
         job_matching.parse_target(target)
+
+
+def test_preview_job_context_uses_the_pinned_target_identity(tmp_path: Path) -> None:
+    target = tmp_path / "targets" / "example-incident-operations-2026-08-17.md"
+    target.parent.mkdir()
+    target.write_text(target_markdown(), encoding="utf-8")
+    digest = hashlib.sha256(target.read_bytes()).hexdigest()
+
+    context = previewing._job_context(
+        {"path": "targets/example-incident-operations-2026-08-17.md", "sha256": digest},
+        tmp_path,
+    )
+
+    assert context == {
+        "company": "Example",
+        "role": "Example Operations Lead",
+        "label": "Example — Example Operations Lead",
+        "target_path": "targets/example-incident-operations-2026-08-17.md",
+        "target_sha256": digest,
+    }
+
+    target.write_text(target.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="pinned job posting changed"):
+        previewing._job_context(
+            {"path": "targets/example-incident-operations-2026-08-17.md", "sha256": digest},
+            tmp_path,
+        )
 
     invalid = target_markdown().replace(
         "criterion_id: incident-response", "criterion_id: work-eligibility", 1

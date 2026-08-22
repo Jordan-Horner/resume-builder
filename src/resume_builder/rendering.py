@@ -212,6 +212,7 @@ def render_payload(
     *,
     preview_notice: str = "Unreviewed diagnostic render — not approved for final review",
     review_issues: Mapping[str, str] | None = None,
+    document_title: str | None = None,
 ) -> str:
     """Render one validated payload into the supplied template."""
     if payload.get("version") != 1:
@@ -361,12 +362,17 @@ def render_payload(
     unknown_issues = sorted(set(issues) - rendered_review_blocks)
     if unknown_issues:
         raise ValueError(f"review issues reference unknown narrative blocks: {unknown_issues}")
+    title = (
+        text(document_title, "document title")
+        if document_title is not None
+        else f"{text(candidate.get('name'), 'candidate.name')} - Resume"
+    )
     replacements = {
         "{{LANG}}": html.escape(lang, quote=True),
         "{{PAGE_SIZE}}": page["size"],
         "{{PAGE_WIDTH}}": page["width"],
         "{{PAGE_MIN_HEIGHT}}": page["height"],
-        "{{TITLE}}": f"{escaped(candidate.get('name'), 'candidate.name')} - Resume",
+        "{{TITLE}}": html.escape(title),
         "{{HEADER_EVIDENCE}}": evidence_attribute(header_evidence),
         "{{NAME}}": escaped(candidate.get("name"), "candidate.name"),
         "{{HEADLINE}}": review_text(

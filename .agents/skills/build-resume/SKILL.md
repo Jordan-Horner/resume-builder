@@ -119,7 +119,17 @@ Git tools do not. Never write candidate data into same-named engine folders.
    explicit role arc to every experience placement: mark its emphasis, state the
    job it performs in the career argument, list its required dimensions and
    required versus optional stories, and record
-   supported signals considered but omitted. For every
+   supported signals considered but omitted. For schema v8, identify at least
+   one required role-anchor story per placement so the visible title and core
+   function remain understandable even when an older role is compressed. For
+   schema v9, also identify at least one different required selling story per
+   placement so the anchor cannot displace the role's differentiating proof. For
+   schema v10, record two or three plain-language core-job interpretations and
+   integer confidence estimates for every role. Treat the scores as comparative
+   evidence judgments, not calibrated probabilities. If the selected interpretation
+   is within 10 points of another candidate, show the choices and ask the user which
+   best describes the actual job before drafting; record that answer as
+   `user-confirmed`. For every
    story, define one `claim_focus`, the smallest required `core_fact_ids` set,
    and the larger `fact_ids` pool of optional supporting evidence. Then declare
    the structured claim's action, object, optional scope, optional outcome,

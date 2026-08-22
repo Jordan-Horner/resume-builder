@@ -104,7 +104,9 @@ career record is the foundation; each resume is a focused view of that record.
    creates a final, format-checked PDF. The preview step returns a structured,
    required handoff with organized, ready-to-post Markdown so the agent presents
    the complete review prompt instead of merely generating a file in the
-   background. Final application PDFs are collected under `exports/resumes/`;
+   background. For a real posting, the browser tab, preview handoff, and mint
+   result identify the company and role so concurrent applications remain easy
+   to distinguish. Final application PDFs are collected under `exports/resumes/`;
    company targeting stays in the folder name, while the upload-visible PDF uses
    the neutral `<candidate-name>-Resume.pdf` filename. Internal manifests,
    previews, and diagnostics stay grouped under

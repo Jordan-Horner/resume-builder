@@ -59,6 +59,37 @@ def build_selection(
             "role_ids": sorted(arc.role_ids),
             "required_dimensions": sorted(arc.required_dimensions),
             "required_story_ids": sorted(arc.required_story_ids),
+            **(
+                {"role_anchor_story_ids": sorted(arc.role_anchor_story_ids)}
+                if plan.version >= 8
+                else {}
+            ),
+            **(
+                {"role_selling_story_ids": sorted(arc.role_selling_story_ids)}
+                if plan.version >= 9
+                else {}
+            ),
+            **(
+                {
+                    "core_job": {
+                        "selected_id": arc.selected_core_job_id,
+                        "decision": arc.core_job_decision,
+                        "candidates": sorted(
+                            [
+                                {
+                                    "id": candidate.candidate_id,
+                                    "description": candidate.description,
+                                    "confidence": candidate.confidence,
+                                }
+                                for candidate in arc.core_job_candidates
+                            ],
+                            key=lambda item: str(item["id"]),
+                        ),
+                    }
+                }
+                if plan.version >= 10
+                else {}
+            ),
         }
         for arc in plan.role_arcs
     ]
@@ -133,6 +164,8 @@ def compare_selections(previous: dict[str, Any], current: dict[str, Any]) -> dic
     old_arcs = _arc_map(previous)
     new_arcs = _arc_map(current)
     removed_dimensions: list[dict[str, object]] = []
+    removed_role_anchors: list[dict[str, object]] = []
+    removed_role_sellers: list[dict[str, object]] = []
     for role_key, old_arc in sorted(old_arcs.items()):
         new_arc = new_arcs.get(role_key, {})
         lost = sorted(
@@ -141,6 +174,18 @@ def compare_selections(previous: dict[str, Any], current: dict[str, Any]) -> dic
         )
         if lost:
             removed_dimensions.append({"role_ids": list(role_key), "dimensions": lost})
+        lost_anchors = sorted(
+            set(_strings(old_arc.get("role_anchor_story_ids")))
+            - set(_strings(new_arc.get("role_anchor_story_ids")))
+        )
+        if lost_anchors:
+            removed_role_anchors.append({"role_ids": list(role_key), "story_ids": lost_anchors})
+        lost_sellers = sorted(
+            set(_strings(old_arc.get("role_selling_story_ids")))
+            - set(_strings(new_arc.get("role_selling_story_ids")))
+        )
+        if lost_sellers:
+            removed_role_sellers.append({"role_ids": list(role_key), "story_ids": lost_sellers})
     target_changed = None
     if previous.get("target") != current.get("target") or previous.get("direction") != current.get(
         "direction"
@@ -160,6 +205,8 @@ def compare_selections(previous: dict[str, Any], current: dict[str, Any]) -> dic
             - set(_strings(current.get("summary_fact_ids")))
         ),
         "removed_required_dimensions": removed_dimensions,
+        "removed_role_anchor_story_ids": removed_role_anchors,
+        "removed_role_selling_story_ids": removed_role_sellers,
         "target_or_direction_changed": target_changed,
     }
     blocking = {key: value for key, value in blocking.items() if value not in ([], None)}

@@ -157,6 +157,15 @@ class OmittedRoleSignal:
 
 
 @dataclass(frozen=True)
+class CoreJobCandidate:
+    """One evidence-based interpretation of a role's core job."""
+
+    candidate_id: str
+    description: str
+    confidence: int
+
+
+@dataclass(frozen=True)
 class RoleArc:
     """The planned story allocation for one experience placement."""
 
@@ -169,6 +178,11 @@ class RoleArc:
     required_dimensions: tuple[str, ...] = ()
     required_story_ids: tuple[str, ...] = ()
     optional_story_ids: tuple[str, ...] = ()
+    role_anchor_story_ids: tuple[str, ...] = ()
+    role_selling_story_ids: tuple[str, ...] = ()
+    core_job_candidates: tuple[CoreJobCandidate, ...] = ()
+    selected_core_job_id: str | None = None
+    core_job_decision: str | None = None
 
 
 @dataclass(frozen=True)
