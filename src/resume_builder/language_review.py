@@ -19,7 +19,7 @@ LANGUAGE_REVIEW_METHOD = "independent-cold-review"
 LANGUAGE_REVIEW_STATUSES = {"approved", "changes-required"}
 LANGUAGE_BLOCK_DECISIONS = {"approved", "revise"}
 LANGUAGE_REVIEW_STANDARD = {
-    "version": 1,
+    "version": 2,
     "context_test": (
         "Can a reviewer identify the actor, action, object, and why the claim matters "
         "using only the visible block and its supplied context?"
@@ -28,9 +28,14 @@ LANGUAGE_REVIEW_STANDARD = {
         "Reject prose when its central meaning depends on an unstated premise, omitted "
         "mechanism, unexplained internal name, or relationship the reader must invent."
     ),
+    "concrete_object_rule": (
+        "Judge whether the action's object identifies a decision-relevant system, "
+        "deliverable, operation, or change. Reject a grammatically complete but "
+        "semantically generic object when the reader still cannot tell what work occurred."
+    ),
     "boundary": (
-        "Apply this as contextual judgment, not a banned-term list or a requirement to "
-        "explain every implementation detail."
+        "Apply these rules through contextual meaning, not exact-word matching, a "
+        "banned-term list, or a requirement to explain every implementation detail."
     ),
 }
 

@@ -148,7 +148,11 @@ string. Use the context supplied by the cold-read package and apply all four tes
    object or problem, and value using only the visible resume context, without
    the writer's plan or internal rationale? Reject the block when its central
    meaning depends on an unstated premise, omitted mechanism, unexplained
-   internal name, or relationship the reader must invent.
+   internal name, or relationship the reader must invent. Also reject a
+   grammatically complete but semantically generic object when it names only a
+   broad category and the reader still cannot identify the decision-relevant
+   system, deliverable, operation, or change. Make this contextual judgment
+   without exact-word matching or a prohibited-term list.
 
 Record a provisional decision from that cold read before consulting synthesis
 notes or builder rationale. Later evidence verification may preserve wording

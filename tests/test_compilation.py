@@ -760,9 +760,15 @@ def test_language_review_reuses_unchanged_approved_blocks(tmp_path: Path) -> Non
     cold = json.loads(paths["cold"].read_text(encoding="utf-8"))
     assert [block["id"] for block in cold["blocks"]] == ["projects[0].description"]
     assert cold["review_standard"] == language_review.LANGUAGE_REVIEW_STANDARD
-    assert cold["review_standard"]["version"] == 1
+    assert cold["review_standard"]["version"] == 2
     assert "actor, action, object" in cold["review_standard"]["context_test"]
     assert "unstated premise" in cold["review_standard"]["unstated_premise_rule"]
+    assert "semantically generic object" in cold["review_standard"]["concrete_object_rule"]
+    assert (
+        "system, deliverable, operation, or change"
+        in cold["review_standard"]["concrete_object_rule"]
+    )
+    assert "exact-word matching" in cold["review_standard"]["boundary"]
     assert "banned-term list" in cold["review_standard"]["boundary"]
 
     decisions = json.loads(paths["decisions"].read_text(encoding="utf-8"))

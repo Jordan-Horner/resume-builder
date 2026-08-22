@@ -97,6 +97,14 @@ unexplained internal name, or a relationship the reader must invent. This is a
 general context test, not a new fact-specific editorial rule, a banned-term
 list, or a requirement to explain every implementation detail.
 
+Apply a concrete-object test within that judgment. A sentence can be
+grammatically complete yet remain uninformative when the object only names a
+broad category of activity. Require enough evidence-supported specificity to
+identify the decision-relevant system, deliverable, operation, or change so a
+reader can distinguish what work occurred. Evaluate the phrase by its meaning
+in the visible context, not by exact-word matching, a synonym table, or a
+prohibited-term list.
+
 Revise prose that passes factual grounding but fails this reading test. Prefer
 the smallest clear account of the work and let a separate bullet carry a
 distinct safeguard, outcome, or capability. Do not enforce a banned-word list,

@@ -203,6 +203,12 @@ Git tools do not. Never write candidate data into same-named engine folders.
    immediately understandable. Apply the cold package's general unstated-premise
    rule: the reader must be able to identify the actor, action, object, and why
    the claim matters without inventing a missing mechanism or relationship.
+   Apply its concrete-object rule as a semantic test: a complete-looking noun
+   phrase still fails when it labels only a broad category and leaves the
+   reader unable to identify the decision-relevant system, deliverable,
+   operation, or change. Recover the smallest evidence-supported concrete
+   object; do not enforce this through exact-word matching or a banned phrase
+   list.
    Do not turn a one-off clarity repair into a durable personal rule. Apply the
    quality contract's natural-voice test
    across individual blocks and neighboring bullets: prefer direct clauses when

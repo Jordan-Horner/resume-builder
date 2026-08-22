@@ -651,6 +651,10 @@ def test_resume_quality_contract_teaches_principles_not_copywriting() -> None:
     assert "actor, action, object" in normalized_quality
     assert "relationship the reader must invent" in normalized_quality
     assert "not a new fact-specific editorial rule" in normalized_quality
+    assert "concrete-object test" in normalized_quality
+    assert "grammatically complete yet remain uninformative" in normalized_quality
+    assert "system, deliverable, operation, or change" in normalized_quality
+    assert "not by exact-word matching" in normalized_quality
     assert "Natural voice test" in quality
     assert "Apply a one-point budget" in quality
     assert "normally carry no more than two supporting details" in normalized_quality

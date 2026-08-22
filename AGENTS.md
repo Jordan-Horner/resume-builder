@@ -506,6 +506,12 @@ indexes. The scripts under
   an unstated premise, omitted mechanism, or relationship the reader must
   invent. Treat this as one general review principle, not a reason to create a
   durable personal rule for every sentence-level repair.
+- Apply a concrete-object test as part of that cold read. A grammatically
+  complete noun phrase does not make a claim specific when it merely labels a
+  broad category of work. Require the action's object to identify a
+  decision-relevant system, deliverable, operation, or change clearly enough
+  that the reader can tell what work occurred. Judge the meaning in context;
+  never implement this as exact-word matching or a prohibited-term list.
 - Apply the same contract's natural-voice test before review. Prefer a direct
   clause when a constructed modifier hides how a technology relates to the
   work, and inspect repeated opening verbs across neighboring bullets. Improve
