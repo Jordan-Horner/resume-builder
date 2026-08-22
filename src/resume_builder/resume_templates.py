@@ -100,9 +100,7 @@ def _validate_theme_renderer(renderer: Path, *, require_theme_css: bool = False)
         )
     css_placeholders = template.count(THEME_CSS_PLACEHOLDER)
     if require_theme_css and css_placeholders != 1:
-        raise ValueError(
-            "version 2 resume theme renderer must contain {{THEME_CSS}} exactly once"
-        )
+        raise ValueError("version 2 resume theme renderer must contain {{THEME_CSS}} exactly once")
     if css_placeholders > 1:
         raise ValueError("resume theme renderer contains {{THEME_CSS}} more than once")
     if css_placeholders == 1:
@@ -342,9 +340,7 @@ def template_catalog(project_root: Path) -> dict[str, object]:
     return {"valid": not errors, "templates": items, "errors": errors}
 
 
-def select_catalog_item(
-    catalog: dict[str, object], template_id: str | None
-) -> dict[str, object]:
+def select_catalog_item(catalog: dict[str, object], template_id: str | None) -> dict[str, object]:
     """Filter a template catalog to one content or theme ID when requested."""
     if template_id is None:
         return catalog

@@ -174,9 +174,7 @@ def build_resume(
             "path": relative_output(template_path, project_root),
             "sha256": sha256_file(template_path),
         },
-        "template_composition_sha256": hashlib.sha256(
-            template_text.encode("utf-8")
-        ).hexdigest(),
+        "template_composition_sha256": hashlib.sha256(template_text.encode("utf-8")).hexdigest(),
         "page_format": payload.get("page_format"),
         "synthesis": {
             "path": relative_output(plan.source, project_root),

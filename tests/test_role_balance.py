@@ -70,8 +70,7 @@ def _entry(role_id: str, story_ids: list[str], words: int) -> dict[str, object]:
     return {
         "evidence": [role_id],
         "bullets": [
-            {"story": story_id, "text": "word " * words_per_story}
-            for story_id in story_ids
+            {"story": story_id, "text": "word " * words_per_story} for story_id in story_ids
         ],
     }
 

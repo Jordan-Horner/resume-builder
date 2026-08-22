@@ -74,9 +74,7 @@ def role_balance_diagnostic(
     """Return an advisory allocation diagnosis without changing selected content."""
     method = {
         "comparison": "older visible experience placements against the largest lead allocation",
-        "material_inversion": (
-            "story_surplus >= 2, or story_surplus >= 1 with word_ratio >= 1.75"
-        ),
+        "material_inversion": ("story_surplus >= 2, or story_surplus >= 1 with word_ratio >= 1.75"),
         "automatic_scope": "selected supporting stories declared optional by the role arc",
     }
     if plan.version < 5 or not plan.role_arcs:
@@ -89,9 +87,7 @@ def role_balance_diagnostic(
             "inversions": [],
         }
 
-    arcs_by_story = {
-        story_id: arc for arc in plan.role_arcs for story_id in arc.story_ids
-    }
+    arcs_by_story = {story_id: arc for arc in plan.role_arcs for story_id in arc.story_ids}
     experience = payload.get("experience")
     placements: list[Placement] = [
         placement
@@ -113,9 +109,7 @@ def role_balance_diagnostic(
         lead_placements,
         key=lambda item: (item["story_count"], item["word_count"]),
     )
-    story_by_id: dict[str, SynthesisStory] = {
-        story.story_id: story for story in plan.stories
-    }
+    story_by_id: dict[str, SynthesisStory] = {story.story_id: story for story in plan.stories}
     inversions: list[dict[str, object]] = []
     for older in placements:
         if older["experience_index"] <= reference["experience_index"]:
@@ -128,16 +122,8 @@ def role_balance_diagnostic(
         matching_arcs = {
             arcs_by_story[story_id] for story_id in older_story_ids if story_id in arcs_by_story
         }
-        optional_ids = {
-            story_id
-            for arc in matching_arcs
-            for story_id in arc.optional_story_ids
-        }
-        required_ids = {
-            story_id
-            for arc in matching_arcs
-            for story_id in arc.required_story_ids
-        }
+        optional_ids = {story_id for arc in matching_arcs for story_id in arc.optional_story_ids}
+        required_ids = {story_id for arc in matching_arcs for story_id in arc.required_story_ids}
         auto_candidates = [
             story_id
             for story_id in older_story_ids
@@ -164,16 +150,11 @@ def role_balance_diagnostic(
             remaining_words -= story_word_counts.get(story_id, 0)
             remaining_surplus = remaining_count - reference["story_count"]
             remaining_ratio = remaining_words / max(reference["word_count"], 1)
-            if not (
-                remaining_surplus >= 2
-                or (remaining_surplus >= 1 and remaining_ratio >= 1.75)
-            ):
+            if not (remaining_surplus >= 2 or (remaining_surplus >= 1 and remaining_ratio >= 1.75)):
                 required_reduction = candidate_index
                 break
         resolution = (
-            "reviewer-decision"
-            if len(auto_candidates) >= required_reduction
-            else "user-decision"
+            "reviewer-decision" if len(auto_candidates) >= required_reduction else "user-decision"
         )
         inversions.append(
             {

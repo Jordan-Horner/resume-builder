@@ -200,8 +200,7 @@ def test_version_2_theme_rejects_css_placeholder_outside_style_block(tmp_path: P
     initialize_workspace(target)
     renderer = target / "templates" / "renderers" / "ats-single-column.html"
     renderer.write_text(
-        renderer.read_text(encoding="utf-8").replace("{{THEME_CSS}}", "")
-        + "{{THEME_CSS}}",
+        renderer.read_text(encoding="utf-8").replace("{{THEME_CSS}}", "") + "{{THEME_CSS}}",
         encoding="utf-8",
     )
 
@@ -216,9 +215,7 @@ def test_theme_catalog_reports_builtins_and_workspace_owned_scaffolds(tmp_path: 
 
     catalog = template_catalog(target)
     entries = {
-        (item["kind"], item["id"]): item
-        for item in catalog["templates"]
-        if isinstance(item, dict)
+        (item["kind"], item["id"]): item for item in catalog["templates"] if isinstance(item, dict)
     }
 
     assert created["created"] == [
@@ -342,9 +339,7 @@ def test_template_sync_installs_missing_builtins_without_overwriting_conflicts(
     assert "templates/resume-template.html" in first["conflicts"]
     assert custom.read_text(encoding="utf-8") == "custom legacy renderer\n"
     assert second["installed"] == []
-    assert "templates/resume-templates/technical-skills-first.yaml" in second[
-        "already_present"
-    ]
+    assert "templates/resume-templates/technical-skills-first.yaml" in second["already_present"]
 
 
 def test_repeated_initialize_synchronizes_missing_templates(tmp_path: Path) -> None:
