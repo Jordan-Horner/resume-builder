@@ -1,0 +1,6 @@
+version: 1
+id: technical-skills-first
+section_order: [summary, skills, experience, projects, education, certifications]
+required_sections: [summary, experience, skills]
+optional_sections: [projects, education, certifications]
+forbidden_sections: [competencies]

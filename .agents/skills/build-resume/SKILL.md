@@ -24,6 +24,7 @@ Git tools do not. Never write candidate data into same-named engine folders.
    [feedback memory contract](references/feedback-memory-contract.md), and
    [resume quality contract](references/resume-quality-contract.md), and
    [synthesis contract](references/synthesis-contract.md), and
+   [resume template contract](references/resume-template-contract.md), and
    [regression review](references/regression-review.md). Read the
    [Markdown contract](references/markdown-contract.md) before creating or
    editing resume Markdown. Read the
@@ -91,7 +92,14 @@ Git tools do not. Never write candidate data into same-named engine folders.
    authorship, authority, technology, scope, chronology, metric, relationship,
    or outcome. For a factual change, freeze the resume and follow the factual
    confirmation sequence in the feedback-memory contract before drafting.
-6. For a fresh baseline or substantial rewrite, write the versioned synthesis
+6. For a fresh baseline or substantial rewrite, first select the reusable
+   content template and visual theme under the plan's `resume_template` section.
+   Use `technical-classic` when the user has not expressed another preference:
+   summary, experience, optional projects, education, certifications, and a
+   dedicated Technical Skills section at the bottom; Core Competencies is
+   forbidden. A different named template is a user presentation preference,
+   not permission to change evidence selection, invent content, or impose a
+   fixed bullet count. Then write the versioned synthesis
    plan required by the synthesis contract under
    `resumes/plans/<resume-slug>.yaml`. Plan the target argument, career
    progression, story clusters, distinct bullet jobs, priority and placement,
@@ -218,6 +226,12 @@ Git tools do not. Never write candidate data into same-named engine folders.
    one dominant hiring claim. A secondary action may remain when it functions as
    method, scope, constraint, reliability, or result for that claim; otherwise
    trim it or return a distinct target-relevant accomplishment to the role arc.
+   Before publishing the preview, inspect the compiled role-balance diagnosis.
+   Resolve a material backward allocation internally only through selected
+   supporting stories already declared optional. Never auto-remove a core,
+   required, or previously approved signal. If the preferred correction touches
+   protected content, show the exact tradeoff and wait for the user; do not emit
+   a generic bullet-count warning.
 8. Run `resume-builder synthesis resumes/plans/<resume-slug>.yaml`, then compile
    the current Markdown. Fix hard compiler failures before review. Run
    `resume-builder review route <resume>` to select the hybrid path, then always
@@ -287,9 +301,12 @@ Git tools do not. Never write candidate data into same-named engine folders.
     confirmation question, and a short note that the resume remains unchanged;
     do not add a recommendation or change-log section to the confirmation.
     Obtain confirmation before routing the replacement through `hydrate-vault`.
-    After applying the validated plan, show only the exact `Saved fact`, the
-    factual-verification question, and the unchanged-resume note. Only then discuss
-    whether the story belongs in this resume. If recommending a revision, show
+    After applying the validated plan, compare the stored fact with the exact
+    approved replacement. When they match, show only a concise `Saved` receipt
+    naming the fact, state that it matches the approved version, and include the
+    unchanged-resume note. Do not repeat the fact or ask another verification
+    question. If they differ, show the discrepancy and keep the resume frozen.
+    Then discuss whether the story belongs in this resume. If recommending a revision, show
     only the exact `Current bullet`, exact `Proposed bullet`, and `Update this
     bullet and refresh the preview?`, plus a short note that other affected
     resumes remain unchanged. After approval, return to edit → compile →
@@ -374,6 +391,10 @@ Git tools do not. Never write candidate data into same-named engine folders.
   context; naming something does not explain what it did or why it mattered.
 - Do not force a Core Competencies section. Never treat copied direction labels
   or repeated target vocabulary as proof of fit.
+- Do not improvise section architecture inside a draft. Select a named content
+  template in the synthesis plan and keep its visual theme separate. A
+  Technical Skills inventory must remain in the template's skills section; it
+  must never be relabeled as Core Competencies.
 - Never treat textual difference as proof of improvement. Preserve precise
   supported terminology and judge the new resume by its evidence use, argument,
   progression, prioritization, and clarity.
@@ -415,6 +436,8 @@ Git tools do not. Never write candidate data into same-named engine folders.
   conversational revision sessions, acceptance, scoping, and durable rules.
 - [Synthesis contract](references/synthesis-contract.md) defines the required
   pre-draft story plan, evidence grouping, bullet jobs, and omission record.
+- [Resume template contract](references/resume-template-contract.md) defines
+  named content architectures, visual themes, and controlled exceptions.
 - [Resume quality contract](references/resume-quality-contract.md) defines the
   reusable principles for persuasive, evidence-grounded, iterative resumes.
 - [Regression review](references/regression-review.md) defines the required

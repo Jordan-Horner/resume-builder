@@ -164,6 +164,7 @@ def compile_markdown(markdown: str) -> dict[str, Any]:
     metadata, body = frontmatter(markdown)
     candidate = object_value(metadata.get("candidate"), "candidate")
     section_map = sections(body)
+    source_section_order = list(section_map)
 
     summary, summary_evidence = evidence_text("\n".join(section_map["summary"]), "summary")
     competencies = []
@@ -267,7 +268,7 @@ def compile_markdown(markdown: str) -> dict[str, Any]:
             raise ValueError(f"skills[{index}] requires at least one item")
         skills.append({"category": match.group(1), "items": items, "evidence": ids})
 
-    return {
+    payload = {
         "version": 1,
         "lang": metadata.get("lang", "en"),
         "page_format": metadata.get("page_format", "letter"),
@@ -281,3 +282,9 @@ def compile_markdown(markdown: str) -> dict[str, Any]:
         "certifications": certifications,
         "skills": skills,
     }
+    payload["section_order"] = [
+        section
+        for section in source_section_order
+        if section == "summary" or bool(payload.get(section))
+    ]
+    return payload

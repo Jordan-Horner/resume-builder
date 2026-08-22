@@ -41,11 +41,14 @@ Version 5 adds role arcs that make story
 allocation explicit without imposing a fixed bullet count. The compiler checks
 that every experience story belongs to one arc and reports the planned and used
 stories, distinct jobs, and supported signals intentionally omitted for each
-role placement. Version 6 is the default for new work: it resolves the page
+role placement. Version 6 resolves the page
 budget, separates required role dimensions and stories from optional stories,
 and assigns exact evidence to each claim's action, object, scope, and outcome.
 This prevents one cited fact from lending unsupported authorship or impact to
 another fact in the same bullet.
+Version 7 is the default for new work. It adds a named content template and a
+separate visual theme, making section architecture explicit and reusable while
+leaving evidence selection and role depth in the synthesis plan.
 
 Job-specific tailoring also requires a preserved posting under `targets/`.
 Never overwrite the baseline with the tailored version; Git history preserves

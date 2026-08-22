@@ -118,6 +118,22 @@ def test_grounding_audit_accepts_explicit_authorship(tmp_path: Path) -> None:
     assert result["fact_ids_checked"] == 1
 
 
+def test_grounding_audit_accepts_owned_when_fact_establishes_ownership(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    write_fact(
+        vault,
+        body="Held sole technical ownership and served as maintainer of the application.",
+    )
+    payload = {
+        "summary": "Owned and maintained the application.",
+        "summary_evidence": ["FACT-001"],
+    }
+
+    result = evidence.audit_claims(payload, vault)
+
+    assert result["fact_ids_checked"] == 1
+
+
 def test_grounding_audit_does_not_treat_system_behavior_as_candidate_authorship(
     tmp_path: Path,
 ) -> None:

@@ -309,6 +309,52 @@ page_budget:
     path.write_text(text, encoding="utf-8")
 
 
+def upgrade_to_v7(path: Path) -> None:
+    """Replace the fixture with an explicit content template and visual theme."""
+    upgrade_to_v6(path)
+    templates = path.parents[2] / "templates"
+    content = templates / "resume-templates" / "technical-classic.yaml"
+    content.parent.mkdir(parents=True)
+    content.write_text(
+        """version: 1
+id: technical-classic
+section_order: [summary, experience, projects, education, certifications, skills]
+required_sections: [summary, experience, skills]
+optional_sections: [projects, education, certifications]
+forbidden_sections: [competencies]
+""",
+        encoding="utf-8",
+    )
+    renderer = templates / "resume-template.html"
+    renderer.write_text(
+        "{{LANG}}{{PAGE_SIZE}}{{PAGE_WIDTH}}{{PAGE_MIN_HEIGHT}}{{TITLE}}"
+        "{{HEADER_EVIDENCE}}{{NAME}}{{HEADLINE}}{{CONTACT}}{{PREVIEW_NOTICE}}"
+        "{{REVIEW_ISSUES}}"
+        "{{RESUME_SECTIONS}}",
+        encoding="utf-8",
+    )
+    theme = templates / "themes" / "clean-teal.yaml"
+    theme.parent.mkdir(parents=True)
+    theme.write_text(
+        """version: 1
+id: clean-teal
+renderer: templates/resume-template.html
+""",
+        encoding="utf-8",
+    )
+    text = path.read_text(encoding="utf-8")
+    text = text.replace("version: 6", "version: 7", 1)
+    text = text.replace(
+        "direction: directions/example.md",
+        """direction: directions/example.md
+resume_template:
+  content: technical-classic
+  theme: clean-teal""",
+        1,
+    )
+    path.write_text(text, encoding="utf-8")
+
+
 def test_synthesis_plan_validates_and_audits_compiled_stories(tmp_path: Path) -> None:
     vault, path = project(tmp_path)
     plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
@@ -935,6 +981,93 @@ def test_v6_resolves_page_budget_and_structured_claims(tmp_path: Path) -> None:
     assert plan.stories[0].claim.evidence.fact_ids == ("FACT-001",)
     assert plan.role_arcs[0].required_story_ids == ("operational-improvement",)
     assert plan.role_arcs[0].optional_story_ids == ("supporting-detail",)
+
+
+def test_v7_loads_named_content_template_and_theme(tmp_path: Path) -> None:
+    vault, path = project(tmp_path)
+    upgrade_to_v7(path)
+
+    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+
+    assert plan.resume_template is not None
+    assert plan.resume_template.content.template_id == "technical-classic"
+    assert plan.resume_template.content.section_order[-1] == "skills"
+    assert plan.resume_template.theme.theme_id == "clean-teal"
+
+
+def test_v7_rejects_duplicate_content_template_sections(tmp_path: Path) -> None:
+    vault, path = project(tmp_path)
+    upgrade_to_v7(path)
+    content = tmp_path / "templates" / "resume-templates" / "technical-classic.yaml"
+    content.write_text(
+        content.read_text(encoding="utf-8").replace(
+            "section_order: [summary, experience",
+            "section_order: [summary, summary, experience",
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="section_order must not contain duplicates"):
+        synthesis.load_synthesis_plan(path, tmp_path, vault)
+
+
+@pytest.mark.parametrize(
+    ("renderer", "message"),
+    [
+        (
+            "{{NAME}}{{HEADLINE}}{{CONTACT}}{{PREVIEW_NOTICE}}{{REVIEW_ISSUES}}",
+            "required placeholder exactly once",
+        ),
+        (
+            "{{LANG}}{{PAGE_SIZE}}{{PAGE_WIDTH}}{{PAGE_MIN_HEIGHT}}{{TITLE}}"
+            "{{HEADER_EVIDENCE}}{{NAME}}{{HEADLINE}}{{CONTACT}}{{PREVIEW_NOTICE}}"
+            "{{REVIEW_ISSUES}}"
+            "{{RESUME_SECTIONS}}{{SKILLS_SECTION}}",
+            "legacy section placeholders",
+        ),
+    ],
+)
+def test_v7_rejects_theme_renderer_that_can_omit_or_reorder_sections(
+    tmp_path: Path,
+    renderer: str,
+    message: str,
+) -> None:
+    vault, path = project(tmp_path)
+    upgrade_to_v7(path)
+    (tmp_path / "templates" / "resume-template.html").write_text(renderer, encoding="utf-8")
+
+    with pytest.raises(ValueError, match=message):
+        synthesis.load_synthesis_plan(path, tmp_path, vault)
+
+
+def test_v7_rejects_section_architecture_drift(tmp_path: Path) -> None:
+    vault, path = project(tmp_path)
+    upgrade_to_v7(path)
+    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    payload = {
+        "section_order": ["summary", "skills", "experience"],
+        "summary_evidence": ["FACT-001"],
+        "competencies": [],
+        "experience": [
+            {
+                "evidence": ["ROLE-001"],
+                "bullets": [
+                    {
+                        "text": "Improved operations.",
+                        "evidence": ["FACT-001"],
+                        "story": "operational-improvement",
+                    }
+                ],
+            }
+        ],
+        "projects": [],
+        "education": [],
+        "certifications": [],
+        "skills": [{"category": "Systems", "items": ["Linux"], "evidence": ["FACT-001"]}],
+    }
+
+    with pytest.raises(ValueError, match="section architecture disagrees"):
+        synthesis.audit_synthesis(payload, plan)
 
 
 def test_v6_rejects_page_budget_drift(tmp_path: Path) -> None:

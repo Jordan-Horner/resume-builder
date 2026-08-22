@@ -99,10 +99,13 @@ write candidate evidence into the engine checkout.
    replacement and introduces no new conflict; pause when it differs.
 8. Run `resume-builder plan apply build/hydration-plan.json` only after the plan
    is accepted. Never write canonical facts or employment indexes directly.
-   After applying a conversational factual correction, read back and show the
-   exact stored canonical fact under `Saved fact`, ask `Is this accurate?`, and
-   state that the resume remains unchanged. Keep affected resumes unchanged
-   until the user verifies it.
+   After applying a conversational factual correction, read back the stored
+   fact and compare it with the exact replacement the user approved. When they
+   match, do not repeat the fact or ask another verification question. Show a
+   concise `Saved` receipt naming the fact, state that it matches the approved
+   version, and note that the resume remains unchanged. If the stored content
+   differs or a new conflict appears, show the discrepancy, keep affected
+   resumes unchanged, and ask the user to resolve it.
 9. Run `resume-builder validate --vault-root <repo>/vault --strict` and fix all
    failures. Report warnings without concealing them. If the package is not
    installed, use `scripts/validate_vault.py` as the compatibility entry point.

@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from resume_builder import project_report
+from resume_builder.resume_templates import load_content_template
 from resume_builder.workspace import (
     CommandResult,
     WorkspaceError,
@@ -15,6 +16,7 @@ from resume_builder.workspace import (
     discover_workspace,
     github_repository_from_remote,
     initialize_workspace,
+    sync_workspace_templates,
     workspace_status,
 )
 
@@ -96,6 +98,9 @@ def test_initialize_local_workspace_creates_independent_repository(tmp_path: Pat
     assert (target / "vault" / "vault.json").is_file()
     assert (target / "vault" / "README.md").is_file()
     assert (target / "templates" / "resume-template.html").is_file()
+    assert (target / "templates" / "resume-templates" / "technical-classic.yaml").is_file()
+    assert (target / "templates" / "themes" / "clean-teal.yaml").is_file()
+    assert (target / "templates" / "themes" / "clean-teal.html").is_file()
     assert (target / ".resume-builder.json").is_file()
     assert discover_workspace(tmp_path) == target.resolve()
     outer_status = subprocess.run(
@@ -140,6 +145,21 @@ def test_initialize_workspace_never_seeds_the_fictional_example(tmp_path: Path) 
     assert "Wright Anything Agency" not in visible_text
 
 
+def test_fresh_workspace_installs_both_builtin_content_architectures(tmp_path: Path) -> None:
+    target = tmp_path / "workspace"
+    initialize_workspace(target)
+
+    classic = load_content_template(target, "technical-classic")
+    skills_first = load_content_template(target, "technical-skills-first")
+
+    assert classic.section_order[-1] == "skills"
+    assert skills_first.section_order.index("skills") < skills_first.section_order.index(
+        "experience"
+    )
+    assert "competencies" in classic.forbidden_sections
+    assert "competencies" in skills_first.forbidden_sections
+
+
 def test_fresh_workspace_report_is_getting_started_not_an_operational_failure(
     tmp_path: Path, run_main
 ) -> None:
@@ -165,6 +185,40 @@ def test_initialize_is_idempotent(tmp_path: Path) -> None:
 
     assert first.created is True
     assert second.created is False
+
+
+def test_template_sync_installs_missing_builtins_without_overwriting_conflicts(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "workspace"
+    initialize_workspace(target)
+    missing = target / "templates" / "resume-templates" / "technical-skills-first.yaml"
+    missing.unlink()
+    custom = target / "templates" / "resume-template.html"
+    custom.write_text("custom legacy renderer\n", encoding="utf-8")
+
+    first = sync_workspace_templates(target)
+    second = sync_workspace_templates(target)
+
+    assert "templates/resume-templates/technical-skills-first.yaml" in first["installed"]
+    assert "templates/resume-template.html" in first["conflicts"]
+    assert custom.read_text(encoding="utf-8") == "custom legacy renderer\n"
+    assert second["installed"] == []
+    assert "templates/resume-templates/technical-skills-first.yaml" in second[
+        "already_present"
+    ]
+
+
+def test_repeated_initialize_synchronizes_missing_templates(tmp_path: Path) -> None:
+    target = tmp_path / "workspace"
+    initialize_workspace(target)
+    missing = target / "templates" / "themes" / "clean-teal.html"
+    missing.unlink()
+
+    result = initialize_workspace(target)
+
+    assert result.created is False
+    assert missing.is_file()
 
 
 def test_repeated_initialize_rejects_malformed_workspace_configuration(tmp_path: Path) -> None:

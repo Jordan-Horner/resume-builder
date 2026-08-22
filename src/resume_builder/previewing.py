@@ -145,6 +145,34 @@ def _current_career_review(
     )
 
 
+def _require_resolved_role_balance(
+    resume: Path,
+    project_root: Path,
+    synthesis: dict[str, Any],
+) -> None:
+    """Prevent a direct preview from bypassing a material allocation decision."""
+    diagnostic = synthesis.get("role_balance")
+    if not isinstance(diagnostic, dict) or diagnostic.get("status") not in {
+        "reviewer-decision",
+        "user-decision",
+    }:
+        return
+    try:
+        require_approved_selection_review(project_root, resume)
+    except ValueError as exc:
+        inversions_value = diagnostic.get("inversions")
+        inversions = inversions_value if isinstance(inversions_value, list) else []
+        affected_roles = [
+            item.get("older_role_ids")
+            for item in inversions
+            if isinstance(item, dict)
+        ]
+        raise ValueError(
+            "preview is waiting for the role-balance selection decision for "
+            f"{affected_roles}; run resume-builder verify to review the exact tradeoff"
+        ) from exc
+
+
 def _render_handoff_markdown(presentation: dict[str, Any], artifact_markdown: str) -> str:
     """Render the structured preview handoff for direct presentation."""
     return "\n\n".join(
@@ -242,7 +270,7 @@ def preview_resume(
     *,
     output_base: Path | None = None,
     vault_root: Path = Path("vault"),
-    template: Path = Path("templates/resume-template.html"),
+    template: Path | None = None,
     synthesis_plan: Path | None = None,
     accept_review_risk: bool = False,
     review_risk_note: str | None = None,
@@ -250,7 +278,6 @@ def preview_resume(
     """Compile and publish the current draft for the user's preview/edit loop."""
     project_root = vault_root.expanduser().resolve().parent
     resume_path = contained_project_path(resume, project_root, "resumes", "resume")
-    template_path = contained_project_path(template, project_root, "templates", "template")
     base_argument = output_base or default_resume_output_base(resume_path)
     resolved_base = contained_project_path(base_argument, project_root, "build", "output base")
     if resolved_base.suffix:
@@ -263,6 +290,13 @@ def preview_resume(
         "resumes/plans",
         "synthesis plan",
     )
+    plan = load_synthesis_plan(requested_plan, project_root, project_root / "vault")
+    template_argument = template or (
+        plan.resume_template.theme.renderer
+        if plan.resume_template is not None
+        else Path("templates/resume-template.html")
+    )
+    template_path = contained_project_path(template_argument, project_root, "templates", "template")
     needs_build = False
     try:
         json_path, build_manifest_path, build_manifest = _current_build(
@@ -300,6 +334,7 @@ def preview_resume(
         requested_plan, project_root
     ):
         raise ValueError("preview build uses a different synthesis plan")
+    _require_resolved_role_balance(resume_path, project_root, synthesis)
     language = current_language_review(resume_path, project_root)
     synthesis_record = build_manifest.get("synthesis")
     if not isinstance(synthesis_record, dict) or not isinstance(synthesis_record.get("path"), str):
@@ -441,7 +476,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("resume", type=Path)
     parser.add_argument("--output-base", type=Path)
     parser.add_argument("--vault-root", type=Path, default=Path("vault"))
-    parser.add_argument("--template", type=Path, default=Path("templates/resume-template.html"))
+    parser.add_argument("--template", type=Path)
     parser.add_argument("--synthesis-plan", type=Path)
     parser.add_argument("--accept-review-risk", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--review-risk-note", help=argparse.SUPPRESS)

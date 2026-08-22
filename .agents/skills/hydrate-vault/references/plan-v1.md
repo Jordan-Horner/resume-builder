@@ -36,8 +36,10 @@ Rules:
 - Run `plan validate` and `plan preview` before `plan apply`.
 - For a user-requested correction to an existing fact, present the exact current
   fact and exact proposed replacement before apply. Apply only after explicit
-  confirmation, then read the stored file back and present the exact canonical
-  fact for verification. Keep affected resumes unchanged until verification.
+  confirmation, then read the stored file back and compare it with the approved
+  replacement. When they match, show a concise saved receipt without repeating
+  the fact or requesting another approval. If they differ, show the discrepancy
+  and keep affected resumes unchanged until the user resolves it.
 
 The apply command stages the complete vault, runs strict validation, rechecks
 optimistic hashes, writes atomically, and rolls back if final validation fails.

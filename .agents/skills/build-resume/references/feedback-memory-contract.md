@@ -61,16 +61,18 @@ For a factual change:
    `What changed`, a recommendation, or repeated rationale.
 4. Apply the confirmed answer through `hydrate-vault`; never edit the canonical
    file directly.
-5. Show the exact stored canonical fact and ask the user to verify it. Keep the
-   resume frozen until verification. If corrected, repeat the validated vault
-   change with the newest answer.
-6. After verification, decide separately whether the story should be kept,
+5. Compare the stored canonical fact with the exact replacement the user
+   approved. When they match, factual approval is complete: show a concise
+   `Saved` receipt without repeating the fact or asking another verification
+   question. If they differ or a new conflict appears, show the discrepancy,
+   keep the resume frozen, and resolve it through another validated vault change.
+6. After a matching save, decide separately whether the story should be kept,
    omitted, reframed, or replaced for the current resume. Then resume the normal
    edit → preview loop.
 
 The pre-apply confirmation authorizes the factual replacement. The post-apply
-confirmation verifies what was actually stored. Neither step invokes an
-independent reviewer or restarts the resume review pipeline.
+read-back is an internal equality check, not a second user approval step. It
+invokes no independent reviewer and does not restart the resume review pipeline.
 
 Use this compact confirmation render:
 
@@ -87,18 +89,16 @@ Use this compact confirmation render:
 The resume will remain unchanged.
 ```
 
-After apply, use this compact verification receipt:
+After a matching apply, use this compact receipt:
 
 ```text
-**Saved fact**
-
-> <exact fact read back from the vault>
-
-**Is this accurate?**
+**Saved**
+<fact title> now matches the version you approved.
 The resume remains unchanged.
 ```
 
-After the user verifies the stored fact, make the resume-selection decision
+Do not repeat the stored fact or ask another verification question when the
+read-back matches. After the matching save, make the resume-selection decision
 separately. If the current resume cites the fact and a revision is recommended,
 use this compact impact render:
 

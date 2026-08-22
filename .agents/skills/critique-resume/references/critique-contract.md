@@ -87,6 +87,15 @@ An improvement to this guidance applies the next time changed selection,
 evidence, direction, or target already requires a selection review. It does not
 invalidate a current approved selection record by itself.
 
+Use the package's `role_balance` diagnosis as a bounded allocation prompt. It is
+advisory and must not become a bullet-count quota. Return `strategy-revise` only
+when already-declared optional supporting stories can fully resolve the
+inversion. Return `needs-user-decision` when a preferred correction would touch
+a core, required, or previously approved signal. If approving the flagged
+allocation, explain why the older role's additional space earns a distinct
+target-relevant contribution. Do not send a generic warning to the user when
+the workflow can resolve the issue within approved optionality.
+
 ### Narrative-block language gate
 
 Compilation produces a draft; it never approves prose. Use `resume-builder

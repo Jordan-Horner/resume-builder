@@ -76,6 +76,7 @@ def build_selection_review_package(
     selection: dict[str, Any],
     *,
     manifest: Path,
+    role_balance: dict[str, Any] | None = None,
 ) -> Path:
     """Freeze the complete evidence-selection argument before prose review."""
     paths = selection_review_paths(project_root, resume)
@@ -106,6 +107,12 @@ def build_selection_review_package(
             }
         )
     facts = [_fact_record(fact_id, project_root / "vault") for fact_id in sorted(all_fact_ids)]
+    manifest_data = _load_json(manifest, "compiled build manifest")
+    synthesis_data = manifest_data.get("synthesis")
+    if role_balance is None:
+        role_balance = (
+            synthesis_data.get("role_balance") if isinstance(synthesis_data, dict) else None
+        )
     role_arc_records: list[dict[str, Any]] = [
         {
             "role_ids": list(arc.role_ids),
@@ -174,6 +181,7 @@ def build_selection_review_package(
         "selection": selection,
         "stories": story_records,
         "role_arcs": role_arc_records,
+        "role_balance": role_balance,
         "facts": facts,
         "review_standard": {
             "purpose": (
@@ -190,6 +198,12 @@ def build_selection_review_package(
                 "Require every additional action or accomplishment to strengthen that claim as method, scope, constraint, reliability, or result.",
                 "Do not combine details merely because they share a fact file, role, employer, system, or time period.",
                 "Use strategy-revise when the plan should integrate the relationship more clearly, trim a nonessential detail, or return a distinct target-relevant accomplishment to the role arc.",
+            ],
+            "role_balance_test": [
+                "Inspect any material backward allocation reported by role_balance; raw story counts and word ratios are diagnostics, not a hiring verdict.",
+                "Use strategy-revise when the inversion can be resolved by omitting selected supporting stories already declared optional.",
+                "Use needs-user-decision when the preferred correction would remove, demote, or displace a core, required, or previously approved hiring signal.",
+                "An approved flagged role arc requires a contextual reason that its extra space earns a distinct target-relevant hiring contribution.",
             ],
             "adverse_or_sensitive_context_may_be_selected_only_when": [
                 "the target requires the disclosure",
@@ -347,6 +361,23 @@ def finalize_selection_review(decisions: Path, project_root: Path) -> dict[str, 
         decisions_seen.append(decision)
         if decision != "approved" and not str(item.get("note", "")).strip():
             raise ValueError(f"role-arc decision[{index}] requires a note")
+        role_balance = package.get("role_balance")
+        inversions_value = role_balance.get("inversions") if isinstance(role_balance, dict) else []
+        inversions = inversions_value if isinstance(inversions_value, list) else []
+        flagged_roles = {
+            tuple(inversion.get("older_role_ids", []))
+            for inversion in inversions
+            if isinstance(inversion, dict)
+        }
+        if (
+            decision == "approved"
+            and tuple(item.get("role_ids", [])) in flagged_roles
+            and not str(item.get("note", "")).strip()
+        ):
+            raise ValueError(
+                f"role-arc decision[{index}] approves a role-balance inversion and requires "
+                "a contextual note"
+            )
 
     derived = (
         "needs-user-decision"
@@ -375,6 +406,7 @@ def finalize_selection_review(decisions: Path, project_root: Path) -> dict[str, 
         "stories": raw_stories,
         "exclusions": raw_exclusions,
         "role_arcs": raw_arcs,
+        "role_balance": package.get("role_balance"),
     }
     atomic_write_json(output, record)
     return {"valid": True, "status": derived, "record": output.relative_to(project_root).as_posix()}

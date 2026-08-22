@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections import Counter
+from pathlib import Path
 from typing import Any
 
+from .role_balance import role_balance_diagnostic
 from .synthesis_models import SynthesisPlan, SynthesisStory
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def body_evidence_ids(payload: dict[str, Any]) -> set[str]:
@@ -240,6 +247,27 @@ def audit_synthesis(payload: dict[str, Any], plan: SynthesisPlan) -> dict[str, o
                 "resume competencies section disagrees with synthesis presentation strategy: "
                 f"planned={plan.presentation.competencies}, present={has_competencies}"
             )
+    if plan.resume_template is not None:
+        template = plan.resume_template.content
+        actual_order_value = payload.get("section_order")
+        if not isinstance(actual_order_value, list) or not all(
+            isinstance(item, str) for item in actual_order_value
+        ):
+            raise ValueError("compiled resume must record its section_order")
+        actual_order = list(actual_order_value)
+        actual_sections = set(actual_order)
+        missing_required = sorted(set(template.required_sections) - actual_sections)
+        forbidden_present = sorted(set(template.forbidden_sections) & actual_sections)
+        expected_order = [
+            section for section in template.section_order if section in actual_sections
+        ]
+        if missing_required or forbidden_present or actual_order != expected_order:
+            raise ValueError(
+                "resume section architecture disagrees with selected template: "
+                f"template={template.template_id}, missing_required={missing_required}, "
+                f"forbidden_present={forbidden_present}, expected_order={expected_order}, "
+                f"actual_order={actual_order}"
+            )
     core_story_ids = sorted(story.story_id for story in plan.stories if story.importance == "core")
     supporting_story_ids = sorted(
         story.story_id for story in plan.stories if story.importance == "supporting"
@@ -298,9 +326,36 @@ def audit_synthesis(payload: dict[str, Any], plan: SynthesisPlan) -> dict[str, o
             else None
         ),
         "role_arcs": role_arc_payloads(plan, set(counts)),
+        "role_balance": role_balance_diagnostic(payload, plan),
         "page_budget": (
             {"max_pages": plan.page_budget.max_pages, "source": plan.page_budget.source}
             if plan.page_budget is not None
+            else None
+        ),
+        "resume_template": (
+            {
+                "content": {
+                    "id": plan.resume_template.content.template_id,
+                    "path": plan.resume_template.content.source.relative_to(
+                        plan.source.parents[2]
+                    ).as_posix(),
+                    "sha256": _sha256(plan.resume_template.content.source),
+                },
+                "theme": {
+                    "id": plan.resume_template.theme.theme_id,
+                    "path": plan.resume_template.theme.source.relative_to(
+                        plan.source.parents[2]
+                    ).as_posix(),
+                    "sha256": _sha256(plan.resume_template.theme.source),
+                },
+                "renderer": {
+                    "path": plan.resume_template.theme.renderer.relative_to(
+                        plan.source.parents[2]
+                    ).as_posix(),
+                    "sha256": _sha256(plan.resume_template.theme.renderer),
+                },
+            }
+            if plan.resume_template is not None
             else None
         ),
     }

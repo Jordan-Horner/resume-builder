@@ -37,8 +37,12 @@ The loader accepts all published schema versions so existing Git history remains
   supporting each part. Every role arc separates required stories and
   dimensions from optional stories, and `page_budget` resolves either the
   direction default or an explicit user choice before drafting.
+- **Version 7:** adds the required `resume_template` selection. It names a
+  reusable content architecture and a separate visual theme so section order
+  cannot drift during tailoring and visual preferences cannot change evidence
+  strategy.
 
-Use version 6 for new plans and substantial rewrites. Do not rename the plan or
+Use version 7 for new plans and substantial rewrites. Do not rename the plan or
 resume with a version suffix; the schema field and Git history carry the version.
 
 ## Required plan
@@ -132,6 +136,14 @@ Version 6 also records:
     stories are supporting and may be omitted without making the role arc
     incomplete.
 
+Version 7 also records:
+
+23. **Resume template:** `resume_template.content` names a reusable content
+    template under `templates/resume-templates/`, while
+    `resume_template.theme` names a visual theme under `templates/themes/`.
+    The compiler enforces required, optional, and forbidden sections, visible
+    section order, and the selected theme's renderer.
+
 Every experience story must belong to exactly one role arc and agree with that
 arc's role placement. Every progression role must appear in an arc, at least one
 arc must lead the resume's argument, and arcs marked `compressed` must agree with
@@ -216,6 +228,23 @@ the facts assigned to the action—not by an unrelated fact elsewhere in the
 same citation list. This is structured integrity, not universal semantic
 entailment; the career review still judges whether the complete sentence and
 the declared relationship are truthful, natural, and persuasive.
+
+Compilation also records an advisory role-balance diagnosis for plans with role
+arcs. It compares older visible experience placements with the largest visible
+lead allocation and reports a material inversion when the older placement has
+at least two more stories, or one more story with at least 1.75 times the visible
+word count. These raw measures are transparent review triggers, not quotas or a
+hiring verdict. The diagnostic never fails compilation and never edits prose.
+
+Resolve a flagged inversion inside the workflow before publishing a new
+preview. A selection reviewer may route `strategy-revise` only when the needed
+reduction is fully available from selected `supporting` stories already declared
+optional in that role arc. Never automatically remove, demote, or displace a
+core, required, or previously approved story. When the preferred correction
+would touch that protected content, return `needs-user-decision` and show the
+user the exact story tradeoff. A reviewer may approve a heavier older role only
+with a contextual reason that the extra space earns a distinct target-relevant
+hiring contribution.
 
 ## Composition rules
 
@@ -324,6 +353,7 @@ Do not begin resume prose until the plan shows:
 - a presentation choice that gives each retained section a distinct job;
 - a resolved page budget; and
 - explicit required-versus-optional stories for every role arc.
+- no unexplained material backward allocation across visible role arcs.
 
 If the plan cannot meet those conditions, route the gap to the direction or
 hydration workflow before drafting.

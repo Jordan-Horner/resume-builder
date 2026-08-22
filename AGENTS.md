@@ -210,14 +210,16 @@ indexes. The scripts under
   not add a change log, recommendation section, or repeated rationale to that
   confirmation render. Ask the user to confirm that exact replacement before
   registering the career note or applying a vault change plan.
-- After applying the confirmed vault plan, show the exact stored canonical fact
-  under `Saved fact` and ask the user to verify it. Keep this receipt equally
-  compact and state that the resume remains unchanged. Do not edit an affected
-  resume until
-  that verification. If the user corrects it, keep the resume frozen and route
-  the newest correction through another validated plan. Once verified,
-  separately discuss whether the story should be kept, omitted, reframed, or
-  replaced for the current resume; factual truth does not determine selection.
+- After applying the confirmed vault plan, compare the stored canonical fact
+  with the exact replacement the user approved. When they match, treat factual
+  approval as complete: do not repeat the fact or ask another verification
+  question. Give a compact, customer-friendly `Saved` receipt naming the fact,
+  state that it matches the approved version, and note that the resume remains
+  unchanged. If the stored content differs or a new conflict appears, show the
+  discrepancy, keep the resume frozen, and ask the user to resolve it. After a
+  matching save, separately discuss whether the story should be kept, omitted,
+  reframed, or replaced for the current resume; factual truth does not determine
+  selection.
   When recommending a revision to a currently affected bullet, show only
   `Current bullet`, `Proposed bullet`, and `Update this bullet and refresh the
   preview?` State that other affected resumes remain unchanged. Do not ask the
@@ -341,11 +343,15 @@ indexes. The scripts under
 - Follow `.agents/skills/build-resume/SKILL.md` when generating or changing a
   resume.
 - Before drafting a fresh baseline or substantial rewrite, create the build
-  skill's versioned synthesis plan under `resumes/plans/`. Group facts into coherent career stories,
+  skill's versioned synthesis plan under `resumes/plans/`. Use schema v7 and
+  select a named content template plus a separate visual theme under its
+  `resume_template` section. Keep section architecture independent from
+  evidence selection and bullet allocation. Group facts into coherent career stories,
   assign each proposed bullet a distinct job, preserve supported progression,
   distinguish core stories from optional supporting stories, define the
   summary's job and evidence, and record intentional omissions. For new work,
-  use plan schema v6 to resolve the page budget; declare `direct`, `adjacent`,
+  use plan schema v7 to select the resume template and resolve the page budget;
+  declare `direct`, `adjacent`,
   or `exploratory` targeting,
   the complete concept-fit map, reviewer risks, and the presentation strategy;
   give each story one claim focus and a minimum core evidence set, and treat the
@@ -437,6 +443,15 @@ indexes. The scripts under
   itself justify combination. Approve supporting actions only when they clearly
   strengthen the same claim; otherwise route clearer integration, trimming, or
   a distinct target-relevant story through the existing strategy decision.
+- Treat the compiled role-balance diagnosis as an advisory pre-preview routing
+  signal, not a universal bullet quota or hard build gate. Resolve a material
+  backward allocation automatically only through selected supporting stories
+  already declared optional. Never auto-remove, demote, or displace core,
+  required, or previously approved content. A reviewer may approve the flagged
+  allocation with a contextual reason, route an optional-only correction with
+  `strategy-revise`, or use `needs-user-decision` when the correction requires
+  an exact protected-content tradeoff. Surface only that exact decision to the
+  user, not a generic warning.
 - Improving this reviewer guidance does not by itself invalidate an approved
   selection record. Apply it when a changed selection, plan, direction, target,
   or cited evidence already requires the next selection review.
@@ -457,6 +472,10 @@ indexes. The scripts under
   stock title-plus-years formula or copy direction concept labels into a
   competency section. Core competencies are optional and should exist only when
   they make supported evidence easier to scan.
+- Select section architecture through a named resume content template. Keep its
+  visual theme separate, never relabel a Technical Skills inventory as Core
+  Competencies, and do not let either template layer impose bullet counts or
+  change evidence strategy.
 - Apply the build skill's cold-reader context test to every visible claim.
   Assume the reviewer cannot access internal company context: project, system,
   team, workflow, and process names may identify evidence, but the prose must

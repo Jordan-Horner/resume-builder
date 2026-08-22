@@ -5,6 +5,16 @@ never hand-author final JSON, HTML, or PDF. The Markdown file under `resumes/`
 remains the editable source. Everything under `build/` is disposable. Building
 and minting are separate lifecycle stages.
 
+Version 7 synthesis plans select a named content template and a separate visual
+theme. The content template supplies the compiled `section_order`; the theme
+must retain every required document and print-style placeholder, render exactly
+one of each data-bearing header, preview, and `{{RESUME_SECTIONS}}` placeholder,
+and may not use legacy per-section placeholders or rearrange the section stream.
+The content template, theme definition, and renderer are all hash-pinned
+lifecycle inputs.
+Compile, verify, preview, and mint use the plan-selected theme by default; an
+explicit conflicting `--template` is rejected.
+
 ## Normal command
 
 ```bash

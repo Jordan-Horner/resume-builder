@@ -94,7 +94,9 @@ career record is the foundation; each resume is a focused view of that record.
    agent selects relevant stories and records what it intentionally leaves out.
 3. **Drafts and checks the resume.** It looks for unsupported metrics,
    exaggerated authority, lost accomplishments, weak wording, and missing
-   evidence.
+   evidence. Named content templates keep section architecture explicit, while
+   separately selected visual themes control appearance without changing the
+   career argument.
 4. **Shows you the result.** An independent reviewer always checks new or changed
    resume language. A deeper career-strategist and hiring-manager review runs
    when the resume is competitive but can be positioned more strongly. You

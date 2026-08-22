@@ -101,8 +101,8 @@ def test_skill_uses_preview_and_plan_boundaries() -> None:
     assert "schema-v2.md" in skill
     assert "scope: organization" in skill
     assert "exact current canonical fact" in normalized_skill
-    assert "exact stored canonical fact" in normalized_skill
-    assert "Keep affected resumes unchanged until the user verifies it" in normalized_skill
+    assert "compare it with the exact replacement the user approved" in normalized_skill
+    assert "do not repeat the fact or ask another verification question" in normalized_skill
 
 
 def test_build_resume_skill_routes_and_preserves_work() -> None:
@@ -152,6 +152,9 @@ def test_build_resume_skill_routes_and_preserves_work() -> None:
     assert "do not map one fact mechanically to one bullet" in normalized_skill
     assert "textual difference" in normalized_skill
     assert "Core Competencies as optional" in normalized_skill
+    assert "resume-template-contract.md" in skill_text
+    assert "technical-classic" in skill_text
+    assert "must never be relabeled as Core Competencies" in normalized_skill
     assert "retrieval signals, not preferred wording" in normalized_skill
     assert "`demonstrated`" in skill_text
     assert "`transferable`" in skill_text
@@ -203,7 +206,7 @@ def test_build_resume_skill_routes_and_preserves_work() -> None:
     assert "Classify the change by meaning, not edit size" in normalized_skill
     assert "freeze the resume" in normalized_skill
     assert "no more than two materially useful enrichment questions" in normalized_skill
-    assert "exact `Saved fact`" in normalized_skill
+    assert "concise `Saved` receipt" in normalized_skill
     assert "show only the exact `Current fact`, exact `Proposed fact`" in normalized_skill
     assert "do not add a recommendation or change-log section" in normalized_skill
 
@@ -224,7 +227,7 @@ def test_feedback_contract_separates_wording_edits_from_fact_changes() -> None:
         assert "exact current canonical fact" in text
         assert "exact proposed" in text
         assert "no more than two" in text
-        assert "exact stored" in text
+        assert "matches" in text and "approved" in text
         assert "Keep the resume" in text or "keep the resume" in text
         assert "kept, omitted, reframed, or replaced" in text
         assert "resume remains unchanged" in text
@@ -232,8 +235,9 @@ def test_feedback_contract_separates_wording_edits_from_fact_changes() -> None:
     assert "Do not add `My read`" in contract
     assert "**Current fact**" in contract
     assert "**Proposed fact**" in contract
-    assert "**Saved fact**" in contract
-    assert "**Is this accurate?**" in contract
+    assert "**Saved**" in contract
+    assert "another verification question" in contract
+    assert "**Is this accurate?**" not in contract
     assert "**Current bullet**" in contract
     assert "**Proposed bullet**" in contract
     assert "**Update this bullet and refresh the preview?**" in contract

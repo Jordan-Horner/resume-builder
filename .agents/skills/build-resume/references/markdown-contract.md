@@ -39,6 +39,10 @@ field. Only HTTP(S) URLs are accepted.
 
 ## Sections
 
+For version 7 synthesis plans, include and order these canonical sections
+according to the selected content template. The Markdown source order is
+compiled into `section_order` and validated before rendering.
+
 Use the following level-one headings. `Professional Summary` is required; the
 others are optional and disappear from rendered output when omitted.
 

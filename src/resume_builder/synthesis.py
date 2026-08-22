@@ -34,9 +34,12 @@ from .synthesis_models import (
     ClaimEvidence,
     ClaimSpec,
     ConceptFit,
+    ContentTemplate,
     OmittedRoleSignal,
     PageBudget,
     PresentationStrategy,
+    RenderingTheme,
+    ResumeTemplateSelection,
     ReviewerRisk,
     RoleArc,
     SynthesisPlan,
@@ -56,9 +59,12 @@ __all__ = [
     "ClaimEvidence",
     "ClaimSpec",
     "ConceptFit",
+    "ContentTemplate",
     "OmittedRoleSignal",
     "PageBudget",
     "PresentationStrategy",
+    "RenderingTheme",
+    "ResumeTemplateSelection",
     "ReviewerRisk",
     "RoleArc",
     "SynthesisPlan",
@@ -146,6 +152,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "source": plan.page_budget.source,
                 }
                 if plan.page_budget is not None
+                else None
+            ),
+            "resume_template": (
+                {
+                    "content": plan.resume_template.content.template_id,
+                    "theme": plan.resume_template.theme.theme_id,
+                    "renderer": plan.resume_template.theme.renderer.relative_to(
+                        project_root
+                    ).as_posix(),
+                }
+                if plan.resume_template is not None
                 else None
             ),
             "sha256": sha256_file(plan.source),

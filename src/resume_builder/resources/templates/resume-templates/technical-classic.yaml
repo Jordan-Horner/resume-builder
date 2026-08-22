@@ -1,0 +1,6 @@
+version: 1
+id: technical-classic
+section_order: [summary, experience, projects, education, certifications, skills]
+required_sections: [summary, experience, skills]
+optional_sections: [projects, education, certifications]
+forbidden_sections: [competencies]

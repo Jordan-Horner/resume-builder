@@ -161,7 +161,8 @@ def _cached_receipt(
     review_inputs = receipt.get("review_inputs")
     if not isinstance(review_inputs, dict):
         return None
-    if "selection_case" in review_inputs and not selection_reasons:
+    selection_record = selection_review_paths(project_root, resume)["record"]
+    if "selection_case" in review_inputs and selection_record.is_file():
         return None
     if "selection_review" in review_inputs and selection_reasons:
         return None
@@ -174,7 +175,7 @@ def verify_resume(
     target: Path | None = None,
     baseline: Path | None = None,
     vault_root: Path = Path("vault"),
-    template: Path = Path("templates/resume-template.html"),
+    template: Path | None = None,
     synthesis_plan: Path | None = None,
     refresh: bool = False,
     skip_vault_validation: bool = False,
@@ -183,11 +184,16 @@ def verify_resume(
     resolved_vault = vault_root.expanduser().resolve()
     project_root = resolved_vault.parent
     resume_path = contained_project_path(resume, project_root, "resumes", "resume")
-    template_path = contained_project_path(template, project_root, "templates", "template")
     plan_argument = synthesis_plan or Path("resumes/plans") / f"{resume_path.stem}.yaml"
     plan = load_synthesis_plan(plan_argument, project_root, resolved_vault)
     if plan.resume != resume_path:
         raise ValueError("synthesis plan targets a different resume")
+    template_argument = template or (
+        plan.resume_template.theme.renderer
+        if plan.resume_template is not None
+        else Path("templates/resume-template.html")
+    )
+    template_path = contained_project_path(template_argument, project_root, "templates", "template")
     target_path = project_target_path(target, project_root) if target is not None else None
     baseline_path = (
         contained_project_path(baseline, project_root, "resumes", "baseline")
@@ -201,6 +207,15 @@ def verify_resume(
         "plan": _path_record(plan.source, project_root),
         "direction": _path_record(plan.direction, project_root),
         "template": _path_record(template_path, project_root),
+        "resume_template": (
+            {
+                "content": _path_record(plan.resume_template.content.source, project_root),
+                "theme": _path_record(plan.resume_template.theme.source, project_root),
+                "renderer": _path_record(plan.resume_template.theme.renderer, project_root),
+            }
+            if plan.resume_template is not None
+            else None
+        ),
         "target": _optional_path_record(target_path, project_root),
         "baseline": _optional_path_record(baseline_path, project_root),
         "vault_validation": "skipped" if skip_vault_validation else "strict",
@@ -283,18 +298,38 @@ def verify_resume(
     evidence: dict[str, Any] = evidence_value if isinstance(evidence_value, dict) else {}
     synthesis_value = manifest.get("synthesis")
     synthesis: dict[str, Any] = synthesis_value if isinstance(synthesis_value, dict) else {}
+    role_balance_value = synthesis.get("role_balance")
+    role_balance: dict[str, Any] = (
+        role_balance_value if isinstance(role_balance_value, dict) else {}
+    )
     selection = build_selection(
         plan,
         synthesis,
         target=_optional_path_record(target_path, project_root),
     )
     selection_guard = guard_selection(project_root, resume_path, selection)
+    if (
+        role_balance.get("status") == "reviewer-decision"
+        and selection_guard.get("status") == "selection-preserved"
+    ):
+        role_balance = {
+            **role_balance,
+            "status": "user-decision",
+            "protected_by_reviewed_selection": True,
+            "inversions": [
+                {**item, "resolution": "user-decision"}
+                if isinstance(item, dict)
+                else item
+                for item in role_balance.get("inversions", [])
+            ],
+        }
     selection_package = build_selection_review_package(
         project_root,
         resume_path,
         plan,
         selection,
         manifest=manifest_path,
+        role_balance=role_balance,
     )
     selection_paths = selection_review_paths(project_root, resume_path)
     selection_reasons = selection_review_freshness(selection_paths["record"], project_root)
@@ -335,6 +370,7 @@ def verify_resume(
                 for arc in role_arcs
                 if isinstance(arc, dict)
             ],
+            "role_balance": role_balance,
             "selection_guard": selection_guard,
         },
         "direction": {
@@ -375,7 +411,32 @@ def verify_resume(
     artifact_paths = [manifest_path, payload_path, selection_package]
     if match_result is not None:
         artifact_paths.extend(project_root / path for path in match_result["outputs"])
-    if selection_reasons:
+    review_inputs: dict[str, Any]
+    workflow: dict[str, Any]
+    selection_record: dict[str, Any] | None = None
+    if selection_paths["record"].is_file():
+        selection_record = _load_json(selection_paths["record"], "selection review")
+    if selection_reasons and selection_record is not None and selection_record.get("status") == "needs-user-decision":
+        artifact_paths.append(selection_paths["record"])
+        review_inputs = {
+            "user_decision": {
+                "role_balance": role_balance,
+                "selection_review": _path_record(selection_paths["record"], project_root),
+                "role_arc_decisions": [
+                    item
+                    for item in selection_record.get("role_arcs", [])
+                    if isinstance(item, dict) and item.get("decision") == "needs-user-decision"
+                ],
+            }
+        }
+        workflow = {
+            "state": "awaiting-user-decision",
+            "next_action": (
+                "Show the exact protected-content tradeoff and wait for the user's decision; "
+                "do not publish or revise the resume automatically."
+            ),
+        }
+    elif selection_reasons:
         review_inputs = {
             "selection_case": _path_record(selection_package, project_root),
             "selection_decisions": relative_output(selection_paths["decisions"], project_root),
@@ -437,7 +498,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--target", type=Path)
     parser.add_argument("--baseline", type=Path)
     parser.add_argument("--vault-root", type=Path, default=Path("vault"))
-    parser.add_argument("--template", type=Path, default=Path("templates/resume-template.html"))
+    parser.add_argument("--template", type=Path)
     parser.add_argument("--synthesis-plan", type=Path)
     parser.add_argument("--refresh", action="store_true")
     parser.add_argument("--skip-vault-validation", action="store_true")

@@ -47,7 +47,7 @@ def mint_resume(
     browser: Path | None = None,
     max_pages: int | None = None,
     vault_root: Path = Path("vault"),
-    template: Path = Path("templates/resume-template.html"),
+    template: Path | None = None,
     synthesis_plan: Path | None = None,
     accept_review_risk: bool = False,
 ) -> dict[str, Any]:
@@ -104,8 +104,11 @@ def mint_resume(
         raise ValueError(
             "mint requires the current independent natural-language review to be approved"
         )
-    template_path = contained_project_path(template, project_root, "templates", "template")
     build_template = build_manifest.get("template")
+    if not isinstance(build_template, dict) or not isinstance(build_template.get("path"), str):
+        raise ValueError("mint build rendering template is missing")
+    template_argument = template or Path(build_template["path"])
+    template_path = contained_project_path(template_argument, project_root, "templates", "template")
     if not isinstance(build_template, dict) or build_template.get("path") != relative_output(
         template_path, project_root
     ):
@@ -229,7 +232,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--browser", type=Path)
     parser.add_argument("--max-pages", type=int)
     parser.add_argument("--vault-root", type=Path, default=Path("vault"))
-    parser.add_argument("--template", type=Path, default=Path("templates/resume-template.html"))
+    parser.add_argument("--template", type=Path)
     parser.add_argument("--synthesis-plan", type=Path)
     parser.add_argument("--accept-review-risk", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)

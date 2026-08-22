@@ -105,6 +105,21 @@ def build_manifest_freshness(manifest_path: Path, project_root: Path) -> list[st
         if reason:
             reasons.append(reason)
 
+    synthesis = manifest.get("synthesis")
+    resume_template = synthesis.get("resume_template") if isinstance(synthesis, dict) else None
+    if resume_template is not None:
+        if not isinstance(resume_template, dict):
+            reasons.append("build resume template record is invalid")
+        else:
+            for owner in ("content", "theme", "renderer"):
+                reason = record_freshness(
+                    resume_template.get(owner),
+                    project_root,
+                    f"build resume template {owner}",
+                )
+                if reason:
+                    reasons.append(reason)
+
     outputs = manifest.get("outputs")
     if not isinstance(outputs, list) or not outputs:
         reasons.append("compiled build output inventory is missing")

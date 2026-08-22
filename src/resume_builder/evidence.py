@@ -60,7 +60,9 @@ ASSERTION_VERBS: dict[str, re.Pattern[str]] = {
         r"\b(?:orchestrate|orchestrates|orchestrated|orchestrating)\b", re.IGNORECASE
     ),
     "oversaw": re.compile(r"\b(?:oversee|oversees|oversaw|overseeing)\b", re.IGNORECASE),
-    "owned": re.compile(r"\b(?:own|owns|owned|owning)\b", re.IGNORECASE),
+    "owned": re.compile(
+        r"\b(?:own|owns|owned|owner|ownership|owning)\b", re.IGNORECASE
+    ),
     "spearheaded": re.compile(
         r"\b(?:spearhead|spearheads|spearheaded|spearheading)\b", re.IGNORECASE
     ),

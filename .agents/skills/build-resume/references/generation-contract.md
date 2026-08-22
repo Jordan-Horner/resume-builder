@@ -45,6 +45,11 @@ filenames; Git owns version history.
 
 ## Resume structure
 
+For version 7 plans, the selected named content template is authoritative for
+section inclusion and order. Use the dedicated
+[resume template contract](resume-template-contract.md). The following order is
+legacy guidance for earlier plans, not a substitute for a v7 template choice.
+
 Follow [the canonical Markdown contract](markdown-contract.md); the compiler
 rejects unsupported sections or ungrounded factual blocks rather than silently
 dropping content.

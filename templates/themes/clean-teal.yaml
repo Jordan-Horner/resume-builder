@@ -1,0 +1,3 @@
+version: 1
+id: clean-teal
+renderer: templates/themes/clean-teal.html

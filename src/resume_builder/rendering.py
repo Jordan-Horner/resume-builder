@@ -395,6 +395,29 @@ def render_payload(
         "{{PREVIEW_NOTICE}}": html.escape(preview_notice),
         "{{REVIEW_ISSUES}}": review_panel(issues),
     }
+    section_html = {
+        "summary": replacements["{{SUMMARY_SECTION}}"],
+        "competencies": replacements["{{COMPETENCIES_SECTION}}"],
+        "experience": replacements["{{EXPERIENCE_SECTION}}"],
+        "projects": replacements["{{PROJECTS_SECTION}}"],
+        "education": replacements["{{EDUCATION_SECTION}}"],
+        "certifications": replacements["{{CERTIFICATIONS_SECTION}}"],
+        "skills": replacements["{{SKILLS_SECTION}}"],
+    }
+    raw_section_order = payload.get("section_order")
+    if raw_section_order is None:
+        ordered_section_ids = list(section_html)
+    elif not isinstance(raw_section_order, list) or not all(
+        isinstance(item, str) and item in section_html for item in raw_section_order
+    ):
+        raise ValueError("section_order must contain canonical resume section IDs")
+    else:
+        ordered_section_ids = list(raw_section_order)
+        if len(set(ordered_section_ids)) != len(ordered_section_ids):
+            raise ValueError("section_order must not contain duplicates")
+    replacements["{{RESUME_SECTIONS}}"] = "".join(
+        section_html[section_id] for section_id in ordered_section_ids
+    )
     rendered = template
     for placeholder, replacement in replacements.items():
         rendered = rendered.replace(placeholder, replacement)

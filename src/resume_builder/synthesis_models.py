@@ -15,6 +15,15 @@ COMPETENCY_DECISIONS = {"include", "omit"}
 ROLE_ARC_EMPHASES = {"lead", "supporting", "compressed"}
 CLAIM_COMPOSITIONS = {"single-fact", "same-system", "sequence", "aggregate"}
 PAGE_BUDGET_SOURCES = {"direction-default", "user"}
+RESUME_SECTIONS = {
+    "summary",
+    "competencies",
+    "experience",
+    "projects",
+    "education",
+    "certifications",
+    "skills",
+}
 
 
 @dataclass(frozen=True)
@@ -52,6 +61,35 @@ class PageBudget:
 
     max_pages: int
     source: str
+
+
+@dataclass(frozen=True)
+class ContentTemplate:
+    """Reusable section architecture selected by a synthesis plan."""
+
+    template_id: str
+    source: Path
+    section_order: tuple[str, ...]
+    required_sections: tuple[str, ...]
+    optional_sections: tuple[str, ...]
+    forbidden_sections: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class RenderingTheme:
+    """Reusable visual theme kept separate from content architecture."""
+
+    theme_id: str
+    source: Path
+    renderer: Path
+
+
+@dataclass(frozen=True)
+class ResumeTemplateSelection:
+    """Named content-template and visual-theme choice for one resume."""
+
+    content: ContentTemplate
+    theme: RenderingTheme
 
 
 @dataclass(frozen=True)
@@ -147,3 +185,4 @@ class SynthesisPlan:
     presentation: PresentationStrategy | None = None
     role_arcs: tuple[RoleArc, ...] = ()
     page_budget: PageBudget | None = None
+    resume_template: ResumeTemplateSelection | None = None

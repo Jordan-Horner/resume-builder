@@ -267,6 +267,53 @@ gaps: []
     return vault, resume
 
 
+def upgrade_compilation_project_to_v7(tmp_path: Path) -> None:
+    templates = tmp_path / "templates"
+    content = templates / "resume-templates" / "technical-complete.yaml"
+    content.parent.mkdir(parents=True)
+    content.write_text(
+        """version: 1
+id: technical-complete
+section_order: [summary, competencies, experience, projects, education, certifications, skills]
+required_sections: [summary, experience, skills]
+optional_sections: [competencies, projects, education, certifications]
+forbidden_sections: []
+""",
+        encoding="utf-8",
+    )
+    theme = templates / "themes" / "test-theme.yaml"
+    theme.parent.mkdir(parents=True)
+    renderer = templates / "themes" / "test-theme.html"
+    renderer.write_text(
+        "{{LANG}}{{PAGE_SIZE}}{{PAGE_WIDTH}}{{PAGE_MIN_HEIGHT}}{{TITLE}}"
+        "{{HEADER_EVIDENCE}}{{NAME}}{{HEADLINE}}{{CONTACT}}{{PREVIEW_NOTICE}}"
+        "{{REVIEW_ISSUES}}"
+        "{{RESUME_SECTIONS}}",
+        encoding="utf-8",
+    )
+    theme.write_text(
+        """version: 1
+id: test-theme
+renderer: templates/themes/test-theme.html
+""",
+        encoding="utf-8",
+    )
+    plan = tmp_path / "resumes" / "plans" / "support-operations.yaml"
+    plan.write_text(
+        plan.read_text(encoding="utf-8")
+        .replace("version: 6", "version: 7", 1)
+        .replace(
+            "direction: directions/support-operations.md",
+            """direction: directions/support-operations.md
+resume_template:
+  content: technical-complete
+  theme: test-theme""",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+
 def approve_selection_review(tmp_path: Path, resume: Path) -> Path:
     """Approve the complete non-prose strategy before language review."""
     plan = synthesis.load_synthesis_plan(
@@ -1176,6 +1223,61 @@ def test_new_applicable_open_feedback_invalidates_an_existing_build(tmp_path: Pa
     ]
 
 
+@pytest.mark.parametrize(
+    ("relative", "reason"),
+    [
+        (
+            "templates/resume-templates/technical-complete.yaml",
+            "build resume template content file changed",
+        ),
+        ("templates/themes/test-theme.yaml", "build resume template theme file changed"),
+    ],
+)
+def test_v7_registry_changes_invalidate_builds(
+    tmp_path: Path,
+    relative: str,
+    reason: str,
+) -> None:
+    vault, resume = project(tmp_path)
+    upgrade_compilation_project_to_v7(tmp_path)
+    compilation.build_resume(resume, vault_root=vault)
+    manifest = tmp_path / "build" / "resumes" / "support-operations" / "resume.manifest.json"
+    assert verification.build_manifest_freshness(manifest, tmp_path) == []
+    registry = tmp_path / relative
+    registry.write_text(registry.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+
+    assert reason in verification.build_manifest_freshness(manifest, tmp_path)
+
+
+def test_v7_build_pins_registry_inputs_and_compiled_section_order(tmp_path: Path) -> None:
+    vault, resume = project(tmp_path)
+    upgrade_compilation_project_to_v7(tmp_path)
+
+    compilation.build_resume(resume, vault_root=vault)
+
+    base = tmp_path / "build" / "resumes" / "support-operations" / "resume"
+    manifest = json.loads(base.with_suffix(".manifest.json").read_text(encoding="utf-8"))
+    payload = json.loads(base.with_suffix(".json").read_text(encoding="utf-8"))
+    selected = manifest["synthesis"]["resume_template"]
+    assert selected["content"]["path"] == (
+        "templates/resume-templates/technical-complete.yaml"
+    )
+    assert selected["content"]["sha256"]
+    assert selected["theme"]["path"] == "templates/themes/test-theme.yaml"
+    assert selected["theme"]["sha256"]
+    assert selected["renderer"]["path"] == "templates/themes/test-theme.html"
+    assert selected["renderer"]["sha256"]
+    assert payload["section_order"] == [
+        "summary",
+        "competencies",
+        "experience",
+        "projects",
+        "education",
+        "certifications",
+        "skills",
+    ]
+
+
 def test_verify_caches_checks_and_drives_review_to_published_state(
     tmp_path: Path,
     run_main,
@@ -1308,6 +1410,10 @@ def test_selection_gate_reviews_omitted_candidates_before_creating_language_inpu
         "Do not combine details merely because they share a fact file, role, employer, system, or time period.",
         "Use strategy-revise when the plan should integrate the relationship more clearly, trim a nonessential detail, or return a distinct target-relevant accomplishment to the role arc.",
     ]
+    assert package["role_balance"]["advisory_only"] is True
+    assert package["review_standard"]["role_balance_test"][0].startswith(
+        "Inspect any material backward allocation"
+    )
     decisions = json.loads(
         (tmp_path / first["review_inputs"]["selection_decisions"]).read_text(encoding="utf-8")
     )
@@ -1325,6 +1431,84 @@ def test_rejected_selection_cannot_reach_language_review(tmp_path: Path) -> None
     assert result["status"] == "changes-required"
     with pytest.raises(ValueError, match="selection review is stale or incomplete"):
         review_records.build_review_package(resume, tmp_path)
+
+
+def test_selection_user_decision_returns_exact_workflow_handoff(tmp_path: Path) -> None:
+    vault, resume = project(tmp_path)
+    verification.verify_resume(resume, vault_root=vault, skip_vault_validation=True)
+    paths = selection_review.selection_review_paths(tmp_path, resume)
+    decisions = json.loads(paths["decisions"].read_text(encoding="utf-8"))
+    decisions["reviewer"]["context"] = "Reviewer received only the frozen selection case."
+    decisions["argument"] = {"decision": "approved", "note": "Argument remains coherent."}
+    for item in decisions["stories"]:
+        item["decision"] = "approved"
+        item["note"] = "Appropriate selection."
+    for item in decisions["exclusions"]:
+        item["decision"] = "approved"
+        item["note"] = "Appropriate exclusion."
+    for item in decisions["role_arcs"]:
+        item["decision"] = "needs-user-decision"
+        item["note"] = "Changing this arc would remove a protected hiring signal."
+    decisions["verdict"] = "needs-user-decision"
+    paths["decisions"].write_text(json.dumps(decisions), encoding="utf-8")
+    selection_review.finalize_selection_review(paths["decisions"], tmp_path)
+
+    result = verification.verify_resume(
+        resume,
+        vault_root=vault,
+        skip_vault_validation=True,
+    )
+
+    assert result["state"]["state"] == "awaiting-user-decision"
+    assert set(result["review_inputs"]) == {"user_decision"}
+    assert result["review_inputs"]["user_decision"]["role_arc_decisions"][0][
+        "decision"
+    ] == "needs-user-decision"
+
+
+def test_approved_role_balance_inversion_requires_contextual_note(tmp_path: Path) -> None:
+    vault, resume = project(tmp_path)
+    verification.verify_resume(resume, vault_root=vault, skip_vault_validation=True)
+    paths = selection_review.selection_review_paths(tmp_path, resume)
+    package = json.loads(paths["package"].read_text(encoding="utf-8"))
+    role_ids = package["role_arcs"][0]["role_ids"]
+    package["role_balance"] = {
+        "status": "user-decision",
+        "advisory_only": True,
+        "inversions": [{"older_role_ids": role_ids, "resolution": "user-decision"}],
+    }
+    paths["package"].write_text(json.dumps(package), encoding="utf-8")
+    decisions = json.loads(paths["decisions"].read_text(encoding="utf-8"))
+    decisions["selection_package"]["sha256"] = compilation.sha256_file(paths["package"])
+    decisions["reviewer"]["context"] = "Reviewer received only the frozen selection case."
+    decisions["argument"] = {"decision": "approved", "note": "Argument remains coherent."}
+    for item in decisions["stories"]:
+        item["decision"] = "approved"
+        item["note"] = "Appropriate selection."
+    for item in decisions["exclusions"]:
+        item["decision"] = "approved"
+        item["note"] = "Appropriate exclusion."
+    for item in decisions["role_arcs"]:
+        item["decision"] = "approved"
+        item["note"] = ""
+    decisions["verdict"] = "approved"
+    paths["decisions"].write_text(json.dumps(decisions), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="approves a role-balance inversion"):
+        selection_review.finalize_selection_review(paths["decisions"], tmp_path)
+
+
+def test_preview_cannot_bypass_unresolved_role_balance(tmp_path: Path) -> None:
+    _vault, resume = project(tmp_path)
+    synthesis_record = {
+        "role_balance": {
+            "status": "user-decision",
+            "inversions": [{"older_role_ids": ["ROLE-001"]}],
+        }
+    }
+
+    with pytest.raises(ValueError, match="run resume-builder verify"):
+        previewing._require_resolved_role_balance(resume, tmp_path, synthesis_record)
 
 
 def test_wording_change_does_not_reopen_approved_selection(tmp_path: Path) -> None:

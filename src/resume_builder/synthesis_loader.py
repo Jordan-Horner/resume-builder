@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 
 from .rendering import contained_project_path
+from .resume_templates import load_content_template, load_rendering_theme
 from .synthesis_models import (
     CLAIM_COMPOSITIONS,
     COMPETENCY_DECISIONS,
@@ -23,6 +24,7 @@ from .synthesis_models import (
     OmittedRoleSignal,
     PageBudget,
     PresentationStrategy,
+    ResumeTemplateSelection,
     ReviewerRisk,
     RoleArc,
     SynthesisPlan,
@@ -52,9 +54,9 @@ def load_synthesis_plan(path: Path, project_root: Path, vault_root: Path) -> Syn
     if (
         not isinstance(version, int)
         or isinstance(version, bool)
-        or version not in {1, 2, 3, 4, 5, 6}
+        or version not in {1, 2, 3, 4, 5, 6, 7}
     ):
-        raise ValueError("synthesis plan must declare version 1, 2, 3, 4, 5, or 6")
+        raise ValueError("synthesis plan must declare version 1, 2, 3, 4, 5, 6, or 7")
     fields = {
         "version",
         "resume",
@@ -73,6 +75,8 @@ def load_synthesis_plan(path: Path, project_root: Path, vault_root: Path) -> Syn
         fields.add("role_arcs")
     if version >= 6:
         fields.add("page_budget")
+    if version >= 7:
+        fields.add("resume_template")
     exact_fields(data, fields, "synthesis plan")
 
     resume = contained_project_path(
@@ -110,6 +114,17 @@ def load_synthesis_plan(path: Path, project_root: Path, vault_root: Path) -> Syn
                     f"plan={max_pages}, direction={direction_budget}"
                 )
         page_budget = PageBudget(max_pages=max_pages, source=budget_source)
+
+    resume_template: ResumeTemplateSelection | None = None
+    if version >= 7:
+        raw_template = object_value(data["resume_template"], "synthesis resume_template")
+        exact_fields(raw_template, {"content", "theme"}, "synthesis resume_template")
+        content_id = nonempty_string(raw_template["content"], "synthesis resume_template.content")
+        theme_id = nonempty_string(raw_template["theme"], "synthesis resume_template.theme")
+        resume_template = ResumeTemplateSelection(
+            content=load_content_template(project_root, content_id),
+            theme=load_rendering_theme(project_root, theme_id),
+        )
 
     facts = fact_metadata(vault_root)
     progression = string_list(data["progression"], "synthesis progression")
@@ -494,6 +509,19 @@ def load_synthesis_plan(path: Path, project_root: Path, vault_root: Path) -> Syn
             ),
             compressed_role_ids=tuple(compressed_role_ids),
         )
+        if resume_template is not None:
+            competency_required = "competencies" in resume_template.content.required_sections
+            competency_forbidden = "competencies" in resume_template.content.forbidden_sections
+            if competency_required and competencies != "include":
+                raise ValueError(
+                    "synthesis competencies decision disagrees with resume template: "
+                    "the selected template requires competencies"
+                )
+            if competency_forbidden and competencies != "omit":
+                raise ValueError(
+                    "synthesis competencies decision disagrees with resume template: "
+                    "the selected template forbids competencies"
+                )
 
     if version >= 5:
         assert presentation is not None
@@ -712,4 +740,5 @@ def load_synthesis_plan(path: Path, project_root: Path, vault_root: Path) -> Syn
         presentation=presentation,
         role_arcs=role_arcs,
         page_budget=page_budget,
+        resume_template=resume_template,
     )

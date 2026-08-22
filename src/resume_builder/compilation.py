@@ -96,13 +96,12 @@ def build_resume(
     *,
     output_base: Path | None = None,
     vault_root: Path = Path("vault"),
-    template: Path = Path("templates/resume-template.html"),
+    template: Path | None = None,
     synthesis_plan: Path | None = None,
 ) -> dict[str, Any]:
     """Build validated draft artifacts without creating a release PDF."""
     project_root = vault_root.expanduser().resolve().parent
     resume_path = contained_project_path(resume, project_root, "resumes", "resume")
-    template_path = contained_project_path(template, project_root, "templates", "template")
     base_argument = output_base or default_resume_output_base(resume_path)
     resolved_base = contained_project_path(base_argument, project_root, "build", "output base")
     if resolved_base.suffix:
@@ -115,6 +114,18 @@ def build_resume(
     plan = load_synthesis_plan(plan_argument, project_root, vault_root.resolve())
     if plan.resume != resume_path:
         raise ValueError("synthesis plan targets a different resume")
+    template_argument = template or (
+        plan.resume_template.theme.renderer
+        if plan.resume_template is not None
+        else Path("templates/resume-template.html")
+    )
+    template_path = contained_project_path(template_argument, project_root, "templates", "template")
+    if plan.resume_template is not None and template_path != plan.resume_template.theme.renderer:
+        raise ValueError(
+            "rendering template disagrees with synthesis resume_template theme: "
+            f"planned={relative_output(plan.resume_template.theme.renderer, project_root)}, "
+            f"requested={relative_output(template_path, project_root)}"
+        )
     feedback_snapshot = guidance_snapshot(plan, project_root)
     feedback_rules = feedback_snapshot["guidance"]
     synthesis_audit = audit_synthesis(payload, plan)
@@ -201,7 +212,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("resume", type=Path)
     parser.add_argument("--output-base", type=Path)
     parser.add_argument("--vault-root", type=Path, default=Path("vault"))
-    parser.add_argument("--template", type=Path, default=Path("templates/resume-template.html"))
+    parser.add_argument("--template", type=Path)
     parser.add_argument("--synthesis-plan", type=Path)
     args = parser.parse_args(argv)
     try:

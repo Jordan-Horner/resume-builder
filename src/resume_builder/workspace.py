@@ -9,11 +9,9 @@ import shutil
 import sys
 import tempfile
 from collections.abc import Sequence
-from importlib.resources import files
 from pathlib import Path
 
-from .atomic import atomic_write_json, atomic_write_text
-from .layout import VaultLayout
+from .atomic import atomic_write_json
 from .workspace_state import (
     DEFAULT_VAULT_REPOSITORY_NAME,
     DEFAULT_WORKSPACE,
@@ -32,6 +30,7 @@ from .workspace_state import (
     run_command,
     workspace_status,
 )
+from .workspace_templates import sync_templates, write_workspace_files
 
 __all__ = [
     "CommandResult",
@@ -45,8 +44,18 @@ __all__ = [
     "main",
     "run_command",
     "status_main",
+    "sync_workspace_templates",
     "workspace_status",
 ]
+
+
+def sync_workspace_templates(root: Path) -> dict[str, object]:
+    """Install missing built-ins without overwriting workspace-owned templates."""
+    resolved = root.expanduser().resolve()
+    if not (resolved / WORKSPACE_CONFIG).is_file():
+        raise WorkspaceError(f"workspace configuration is missing: {resolved}")
+    _load_workspace_configuration(resolved / WORKSPACE_CONFIG)
+    return sync_templates(resolved)
 
 
 def _require_success(result: CommandResult, action: str) -> None:
@@ -128,56 +137,6 @@ def _load_workspace_configuration(path: Path) -> dict[str, object]:
             "workspace configuration with GitHub backup requires git.github_repository"
         )
     return raw
-
-
-def _write_workspace_files(
-    root: Path,
-    *,
-    backup: str,
-    github_repository: str | None,
-) -> None:
-    atomic_write_json(
-        root / WORKSPACE_CONFIG,
-        _workspace_configuration(backup, github_repository),
-    )
-    atomic_write_text(
-        root / ".gitignore",
-        "/build/\n*.db\n*.docx\n*.pdf\n*.sqlite\n*.sqlite3\n.DS_Store\n",
-    )
-    atomic_write_text(
-        root / "README.md",
-        "# Private Resume Builder Workspace\n\n"
-        "This repository contains private career information. Keep every remote private.\n"
-        "Local Git history is not an off-device backup.\n\n"
-        "## Where to find finished resumes\n\n"
-        "Use `exports/resumes/` for PDFs that are ready to upload with job applications.\n"
-        "Targeting context stays in the folder name, while the PDF itself uses a neutral\n"
-        "filename such as `<candidate-name>-Resume.pdf`.\n\n"
-        "The ignored `build/` directory contains internal previews, manifests, reviews,\n"
-        "diagnostics, and audited working files. You normally do not need to open it.\n\n"
-        "Canonical career facts and editable resume sources remain under `vault/` and\n"
-        "`resumes/`. Files under `exports/` and `build/` can be regenerated from those\n"
-        "sources.\n",
-    )
-    VaultLayout.load(root / "vault", allow_missing=True).initialize()
-    workspace_resources = files("resume_builder.resources").joinpath("workspace")
-    for directory in ("vault", "resumes", "directions", "targets", "editorial", "exports"):
-        readme = workspace_resources.joinpath(directory).joinpath("README.md")
-        atomic_write_text(root / directory / "README.md", readme.read_text(encoding="utf-8"))
-    for directory in (
-        "resumes/baselines",
-        "resumes/plans",
-        "resumes/tailored",
-        "editorial/rules",
-    ):
-        atomic_write_text(root / directory / ".gitkeep", "")
-    template = (
-        files("resume_builder.resources").joinpath("templates").joinpath("resume-template.html")
-    )
-    atomic_write_text(
-        root / "templates" / "resume-template.html",
-        template.read_text(encoding="utf-8"),
-    )
 
 
 def _create_initial_commit(root: Path, runner: Runner) -> bool:
@@ -265,6 +224,7 @@ def initialize_workspace(
     config_path = resolved / WORKSPACE_CONFIG
     if config_path.is_file() and _is_git_repository(resolved, runner):
         _load_workspace_configuration(config_path)
+        sync_workspace_templates(resolved)
         actual_backup, remote, actual_repository = _remote_privacy(resolved, runner=runner)
         if actual_backup == "public":
             raise WorkspaceError(
@@ -288,10 +248,9 @@ def initialize_workspace(
         tempfile.mkdtemp(prefix=f".{resolved.name}.resume-builder-init-", dir=resolved.parent)
     )
     try:
-        _write_workspace_files(
+        write_workspace_files(
             temporary,
-            backup=backup,
-            github_repository=github_repository,
+            _workspace_configuration(backup, github_repository),
         )
         _require_success(runner(("git", "init", "-b", "main"), temporary), "initializing local Git")
         if git_name is not None and git_email is not None:
@@ -365,6 +324,7 @@ def connect_existing_workspace(
             config_path,
             _workspace_configuration(backup, github_repository),
         )
+    sync_workspace_templates(resolved)
     committed = runner(("git", "rev-parse", "--verify", "HEAD"), resolved).returncode == 0
     return WorkspaceInitResult(resolved, False, committed, backup, github_repository)
 
@@ -375,9 +335,21 @@ def status_main(argv: Sequence[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="action", required=True)
     show = subparsers.add_parser("show", help="Show the active private workspace")
     show.add_argument("--workspace", type=Path)
+    sync = subparsers.add_parser("templates", help="Manage built-in resume templates")
+    sync_subparsers = sync.add_subparsers(dest="template_action", required=True)
+    sync_templates = sync_subparsers.add_parser(
+        "sync", help="Install missing built-ins without overwriting custom files"
+    )
+    sync_templates.add_argument("--workspace", type=Path)
     args = parser.parse_args(argv)
     try:
-        result = workspace_status(args.workspace)
+        if args.action == "show":
+            result = workspace_status(args.workspace)
+        else:
+            target = args.workspace or discover_workspace()
+            if target is None:
+                raise WorkspaceError("no Resume Builder workspace is configured")
+            result = sync_workspace_templates(target)
     except (OSError, ValueError, WorkspaceError, json.JSONDecodeError) as exc:
         print(json.dumps({"error": str(exc)}, indent=2), file=sys.stderr)
         return 1
