@@ -18,6 +18,21 @@ from .review_schema import sha256_text
 LANGUAGE_REVIEW_METHOD = "independent-cold-review"
 LANGUAGE_REVIEW_STATUSES = {"approved", "changes-required"}
 LANGUAGE_BLOCK_DECISIONS = {"approved", "revise"}
+LANGUAGE_REVIEW_STANDARD = {
+    "version": 1,
+    "context_test": (
+        "Can a reviewer identify the actor, action, object, and why the claim matters "
+        "using only the visible block and its supplied context?"
+    ),
+    "unstated_premise_rule": (
+        "Reject prose when its central meaning depends on an unstated premise, omitted "
+        "mechanism, unexplained internal name, or relationship the reader must invent."
+    ),
+    "boundary": (
+        "Apply this as contextual judgment, not a banned-term list or a requirement to "
+        "explain every implementation detail."
+    ),
+}
 
 
 def language_review_paths(project_root: Path, resume: Path) -> dict[str, Path]:
@@ -157,6 +172,7 @@ def prepare_language_review(
         "target": target_record,
         "target_text": target_path.read_text(encoding="utf-8") if target_path is not None else None,
         "scope": "changed-narrative-prose" if prior_record is not None else "all-narrative-prose",
+        "review_standard": LANGUAGE_REVIEW_STANDARD,
         "blocks": [
             {
                 "id": block.id,

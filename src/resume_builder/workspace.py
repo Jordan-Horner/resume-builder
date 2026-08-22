@@ -12,6 +12,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from .atomic import atomic_write_json
+from .resume_templates import scaffold_template, select_catalog_item, template_catalog
 from .workspace_state import (
     DEFAULT_VAULT_REPOSITORY_NAME,
     DEFAULT_WORKSPACE,
@@ -341,6 +342,21 @@ def status_main(argv: Sequence[str] | None = None) -> int:
         "sync", help="Install missing built-ins without overwriting custom files"
     )
     sync_templates.add_argument("--workspace", type=Path)
+    list_templates = sync_subparsers.add_parser(
+        "list", help="List content templates and visual themes"
+    )
+    list_templates.add_argument("--workspace", type=Path)
+    validate_templates = sync_subparsers.add_parser(
+        "validate", help="Validate all templates or one template ID"
+    )
+    validate_templates.add_argument("template_id", nargs="?")
+    validate_templates.add_argument("--workspace", type=Path)
+    scaffold = sync_subparsers.add_parser(
+        "scaffold", help="Create a workspace-owned version-2 template"
+    )
+    scaffold.add_argument("kind", choices=("content", "theme"))
+    scaffold.add_argument("template_id")
+    scaffold.add_argument("--workspace", type=Path)
     args = parser.parse_args(argv)
     try:
         if args.action == "show":
@@ -349,7 +365,16 @@ def status_main(argv: Sequence[str] | None = None) -> int:
             target = args.workspace or discover_workspace()
             if target is None:
                 raise WorkspaceError("no Resume Builder workspace is configured")
-            result = sync_workspace_templates(target)
+            if args.template_action == "sync":
+                result = sync_workspace_templates(target)
+            elif args.template_action in {"list", "validate"}:
+                result = select_catalog_item(
+                    template_catalog(target), getattr(args, "template_id", None)
+                )
+                if args.template_action == "validate" and result["valid"] is not True:
+                    raise ValueError(f"template validation failed: {result['errors']}")
+            else:
+                result = scaffold_template(target, args.kind, args.template_id)
     except (OSError, ValueError, WorkspaceError, json.JSONDecodeError) as exc:
         print(json.dumps({"error": str(exc)}, indent=2), file=sys.stderr)
         return 1

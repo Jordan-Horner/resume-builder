@@ -1,0 +1,20 @@
+:root {
+  --ink: #111111;
+  --text: #1c1c1c;
+  --muted: #555555;
+  --line: #b8b8b8;
+  --accent: #222222;
+  --accent-dark: #222222;
+  --secondary: #333333;
+  --tag-bg: #f5f5f5;
+}
+
+.header-rule {
+  background: var(--ink);
+  height: 1px;
+}
+
+.section-title {
+  border-bottom-width: 1px;
+  letter-spacing: 0.045em;
+}

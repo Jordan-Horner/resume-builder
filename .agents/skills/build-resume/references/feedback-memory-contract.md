@@ -4,10 +4,43 @@ Use feedback memory when the user asks to edit, replace, shorten, remove, or
 reframe visible resume prose, or says that wording is inaccurate, unnatural, or
 otherwise undesirable.
 
-## Two-stage lifecycle
+## Semantic drafting gate
 
-1. Record every explicit correction as a temporary session before editing the
-   resume. Pass the returned session ID when the user corrects the replacement;
+Interpret the user's meaning before treating feedback as authorization to edit.
+Use three semantic states:
+
+- **Exploring:** the user rejects, doubts, questions, or remains tentative about
+  the whole sentence or its meaning. Keep all candidate wording in conversation.
+  Identify the intended hiring message and offer three to five materially
+  different alternatives. Do not record feedback, write files, compile, invoke
+  reviewers, or refresh the preview.
+- **Needs factual clarification:** the requested wording may change authorship,
+  authority, technology, scope, chronology, metric, relationship, or outcome,
+  and the canonical evidence does not settle the boundary. Inspect evidence
+  read-only and ask only the narrow factual question needed to continue. Do not
+  use a stronger alternative until its claim is supported.
+- **Ready to apply:** the user unambiguously selects or supplies the wording to
+  use. A clear reference to one offered alternative is authorization; proceed
+  without another confirmation. Only now record the feedback session and begin the
+  edit, language-review, and preview workflow.
+
+Store the selected candidate as data, not as a fourth workflow state. Semantic
+intent controls the transition; do not depend on a hardcoded list of rejection
+or approval phrases. Mixed or tentative signals remain `exploring`, including a
+complete user-written sentence that they still describe as unfinished. When in
+doubt, continue conversational drafting without repository actions.
+
+Before offering alternatives, perform a read-only factual preflight against the
+current canonical fact and supported claim boundary. This protects verbs and
+scope without turning ordinary wording dissatisfaction into a hydration or
+review workflow. Alternatives must differ in emphasis or sentence strategy,
+not merely rotate synonyms.
+
+## Persisted lifecycle
+
+1. After the semantic drafting gate reaches `ready to apply`, record the chosen
+   correction as a temporary session before editing the resume. Pass the
+   returned session ID when the user later corrects the applied replacement;
    the newest revision replaces earlier interpretations even when the agent
    corrects its kind or scope.
 2. Build and preview with the latest applicable open revisions plus accepted
@@ -33,6 +66,7 @@ approval, or minting alone.
 
 After recording, give the command's one-line receipt to the user without asking
 another approval question. It lets the user catch a misunderstood instruction.
+Never issue this receipt while candidate wording is still being explored.
 
 ## Meaning-change routing
 

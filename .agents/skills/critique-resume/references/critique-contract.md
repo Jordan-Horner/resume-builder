@@ -144,9 +144,11 @@ string. Use the context supplied by the cold-read package and apply all four tes
    necessary qualification? If not, remove them.
 3. **Neighbor test:** Does the block duplicate the claim or setup of an adjacent
    bullet instead of contributing a distinct reason to interview the candidate?
-4. **Cold-reader-in-context test:** Can a reviewer understand the actor, action,
-   and value using only the visible resume context, without the writer's plan or
-   internal rationale?
+4. **Cold-reader-in-context test:** Can a reviewer identify the actor, action,
+   object or problem, and value using only the visible resume context, without
+   the writer's plan or internal rationale? Reject the block when its central
+   meaning depends on an unstated premise, omitted mechanism, unexplained
+   internal name, or relationship the reader must invent.
 
 Record a provisional decision from that cold read before consulting synthesis
 notes or builder rationale. Later evidence verification may preserve wording

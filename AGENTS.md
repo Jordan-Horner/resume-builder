@@ -190,8 +190,19 @@ indexes. The scripts under
   reason for an earlier manual edit.
 - Treat a request to edit, replace, shorten, remove, or reframe visible resume
   prose—and any statement that wording is inaccurate, awkward, unnatural, or
-  undesirable—as a feedback-memory trigger. Do not skip capture because the
-  requested edit looks small or the replacement wording seems obvious.
+  undesirable—as a semantic drafting trigger. If the user is rejecting,
+  questioning, or remaining tentative about the whole sentence, stay in
+  conversation: inspect factual support read-only, identify the intended hiring
+  message, and offer three to five materially different alternatives. Do not
+  record feedback, write files, compile, invoke reviewers, or refresh the
+  preview while wording remains exploratory. Detect this by meaning rather than
+  a fixed phrase list. A complete proposed sentence remains exploratory when
+  the user signals it is unfinished.
+- Begin feedback capture and repository actions only when the user
+  unambiguously selects or supplies wording to apply. A clear selection of an
+  offered alternative authorizes the edit without another confirmation. When
+  factual support is genuinely ambiguous, ask only the narrow factual question
+  needed; otherwise do not turn dissatisfaction into a confirmation loop.
 - Classify the change by meaning: whether it changes the claim's truth
   conditions, not by word count. A wording-only change preserves the supported
   action, authorship, authority, technology, scope, chronology, metric,
@@ -480,7 +491,10 @@ indexes. The scripts under
   Assume the reviewer cannot access internal company context: project, system,
   team, workflow, and process names may identify evidence, but the prose must
   explain the relevant problem, function, audience, scale, or value without
-  depending on those names.
+  depending on those names. Reject a block when its central meaning depends on
+  an unstated premise, omitted mechanism, or relationship the reader must
+  invent. Treat this as one general review principle, not a reason to create a
+  durable personal rule for every sentence-level repair.
 - Apply the same contract's natural-voice test before review. Prefer a direct
   clause when a constructed modifier hides how a technology relates to the
   work, and inspect repeated opening verbs across neighboring bullets. Improve

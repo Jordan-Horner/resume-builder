@@ -110,6 +110,14 @@ career record is the foundation; each resume is a focused view of that record.
    previews, and diagnostics stay grouped under
    `build/resumes/<resume-slug>/`.
 
+Resume presentation is extensible without forking the resume workflow. Content
+templates control allowed sections and their order; visual themes control only
+typography, color, spacing, and print styling. Workspaces include a compatible
+default and an alternate conservative theme. Use
+`resume-builder workspace templates list` to inspect them,
+`resume-builder workspace templates scaffold theme <id>` to create a custom
+theme, and `resume-builder workspace templates validate` before using it.
+
 If a draft is weak, the agent checks your saved career evidence and imported
 sources before asking a question. It asks only focused questions that could
 materially improve the resume; it does not ask you to repeat information it
@@ -160,6 +168,10 @@ earlier commits.
   mint request approves the current
   preview; mint then performs the hard source, evidence, page, rendering, and
   PDF-extraction checks.
+- **Drafting stays conversational until wording is chosen.** If you reject or
+  question a sentence, the agent proposes distinct alternatives without
+  starting build and review work. Once you select one, only the changed language
+  is reviewed; unchanged strategy and hiring judgments carry forward.
 
 These safeguards do not predict an employer's decision or produce a universal ATS
 score. They make the resume easier to verify, revise, and defend.

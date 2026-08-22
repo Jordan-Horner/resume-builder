@@ -9,8 +9,9 @@ independent layers:
    the order of every visible section. Version 1 keeps canonical ATS-safe
    section headings fixed.
 2. A **visual theme** under `templates/themes/<id>.yaml` identifies an HTML
-   renderer under `templates/`. It controls typography, color, spacing, and
-   print behavior. A registered theme must contain every required document and
+   renderer under `templates/`. Version 2 themes also identify a self-contained
+   CSS file. A theme controls typography, color, spacing, and print behavior. A
+   registered theme must contain every required document and
    print-style placeholder, exactly one of each data-bearing header, preview,
    and `{{RESUME_SECTIONS}}` placeholder, and no legacy per-section placeholders,
    so it cannot discard resume data or choose a new content hierarchy.
@@ -39,6 +40,26 @@ same allowed sections as `technical-classic`, but places Technical Skills after
 the summary and before experience. It does not convert skills into competency
 labels.
 
+## Visual theme versions
+
+- Version 1 themes point directly to a complete HTML renderer and remain valid
+  for existing workspaces.
+- Version 2 themes declare `display_name`, `description`, `category`, a shared
+  `renderer`, and a local `stylesheet`. Their renderer must contain exactly one
+  `{{THEME_CSS}}` placeholder. Composition occurs before rendering and leaves no
+  unresolved theme placeholder.
+- Built-in `clean-teal` preserves the established default presentation.
+  Built-in `minimal-black` demonstrates a second conservative style on the
+  shared ATS single-column renderer.
+- Theme stylesheets must be local and self-contained. Remote imports,
+  `url(...)`, scripts, images, and text that can close the renderer's style tag
+  are outside this contract.
+
+Manage the registry with `resume-builder workspace templates list`,
+`validate`, `scaffold`, and `sync`. Scaffolding creates version 2
+workspace-owned files and never overwrites existing files. Sync recursively
+installs missing built-ins and never overwrites workspace-owned files.
+
 ## Boundaries
 
 - Content templates control section presence and order. Version 1 uses fixed
@@ -64,5 +85,6 @@ labels.
 Compilation rejects missing required sections, forbidden sections, section
 order drift, a competency decision that conflicts with the selected content
 template, or a renderer that conflicts with the selected theme.
-The build manifest pins the content-template YAML, theme YAML, and renderer
-HTML. Changing any one invalidates the build and its dependent reviews.
+The build manifest pins the content-template YAML, theme YAML, renderer HTML,
+optional stylesheet, and final composed-theme digest. Changing any one
+invalidates the build and its dependent reviews.

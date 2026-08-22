@@ -244,6 +244,28 @@ def test_feedback_contract_separates_wording_edits_from_fact_changes() -> None:
     assert "Other affected resumes will remain unchanged" in contract
 
 
+def test_feedback_contract_keeps_uncertain_sentence_drafting_conversational() -> None:
+    agents = " ".join((ROOT / "AGENTS.md").read_text(encoding="utf-8").split())
+    skill = " ".join((BUILD_SKILL / "SKILL.md").read_text(encoding="utf-8").split())
+    contract = " ".join(
+        (BUILD_SKILL / "references" / "feedback-memory-contract.md")
+        .read_text(encoding="utf-8")
+        .split()
+    )
+
+    for text in (agents, skill, contract):
+        assert "three to five materially different alternatives" in text
+        assert "read-only" in text
+        assert "Do not record" in text or "do not record" in text
+        assert "meaning" in text
+    assert "Exploring" in contract
+    assert "Needs factual clarification" in contract
+    assert "Ready to apply" in contract
+    assert "not as a fourth workflow state" in contract
+    assert "hardcoded list" in contract
+    assert "without another confirmation" in contract
+
+
 def test_critique_skill_owns_mandatory_editorial_approval_and_is_non_mutating() -> None:
     skill_text = (CRITIQUE_SKILL / "SKILL.md").read_text(encoding="utf-8")
     normalized_skill = " ".join(skill_text.split())
@@ -321,6 +343,8 @@ def test_critique_skill_owns_mandatory_editorial_approval_and_is_non_mutating() 
     assert "Opening-removal test" in contract
     assert "Neighbor test" in contract
     assert "Cold-reader-in-context test" in contract
+    assert "unstated premise" in normalized_contract
+    assert "relationship the reader must invent" in normalized_contract
     assert "Role-arc completeness" in contract
     assert "dominant-claim and strategic-relationship" in normalized_contract
     assert "factual compatibility alone does not justify" in normalized_skill
@@ -612,6 +636,10 @@ def test_resume_quality_contract_teaches_principles_not_copywriting() -> None:
     assert "reviewer sees only the resume" in normalized_quality
     assert "must not carry the sentence's meaning" in normalized_quality
     assert "problem, function, audience, scale, or value" in normalized_quality
+    assert "unstated-premise test" in normalized_quality
+    assert "actor, action, object" in normalized_quality
+    assert "relationship the reader must invent" in normalized_quality
+    assert "not a new fact-specific editorial rule" in normalized_quality
     assert "Natural voice test" in quality
     assert "Apply a one-point budget" in quality
     assert "normally carry no more than two supporting details" in normalized_quality

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from collections.abc import Sequence
@@ -18,10 +19,16 @@ from .atomic import atomic_write_json, atomic_write_text
 from .compilation import build_resume, relative_output, sha256_file
 from .language_review import current_language_review
 from .rendering import contained_project_path, known_fact_ids, load_payload, render_payload
-from .review_approval import review_freshness
+from .resume_templates import rendering_theme_text
+from .review_approval import carried_career_review, review_freshness
 from .review_policy import hybrid_review_route
 from .review_schema import load_review_record
-from .selection_review import require_approved_selection_review
+from .selection_guard import build_selection
+from .selection_review import (
+    require_approved_selection_review,
+    selection_review_paths,
+    selection_strategy_digest,
+)
 from .synthesis import load_synthesis_plan
 
 APPROVED_NOTICE = "Language reviewed · Edit or mint when ready"
@@ -87,62 +94,76 @@ def _current_career_review(
     resume: Path,
     project_root: Path,
     language: dict[str, Any],
-) -> tuple[str, str, dict[str, str] | None]:
+    selection: dict[str, Any],
+    strategy_sha256: str,
+) -> tuple[str, str, dict[str, Any] | None]:
     """Return only a current review that satisfies the hybrid deep-review contract."""
     path = project_root / "build" / "reviews" / f"{resume.stem}.json"
-    if not path.is_file():
-        return "not-reviewed", "not-reviewed", None
-    try:
-        record = load_review_record(path, project_root)
-    except ValueError:
-        return "not-reviewed", "not-reviewed", None
-    if (
-        record.resume.path != resume.resolve()
-        or record.version not in {4, 5}
-        or record.reviewer_method != "independent-cold-review"
-        or record.evidence_status != "claim-checked"
-        or record.editorial_status != "approved"
-        or record.build_manifest is None
-        or record.cold_read is None
-        or record.review_package is None
-        or (record.version >= 5 and record.feedback_status != "approved")
-        or review_freshness(record)
-    ):
-        return "not-reviewed", "not-reviewed", None
-    if record.version == 4:
+    if path.is_file():
         try:
-            build = json.loads(record.build_manifest.path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return "not-reviewed", "not-reviewed", None
-        memory = build.get("feedback_memory") if isinstance(build, dict) else None
-        rules = memory.get("rules") if isinstance(memory, dict) else None
-        if isinstance(rules, list) and rules:
-            return "not-reviewed", "not-reviewed", None
-    try:
-        package = json.loads(record.review_package.path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return "not-reviewed", "not-reviewed", None
-    expected_language = {
-        "path": relative_output(language["path"], project_root),
-        "sha256": language["sha256"],
-    }
-    if not isinstance(package, dict) or package.get("language_review") != expected_language:
-        return "not-reviewed", "not-reviewed", None
-    try:
-        require_approved_selection_review(project_root, resume)
-    except ValueError:
-        return "not-reviewed", "not-reviewed", None
-    return (
-        record.hiring_read,
-        record.verdict,
-        {
-            "path": relative_output(path, project_root),
-            "sha256": sha256_file(path),
-            "verdict": record.verdict,
-            "hiring_read": record.hiring_read,
-            "next_action": record.next_summary,
-        },
+            record = load_review_record(path, project_root)
+        except ValueError:
+            record = None
+        if record is not None and not (
+            record.resume.path != resume.resolve()
+            or record.version not in {4, 5}
+            or record.reviewer_method != "independent-cold-review"
+            or record.evidence_status != "claim-checked"
+            or record.editorial_status != "approved"
+            or record.build_manifest is None
+            or record.cold_read is None
+            or record.review_package is None
+            or (record.version >= 5 and record.feedback_status != "approved")
+            or review_freshness(record)
+        ):
+            legacy_feedback_conflict = False
+            if record.version == 4:
+                try:
+                    build = json.loads(record.build_manifest.path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    legacy_feedback_conflict = True
+                else:
+                    memory = build.get("feedback_memory") if isinstance(build, dict) else None
+                    rules = memory.get("rules") if isinstance(memory, dict) else None
+                    legacy_feedback_conflict = isinstance(rules, list) and bool(rules)
+            if not legacy_feedback_conflict:
+                try:
+                    package = json.loads(record.review_package.path.read_text(encoding="utf-8"))
+                    require_approved_selection_review(
+                        project_root,
+                        resume,
+                        strategy_sha256=strategy_sha256,
+                    )
+                except (OSError, json.JSONDecodeError, ValueError):
+                    package = None
+                expected_language = {
+                    "path": relative_output(language["path"], project_root),
+                    "sha256": language["sha256"],
+                }
+                if (
+                    isinstance(package, dict)
+                    and package.get("language_review") == expected_language
+                ):
+                    return (
+                        record.hiring_read,
+                        record.verdict,
+                        {
+                            "path": relative_output(path, project_root),
+                            "sha256": sha256_file(path),
+                            "verdict": record.verdict,
+                            "hiring_read": record.hiring_read,
+                            "next_action": record.next_summary,
+                        },
+                    )
+    carried = carried_career_review(
+        resume,
+        project_root,
+        selection,
+        strategy_sha256,
     )
+    if carried is None:
+        return "not-reviewed", "not-reviewed", None
+    return str(carried["hiring_read"]), str(carried["verdict"]), carried
 
 
 def _require_resolved_role_balance(
@@ -163,9 +184,7 @@ def _require_resolved_role_balance(
         inversions_value = diagnostic.get("inversions")
         inversions = inversions_value if isinstance(inversions_value, list) else []
         affected_roles = [
-            item.get("older_role_ids")
-            for item in inversions
-            if isinstance(item, dict)
+            item.get("older_role_ids") for item in inversions if isinstance(item, dict)
         ]
         raise ValueError(
             "preview is waiting for the role-balance selection decision for "
@@ -230,6 +249,23 @@ def _current_build(
         )
         if not path.is_file() or sha256_file(path) != digest:
             raise ValueError(f"preview build {owner} changed after compilation")
+    if not isinstance(synthesis, dict) or not isinstance(template, dict):
+        raise ValueError("preview build template inputs are invalid")
+    synthesis_path = contained_project_path(
+        Path(str(synthesis["path"])), project_root, "resumes/plans", "build synthesis"
+    )
+    template_path = contained_project_path(
+        Path(str(template["path"])), project_root, "templates", "build template"
+    )
+    plan = load_synthesis_plan(synthesis_path, project_root, vault_root.resolve())
+    template_text = (
+        rendering_theme_text(plan.resume_template.theme)
+        if plan.resume_template is not None
+        else template_path.read_text(encoding="utf-8").replace("{{THEME_CSS}}", "")
+    )
+    composition_sha256 = hashlib.sha256(template_text.encode("utf-8")).hexdigest()
+    if manifest.get("template_composition_sha256") != composition_sha256:
+        raise ValueError("preview build theme composition changed after compilation")
     evidence = manifest.get("evidence")
     facts = evidence.get("facts") if isinstance(evidence, dict) else None
     if not isinstance(facts, list):
@@ -341,8 +377,29 @@ def preview_resume(
         raise ValueError("preview build synthesis record is missing")
     plan = load_synthesis_plan(Path(synthesis_record["path"]), project_root, project_root / "vault")
     route = hybrid_review_route(plan)
+    selection_target: dict[str, str] | None = None
+    selection_package_path = selection_review_paths(project_root, resume_path)["package"]
+    if selection_package_path.is_file():
+        try:
+            selection_package = json.loads(selection_package_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            selection_package = None
+        package_selection = (
+            selection_package.get("selection") if isinstance(selection_package, dict) else None
+        )
+        package_target = (
+            package_selection.get("target") if isinstance(package_selection, dict) else None
+        )
+        if isinstance(package_target, dict):
+            selection_target = package_target
+    selection = build_selection(plan, synthesis_record, target=selection_target)
+    strategy_sha256 = selection_strategy_digest(plan, selection)
     role_fit, career_verdict, career_record = _current_career_review(
-        resume_path, project_root, language
+        resume_path,
+        project_root,
+        language,
+        selection,
+        strategy_sha256,
     )
     career_required = bool(route["career_review"]["run"])
     if career_required and career_record is None:
@@ -363,7 +420,11 @@ def preview_resume(
         for item in payload.get("experience", [])
         if isinstance(item, dict)
     )
-    template_text = template_path.read_text(encoding="utf-8")
+    template_text = (
+        rendering_theme_text(plan.resume_template.theme)
+        if plan.resume_template is not None
+        else template_path.read_text(encoding="utf-8").replace("{{THEME_CSS}}", "")
+    )
     rendered = render_payload(
         payload,
         template_text,

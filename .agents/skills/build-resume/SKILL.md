@@ -80,12 +80,19 @@ Git tools do not. Never write candidate data into same-named engine folders.
    vault and propose two or three evidence-backed options instead of asking an
    open-ended career-history questionnaire.
    When the request edits or rejects visible resume prose, first follow the
-   feedback-memory contract: pin the exact current block, record or revise the
-   temporary session, and give the user its compact "Remembering for this
-   revision" receipt. Pass the returned session ID when the user rejects a
-   replacement again so the latest correction replaces the earlier
-   interpretation even when its kind or scope changes. Do not promote an
-   intermediate interpretation. Classify the change by meaning, not edit size.
+   feedback-memory contract's semantic drafting gate. Treat whole-sentence
+   dislike, confusion, doubt, or tentative replacement wording as exploration:
+   inspect the factual boundary read-only, identify the intended hiring message,
+   and offer three to five materially different alternatives without recording
+   feedback or changing repository state. Do not depend on exact trigger
+   phrases. When the user unambiguously selects or supplies the wording to use,
+   pin the exact current block, record or revise the temporary session, and give
+   the user its compact "Remembering for this revision" receipt. A clear option
+   selection authorizes the edit without another confirmation. Pass the returned
+   session ID when the user later rejects the applied replacement so the latest
+   correction replaces the earlier interpretation even when its kind or scope
+   changes. Do not promote an intermediate interpretation. Classify the change
+   by meaning, not edit size.
    For wording-only feedback that preserves every factual claim boundary,
    continue directly to edit and preview without another approval question. A
    changed verb, noun, or number is not wording-only when it changes supported
@@ -183,7 +190,11 @@ Git tools do not. Never write candidate data into same-named engine folders.
    not let an internal project, system, team, workflow, or process name carry a
    claim's meaning. Describe the reader-relevant problem, function, audience,
    scale, or value, retaining a name only when it adds useful context and is
-   immediately understandable. Apply the quality contract's natural-voice test
+   immediately understandable. Apply the cold package's general unstated-premise
+   rule: the reader must be able to identify the actor, action, object, and why
+   the claim matters without inventing a missing mechanism or relationship.
+   Do not turn a one-off clarity repair into a durable personal rule. Apply the
+   quality contract's natural-voice test
    across individual blocks and neighboring bullets: prefer direct clauses when
    constructed modifiers hide how a technology relates to the work, and flag a
    run of identical opening verbs when it makes distinct contributions sound
@@ -374,6 +385,10 @@ Git tools do not. Never write candidate data into same-named engine folders.
   wording as user feedback memory. Record only direct user corrections.
 - Record user prose corrections before editing, keep failed interpretations in
   temporary sessions, and promote only the latest user-accepted revision.
+- Keep rejected, unclear, or tentative candidate sentences in conversation.
+  Do not record, compile, review, or preview until semantic intent shows that
+  the user has selected wording to apply; use factual questions only when the
+  supported claim boundary is genuinely unclear.
 - Default feedback memory to the narrowest stable scope. Do not convert a
   one-off sentence cleanup into a global style rule.
 - Never let a useful answer to a critique question remain only in conversation
@@ -410,8 +425,10 @@ Git tools do not. Never write candidate data into same-named engine folders.
   specificity over generic responsibility language. When strong proof is not
   yet canonical, surface the missing evidence for later hydration rather than
   weakening trust.
-- Use the repository template's established teal-and-blue resume palette. Never
-  introduce generic AI-purple styling. Original resume artifacts may be
+- Use the visual theme selected in the synthesis plan. The default keeps the
+  established teal-and-blue palette; another registered theme may use a
+  distinct restrained ATS-safe palette. Never introduce generic AI-purple styling.
+  Original resume artifacts may be
   inspected for presentation details only when the user asks to preserve their
   visual identity; never use their wording as a generation source.
 - Never bypass the compiler's evidence gate or the mint command's layout,

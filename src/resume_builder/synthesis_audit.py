@@ -336,6 +336,7 @@ def audit_synthesis(payload: dict[str, Any], plan: SynthesisPlan) -> dict[str, o
             {
                 "content": {
                     "id": plan.resume_template.content.template_id,
+                    "version": plan.resume_template.content.version,
                     "path": plan.resume_template.content.source.relative_to(
                         plan.source.parents[2]
                     ).as_posix(),
@@ -343,6 +344,7 @@ def audit_synthesis(payload: dict[str, Any], plan: SynthesisPlan) -> dict[str, o
                 },
                 "theme": {
                     "id": plan.resume_template.theme.theme_id,
+                    "version": plan.resume_template.theme.version,
                     "path": plan.resume_template.theme.source.relative_to(
                         plan.source.parents[2]
                     ).as_posix(),
@@ -354,6 +356,16 @@ def audit_synthesis(payload: dict[str, Any], plan: SynthesisPlan) -> dict[str, o
                     ).as_posix(),
                     "sha256": _sha256(plan.resume_template.theme.renderer),
                 },
+                "stylesheet": (
+                    {
+                        "path": plan.resume_template.theme.stylesheet.relative_to(
+                            plan.source.parents[2]
+                        ).as_posix(),
+                        "sha256": _sha256(plan.resume_template.theme.stylesheet),
+                    }
+                    if plan.resume_template.theme.stylesheet is not None
+                    else None
+                ),
             }
             if plan.resume_template is not None
             else None

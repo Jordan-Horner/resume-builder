@@ -9,6 +9,7 @@ from .feedback_resolution import manifest_guidance_freshness
 from .layout import contained_path
 from .review_blocks import narrative_block_inventory
 from .review_schema import ReviewRecord, load_review_record, sha256_file, sha256_text
+from .selection_guard import load_seal, selection_digest
 from .selection_review import require_approved_selection_review
 
 
@@ -205,3 +206,76 @@ def require_editorial_approval(
             "--accept-review-risk after the user accepts the documented non-language tradeoff"
         )
     return record
+
+
+def carried_career_review(
+    resume: Path,
+    project_root: Path,
+    selection: dict[str, object],
+    strategy_sha256: str,
+) -> dict[str, str | bool] | None:
+    """Reuse a sealed hiring judgment when only independently reviewed prose changed."""
+    try:
+        require_approved_selection_review(
+            project_root,
+            resume,
+            strategy_sha256=strategy_sha256,
+        )
+        seal = load_seal(project_root, resume)
+    except ValueError:
+        return None
+    if seal is None or seal.get("selection_sha256") != selection_digest(selection):
+        return None
+    review_ref = seal.get("review")
+    if not isinstance(review_ref, dict) or not isinstance(review_ref.get("path"), str):
+        return None
+    try:
+        review_path = contained_path(project_root, review_ref["path"], "sealed career review")
+    except ValueError:
+        return None
+    if (
+        review_path.parent != (project_root / "build" / "reviews").resolve()
+        or not review_path.is_file()
+        or review_ref.get("sha256") != sha256_file(review_path)
+    ):
+        return None
+    try:
+        raw = json.loads(review_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(raw, dict) or raw.get("version") not in {4, 5}:
+        return None
+    reviewer = raw.get("reviewer")
+    resume_ref = raw.get("resume")
+    evidence = raw.get("evidence_integrity")
+    language = raw.get("language_review")
+    next_action = raw.get("next_action")
+    if (
+        not isinstance(reviewer, dict)
+        or reviewer.get("method") != "independent-cold-review"
+        or not isinstance(resume_ref, dict)
+        or resume_ref.get("path") != resume.relative_to(project_root).as_posix()
+        or not isinstance(evidence, dict)
+        or evidence.get("status") != "claim-checked"
+        or not isinstance(language, dict)
+        or language.get("status") != "approved"
+        or not isinstance(next_action, dict)
+        or not isinstance(next_action.get("summary"), str)
+    ):
+        return None
+    if raw.get("version") == 5:
+        feedback = raw.get("feedback_review")
+        if not isinstance(feedback, dict) or feedback.get("status") != "approved":
+            return None
+    verdict = raw.get("verdict")
+    hiring_read = raw.get("hiring_read")
+    if not isinstance(verdict, str) or not isinstance(hiring_read, str):
+        return None
+    return {
+        "path": review_path.relative_to(project_root).as_posix(),
+        "sha256": sha256_file(review_path),
+        "verdict": verdict,
+        "hiring_read": hiring_read,
+        "next_action": next_action["summary"],
+        "carried_forward": True,
+    }

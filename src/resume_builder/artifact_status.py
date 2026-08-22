@@ -119,6 +119,15 @@ def build_manifest_freshness(manifest_path: Path, project_root: Path) -> list[st
                 )
                 if reason:
                     reasons.append(reason)
+            stylesheet = resume_template.get("stylesheet")
+            if stylesheet is not None:
+                reason = record_freshness(
+                    stylesheet,
+                    project_root,
+                    "build resume template stylesheet",
+                )
+                if reason:
+                    reasons.append(reason)
 
     outputs = manifest.get("outputs")
     if not isinstance(outputs, list) or not outputs:

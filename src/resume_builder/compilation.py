@@ -35,6 +35,7 @@ from .resume_parser import (
     sections,
     story_id,
 )
+from .resume_templates import rendering_theme_text
 from .synthesis import audit_synthesis, load_synthesis_plan
 
 __all__ = [
@@ -136,7 +137,11 @@ def build_resume(
         claim_specs=claim_specs or None,
     )
     facts = known_fact_ids(vault_root.resolve())
-    template_text = template_path.read_text(encoding="utf-8")
+    template_text = (
+        rendering_theme_text(plan.resume_template.theme)
+        if plan.resume_template is not None
+        else template_path.read_text(encoding="utf-8").replace("{{THEME_CSS}}", "")
+    )
     # Validate the template and rendered payload without publishing a web preview.
     # A readable HTML artifact is created only by the preview stage.
     render_payload(payload, template_text, facts)
@@ -167,8 +172,11 @@ def build_resume(
         },
         "template": {
             "path": relative_output(template_path, project_root),
-            "sha256": hashlib.sha256(template_text.encode("utf-8")).hexdigest(),
+            "sha256": sha256_file(template_path),
         },
+        "template_composition_sha256": hashlib.sha256(
+            template_text.encode("utf-8")
+        ).hexdigest(),
         "page_format": payload.get("page_format"),
         "synthesis": {
             "path": relative_output(plan.source, project_root),

@@ -36,9 +36,11 @@ where = ["src"]
 [tool.setuptools.package-data]
 resume_builder = [
   "resources/templates/*.html",
+  "resources/templates/renderers/*.html",
   "resources/templates/resume-templates/*.yaml",
   "resources/templates/themes/*.yaml",
   "resources/templates/themes/*.html",
+  "resources/templates/themes/*.css",
   "resources/workspace/*/*.md",
 ]
 

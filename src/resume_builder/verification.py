@@ -17,7 +17,9 @@ from .atomic import atomic_write_json
 from .compilation import build_resume, relative_output, sha256_file
 from .directions import audit_direction, parse_direction
 from .job_matching import match_job, project_target_path
+from .language_review import current_language_review
 from .rendering import contained_project_path
+from .review_approval import carried_career_review
 from .review_records import (
     build_review_package,
     narrative_block_inventory,
@@ -27,6 +29,7 @@ from .selection_review import (
     build_selection_review_package,
     selection_review_freshness,
     selection_review_paths,
+    selection_strategy_digest,
 )
 from .synthesis import load_synthesis_plan
 from .validation import validate_vault
@@ -212,6 +215,9 @@ def verify_resume(
                 "content": _path_record(plan.resume_template.content.source, project_root),
                 "theme": _path_record(plan.resume_template.theme.source, project_root),
                 "renderer": _path_record(plan.resume_template.theme.renderer, project_root),
+                "stylesheet": _optional_path_record(
+                    plan.resume_template.theme.stylesheet, project_root
+                ),
             }
             if plan.resume_template is not None
             else None
@@ -317,9 +323,7 @@ def verify_resume(
             "status": "user-decision",
             "protected_by_reviewed_selection": True,
             "inversions": [
-                {**item, "resolution": "user-decision"}
-                if isinstance(item, dict)
-                else item
+                {**item, "resolution": "user-decision"} if isinstance(item, dict) else item
                 for item in role_balance.get("inversions", [])
             ],
         }
@@ -331,8 +335,13 @@ def verify_resume(
         manifest=manifest_path,
         role_balance=role_balance,
     )
+    strategy_sha256 = selection_strategy_digest(plan, selection)
     selection_paths = selection_review_paths(project_root, resume_path)
-    selection_reasons = selection_review_freshness(selection_paths["record"], project_root)
+    selection_reasons = selection_review_freshness(
+        selection_paths["record"],
+        project_root,
+        strategy_sha256=strategy_sha256,
+    )
     feedback_value = manifest.get("feedback_memory")
     feedback: dict[str, Any] = feedback_value if isinstance(feedback_value, dict) else {}
     role_arcs_value = synthesis.get("role_arcs")
@@ -416,7 +425,11 @@ def verify_resume(
     selection_record: dict[str, Any] | None = None
     if selection_paths["record"].is_file():
         selection_record = _load_json(selection_paths["record"], "selection review")
-    if selection_reasons and selection_record is not None and selection_record.get("status") == "needs-user-decision":
+    if (
+        selection_reasons
+        and selection_record is not None
+        and selection_record.get("status") == "needs-user-decision"
+    ):
         artifact_paths.append(selection_paths["record"])
         review_inputs = {
             "user_decision": {
@@ -449,24 +462,54 @@ def verify_resume(
             ),
         }
     else:
-        package_path = build_review_package(resume_path, project_root, target=target_path)
-        cold_path = package_path.with_name(
-            f"{package_path.name.removesuffix('.package.json')}.cold.json"
+        try:
+            language = current_language_review(resume_path, project_root)
+        except ValueError:
+            language = None
+        carried_review = (
+            carried_career_review(
+                resume_path,
+                project_root,
+                selection,
+                strategy_sha256,
+            )
+            if isinstance(language, dict) and language.get("status") == "approved"
+            else None
         )
-        decisions_path = package_path.with_name(
-            f"{package_path.name.removesuffix('.package.json')}.decisions.json"
-        )
-        artifact_paths.extend([selection_paths["record"], cold_path, package_path])
-        review_inputs = {
-            "selection_review": _path_record(selection_paths["record"], project_root),
-            "cold_read": _path_record(cold_path, project_root),
-            "package": _path_record(package_path, project_root),
-            "decisions": relative_output(decisions_path, project_root),
-        }
-        workflow = {
-            "state": "awaiting-review",
-            "next_action": "Complete the generated language decisions and run review finalize.",
-        }
+        if carried_review is not None:
+            assert isinstance(language, dict)
+            artifact_paths.extend([selection_paths["record"], language["path"]])
+            review_inputs = {
+                "selection_review": _path_record(selection_paths["record"], project_root),
+                "language_review": _path_record(language["path"], project_root),
+                "carried_career_review": carried_review,
+            }
+            workflow = {
+                "state": "preview-ready",
+                "next_action": (
+                    "Publish the current preview; the unchanged strategy retains its prior "
+                    "career review and the revised prose has a current language approval."
+                ),
+            }
+        else:
+            package_path = build_review_package(resume_path, project_root, target=target_path)
+            cold_path = package_path.with_name(
+                f"{package_path.name.removesuffix('.package.json')}.cold.json"
+            )
+            decisions_path = package_path.with_name(
+                f"{package_path.name.removesuffix('.package.json')}.decisions.json"
+            )
+            artifact_paths.extend([selection_paths["record"], cold_path, package_path])
+            review_inputs = {
+                "selection_review": _path_record(selection_paths["record"], project_root),
+                "cold_read": _path_record(cold_path, project_root),
+                "package": _path_record(package_path, project_root),
+                "decisions": relative_output(decisions_path, project_root),
+            }
+            workflow = {
+                "state": "awaiting-review",
+                "next_action": "Complete the generated language decisions and run review finalize.",
+            }
     receipt = {
         "version": 3,
         "phase": "verification",

@@ -7,7 +7,13 @@ from pathlib import Path
 import pytest
 
 from resume_builder import project_report
-from resume_builder.resume_templates import load_content_template
+from resume_builder.resume_templates import (
+    load_content_template,
+    load_rendering_theme,
+    rendering_theme_text,
+    scaffold_template,
+    template_catalog,
+)
 from resume_builder.workspace import (
     CommandResult,
     WorkspaceError,
@@ -16,9 +22,11 @@ from resume_builder.workspace import (
     discover_workspace,
     github_repository_from_remote,
     initialize_workspace,
+    status_main,
     sync_workspace_templates,
     workspace_status,
 )
+from resume_builder.workspace_templates import template_resources
 
 
 def test_default_github_repository_uses_authenticated_owner(tmp_path: Path) -> None:
@@ -100,7 +108,9 @@ def test_initialize_local_workspace_creates_independent_repository(tmp_path: Pat
     assert (target / "templates" / "resume-template.html").is_file()
     assert (target / "templates" / "resume-templates" / "technical-classic.yaml").is_file()
     assert (target / "templates" / "themes" / "clean-teal.yaml").is_file()
-    assert (target / "templates" / "themes" / "clean-teal.html").is_file()
+    assert (target / "templates" / "renderers" / "ats-single-column.html").is_file()
+    assert (target / "templates" / "themes" / "minimal-black.yaml").is_file()
+    assert (target / "templates" / "themes" / "minimal-black.css").is_file()
     assert (target / ".resume-builder.json").is_file()
     assert discover_workspace(tmp_path) == target.resolve()
     outer_status = subprocess.run(
@@ -160,6 +170,134 @@ def test_fresh_workspace_installs_both_builtin_content_architectures(tmp_path: P
     assert "competencies" in skills_first.forbidden_sections
 
 
+def test_packaged_template_discovery_is_recursive_and_matches_development_mirror() -> None:
+    root = Path(__file__).resolve().parents[1]
+    resources = dict(template_resources())
+
+    assert Path("themes/minimal-black.css") in resources
+    assert Path("themes/minimal-black.yaml") in resources
+    for relative, content in resources.items():
+        assert (root / "templates" / relative).read_text(encoding="utf-8") == content
+
+
+def test_version_2_theme_composes_self_contained_stylesheet(tmp_path: Path) -> None:
+    target = tmp_path / "workspace"
+    initialize_workspace(target)
+
+    theme = load_rendering_theme(target, "minimal-black")
+    template = rendering_theme_text(theme)
+
+    assert theme.version == 2
+    assert theme.display_name == "Minimal Black"
+    assert theme.stylesheet == target / "templates" / "themes" / "minimal-black.css"
+    assert "{{THEME_CSS}}" not in template
+    assert "--accent: #222222" in template
+    assert template.count("{{RESUME_SECTIONS}}") == 1
+
+
+def test_version_2_theme_rejects_css_placeholder_outside_style_block(tmp_path: Path) -> None:
+    target = tmp_path / "workspace"
+    initialize_workspace(target)
+    renderer = target / "templates" / "renderers" / "ats-single-column.html"
+    renderer.write_text(
+        renderer.read_text(encoding="utf-8").replace("{{THEME_CSS}}", "")
+        + "{{THEME_CSS}}",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="must be inside a style block"):
+        load_rendering_theme(target, "minimal-black")
+
+
+def test_theme_catalog_reports_builtins_and_workspace_owned_scaffolds(tmp_path: Path) -> None:
+    target = tmp_path / "workspace"
+    initialize_workspace(target)
+    created = scaffold_template(target, "theme", "quiet-blue")
+
+    catalog = template_catalog(target)
+    entries = {
+        (item["kind"], item["id"]): item
+        for item in catalog["templates"]
+        if isinstance(item, dict)
+    }
+
+    assert created["created"] == [
+        "templates/themes/quiet-blue.yaml",
+        "templates/themes/quiet-blue.css",
+    ]
+    assert catalog["valid"] is True
+    assert entries[("theme", "minimal-black")]["origin"] == "built-in"
+    assert entries[("theme", "quiet-blue")]["origin"] == "workspace-owned"
+    assert load_rendering_theme(target, "quiet-blue").version == 2
+
+
+def test_template_scaffold_never_overwrites_existing_files(tmp_path: Path) -> None:
+    target = tmp_path / "workspace"
+    initialize_workspace(target)
+    scaffold_template(target, "content", "executive-compact")
+
+    content = load_content_template(target, "executive-compact")
+    assert content.version == 2
+    assert content.display_name == "Executive Compact"
+
+    with pytest.raises(ValueError, match="already exists"):
+        scaffold_template(target, "content", "executive-compact")
+
+
+@pytest.mark.parametrize("forbidden", ["@import 'remote.css';", "body { background: url(x); }"])
+def test_version_2_theme_rejects_external_stylesheet_dependencies(
+    tmp_path: Path,
+    forbidden: str,
+) -> None:
+    target = tmp_path / "workspace"
+    initialize_workspace(target)
+    stylesheet = target / "templates" / "themes" / "minimal-black.css"
+    stylesheet.write_text(forbidden, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="self-contained"):
+        load_rendering_theme(target, "minimal-black")
+
+
+def test_workspace_template_management_cli_lists_validates_and_scaffolds(
+    tmp_path: Path,
+    run_main,
+    capsys,
+) -> None:
+    target = tmp_path / "workspace"
+    initialize_workspace(target)
+
+    assert run_main(status_main, "templates", "list", "--workspace", target) == 0
+    listed = json.loads(capsys.readouterr().out)
+    assert any(item["id"] == "minimal-black" for item in listed["templates"])
+    assert (
+        run_main(
+            status_main,
+            "templates",
+            "validate",
+            "minimal-black",
+            "--workspace",
+            target,
+        )
+        == 0
+    )
+    validated = json.loads(capsys.readouterr().out)
+    assert validated["valid"] is True
+    assert (
+        run_main(
+            status_main,
+            "templates",
+            "scaffold",
+            "theme",
+            "warm-gray",
+            "--workspace",
+            target,
+        )
+        == 0
+    )
+    scaffolded = json.loads(capsys.readouterr().out)
+    assert scaffolded["id"] == "warm-gray"
+
+
 def test_fresh_workspace_report_is_getting_started_not_an_operational_failure(
     tmp_path: Path, run_main
 ) -> None:
@@ -212,7 +350,7 @@ def test_template_sync_installs_missing_builtins_without_overwriting_conflicts(
 def test_repeated_initialize_synchronizes_missing_templates(tmp_path: Path) -> None:
     target = tmp_path / "workspace"
     initialize_workspace(target)
-    missing = target / "templates" / "themes" / "clean-teal.html"
+    missing = target / "templates" / "renderers" / "ats-single-column.html"
     missing.unlink()
 
     result = initialize_workspace(target)

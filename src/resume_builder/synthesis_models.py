@@ -73,6 +73,9 @@ class ContentTemplate:
     required_sections: tuple[str, ...]
     optional_sections: tuple[str, ...]
     forbidden_sections: tuple[str, ...]
+    version: int = 1
+    display_name: str | None = None
+    description: str | None = None
 
 
 @dataclass(frozen=True)
@@ -82,6 +85,11 @@ class RenderingTheme:
     theme_id: str
     source: Path
     renderer: Path
+    version: int = 1
+    display_name: str | None = None
+    description: str | None = None
+    category: str | None = None
+    stylesheet: Path | None = None
 
 
 @dataclass(frozen=True)

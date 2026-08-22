@@ -69,6 +69,166 @@ def _claim_record(story: object) -> dict[str, Any] | None:
     }
 
 
+def selection_strategy_payload(
+    plan: SynthesisPlan,
+    selection: dict[str, Any],
+) -> dict[str, Any]:
+    """Return the prose-independent strategy surface judged by selection review."""
+    selected_ids = {
+        item["id"]
+        for item in selection.get("stories", [])
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    }
+    return {
+        "selection": selection,
+        "concept_fit": sorted(
+            [
+                {
+                    "concept_id": item.concept_id,
+                    "status": item.status,
+                    "fact_ids": sorted(item.fact_ids),
+                }
+                for item in plan.concept_fit
+            ],
+            key=lambda item: item["concept_id"],
+        ),
+        "reviewer_risks": sorted(
+            [
+                {
+                    "id": item.risk_id,
+                    "status": item.status,
+                    "fact_ids": sorted(item.fact_ids),
+                }
+                for item in plan.reviewer_risks
+            ],
+            key=lambda item: item["id"],
+        ),
+        "exclusion_fact_ids": sorted(fact_id for fact_id, _reason in plan.exclusions),
+        "stories": [
+            {
+                "id": story.story_id,
+                "selected": story.story_id in selected_ids,
+                "section": story.section,
+                "role_ids": sorted(story.role_ids),
+                "importance": story.importance,
+                "primary_job": story.primary_job,
+                "fact_ids": sorted(story.fact_ids),
+                "core_fact_ids": sorted(story.core_fact_ids),
+            }
+            for story in sorted(plan.stories, key=lambda item: item.story_id)
+        ],
+        "role_arcs": [
+            {
+                "role_ids": sorted(arc.role_ids),
+                "emphasis": arc.emphasis,
+                "selected_story_ids": sorted(
+                    story_id for story_id in arc.story_ids if story_id in selected_ids
+                ),
+                "candidate_story_ids": sorted(arc.story_ids),
+                "required_dimensions": sorted(arc.required_dimensions),
+                "required_story_ids": sorted(arc.required_story_ids),
+                "optional_story_ids": sorted(arc.optional_story_ids),
+                "omitted_signal_fact_ids": sorted(
+                    fact_id for signal in arc.omitted_signals for fact_id in signal.fact_ids
+                ),
+            }
+            for arc in sorted(plan.role_arcs, key=lambda item: tuple(sorted(item.role_ids)))
+        ],
+    }
+
+
+def selection_strategy_digest(plan: SynthesisPlan, selection: dict[str, Any]) -> str:
+    """Hash selection meaning while ignoring wording and prose-derived diagnostics."""
+    return selection_digest(selection_strategy_payload(plan, selection))
+
+
+def _package_strategy_payload(package: dict[str, Any]) -> dict[str, Any] | None:
+    """Normalize a current or legacy package for semantic reuse checks."""
+    selection = package.get("selection")
+    stories = package.get("stories")
+    role_arcs = package.get("role_arcs")
+    context = package.get("review_context")
+    if (
+        not isinstance(selection, dict)
+        or not isinstance(stories, list)
+        or not isinstance(role_arcs, list)
+        or not isinstance(context, dict)
+    ):
+        return None
+    return {
+        "selection": selection,
+        "concept_fit": sorted(
+            [
+                {
+                    "concept_id": item.get("concept_id"),
+                    "status": item.get("status"),
+                    "fact_ids": sorted(item.get("fact_ids", [])),
+                }
+                for item in context.get("concept_fit", [])
+                if isinstance(item, dict)
+            ],
+            key=lambda item: str(item["concept_id"]),
+        ),
+        "reviewer_risks": sorted(
+            [
+                {
+                    "id": item.get("id"),
+                    "status": item.get("status"),
+                    "fact_ids": sorted(item.get("fact_ids", [])),
+                }
+                for item in context.get("reviewer_risks", [])
+                if isinstance(item, dict)
+            ],
+            key=lambda item: str(item["id"]),
+        ),
+        "exclusion_fact_ids": sorted(
+            item.get("fact_id")
+            for item in context.get("exclusions", [])
+            if isinstance(item, dict) and isinstance(item.get("fact_id"), str)
+        ),
+        "stories": sorted(
+            [
+                {
+                    "id": item.get("id"),
+                    "selected": item.get("selected"),
+                    "section": item.get("section"),
+                    "role_ids": sorted(item.get("role_ids", [])),
+                    "importance": item.get("importance"),
+                    "primary_job": item.get("primary_job"),
+                    "fact_ids": sorted(item.get("fact_ids", [])),
+                    "core_fact_ids": sorted(item.get("core_fact_ids", [])),
+                }
+                for item in stories
+                if isinstance(item, dict)
+            ],
+            key=lambda item: str(item["id"]),
+        ),
+        "role_arcs": sorted(
+            [
+                {
+                    "role_ids": sorted(item.get("role_ids", [])),
+                    "emphasis": item.get("emphasis"),
+                    "selected_story_ids": sorted(item.get("selected_story_ids", [])),
+                    "candidate_story_ids": sorted(item.get("candidate_story_ids", [])),
+                    "required_dimensions": sorted(item.get("required_dimensions", [])),
+                    "required_story_ids": sorted(item.get("required_story_ids", [])),
+                    "optional_story_ids": sorted(item.get("optional_story_ids", [])),
+                    "omitted_signal_fact_ids": sorted(
+                        fact_id
+                        for signal in item.get("omitted_signals", [])
+                        if isinstance(signal, dict)
+                        for fact_id in signal.get("fact_ids", [])
+                        if isinstance(fact_id, str)
+                    ),
+                }
+                for item in role_arcs
+                if isinstance(item, dict)
+            ],
+            key=lambda item: tuple(str(value) for value in item["role_ids"]),
+        ),
+    }
+
+
 def build_selection_review_package(
     project_root: Path,
     resume: Path,
@@ -145,9 +305,12 @@ def build_selection_review_package(
             # Selection is a non-prose decision. Pin the resume identity, not its
             # wording hash, so a bounded language repair does not reopen strategy.
             "resume": {"path": resume.relative_to(project_root).as_posix()},
-            "plan": _path_record(plan.source, project_root),
+            # The plan path remains traceable, but its prose hash is deliberately
+            # excluded. strategy_sha256 covers only decisions the reviewer judged.
+            "plan": {"path": plan.source.relative_to(project_root).as_posix()},
             "direction": _path_record(plan.direction, project_root),
             "selection_sha256": selection_digest(selection),
+            "strategy_sha256": selection_strategy_digest(plan, selection),
         },
         "review_context": {
             "target_argument": plan.target_argument,
@@ -224,6 +387,16 @@ def build_selection_review_package(
         raise ValueError("selection review requires a compiled build manifest")
     if paths["package"].is_file() and paths["decisions"].is_file():
         existing = _load_json(paths["package"], "selection package")
+        existing_strategy = _package_strategy_payload(existing)
+        existing_inputs = existing.get("inputs")
+        current_direction = _path_record(plan.direction, project_root)
+        if (
+            existing_strategy == selection_strategy_payload(plan, selection)
+            and isinstance(existing_inputs, dict)
+            and existing_inputs.get("direction") == current_direction
+            and existing.get("facts") == facts
+        ):
+            return paths["package"]
         comparable_existing = {
             key: value for key, value in existing.items() if key != "generated_at"
         }
@@ -412,7 +585,12 @@ def finalize_selection_review(decisions: Path, project_root: Path) -> dict[str, 
     return {"valid": True, "status": derived, "record": output.relative_to(project_root).as_posix()}
 
 
-def selection_review_freshness(record: Path, project_root: Path) -> list[str]:
+def selection_review_freshness(
+    record: Path,
+    project_root: Path,
+    *,
+    strategy_sha256: str | None = None,
+) -> list[str]:
     """Return reasons a selection review is stale, incomplete, or unapproved."""
     if not record.is_file():
         return ["selection review is missing"]
@@ -458,10 +636,17 @@ def selection_review_freshness(record: Path, project_root: Path) -> list[str]:
             continue
         if not path.is_file():
             reasons.append(f"selection review {owner} changed or is missing")
-        elif owner != "resume" and ref.get("sha256") != sha256_file(path):
+        elif owner == "direction" and ref.get("sha256") != sha256_file(path):
             reasons.append(f"selection review {owner} changed or is missing")
     if package_data is None:
         return reasons
+    if strategy_sha256 is not None:
+        package_strategy = _package_strategy_payload(package_data)
+        package_digest = (
+            selection_digest(package_strategy) if package_strategy is not None else None
+        )
+        if package_digest != strategy_sha256:
+            reasons.append("selection review strategy changed")
     selection = package_data.get("selection")
     target = selection.get("target") if isinstance(selection, dict) else None
     if target is not None:
@@ -499,10 +684,19 @@ def selection_review_freshness(record: Path, project_root: Path) -> list[str]:
     return reasons
 
 
-def require_approved_selection_review(project_root: Path, resume: Path) -> Path:
+def require_approved_selection_review(
+    project_root: Path,
+    resume: Path,
+    *,
+    strategy_sha256: str | None = None,
+) -> Path:
     """Return the current selection record or fail closed."""
     record = selection_review_paths(project_root, resume)["record"]
-    reasons = selection_review_freshness(record, project_root)
+    reasons = selection_review_freshness(
+        record,
+        project_root,
+        strategy_sha256=strategy_sha256,
+    )
     if reasons:
         raise ValueError(f"resume selection review is stale or incomplete: {reasons}")
     return record

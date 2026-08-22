@@ -1,0 +1,7 @@
+version: 2
+id: minimal-black
+display_name: Minimal Black
+description: Conservative monochrome technical resume with restrained visual hierarchy
+category: conservative
+renderer: templates/renderers/ats-single-column.html
+stylesheet: templates/themes/minimal-black.css

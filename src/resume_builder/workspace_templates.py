@@ -4,25 +4,29 @@ from __future__ import annotations
 
 from importlib.resources import files
 from pathlib import Path
+from typing import Any
 
 from .atomic import atomic_write_json, atomic_write_text
 from .layout import VaultLayout
 
 
+def _walk_resources(node: Any, prefix: Path = Path()) -> list[tuple[Path, str]]:
+    entries: list[tuple[Path, str]] = []
+    for child in sorted(node.iterdir(), key=lambda item: item.name):
+        relative = prefix / child.name
+        if child.is_dir():
+            entries.extend(_walk_resources(child, relative))
+        elif child.is_file():
+            if relative.is_absolute() or ".." in relative.parts:
+                raise ValueError(f"unsafe packaged template resource: {relative}")
+            entries.append((relative, child.read_text(encoding="utf-8")))
+    return entries
+
+
 def template_resources() -> list[tuple[Path, str]]:
     """Return every immutable built-in template resource and its workspace path."""
     root = files("resume_builder.resources") / "templates"
-    entries: list[tuple[Path, str]] = []
-    for relative in (
-        Path("resume-template.html"),
-        Path("resume-templates/technical-classic.yaml"),
-        Path("resume-templates/technical-skills-first.yaml"),
-        Path("themes/clean-teal.yaml"),
-        Path("themes/clean-teal.html"),
-    ):
-        resource = root.joinpath(*relative.parts)
-        entries.append((relative, resource.read_text(encoding="utf-8")))
-    return entries
+    return _walk_resources(root)
 
 
 def sync_templates(root: Path) -> dict[str, object]:

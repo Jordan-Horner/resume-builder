@@ -55,6 +55,9 @@ career-professional pass must read every narrative block and ask:
    application rather than merely calling the application framework-enabled?
 8. Do several adjacent bullets begin with the same broad verb, making distinct
    contributions sound mechanically generated or interchangeable?
+9. Can the reader identify the actor, action, object, and why the claim matters
+   without supplying an unstated premise, omitted mechanism, or internal
+   relationship that the sentence never explains?
 
 Apply a one-point budget to every bullet. It should make one main hiring claim
 and normally carry no more than two supporting details, such as method, scope,
@@ -85,6 +88,14 @@ the same role heading is a common example, but the rule applies to any visible
 context and does not ban a phrase such as "As ...". Preserve the wording when it
 clarifies a real distinction—for example, acting authority that is not conveyed
 by the formal title.
+
+Apply an unstated-premise test across every narrative block. Using only the
+visible sentence and its supplied heading and neighbor context, identify the
+actor, action, object or problem, and reader-relevant reason the claim matters.
+Revise the block when its central meaning depends on an omitted mechanism, an
+unexplained internal name, or a relationship the reader must invent. This is a
+general context test, not a new fact-specific editorial rule, a banned-term
+list, or a requirement to explain every implementation detail.
 
 Revise prose that passes factual grounding but fails this reading test. Prefer
 the smallest clear account of the work and let a separate bullet carry a

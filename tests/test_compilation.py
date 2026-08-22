@@ -314,6 +314,29 @@ resume_template:
     )
 
 
+def upgrade_compilation_theme_to_v2(tmp_path: Path) -> Path:
+    theme = tmp_path / "templates" / "themes" / "test-theme.yaml"
+    renderer = tmp_path / "templates" / "themes" / "test-theme.html"
+    stylesheet = tmp_path / "templates" / "themes" / "test-theme.css"
+    renderer.write_text(
+        (ROOT / "templates" / "renderers" / "ats-single-column.html").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    stylesheet.write_text(":root { --accent: #222222; }\n", encoding="utf-8")
+    theme.write_text(
+        """version: 2
+id: test-theme
+display_name: Test Theme
+description: Test composable theme
+category: test
+renderer: templates/themes/test-theme.html
+stylesheet: templates/themes/test-theme.css
+""",
+        encoding="utf-8",
+    )
+    return stylesheet
+
+
 def approve_selection_review(tmp_path: Path, resume: Path) -> Path:
     """Approve the complete non-prose strategy before language review."""
     plan = synthesis.load_synthesis_plan(
@@ -736,6 +759,11 @@ def test_language_review_reuses_unchanged_approved_blocks(tmp_path: Path) -> Non
     paths = language_review.language_review_paths(tmp_path, resume)
     cold = json.loads(paths["cold"].read_text(encoding="utf-8"))
     assert [block["id"] for block in cold["blocks"]] == ["projects[0].description"]
+    assert cold["review_standard"] == language_review.LANGUAGE_REVIEW_STANDARD
+    assert cold["review_standard"]["version"] == 1
+    assert "actor, action, object" in cold["review_standard"]["context_test"]
+    assert "unstated premise" in cold["review_standard"]["unstated_premise_rule"]
+    assert "banned-term list" in cold["review_standard"]["boundary"]
 
     decisions = json.loads(paths["decisions"].read_text(encoding="utf-8"))
     decisions["reviewer"]["context"] = (
@@ -1259,9 +1287,7 @@ def test_v7_build_pins_registry_inputs_and_compiled_section_order(tmp_path: Path
     manifest = json.loads(base.with_suffix(".manifest.json").read_text(encoding="utf-8"))
     payload = json.loads(base.with_suffix(".json").read_text(encoding="utf-8"))
     selected = manifest["synthesis"]["resume_template"]
-    assert selected["content"]["path"] == (
-        "templates/resume-templates/technical-complete.yaml"
-    )
+    assert selected["content"]["path"] == ("templates/resume-templates/technical-complete.yaml")
     assert selected["content"]["sha256"]
     assert selected["theme"]["path"] == "templates/themes/test-theme.yaml"
     assert selected["theme"]["sha256"]
@@ -1276,6 +1302,44 @@ def test_v7_build_pins_registry_inputs_and_compiled_section_order(tmp_path: Path
         "certifications",
         "skills",
     ]
+
+
+def test_v7_build_composes_and_pins_version_2_theme_stylesheet(tmp_path: Path) -> None:
+    vault, resume = project(tmp_path)
+    upgrade_compilation_project_to_v7(tmp_path)
+    stylesheet = upgrade_compilation_theme_to_v2(tmp_path)
+
+    compilation.build_resume(resume, vault_root=vault)
+
+    manifest_path = tmp_path / "build" / "resumes" / "support-operations" / "resume.manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    selected = manifest["synthesis"]["resume_template"]
+    assert selected["theme"]["version"] == 2
+    assert selected["stylesheet"]["path"] == "templates/themes/test-theme.css"
+    assert selected["stylesheet"]["sha256"] == compilation.sha256_file(stylesheet)
+    assert manifest["template_composition_sha256"]
+    assert verification.build_manifest_freshness(manifest_path, tmp_path) == []
+
+    stylesheet.write_text(":root { --accent: #333333; }\n", encoding="utf-8")
+
+    assert "build resume template stylesheet file changed" in verification.build_manifest_freshness(
+        manifest_path, tmp_path
+    )
+
+
+def test_preview_rejects_tampered_theme_composition_digest(tmp_path: Path) -> None:
+    vault, resume = project(tmp_path)
+    upgrade_compilation_project_to_v7(tmp_path)
+    upgrade_compilation_theme_to_v2(tmp_path)
+    compilation.build_resume(resume, vault_root=vault)
+    base = tmp_path / "build" / "resumes" / "support-operations" / "resume"
+    manifest_path = base.with_suffix(".manifest.json")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["template_composition_sha256"] = "0" * 64
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="theme composition changed"):
+        previewing._current_build(resume, tmp_path, vault, base)
 
 
 def test_verify_caches_checks_and_drives_review_to_published_state(
@@ -1461,9 +1525,10 @@ def test_selection_user_decision_returns_exact_workflow_handoff(tmp_path: Path) 
 
     assert result["state"]["state"] == "awaiting-user-decision"
     assert set(result["review_inputs"]) == {"user_decision"}
-    assert result["review_inputs"]["user_decision"]["role_arc_decisions"][0][
-        "decision"
-    ] == "needs-user-decision"
+    assert (
+        result["review_inputs"]["user_decision"]["role_arc_decisions"][0]["decision"]
+        == "needs-user-decision"
+    )
 
 
 def test_approved_role_balance_inversion_requires_contextual_note(tmp_path: Path) -> None:
@@ -1524,6 +1589,105 @@ def test_wording_change_does_not_reopen_approved_selection(tmp_path: Path) -> No
     )
 
     assert selection_review.selection_review_freshness(record, tmp_path) == []
+
+
+def test_plan_prose_and_role_word_counts_do_not_reopen_selection_review(
+    tmp_path: Path,
+) -> None:
+    vault, resume = project(tmp_path)
+    compilation.build_resume(resume, vault_root=vault)
+    record = approve_selection_review(tmp_path, resume)
+    package_path = selection_review.selection_review_paths(tmp_path, resume)["package"]
+    package_sha256 = compilation.sha256_file(package_path)
+
+    resume.write_text(
+        resume.read_text(encoding="utf-8").replace(
+            "Reduced processing time through an integrated example workflow.",
+            "Reduced processing time through a carefully integrated example workflow.",
+        ),
+        encoding="utf-8",
+    )
+    plan_path = tmp_path / "resumes" / "plans" / "support-operations.yaml"
+    plan_path.write_text(
+        plan_path.read_text(encoding="utf-8").replace(
+            "Lead with the strongest workflow outcome.",
+            "Lead with the clearest supported workflow outcome.",
+        ),
+        encoding="utf-8",
+    )
+    compilation.build_resume(resume, vault_root=vault)
+    plan = synthesis.load_synthesis_plan(plan_path, tmp_path, vault)
+    manifest_path = tmp_path / "build" / "resumes" / resume.stem / "resume.manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    selected = selection_guard.build_selection(plan, manifest["synthesis"])
+
+    selection_review.build_selection_review_package(
+        tmp_path,
+        resume,
+        plan,
+        selected,
+        manifest=manifest_path,
+        role_balance=manifest["synthesis"]["role_balance"],
+    )
+
+    assert compilation.sha256_file(package_path) == package_sha256
+    assert (
+        selection_review.selection_review_freshness(
+            record,
+            tmp_path,
+            strategy_sha256=selection_review.selection_strategy_digest(plan, selected),
+        )
+        == []
+    )
+
+
+def test_wording_only_edit_carries_forward_sealed_career_judgment(
+    tmp_path: Path,
+) -> None:
+    vault, resume = project(tmp_path)
+    plan_path = tmp_path / "resumes" / "plans" / "support-operations.yaml"
+    plan_path.write_text(
+        plan_path.read_text(encoding="utf-8").replace(
+            "target_mode: direct", "target_mode: adjacent"
+        ),
+        encoding="utf-8",
+    )
+    compilation.build_resume(resume, vault_root=vault)
+    write_language_review(tmp_path, resume)
+    review_path = write_approved_review(tmp_path, resume)
+    plan = synthesis.load_synthesis_plan(plan_path, tmp_path, vault)
+    manifest_path = tmp_path / "build" / "resumes" / resume.stem / "resume.manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    selected = selection_guard.build_selection(plan, manifest["synthesis"])
+    selection_guard.write_selection_seal(tmp_path, resume, selected, review_path)
+
+    resume.write_text(
+        resume.read_text(encoding="utf-8").replace(
+            "Support engineer who improves example workflows.",
+            "Support engineer focused on improving example workflows.",
+        ),
+        encoding="utf-8",
+    )
+    compilation.build_resume(resume, vault_root=vault)
+    write_language_review(tmp_path, resume)
+
+    verified = verification.verify_resume(
+        resume,
+        vault_root=vault,
+        skip_vault_validation=True,
+    )
+
+    assert verified["state"]["state"] == "preview-ready"
+    assert verified["checks"]["selection_review"]["status"] == "approved"
+    assert verified["review_inputs"]["carried_career_review"]["carried_forward"] is True
+
+    previewing.preview_resume(resume, vault_root=vault)
+    preview_manifest = json.loads(
+        (tmp_path / "build" / "resumes" / resume.stem / "resume.preview.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert preview_manifest["career_review"]["carried_forward"] is True
 
 
 def test_fact_change_reopens_approved_selection(tmp_path: Path) -> None:
@@ -1948,8 +2112,15 @@ def test_compile_normalizes_ats_characters(tmp_path: Path, run_main) -> None:
 @pytest.mark.browser
 def test_mint_pdf_end_to_end(tmp_path: Path, run_main) -> None:
     vault, resume = project(tmp_path)
+    upgrade_compilation_project_to_v7(tmp_path)
+    upgrade_compilation_theme_to_v2(tmp_path)
     write_language_review(tmp_path, resume)
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
+    html = (tmp_path / "build" / "resumes" / "support-operations" / "resume.html").read_text(
+        encoding="utf-8"
+    )
+    assert "--accent: #222222" in html
+    assert "{{THEME_CSS}}" not in html
 
     assert (
         run_main(

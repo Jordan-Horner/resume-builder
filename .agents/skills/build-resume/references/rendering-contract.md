@@ -10,8 +10,8 @@ theme. The content template supplies the compiled `section_order`; the theme
 must retain every required document and print-style placeholder, render exactly
 one of each data-bearing header, preview, and `{{RESUME_SECTIONS}}` placeholder,
 and may not use legacy per-section placeholders or rearrange the section stream.
-The content template, theme definition, and renderer are all hash-pinned
-lifecycle inputs.
+The content template, theme definition, renderer, optional version 2
+stylesheet, and final renderer composition are hash-pinned lifecycle inputs.
 Compile, verify, preview, and mint use the plan-selected theme by default; an
 explicit conflicting `--template` is rejected.
 
@@ -44,9 +44,21 @@ Use `resume-builder compile` directly when diagnosing only that build stage.
 Every draft first uses `review language-package`. Its
 `.language.cold.json` file contains all narrative blocks on the first pass and
 only new or changed blocks on later passes, with visible neighbor context.
+It also carries a versioned `review_standard` whose general context test asks
+whether the visible block identifies the actor, action, object, and
+reader-relevant value without requiring an invented premise, mechanism, or
+relationship. Keep the standard free of candidate examples and personal
+editorial rules so engine tests never need private resume prose.
 `review language-finalize` carries exact approved unchanged blocks into the new
 hash-pinned record. When hybrid routing selects the deeper review or the user
 explicitly requests it, `verify` prepares the strategy and hiring workflow.
+Selection freshness is based on a prose-independent strategy digest covering
+the chosen stories, evidence, exclusions, role allocation, direction, and
+target. Sentence wording, plan rationale prose, and word-count diagnostics do
+not reopen selection review. After a changed block passes the standalone
+language review, an unchanged sealed strategy may also carry forward the prior
+hiring verdict; a target, direction, evidence, selection, exclusion, or role-
+allocation change still requires the appropriate deeper review.
 `review package` writes two pinned inputs. The `.cold.json` file contains only
 the target and visible resume blocks for the provisional independent read. The
 `.package.json` appendix pins the compiled build, plan, direction, concept and
@@ -95,10 +107,17 @@ resume-builder render build/<resume-slug>.json \
   --output build/<resume-slug>.html
 ```
 
-Use `render` only for renderer development or diagnostics. Use
-`--template templates/<name>.html` only when the user selects another
-repository template. The renderer rejects templates outside `templates/` and
-outputs outside `build/`.
+Use `render` only for renderer development or diagnostics. Normal resume work
+selects a registered content template and visual theme in the synthesis plan.
+Use `--template templates/<name>.html` only as a diagnostic override. The
+renderer rejects templates outside `templates/` and outputs outside `build/`.
+
+Version 1 visual themes may point to complete HTML renderers. Version 2 themes
+compose a local stylesheet into exactly one `{{THEME_CSS}}` placeholder in a
+shared renderer. The stylesheet cannot import remote resources, use
+`url(...)`, or close the surrounding style tag. This feature changes HTML and
+PDF presentation only; it does not add DOCX, LaTeX, image, script, or remote
+font backends.
 
 ## Payload schema
 
@@ -148,9 +167,10 @@ Empty optional arrays remove their sections entirely. Use `letter` for US and
 Canada unless the user requests otherwise; use `a4` where that is the market
 standard. The template uses selectable text, ATS-safe system fonts, standard
 headings, a single column, disabled optional ligatures, and print-aware page
-breaks. Preserve the established resume palette: teal `#087f8c` for section
-accents and blue `#245f8f` for secondary emphasis. Do not substitute purple or
-an AI-branded gradient. Original resume artifacts may inform presentation only
+breaks. The default `clean-teal` theme preserves teal `#087f8c` for section
+accents and blue `#245f8f` for secondary emphasis. Other named themes may
+define a distinct restrained ATS-safe palette; do not introduce AI-branded
+gradients. Original resume artifacts may inform presentation only
 when the user explicitly asks to preserve their visual identity; they remain
 out of scope for resume wording and factual claims.
 
