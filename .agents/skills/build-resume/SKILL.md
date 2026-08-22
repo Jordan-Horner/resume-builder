@@ -327,10 +327,15 @@ Git tools do not. Never write candidate data into same-named engine folders.
     naming the fact, state that it matches the approved version, and include the
     unchanged-resume note. Do not repeat the fact or ask another verification
     question. If they differ, show the discrepancy and keep the resume frozen.
-    Then discuss whether the story belongs in this resume. If recommending a revision, show
-    only the exact `Current bullet`, exact `Proposed bullet`, and `Update this
-    bullet and refresh the preview?`, plus a short note that other affected
-    resumes remain unchanged. After approval, return to edit → compile →
+    Then discuss whether the story belongs in this resume. If recommending a
+    revision to an experience bullet, begin with
+    `### **<Company> — <Role>**`, copying both values exactly from the current
+    visible resume placement heading; never infer, normalize, promote, or
+    otherwise rename the role. For a non-experience narrative block, use its
+    exact visible section heading in the same bold format. Then show only the
+    exact `Current bullet`, exact `Proposed bullet`, and `Update this bullet and
+    refresh the preview?`, plus a short note that other affected resumes remain
+    unchanged. After approval, return to edit → compile →
     changed-block language review → preview. Do not restart selection or the
     full career review merely because wording changed; reroute only after a
     material evidence, selection, direction, or target change. A

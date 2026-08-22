@@ -231,11 +231,16 @@ indexes. The scripts under
   matching save, separately discuss whether the story should be kept, omitted,
   reframed, or replaced for the current resume; factual truth does not determine
   selection.
-  When recommending a revision to a currently affected bullet, show only
+  When recommending a revision to a currently affected experience bullet,
+  begin with `### **<Company> — <Role>**`, copying the company and role exactly
+  from that bullet's visible resume placement heading. Never infer, normalize,
+  promote, or otherwise rename the role for this handoff. Then show only
   `Current bullet`, `Proposed bullet`, and `Update this bullet and refresh the
-  preview?` State that other affected resumes remain unchanged. Do not ask the
-  vague compound question “Should I update the bullet and generate a preview?”
-  without showing the exact proposed bullet.
+  preview?` State that other affected resumes remain unchanged. For a
+  non-experience narrative block, use its exact visible section heading in the
+  same bold heading format. Do not ask the vague compound question “Should I
+  update the bullet and generate a preview?” without showing the exact proposed
+  bullet.
 - Before changing the resume, follow the build-resume feedback-memory contract:
   identify the current narrative block with `resume-builder review blocks`,
   record or revise the temporary session with `resume-builder feedback record`,

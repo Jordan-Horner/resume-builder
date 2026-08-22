@@ -134,9 +134,14 @@ The resume remains unchanged.
 Do not repeat the stored fact or ask another verification question when the
 read-back matches. After the matching save, make the resume-selection decision
 separately. If the current resume cites the fact and a revision is recommended,
-use this compact impact render:
+use this compact impact render. Copy the company and role exactly from the
+affected bullet's visible resume placement heading; never infer, normalize,
+promote, or otherwise rename the role. For a non-experience narrative block,
+use its exact visible section heading instead:
 
 ```text
+### **<Company> — <Role>**
+
 **Current bullet**
 
 > <exact current bullet>
@@ -151,8 +156,9 @@ Other affected resumes will remain unchanged.
 
 Do not show build manifests, synthesis-plan paths, or every affected resume in
 this conversational decision. Do not ask whether to update and preview without
-first showing the proposed bullet. After approval, update the active synthesis
-plan and resume together, then publish the refreshed preview.
+first showing the exact affected placement or section heading and the proposed
+bullet. After approval, update the active synthesis plan and resume together,
+then publish the refreshed preview.
 
 ## Classification
 

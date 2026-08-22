@@ -242,6 +242,13 @@ def test_feedback_contract_separates_wording_edits_from_fact_changes() -> None:
     assert "**Proposed bullet**" in contract
     assert "**Update this bullet and refresh the preview?**" in contract
     assert "Other affected resumes will remain unchanged" in contract
+    assert "### **<Company> — <Role>**" in contract
+    assert (
+        "exactly from the affected bullet's visible resume placement heading" in normalized_contract
+    )
+    assert "never infer, normalize, promote, or otherwise rename the role" in normalized_contract
+    assert "### **<Company> — <Role>**" in agents
+    assert "exactly from that bullet's visible resume placement heading" in normalized_agents
 
 
 def test_feedback_contract_keeps_uncertain_sentence_drafting_conversational() -> None:
