@@ -3,10 +3,13 @@
 **Keep the strongest parts of every resume version, then build honest, targeted
 resumes without starting over.**
 
+Your career is bigger than two pages. What matters most will change with each
+opportunity, so tailor every resume to the job while preserving the rest of your
+story.
+
 Resume Builder gives an AI agent a private, organized record of your career. It
-combines useful details scattered across old resumes, LinkedIn exports, and career
-notes so tailoring one resume does not erase accomplishments that may matter for
-another role.
+brings together useful details scattered across old resumes, LinkedIn exports,
+and career notes so they remain available for future resumes.
 
 **Requires:** a local source checkout · Python 3.10 or newer · Codex or Claude Code
 
