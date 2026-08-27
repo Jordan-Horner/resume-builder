@@ -98,7 +98,7 @@ class HttpProvider:
             "raw_results": len(observations),
             "invalid": 0,
             "title_rejected": 0,
-            "remote_rejected": 0,
+            "work_mode_mismatch": 0,
             "freshness_rejected": 0,
             "accepted": 0,
         }
@@ -112,13 +112,11 @@ class HttpProvider:
                 metrics["invalid"] += 1
             elif not title_matches(observation.title, titles):
                 metrics["title_rejected"] += 1
-            elif not remote_matches(observation, self.search):
-                metrics["remote_rejected"] += 1
             elif not recent_matches(observation, since):
                 metrics["freshness_rejected"] += 1
             else:
-                if self.search.remote_only:
-                    observation.remote = True
+                if not remote_matches(observation, self.search):
+                    metrics["work_mode_mismatch"] += 1
                 accepted.append(observation)
         metrics["accepted"] = len(accepted)
         return accepted, metrics
@@ -133,7 +131,7 @@ class CandidateDetailProvider(HttpProvider):
             "raw_results": 0,
             "invalid": 0,
             "title_rejected": 0,
-            "remote_rejected": 0,
+            "work_mode_mismatch": 0,
             "freshness_rejected": 0,
             "duplicates": 0,
             "detail_errors": 0,
@@ -166,13 +164,11 @@ class CandidateDetailProvider(HttpProvider):
                             f"{card['job_id']}: {type(exc).__name__}: {exc}"
                         )
                         continue
-                    if self.search and not remote_matches(observation, self.search):
-                        metrics["remote_rejected"] += 1
-                    elif self.search and not recent_matches(observation, since):
+                    if self.search and not recent_matches(observation, since):
                         metrics["freshness_rejected"] += 1
                     else:
-                        if self.search and self.search.remote_only:
-                            observation.remote = True
+                        if self.search and not remote_matches(observation, self.search):
+                            metrics["work_mode_mismatch"] += 1
                         observations.append(observation)
                 metrics["accepted"] = len(observations)
             completed = datetime.now(UTC)

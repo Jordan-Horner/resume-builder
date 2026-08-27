@@ -61,13 +61,16 @@ Reconciliation retains every source observation and merges canonical jobs only w
 provider requisition identity agrees.
 
 Commercial-board runs print a filter waterfall showing raw results, invalid records, title rejections, work-mode
-rejections, stale records, duplicates, and accepted observations. The same metrics are retained with the scrape
+profile mismatches, stale records, duplicates, and accepted observations. The same metrics are retained with the scrape
 run in SQLite for later diagnostics.
 
 `search.accepted_work_modes` selects any combination of `remote`, `hybrid`, `onsite`, and `unknown`. The default
 configuration uses `[remote]`. The former `remote_only` setting remains readable for older private configurations,
 but new configurations should use the typed list. A job can expose more than one available arrangement, so the
 inventory stores modes in relational tables rather than forcing every posting into a single label.
+Work-mode selection guides provider-side discovery and marks profile matches; it is not an ingestion rejection.
+Every valid, recent, title-matching result returned by a provider is retained so another consumer can choose a
+different work-mode view without wasting an already completed provider request.
 
 Commercial providers use a default result target and may override it for specific families with
 `family_results_wanted`. For LinkedIn, the target counts title- and freshness-qualified cards rather than raw
@@ -101,11 +104,11 @@ raw jobs is treated as suspicious.
 LinkedIn collection uses its logged-out search and job-detail HTML fragments without personal cookies or an
 authenticated browser. Search cards are paginated with absolute offsets, deduplicated, title-gated, and
 freshness-gated before full descriptions are requested. The adapter uses LinkedIn's server-side remote filter as
-one signal, requires positive remote-work language, and rejects explicit hybrid or office-required contradictions
-in the title, displayed location, and description. Workplace patterns are contextual so technical phrases such as
+one signal and records whether role-specific remote evidence is present. Explicit hybrid or office-required
+contradictions are retained as classified inventory rather than discarded. Workplace patterns are contextual so technical phrases such as
 “hybrid cloud” are not treated as scheduling evidence. `remote_policy` supports `strict`, `balanced`, and `source`;
-strict is the default and excludes employer-level remote language unless the role itself is verifiably remote.
-Accepted observations retain the exact evidence rule, source, and matching text.
+strict is the default for deciding whether a result matches the remote profile. Observations retain the exact
+evidence rule, source, and matching text regardless of profile match.
 
 LinkedIn job details are cached by job ID and parser version for 24 hours. Search pages are never cached because
 they are the rotating discovery surface. Individual malformed details are reported and skipped without hiding later

@@ -5,6 +5,7 @@ import httpx
 import job_puller.providers.ats as ats_module
 from job_puller.config import AtsBoard, CommercialProvider, SearchSettings
 from job_puller.eligibility import family_keyword_queries
+from job_puller.models import JobObservation
 from job_puller.providers.ats import (
     AshbyProvider,
     GreenhouseProvider,
@@ -224,6 +225,49 @@ def test_candidate_detail_provider_deduplicates_list_ids(monkeypatch):
     assert result.metrics["duplicates"] == 1
 
 
+def test_candidate_detail_provider_keeps_onsite_profile_mismatch(monkeypatch):
+    list_payload = {
+        "items": [
+            {
+                "id": "onsite-1",
+                "name": "Site Reliability Engineer",
+                "url": "https://ats.rippling.com/acme/jobs/onsite-1",
+                "locations": [{"name": "New York", "workplaceType": "ON_SITE"}],
+            }
+        ],
+        "totalPages": 1,
+    }
+    detail_payload = {
+        "uuid": "onsite-1",
+        "name": "Site Reliability Engineer",
+        "description": {"role": "<p>Operate production systems</p>"},
+        "workLocations": ["New York"],
+        "createdOn": "2026-08-26T10:00:00Z",
+        "url": "https://ats.rippling.com/acme/jobs/onsite-1",
+    }
+
+    class ContextClient(FakeClient):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+    client = ContextClient(get_payloads=[list_payload, detail_payload])
+    monkeypatch.setattr(ats_module.httpx, "Client", lambda **kwargs: client)
+    search = SearchSettings(
+        accepted_work_modes=[WorkMode.REMOTE],
+        families=[{"name": "reliability", "titles": ["site reliability engineer"]}],
+    )
+
+    result = RipplingProvider(AtsBoard(id="acme", name="Acme"), search=search).fetch(SINCE)
+
+    assert result.success is True
+    assert len(result.observations) == 1
+    assert result.observations[0].work_modes == {WorkMode.ONSITE}
+    assert result.metrics["work_mode_mismatch"] == 1
+
+
 def test_lever_normalizes_apply_url():
     provider = LeverProvider(AtsBoard(id="example", name="Example"))
     client = FakeClient(
@@ -385,7 +429,7 @@ def test_workday_paginates_when_later_pages_report_zero_total():
     assert [job.provider_job_id for job in jobs] == ["1", "2", "3"]
 
 
-def test_ats_filter_keeps_only_recent_remote_target_titles():
+def test_ats_filter_keeps_recent_target_titles_regardless_of_work_mode():
     search = SearchSettings(
         remote_only=True,
         families=[{"name": "reliability", "titles": ["site reliability engineer", "SRE"]}],
@@ -411,10 +455,21 @@ def test_ats_filter_keeps_only_recent_remote_target_titles():
             ("old", "Site Reliability Engineer", True, "Remote", "2026-08-01"),
         ]
     ]
+    observations.append(
+        JobObservation(
+            provider="greenhouse",
+            provider_job_id="invalid",
+            title="Site Reliability Engineer",
+            company="Example",
+            source_url="",
+            posted_at=datetime(2026, 8, 26, tzinfo=UTC),
+        )
+    )
     accepted, metrics = provider._eligible([item for item in observations if item], SINCE)
-    assert [item.provider_job_id for item in accepted] == ["keep"]
+    assert [item.provider_job_id for item in accepted] == ["keep", "remote"]
+    assert metrics["invalid"] == 1
     assert metrics["title_rejected"] == 1
-    assert metrics["remote_rejected"] == 1
+    assert metrics["work_mode_mismatch"] == 1
     assert metrics["freshness_rejected"] == 1
 
 
@@ -581,22 +636,22 @@ def test_indeed_fetch_reports_filter_waterfall(monkeypatch):
     assert captured[0]["results_wanted"] == 200
     assert captured[0]["is_remote"] is True
     assert "hours_old" not in captured[0]
-    assert len(result.observations) == 1
+    assert len(result.observations) == 2
     assert result.metrics == {
         "queries": 1,
         "raw_results": 5,
         "invalid": 0,
         "title_rejected": 1,
-        "remote_rejected": 1,
+        "work_mode_mismatch": 1,
         "freshness_rejected": 1,
-        "accepted_before_dedupe": 2,
+        "accepted_before_dedupe": 3,
         "duplicates": 1,
-        "accepted": 1,
+        "accepted": 2,
         "saturated_queries": 0,
         "family.reliability.raw_results": 5,
-        "family.reliability.accepted_before_dedupe": 2,
+        "family.reliability.accepted_before_dedupe": 3,
         "family.reliability.query.site reliability engineer.raw_results": 5,
-        "family.reliability.query.site reliability engineer.accepted_before_dedupe": 2,
+        "family.reliability.query.site reliability engineer.accepted_before_dedupe": 3,
     }
 
 

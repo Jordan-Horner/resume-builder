@@ -16,6 +16,7 @@ from job_puller.providers.linkedin import (
     parse_job_detail,
     parse_search_cards,
 )
+from job_puller.work_modes import WorkMode
 
 SINCE = datetime(2026, 8, 20, 12, tzinfo=UTC)
 
@@ -196,27 +197,29 @@ def test_provider_enforces_minimum_incremental_lookback():
         "Employees are required to work in the office.",
     ],
 )
-def test_provider_rejects_explicit_remote_contradictions(description):
+def test_provider_keeps_explicit_remote_contradictions(description):
     client = FakeLinkedInClient(
         pages={0: card(1, "SRE")},
         details={"1": detail(description)},
     )
     result = provider(client).fetch(SINCE)
     assert result.success
-    assert result.observations == []
-    assert result.metrics["remote_rejected"] == 1
-    assert result.metrics["remote_contradiction_rejected"] == 1
+    assert len(result.observations) == 1
+    assert result.metrics["work_mode_mismatch"] == 1
+    assert result.metrics["remote_contradiction_observed"] == 1
 
 
-def test_provider_rejects_remote_filter_result_without_positive_evidence():
+def test_provider_keeps_remote_filter_result_without_positive_evidence():
     client = FakeLinkedInClient(
         pages={0: card(1, "SRE", location="Austin, TX")},
         details={"1": detail("Build and operate reliable cloud services.")},
     )
     result = provider(client).fetch(SINCE)
     assert result.success
-    assert result.observations == []
-    assert result.metrics["remote_unverified_rejected"] == 1
+    assert len(result.observations) == 1
+    assert result.observations[0].work_modes == {WorkMode.UNKNOWN}
+    assert result.metrics["work_mode_mismatch"] == 1
+    assert result.metrics["remote_unverified_observed"] == 1
 
 
 def test_remote_evidence_does_not_treat_hybrid_cloud_as_a_work_arrangement():

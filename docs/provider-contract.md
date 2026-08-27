@@ -30,6 +30,11 @@ The inventory persists observation modes and their evidence in `observation_work
 set in `job_work_modes`. The legacy `jobs.work_mode` column is a display projection: one mode is stored directly,
 multiple modes appear as `mixed`, and no evidence appears as `unknown`.
 
+Work-mode preferences are query/discovery-profile metadata, not ingestion gates. Once a provider returns a valid,
+recent observation whose title matches an enabled family, the observation must be retained even when its mode does
+not match the active profile. Providers report `work_mode_mismatch` for visibility. Invalid identities, malformed
+details, nonmatching titles, and stale observations remain rejection conditions.
+
 Commercial-board results are discovery observations and never authoritative for closure. Direct ATS list results
 may be authoritative when pagination completes successfully. JazzHR and Rippling list every public opening first,
 then fetch details only for locally matching titles; their normal filtered runs are therefore not authoritative
@@ -74,8 +79,8 @@ requests. Because guest results rotate, incremental runs retain a configurable m
 treating completion time as a complete chronological cursor. In remote-only mode, the adapter uses one of three
 policies: `strict` requires role-specific evidence, `balanced` also accepts employer-level remote evidence, and
 `source` trusts LinkedIn's filter unless contradicted. Language such as “remote hands,” required office presence,
-one remote day, hybrid schedules, onsite, or in-office is rejected in every mode. Accepted observations record the
-evidence rule, source, and matching text.
+one remote day, hybrid schedules, onsite, or in-office is a remote-profile mismatch in every policy. Those jobs are
+still retained and classified; observations record the evidence rule, source, and matching text.
 
 Successful LinkedIn details are cached by provider job ID and parser version. Cache failures are surfaced as partial
 run errors without discarding retrieved jobs. A missing detail is skipped; an individual parser failure is recorded

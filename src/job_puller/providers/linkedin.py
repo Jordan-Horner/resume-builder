@@ -302,9 +302,9 @@ class LinkedInGuestProvider:
             "detail_cache_expired": 0,
             "detail_cache_errors": 0,
             "detail_requests_saved": 0,
-            "remote_rejected": 0,
-            "remote_contradiction_rejected": 0,
-            "remote_unverified_rejected": 0,
+            "work_mode_mismatch": 0,
+            "remote_contradiction_observed": 0,
+            "remote_unverified_observed": 0,
             "accepted_before_dedupe": 0,
             "duplicates": 0,
             "accepted": 0,
@@ -475,9 +475,8 @@ class LinkedInGuestProvider:
                         self.settings.remote_policy,
                     )
                     if remote_evidence.status != "verified":
-                        metrics["remote_rejected"] += 1
-                        metrics[f"remote_{remote_evidence.status}_rejected"] += 1
-                        continue
+                        metrics["work_mode_mismatch"] += 1
+                        metrics[f"remote_{remote_evidence.status}_observed"] += 1
                 else:
                     remote_evidence = RemoteEvidence("not_filtered", "not_filtered", "none")
                 observation = self._normalize(candidate, detail, remote_evidence)
@@ -538,6 +537,22 @@ class LinkedInGuestProvider:
                 rule=remote_evidence.rule,
                 matched_text=remote_evidence.matched_text,
             )
+        elif remote_evidence.status == "contradiction":
+            contradiction_mode = {
+                "hybrid_workplace": WorkMode.HYBRID,
+                "hybrid_schedule": WorkMode.HYBRID,
+                "limited_remote_days": WorkMode.HYBRID,
+                "onsite_workplace": WorkMode.ONSITE,
+                "office_workplace": WorkMode.ONSITE,
+                "required_office_presence": WorkMode.ONSITE,
+            }.get(remote_evidence.rule)
+            if contradiction_mode is not None:
+                work_arrangement = explicit_arrangement(
+                    [contradiction_mode],
+                    source=f"linkedin_{remote_evidence.source}",
+                    rule=remote_evidence.rule,
+                    matched_text=remote_evidence.matched_text,
+                )
         return JobObservation(
             provider=self.name,
             provider_job_id=card.job_id,
@@ -550,7 +565,7 @@ class LinkedInGuestProvider:
             description_text=description_text,
             posted_at=card.posted_at,
             employment_type=detail.employment_type if detail else None,
-            remote=True if self.search.remote_only else "remote" in card.location.casefold(),
+            remote=True if remote_evidence.status == "verified" else None,
             work_arrangement=work_arrangement,
             raw_payload=raw_payload,
             parser_version=_PARSER_VERSION,

@@ -35,7 +35,7 @@ class JobSpyProvider:
             "raw_results": 0,
             "invalid": 0,
             "title_rejected": 0,
-            "remote_rejected": 0,
+            "work_mode_mismatch": 0,
             "freshness_rejected": 0,
             "accepted_before_dedupe": 0,
             "duplicates": 0,
@@ -90,13 +90,11 @@ class JobSpyProvider:
                             metrics["invalid"] += 1
                         elif not self._title_matches(observation.title, family.titles):
                             metrics["title_rejected"] += 1
-                        elif not self._remote_eligible(observation):
-                            metrics["remote_rejected"] += 1
                         elif not self._recent_enough(observation, since):
                             metrics["freshness_rejected"] += 1
                         else:
-                            if self.search.remote_only:
-                                observation.remote = True
+                            if not self._remote_eligible(observation):
+                                metrics["work_mode_mismatch"] += 1
                             observations.append(observation)
                             family_accepted += 1
                     metrics[family_prefix + "accepted_before_dedupe"] = (
