@@ -1,0 +1,62 @@
+schema_version: 1
+database_path: data/inventory.db
+raw_payload_retention_days: 30
+initial_lookback_days: 7
+checkpoint_overlap_hours: 6
+request_timeout_seconds: 30
+
+search:
+  location: United States
+  remote_only: true
+  families:
+    - name: reliability-cloud-operations
+      terms:
+        - site reliability engineer
+        - devops engineer
+        - cloud engineer
+    - name: production-support-operations
+      terms:
+        - production support engineer
+        - application support engineer
+        - technical operations engineer
+    - name: ai-assisted-operations
+      terms:
+        - AI automation engineer
+        - AI production support engineer
+    - name: systems-configuration-integrations
+      terms:
+        - systems engineer
+        - system administrator
+        - integration engineer
+    - name: backend-api-cloud-development
+      terms:
+        - backend software engineer
+        - python backend engineer
+        - API engineer
+        - cloud software engineer
+
+providers:
+  linkedin:
+    enabled: true
+    results_wanted: 25
+    fetch_descriptions: true
+  indeed:
+    enabled: true
+    results_wanted: 50
+    fetch_descriptions: true
+  greenhouse:
+    enabled: true
+    boards: []
+  lever:
+    enabled: true
+    boards: []
+  ashby:
+    enabled: true
+    boards: []
+  smartrecruiters:
+    enabled: true
+    boards: []
+  workday:
+    enabled: true
+    boards: []
+
