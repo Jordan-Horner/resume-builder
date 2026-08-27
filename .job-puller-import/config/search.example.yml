@@ -1,0 +1,87 @@
+schema_version: 1
+database_path: data/inventory.db
+board_registry_path: config/boards.yml
+raw_payload_retention_days: 30
+initial_lookback_days: 7
+checkpoint_overlap_hours: 6
+request_timeout_seconds: 30
+
+search:
+  location: United States
+  accepted_work_modes: [remote]
+  families:
+    - name: reliability-cloud-operations
+      enabled: true
+      titles:
+        - site reliability engineer
+        - SRE
+        - devops engineer
+        - cloud engineer
+        - platform engineer
+    - name: production-support-operations
+      enabled: true
+      titles:
+        - production support engineer
+        - application support engineer
+        - technical support engineer
+        - technical operations engineer
+        - production operations engineer
+    - name: systems-configuration-integrations
+      enabled: true
+      titles:
+        - systems engineer
+        - system administrator
+        - infrastructure engineer
+        - operations engineer
+        - integration engineer
+    - name: backend-api-cloud-development
+      enabled: true
+      titles:
+        - backend engineer
+        - backend software engineer
+        - python developer
+        - API engineer
+    - name: automation-ai
+      enabled: true
+      titles:
+        - automation engineer
+        - AI automation engineer
+        - AI engineer
+
+providers:
+  jazzhr:
+    enabled: true
+  rippling:
+    enabled: true
+  linkedin:
+    enabled: true
+    results_wanted: 10
+    fetch_descriptions: true
+    request_delay_seconds: 3.2
+    incremental_lookback_hours: 48
+    max_cards_scanned: 50
+    detail_cache_hours: 24
+    remote_policy: strict
+  indeed:
+    enabled: true
+    results_wanted: 100
+    fetch_descriptions: true
+    request_delay_seconds: 1
+    family_results_wanted:
+      production-support-operations: 200
+      backend-api-cloud-development: 200
+  greenhouse:
+    enabled: true
+    boards: []
+  lever:
+    enabled: true
+    boards: []
+  ashby:
+    enabled: true
+    boards: []
+  smartrecruiters:
+    enabled: true
+    boards: []
+  workday:
+    enabled: true
+    boards: []
