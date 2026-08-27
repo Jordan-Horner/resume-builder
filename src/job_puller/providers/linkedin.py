@@ -98,7 +98,9 @@ class LinkedInGuestClient:
         if response.status_code == 400:
             if int(params.get("start", 0)) >= 990:
                 return ""
-            raise LinkedInError(f"LinkedIn search returned HTTP 400 at offset {params.get('start', 0)}")
+            raise LinkedInError(
+                f"LinkedIn search returned HTTP 400 at offset {params.get('start', 0)}"
+            )
         self._raise_for_status(response)
         self._raise_for_challenge(response)
         return response.text
@@ -138,7 +140,9 @@ class LinkedInGuestClient:
     def _raise_for_challenge(response: httpx.Response) -> None:
         body = response.text.casefold()
         final_url = str(response.url).casefold()
-        redirected_to_auth = any(marker in final_url for marker in ("/signup", "/login", "authwall"))
+        redirected_to_auth = any(
+            marker in final_url for marker in ("/signup", "/login", "authwall")
+        )
         challenge_body = any(marker in body for marker in ("checkpoint/challenge", "captcha"))
         if redirected_to_auth or challenge_body:
             raise LinkedInBlockedError("LinkedIn returned a login or challenge page")
@@ -164,7 +168,8 @@ def _parse_card(node: Tag) -> LinkedInCard | None:
     match = _JOB_ID_RE.search(urn) or _JOB_ID_RE.search(href)
     title_node = node.select_one("h3.base-search-card__title") or node.select_one("span.sr-only")
     title = _node_text(title_node)
-    if not match or not title:
+    company = _node_text(node.select_one("h4.base-search-card__subtitle"))
+    if not match or not title or not company:
         return None
     job_id = match.group(1)
     time_node = node.select_one("time")
@@ -172,7 +177,7 @@ def _parse_card(node: Tag) -> LinkedInCard | None:
     return LinkedInCard(
         job_id=job_id,
         title=title,
-        company=_node_text(node.select_one("h4.base-search-card__subtitle")),
+        company=company,
         location=_node_text(node.select_one("span.job-search-card__location")),
         posted_at=parse_datetime(posted_value),
         posted_label=_node_text(time_node),
@@ -365,12 +370,12 @@ class LinkedInGuestProvider:
                     scanned_for_query += len(selected)
                     metrics["raw_results"] += len(selected)
                     metrics["cards_scanned"] += len(selected)
-                    metrics[family_key + "raw_results"] = (
-                        metrics.get(family_key + "raw_results", 0) + len(selected)
-                    )
-                    metrics[query_key + "raw_results"] = (
-                        metrics.get(query_key + "raw_results", 0) + len(selected)
-                    )
+                    metrics[family_key + "raw_results"] = metrics.get(
+                        family_key + "raw_results", 0
+                    ) + len(selected)
+                    metrics[query_key + "raw_results"] = metrics.get(
+                        query_key + "raw_results", 0
+                    ) + len(selected)
                     for card in selected:
                         if card.job_id in seen_for_query:
                             metrics["card_duplicates"] += 1
@@ -447,9 +452,8 @@ class LinkedInGuestProvider:
                         )
                         continue
                     metrics["detail_fetched"] += 1
-                    if (
-                        self.detail_cache is not None
-                        and (cache_entry is None or cache_entry.expires_at <= now)
+                    if self.detail_cache is not None and (
+                        cache_entry is None or cache_entry.expires_at <= now
                     ):
                         try:
                             fetched_at = datetime.now(UTC)

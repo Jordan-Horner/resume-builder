@@ -37,6 +37,7 @@ def test_distribution_audit_accepts_cli_wheel_and_fictional_source(tmp_path: Pat
     _wheel(
         wheel,
         {
+            "job_puller/cli.py": b"# inventory cli",
             "resume_builder/cli.py": b"# cli",
             "resume_builder/evidence_questions.py": b"# questions",
             "resume_builder/resources/workspace/vault/README.md": b"# Empty vault",
@@ -65,6 +66,7 @@ def test_distribution_audit_rejects_runtime_data_and_private_strings(tmp_path: P
     _wheel(
         wheel,
         {
+            "job_puller/cli.py": b"# inventory cli",
             "resume_builder/cli.py": b"private-marker",
             "resume_builder/evidence_questions.py": b"# questions",
             "resume_builder/resources/workspace/vault/README.md": b"# Empty vault",

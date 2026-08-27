@@ -51,6 +51,21 @@ def test_migrate_and_insert(tmp_path):
     assert db.stats()["complete_descriptions"] == 1
 
 
+def test_active_inventory_exposes_stable_consumer_projection(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    db.record_result(result(observation(direct="https://example.com/apply/1")))
+
+    inventory = db.active_inventory()
+    assert len(inventory) == 1
+    assert inventory[0]["company"] == "Example, Inc."
+    assert inventory[0]["title"] == "Senior Production Support Engineer"
+    assert inventory[0]["description_quality"] == "complete"
+    assert inventory[0]["work_modes"] == ["remote"]
+    assert inventory[0]["providers"] == ["linkedin"]
+    assert inventory[0]["url"] == "https://example.com/apply/1"
+
+
 def test_run_metrics_are_persisted(tmp_path):
     db = InventoryDatabase(tmp_path / "inventory.db")
     db.migrate()
@@ -105,9 +120,7 @@ def test_legacy_false_remote_is_persisted_as_unknown_not_onsite(tmp_path):
     db.record_result(result(item))
 
     with db.connect() as conn:
-        observation_modes = conn.execute(
-            "SELECT mode FROM observation_work_modes"
-        ).fetchall()
+        observation_modes = conn.execute("SELECT mode FROM observation_work_modes").fetchall()
         job = conn.execute("SELECT work_mode FROM jobs").fetchone()
         job_modes = conn.execute("SELECT mode FROM job_work_modes").fetchall()
     assert [row[0] for row in observation_modes] == ["unknown"]
@@ -153,7 +166,9 @@ def test_provider_identity_survives_url_change(tmp_path):
     db = InventoryDatabase(tmp_path / "inventory.db")
     db.migrate()
     db.record_result(result(observation(source="https://example.com/jobs/1?ref=old")))
-    inserted, updated = db.record_result(result(observation(source="https://example.com/jobs/1?ref=new")))
+    inserted, updated = db.record_result(
+        result(observation(source="https://example.com/jobs/1?ref=new"))
+    )
     assert (inserted, updated) == (0, 1)
     assert db.stats()["observations"] == 1
 
@@ -200,9 +215,7 @@ def test_verified_greenhouse_redirect_merges_without_losing_observations(tmp_pat
     assert db.stats()["jobs"] == 1
     assert db.stats()["observations"] == 2
     with db.connect() as conn:
-        providers = {
-            row[0] for row in conn.execute("SELECT provider FROM observations").fetchall()
-        }
+        providers = {row[0] for row in conn.execute("SELECT provider FROM observations").fetchall()}
         merge_reasons = {
             row[0]
             for row in conn.execute("SELECT merge_reason FROM job_observation_links").fetchall()
@@ -249,8 +262,7 @@ def test_workday_requisition_identity_merges_url_variants(tmp_path):
         provider="indeed",
         job_id="indeed-r29937",
         direct=(
-            "https://example.wd5.myworkdayjobs.com/en-US/Careers/job/Remote/"
-            "Senior-Engineer_R29937"
+            "https://example.wd5.myworkdayjobs.com/en-US/Careers/job/Remote/Senior-Engineer_R29937"
         ),
         description="Syndicated description. ",
     )
@@ -303,7 +315,9 @@ def test_two_authoritative_absences_close_without_deleting(tmp_path):
     second.authoritative_complete = True
     db.record_result(second)
     with db.connect() as conn:
-        status = conn.execute("SELECT status FROM jobs WHERE canonical_apply_url LIKE '%/1'").fetchone()[0]
+        status = conn.execute(
+            "SELECT status FROM jobs WHERE canonical_apply_url LIKE '%/1'"
+        ).fetchone()[0]
     assert status == "possibly_closed"
 
     third = result(replacement, when=first_time + timedelta(hours=2))
@@ -343,9 +357,7 @@ def test_exact_company_title_description_merges_location_variants(tmp_path):
     assert db.stats()["jobs"] == 1
     assert db.stats()["observations"] == 2
     with db.connect() as conn:
-        reasons = {
-            row[0] for row in conn.execute("SELECT merge_reason FROM job_observation_links")
-        }
+        reasons = {row[0] for row in conn.execute("SELECT merge_reason FROM job_observation_links")}
     assert reasons == {"new_canonical_job", "exact_company_title_description"}
 
 

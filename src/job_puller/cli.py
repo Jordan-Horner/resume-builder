@@ -14,7 +14,7 @@ from .boards import (
     merge_registries,
     write_board_registry,
 )
-from .config import load_config, resolve_database_path, resolve_project_path
+from .config import InventoryConfig, load_config, resolve_database_path, resolve_project_path
 from .database import InventoryDatabase
 from .service import InventoryService
 
@@ -22,11 +22,11 @@ from .service import InventoryService
 def _default_config_path() -> str:
     if configured := os.environ.get("JOB_PULLER_CONFIG"):
         return configured
-    local = Path.cwd() / "config" / "search.yml"
-    if local.exists():
-        return str(local)
-    editable_project = Path(__file__).resolve().parents[2] / "config" / "search.yml"
-    return str(editable_project)
+    candidates = (
+        Path.cwd() / "job-search" / "config" / "search.yml",
+        Path.cwd() / "config" / "search.yml",
+    )
+    return str(next((path for path in candidates if path.exists()), candidates[0]))
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -34,7 +34,9 @@ def _parser() -> argparse.ArgumentParser:
         prog="job-puller", description="Collect jobs into a private local inventory."
     )
     parser.add_argument("--version", action="version", version=f"job-puller {__version__}")
-    parser.add_argument("--config", default=_default_config_path(), help="Path to search configuration YAML")
+    parser.add_argument(
+        "--config", default=_default_config_path(), help="Path to search configuration YAML"
+    )
     commands = parser.add_subparsers(dest="command", required=True)
     scrape = commands.add_parser("scrape", help="Run enabled providers and update inventory")
     scrape.add_argument(
@@ -71,7 +73,7 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _load(config_path: Path):
+def _load(config_path: Path) -> tuple[InventoryConfig, InventoryDatabase]:
     config = load_config(config_path)
     database_path = resolve_database_path(config_path, config.database_path)
     database = InventoryDatabase(database_path, config.raw_payload_retention_days)
@@ -93,7 +95,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "config":
         enabled = [
-            name for name in type(config.providers).model_fields if getattr(config.providers, name).enabled
+            name
+            for name in type(config.providers).model_fields
+            if getattr(config.providers, name).enabled
         ]
         print(f"Configuration valid: {config_path}")
         print(f"Enabled providers: {', '.join(enabled)}")
@@ -214,7 +218,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {summary.error}", file=sys.stderr)
         failed += int(not summary.success or summary.suspicious_empty)
     stats = database.stats()
-    print(f"Inventory: {stats['active_jobs']} active jobs, {stats['observations']} source observations")
+    print(
+        f"Inventory: {stats['active_jobs']} active jobs, {stats['observations']} source observations"
+    )
     return 1 if failed else 0
 
 

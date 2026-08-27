@@ -35,7 +35,9 @@ def enrich_observation(observation: JobObservation, timeout: float = 30) -> JobO
         return observation
     try:
         with httpx.Client(timeout=timeout, follow_redirects=True) as client:
-            response = client.get(url, headers={"User-Agent": "JobPuller/0.1 (+local personal inventory)"})
+            response = client.get(
+                url, headers={"User-Agent": "JobPuller/0.1 (+local personal inventory)"}
+            )
             response.raise_for_status()
     except (httpx.HTTPError, ValueError):
         return observation

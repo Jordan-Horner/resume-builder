@@ -1,14 +1,18 @@
 # Job Puller
 
-Job Puller is a private, local-only command-line application that collects job postings into a durable SQLite inventory. It does not rank candidates, modify resumes, submit applications, run a server, or publish data.
+Job Puller is Resume Builder's reusable local inventory package. It collects job
+postings into a durable SQLite inventory. It does not modify resumes, submit
+applications, run a server, or publish data. Resume Builder adds a separate,
+candidate-aware orchestration layer for cheap prescreening and deeper screening.
 
 ## Boundaries
 
 - Local manual execution only.
-- No Git remote, telemetry, hosted service, or background scheduler.
+- No separate repository, telemetry, hosted service, or background scheduler.
 - LinkedIn uses a direct logged-out guest adapter; Indeed is isolated behind `python-jobspy`.
 - Greenhouse, Lever, Ashby, SmartRecruiters, and Workday use direct public board adapters.
-- Resume matching remains a separate future Resume Builder concern.
+- Mutable inventory and personal configuration live under the private Resume
+  Builder workspace; reusable provider code lives in the public engine.
 
 ## Setup
 
@@ -19,12 +23,14 @@ uv sync --extra dev
 uv run job-puller config validate
 ```
 
-The personal `config/search.yml`, `config/boards.yml`, and everything under `data/` are ignored by Git. Start from
-the two example configuration files on another installation:
+The personal files live under `workspace/job-search/`. Start from the public
+examples on another installation:
 
 ```bash
-cp config/search.example.yml config/search.yml
-cp config/boards.example.yml config/boards.yml
+mkdir -p workspace/job-search/config
+cp config/job-puller/search.example.yml workspace/job-search/config/search.yml
+cp config/job-puller/boards.example.yml workspace/job-search/config/boards.yml
+cp config/job-puller/preferences.example.yml workspace/job-search/preferences.yml
 ```
 
 Search configuration describes reusable title families rather than provider query syntax. Each family can be
@@ -47,6 +53,16 @@ Manually update inventory:
 ```bash
 uv run job-puller scrape
 uv run job-puller scrape --provider greenhouse
+```
+
+From a discovered Resume Builder workspace, prefer the unified commands:
+
+```bash
+resume-builder jobs update
+resume-builder jobs update --provider indeed
+resume-builder jobs status
+resume-builder jobs shortlist
+resume-builder jobs screen <job-id>
 ```
 
 Repeat `--provider` to update a selected group. Omitting it runs every enabled provider.

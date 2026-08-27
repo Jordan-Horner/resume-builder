@@ -25,7 +25,7 @@ class SearchFamily(StrictModel):
         if any(not title for title in cleaned):
             raise ValueError("job titles cannot be blank")
         if any('"' in title for title in cleaned):
-            raise ValueError('job titles cannot contain double quotes')
+            raise ValueError("job titles cannot contain double quotes")
         if len({title.casefold() for title in cleaned}) != len(cleaned):
             raise ValueError("job titles must be unique within a family")
         return cleaned
@@ -41,7 +41,10 @@ class SearchSettings(StrictModel):
     def require_enabled_family(self) -> SearchSettings:
         if not any(family.enabled for family in self.families):
             raise ValueError("at least one search family must be enabled")
-        if "accepted_work_modes" in self.model_fields_set and "remote_only" in self.model_fields_set:
+        if (
+            "accepted_work_modes" in self.model_fields_set
+            and "remote_only" in self.model_fields_set
+        ):
             raise ValueError("set accepted_work_modes or legacy remote_only, not both")
         if self.accepted_work_modes is None:
             self.accepted_work_modes = (
@@ -159,7 +162,9 @@ class InventoryConfig(StrictModel):
 
     @model_validator(mode="after")
     def require_provider(self) -> InventoryConfig:
-        if not any(getattr(self.providers, name).enabled for name in type(self.providers).model_fields):
+        if not any(
+            getattr(self.providers, name).enabled for name in type(self.providers).model_fields
+        ):
             raise ValueError("at least one provider must be enabled")
         family_names = {family.name for family in self.search.families}
         for provider_name in ("linkedin", "indeed"):

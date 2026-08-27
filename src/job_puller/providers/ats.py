@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urljoin, urlsplit
 
@@ -22,12 +23,12 @@ from job_puller.work_modes import WorkArrangement, WorkMode, explicit_arrangemen
 
 
 def _provider_work_arrangement(
-    values: list[object], *, provider: str, rule: str
+    values: Sequence[object], *, provider: str, rule: str
 ) -> WorkArrangement | None:
     modes: set[WorkMode] = set()
     matched: list[str] = []
     for value in values:
-        text = clean_text(value)
+        text = clean_text(str(value) if value is not None else None)
         normalized = text.casefold().replace("_", "-")
         if normalized in {"remote", "telecommute", "work-from-home", "wfh"}:
             modes.add(WorkMode.REMOTE)
@@ -51,9 +52,7 @@ def _provider_work_arrangement(
 class HttpProvider:
     name = "http"
 
-    def __init__(
-        self, board: AtsBoard, timeout: float = 30, search: SearchSettings | None = None
-    ):
+    def __init__(self, board: AtsBoard, timeout: float = 30, search: SearchSettings | None = None):
         self.board = board
         self.timeout = timeout
         self.search = search
@@ -108,7 +107,11 @@ class HttpProvider:
         titles = enabled_titles(self.search)
         accepted = []
         for observation in observations:
-            if not observation.provider_job_id or not observation.title or not observation.source_url:
+            if (
+                not observation.provider_job_id
+                or not observation.title
+                or not observation.source_url
+            ):
                 metrics["invalid"] += 1
             elif not title_matches(observation.title, titles):
                 metrics["title_rejected"] += 1
@@ -160,9 +163,7 @@ class CandidateDetailProvider(HttpProvider):
                         observation = self._detail(client, card)
                     except (httpx.HTTPError, ValueError, json.JSONDecodeError) as exc:
                         metrics["detail_errors"] += 1
-                        detail_errors.append(
-                            f"{card['job_id']}: {type(exc).__name__}: {exc}"
-                        )
+                        detail_errors.append(f"{card['job_id']}: {type(exc).__name__}: {exc}")
                         continue
                     if self.search and not recent_matches(observation, since):
                         metrics["freshness_rejected"] += 1
@@ -224,7 +225,11 @@ class JazzHRProvider(CandidateDetailProvider):
             source_url = urljoin(str(response.url), str(link.get("href") or ""))
             match = re.search(r"/apply/([^/?#]+)", urlsplit(source_url).path)
             location_node = item.select_one(".fa-map-marker")
-            location = clean_text(location_node.parent.get_text(" ") if location_node else "")
+            location = clean_text(
+                location_node.parent.get_text(" ")
+                if location_node is not None and location_node.parent is not None
+                else ""
+            )
             cards.append(
                 {
                     "job_id": match.group(1) if match else "",
@@ -327,7 +332,7 @@ class RipplingProvider(CandidateDetailProvider):
         employment_type = payload.get("employmentType") or {}
         source_url = str(payload.get("url") or card["url"])
         arrangement = _provider_work_arrangement(
-            card.get("work_modes", "").split(","),
+            list(card.get("work_modes", "").split(",")),
             provider=self.name,
             rule="location_workplace_types",
         )
@@ -472,7 +477,10 @@ class SmartRecruitersProvider(HttpProvider):
     name = "smartrecruiters"
 
     def _fetch(self, client: httpx.Client, since: datetime) -> list[JobObservation]:
-        base = self.board.api_url or f"https://api.smartrecruiters.com/v1/companies/{self.board.id}/postings"
+        base = (
+            self.board.api_url
+            or f"https://api.smartrecruiters.com/v1/companies/{self.board.id}/postings"
+        )
         result = []
         offset = 0
         while True:
@@ -505,13 +513,18 @@ class SmartRecruitersProvider(HttpProvider):
                     provider_job_id=job_id,
                     title=clean_text(detail.get("name") or item.get("name")),
                     company=self.board.name,
-                    source_url=str(detail.get("postingUrl") or item.get("ref") or f"{base}/{job_id}"),
+                    source_url=str(
+                        detail.get("postingUrl") or item.get("ref") or f"{base}/{job_id}"
+                    ),
                     direct_apply_url=str(detail.get("applyUrl") or detail.get("postingUrl") or ""),
                     location=location,
                     description_html=description,
                     description_text=html_to_text(description),
-                    posted_at=parse_datetime(detail.get("releasedDate") or item.get("releasedDate")),
-                    employment_type=clean_text((detail.get("typeOfEmployment") or {}).get("label")) or None,
+                    posted_at=parse_datetime(
+                        detail.get("releasedDate") or item.get("releasedDate")
+                    ),
+                    employment_type=clean_text((detail.get("typeOfEmployment") or {}).get("label"))
+                    or None,
                     raw_payload=detail,
                     parser_version="smartrecruiters-v1",
                 )
@@ -622,7 +635,9 @@ def _json_ld_location(payload: dict) -> str:
     remote_regions = payload.get("applicantLocationRequirements") or []
     if isinstance(remote_regions, dict):
         remote_regions = [remote_regions]
-    names = [clean_text(region.get("name")) for region in remote_regions if isinstance(region, dict)]
+    names = [
+        clean_text(region.get("name")) for region in remote_regions if isinstance(region, dict)
+    ]
     if names:
         return ", ".join(name for name in names if name)
     locations = payload.get("jobLocation") or []

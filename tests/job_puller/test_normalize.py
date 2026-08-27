@@ -30,4 +30,6 @@ def test_html_to_text_removes_script():
 
 
 def test_normalized_key_folds_punctuation():
-    assert normalized_key("  Senior Site-Reliability Engineer! ") == "senior site reliability engineer"
+    assert (
+        normalized_key("  Senior Site-Reliability Engineer! ") == "senior site reliability engineer"
+    )

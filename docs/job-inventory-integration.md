@@ -1,13 +1,21 @@
 # Job Inventory and Resume Matching Integration
 
 **Date:** 2026-08-27
-**Status:** Implemented as private local Job Puller v0.1.0
-**Implementation:** `/Users/jordan/Projects/job-puller` at local commit `c56ccb8`; no Git remote
-**Scope:** Resume Builder integration remains deferred. No Resume Builder matching, workspace, or resume behavior is changed by this document.
+**Status:** Implemented in Resume Builder on 2026-08-27
+**Implementation:** `src/job_puller` plus `resume-builder jobs`
+**Storage:** `workspace/job-search/inventory.db` in the private workspace
+
+> This document preserves the original design investigation. The initial
+> standalone repository was subsequently merged, with full Git history, into
+> Resume Builder so only one public project must be maintained. The package
+> boundary remains intact, but ranking orchestration now lives beside matching.
 
 ## Decision
 
-Build a high-quality job inventory as a **new standalone backend in its own repository**, then connect shortlisted postings to Resume Builder through its existing target and matching contracts.
+Build a high-quality job inventory as an isolated backend package, then connect
+shortlisted postings to Resume Builder through stable inventory and target
+contracts. Ship both packages in one distribution while keeping mutable job data
+in the private workspace.
 
 CareerPulse is frozen for this effort. It is neither the inventory host nor a runtime dependency. Its implementation may be consulted for proven retry, enrichment, location, and source-health ideas, but no new inventory work belongs in CareerPulse and the new backend must not read CareerPulse's database.
 

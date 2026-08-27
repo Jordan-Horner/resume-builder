@@ -45,7 +45,9 @@ def canonical_url(value: str | None) -> str:
     if parts.scheme not in {"http", "https"} or not parts.netloc:
         return ""
     query = [
-        (k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k.lower() not in TRACKING_KEYS
+        (k, v)
+        for k, v in parse_qsl(parts.query, keep_blank_values=True)
+        if k.lower() not in TRACKING_KEYS
     ]
     query = list(dict.fromkeys(query))
     path = parts.path.rstrip("/") or "/"

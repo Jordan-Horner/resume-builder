@@ -22,8 +22,10 @@ every screen.
 ## Workflow
 
 1. Confirm that one real posting is in scope. Accept a URL, pasted description,
-   supplied file, or existing record under `targets/`. A title alone is not
-   enough.
+   supplied file, existing record under `targets/`, or an inventory job ID. For
+   an inventory ID, run `resume-builder jobs screen <job-id>` from the workspace
+   and use its preserved description, source URL, provider provenance, and
+   prescreen evidence. A title alone is not enough.
 2. Read the complete posting. For Greenhouse and Ashby URLs, first run
    `python .agents/skills/screen-job/scripts/fetch_posting.py <url>` to use the
    provider's public job-board API. For other providers or an API failure, try a
@@ -44,7 +46,8 @@ every screen.
    source. Do not turn a quick screen into exhaustive company research.
 4. Inspect `vault/vault.json`, canonical facts, existing baselines and tailored
    resumes, relevant directions, and stored work preferences. Reuse an existing
-   posting snapshot when present, but do not create one merely to screen.
+   posting snapshot when present. Treat inventory records as transient screening
+   inputs, not target snapshots, and do not create one merely to screen.
 5. Compare the posting with demonstrated evidence. Select the closest existing
    resume, if any. Classify only the material requirements using the contract's
    requirement types, then assign one of its fixed overall-match labels. Judge

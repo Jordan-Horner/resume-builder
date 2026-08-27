@@ -57,9 +57,7 @@ def test_discovery_follows_only_known_greenhouse_redirects():
 
 
 def test_discovery_accepts_european_greenhouse_host():
-    recognized = recognize_board(
-        "https://job-boards.eu.greenhouse.io/acme/jobs/42", "Acme"
-    )
+    recognized = recognize_board("https://job-boards.eu.greenhouse.io/acme/jobs/42", "Acme")
     assert recognized is not None
     assert recognized[0] == "greenhouse"
     assert recognized[1].id == "acme"

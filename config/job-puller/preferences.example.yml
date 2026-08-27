@@ -1,0 +1,24 @@
+schema_version: 1
+accepted_work_modes: [remote]
+desired_title_terms:
+  - site reliability engineer
+  - production support engineer
+  - technical operations
+  - cloud engineer
+  - backend engineer
+interest_terms:
+  - incident response
+  - reliability
+  - production operations
+  - Python
+  - APIs
+  - cloud
+unwanted_title_terms:
+  - computer repair
+  - desktop technician
+  - field service technician
+excluded_companies: []
+minimum_salary: null
+resume_globs:
+  - resumes/baselines/*.md
+  - resumes/tailored/*.md

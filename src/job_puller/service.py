@@ -17,6 +17,7 @@ from .providers import (
     SmartRecruitersProvider,
     WorkdayProvider,
 )
+from .providers.base import Provider
 
 ATS_PROVIDER_CLASSES = {
     "jazzhr": JazzHRProvider,
@@ -47,8 +48,8 @@ class InventoryService:
         self.config = config
         self.database = database
 
-    def providers(self, selected: set[str] | None = None):
-        result = []
+    def providers(self, selected: set[str] | None = None) -> list[Provider]:
+        result: list[Provider] = []
         if self.config.providers.linkedin.enabled and (selected is None or "linkedin" in selected):
             result.append(
                 LinkedInGuestProvider(
@@ -59,7 +60,9 @@ class InventoryService:
                 )
             )
         if self.config.providers.indeed.enabled and (selected is None or "indeed" in selected):
-            result.append(JobSpyProvider("indeed", self.config.providers.indeed, self.config.search))
+            result.append(
+                JobSpyProvider("indeed", self.config.providers.indeed, self.config.search)
+            )
         for name, provider_class in ATS_PROVIDER_CLASSES.items():
             if selected is not None and name not in selected:
                 continue
@@ -76,7 +79,7 @@ class InventoryService:
                         )
         return result
 
-    def ats_providers(self, name: str, *, include_disabled: bool = False):
+    def ats_providers(self, name: str, *, include_disabled: bool = False) -> list[Provider]:
         provider_class = ATS_PROVIDER_CLASSES[name]
         settings = getattr(self.config.providers, name)
         if not settings.enabled and not include_disabled:
@@ -102,7 +105,9 @@ class InventoryService:
             if result.observations:
                 enriched = []
                 for observation in result.observations:
-                    enriched.append(enrich_observation(observation, self.config.request_timeout_seconds))
+                    enriched.append(
+                        enrich_observation(observation, self.config.request_timeout_seconds)
+                    )
                 result.observations = enriched
             inserted, updated = self.database.record_result(result)
             summaries.append(

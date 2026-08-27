@@ -138,9 +138,7 @@ def classify_work_arrangement(
     # Keep the title in the signature so callers have one stable classifier
     # interface; deliberately do not infer arrangements from bare title words.
     _ = structured
-    return explicit_arrangement(
-        [WorkMode.UNKNOWN], source="inferred", rule="insufficient_evidence"
-    )
+    return explicit_arrangement([WorkMode.UNKNOWN], source="inferred", rule="insufficient_evidence")
 
 
 def display_work_mode(modes: Iterable[WorkMode]) -> str:

@@ -39,6 +39,22 @@ class FakeClient:
 SINCE = datetime(2026, 8, 20, tzinfo=UTC)
 
 
+def test_jobspy_rejects_missing_company_identity():
+    provider = JobSpyProvider(
+        "indeed",
+        CommercialProvider(),
+        SearchSettings(families=[{"name": "cloud", "titles": ["cloud engineer"]}]),
+    )
+
+    assert (
+        provider._normalize(
+            {"id": "1", "job_url": "https://example/jobs/1", "title": "Cloud Engineer"},
+            "cloud",
+        )
+        is None
+    )
+
+
 def test_greenhouse_normalizes_full_description():
     provider = GreenhouseProvider(AtsBoard(id="example", name="Example"))
     client = FakeClient(
@@ -135,9 +151,7 @@ def test_rippling_uses_public_list_and_detail_apis():
                 "id": "abc123",
                 "name": "AWS DevOps Engineer",
                 "url": "https://ats.rippling.com/acme/jobs/abc123",
-                "locations": [
-                    {"name": "Remote (United States)", "workplaceType": "REMOTE"}
-                ],
+                "locations": [{"name": "Remote (United States)", "workplaceType": "REMOTE"}],
             }
         ],
         "totalPages": 1,

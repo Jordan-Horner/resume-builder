@@ -247,14 +247,18 @@ class InventoryDatabase:
                     applied_at TEXT NOT NULL
                 )"""
             )
-            current = conn.execute("SELECT COALESCE(MAX(version), 0) FROM schema_migrations").fetchone()[0]
+            current = conn.execute(
+                "SELECT COALESCE(MAX(version), 0) FROM schema_migrations"
+            ).fetchone()[0]
         if current >= SCHEMA_VERSION:
             return
         if existed:
             backup_dir = self.path.parent / "backups"
             backup_dir.mkdir(parents=True, exist_ok=True)
             stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-            shutil.copy2(self.path, backup_dir / f"{self.path.stem}-pre-v{SCHEMA_VERSION}-{stamp}.db")
+            shutil.copy2(
+                self.path, backup_dir / f"{self.path.stem}-pre-v{SCHEMA_VERSION}-{stamp}.db"
+            )
         with self.connect() as conn:
             for version in range(current + 1, SCHEMA_VERSION + 1):
                 conn.executescript(MIGRATIONS[version])
@@ -317,7 +321,9 @@ class InventoryDatabase:
             for source, target in redirects:
                 alias_url = canonical_url(source)
                 target_url = canonical_url(target)
-                if not alias_url.startswith("https://grnh.se/") or not target_url.startswith("https://"):
+                if not alias_url.startswith("https://grnh.se/") or not target_url.startswith(
+                    "https://"
+                ):
                     continue
                 cursor = conn.execute(
                     """INSERT INTO application_url_aliases(alias_url, target_url, verified_at)
@@ -382,9 +388,7 @@ class InventoryDatabase:
         return merged
 
     def _recanonicalize_observation_urls(self, conn: sqlite3.Connection) -> None:
-        rows = conn.execute(
-            "SELECT id, source_url, direct_apply_url FROM observations"
-        ).fetchall()
+        rows = conn.execute("SELECT id, source_url, direct_apply_url FROM observations").fetchall()
         for row in rows:
             conn.execute(
                 """UPDATE observations
@@ -649,10 +653,16 @@ class InventoryDatabase:
         )
 
     def _upsert_observation(
-        self, conn: sqlite3.Connection, observation: JobObservation, source_key: str, seen_at: datetime
+        self,
+        conn: sqlite3.Connection,
+        observation: JobObservation,
+        source_key: str,
+        seen_at: datetime,
     ) -> bool:
         key = self._observation_key(observation)
-        existing = conn.execute("SELECT id FROM observations WHERE observation_key = ?", (key,)).fetchone()
+        existing = conn.execute(
+            "SELECT id FROM observations WHERE observation_key = ?", (key,)
+        ).fetchone()
         observation_id = existing[0] if existing else str(uuid.uuid4())
         text = observation.description_text.strip()
         quality = "complete" if len(text) >= 200 else "partial" if text else "missing"
@@ -752,9 +762,7 @@ class InventoryDatabase:
                 ),
             )
         assert observation.work_arrangement is not None
-        self._replace_observation_work_modes(
-            conn, observation_id, observation.work_arrangement
-        )
+        self._replace_observation_work_modes(conn, observation_id, observation.work_arrangement)
         self._refresh_job(conn, observation_id, seen_at)
         return not bool(existing)
 
@@ -885,7 +893,9 @@ class InventoryDatabase:
         text: str,
     ) -> str:
         job_id = str(uuid.uuid4())
-        apply_url = canonical_url(observation.direct_apply_url) or canonical_url(observation.source_url)
+        apply_url = canonical_url(observation.direct_apply_url) or canonical_url(
+            observation.source_url
+        )
         work_mode = display_work_mode(observation.work_modes)
         conn.execute(
             """INSERT INTO jobs(
@@ -921,7 +931,9 @@ class InventoryDatabase:
         self._record_possible_duplicates(conn, job_id, seen_at)
         return job_id
 
-    def _record_possible_duplicates(self, conn: sqlite3.Connection, job_id: str, seen_at: datetime) -> None:
+    def _record_possible_duplicates(
+        self, conn: sqlite3.Connection, job_id: str, seen_at: datetime
+    ) -> None:
         current = conn.execute(
             "SELECT normalized_company, normalized_title FROM jobs WHERE id=?", (job_id,)
         ).fetchone()
@@ -938,7 +950,9 @@ class InventoryDatabase:
                 (left, right, _iso(seen_at)),
             )
 
-    def _refresh_job(self, conn: sqlite3.Connection, observation_id: str, seen_at: datetime) -> None:
+    def _refresh_job(
+        self, conn: sqlite3.Connection, observation_id: str, seen_at: datetime
+    ) -> None:
         row = conn.execute(
             """SELECT j.id, j.status, j.description_quality, j.preferred_observation_id,
                       o.provider, o.company_raw, o.title_raw, o.location_raw, o.description_text,
@@ -967,7 +981,9 @@ class InventoryDatabase:
             "SELECT provider, description_quality FROM observations WHERE id=?", (row[3],)
         ).fetchone()
         current_score = (
-            priority.get(current[0], 10) + (20 if current[1] == "complete" else 0) if current else -1
+            priority.get(current[0], 10) + (20 if current[1] == "complete" else 0)
+            if current
+            else -1
         )
         candidate_score = priority.get(row[4], 10) + (20 if row[10] == "complete" else 0)
         status = "reopened" if row[1] in {"closed", "possibly_closed"} else row[1]
@@ -1043,3 +1059,33 @@ class InventoryDatabase:
                     "SELECT COUNT(*) FROM scrape_runs WHERE success=0 OR suspicious_empty=1"
                 ).fetchone()[0],
             }
+
+    def active_inventory(self) -> list[dict[str, object]]:
+        """Return the stable, consumer-facing active inventory projection."""
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT j.id, j.display_company AS company, j.display_title AS title,
+                          j.location, j.employment_type, j.salary_min, j.salary_max,
+                          j.salary_currency, j.salary_interval, j.posted_at,
+                          j.first_seen_at, j.last_seen_at, j.status,
+                          j.description_text, j.description_hash, j.description_quality,
+                          COALESCE(GROUP_CONCAT(DISTINCT wm.mode), 'unknown') AS work_modes,
+                          COALESCE(GROUP_CONCAT(DISTINCT o.provider), '') AS providers,
+                          COALESCE(NULLIF(j.canonical_apply_url, ''),
+                                   MAX(NULLIF(o.direct_apply_url, '')),
+                                   MAX(o.source_url), '') AS url
+                   FROM jobs j
+                   LEFT JOIN job_work_modes wm ON wm.job_id=j.id
+                   LEFT JOIN job_observation_links l ON l.job_id=j.id
+                   LEFT JOIN observations o ON o.id=l.observation_id
+                   WHERE j.status IN ('active','reopened')
+                   GROUP BY j.id
+                   ORDER BY COALESCE(j.posted_at, j.first_seen_at) DESC, j.id"""
+            ).fetchall()
+        inventory: list[dict[str, object]] = []
+        for row in rows:
+            item = dict(row)
+            item["work_modes"] = sorted(set(str(item["work_modes"]).split(",")))
+            item["providers"] = sorted(filter(None, set(str(item["providers"]).split(","))))
+            inventory.append(item)
+        return inventory

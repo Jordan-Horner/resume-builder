@@ -173,7 +173,7 @@ def discover_boards(
         for link in links:
             url = str(link.get("url") or "")
             company = str(link.get("company") or "").strip()
-            observations = int(link.get("observations") or 1)
+            observations = int(str(link.get("observations") or 1))
             host, _ = _segments(url)
             report.host_counts[host or "invalid"] += observations
             candidate_url = url
@@ -203,7 +203,11 @@ def discover_boards(
 
     grouped: dict[str, list[AtsBoard]] = {name: [] for name in SUPPORTED_PROVIDERS}
     for candidate in candidates.values():
-        name = candidate.companies.most_common(1)[0][0] if candidate.companies else candidate.board.name
+        name = (
+            candidate.companies.most_common(1)[0][0]
+            if candidate.companies
+            else candidate.board.name
+        )
         grouped[candidate.provider].append(candidate.board.model_copy(update={"name": name}))
     for boards in grouped.values():
         boards.sort(key=lambda board: (board.name.casefold(), board.id.casefold()))
@@ -216,7 +220,9 @@ def merge_registries(current: BoardRegistry, discovered: BoardRegistry) -> Board
         existing = list(getattr(current.providers, provider))
         known = {board.id.casefold() for board in existing}
         additions = [
-            board for board in getattr(discovered.providers, provider) if board.id.casefold() not in known
+            board
+            for board in getattr(discovered.providers, provider)
+            if board.id.casefold() not in known
         ]
         updates[provider] = [*existing, *additions]
     return BoardRegistry(providers=BoardRegistryProviders(**updates))

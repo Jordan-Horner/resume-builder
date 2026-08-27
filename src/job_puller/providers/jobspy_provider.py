@@ -27,7 +27,9 @@ class JobSpyProvider:
         try:
             from jobspy import scrape_jobs
         except ImportError as exc:
-            return ProviderResult(self.source_key, self.name, [], started, datetime.now(UTC), False, str(exc))
+            return ProviderResult(
+                self.source_key, self.name, [], started, datetime.now(UTC), False, str(exc)
+            )
 
         hours_old = max(1, int((started - since).total_seconds() / 3600) + 1)
         metrics = {
@@ -79,9 +81,9 @@ class JobSpyProvider:
                     metrics["raw_results"] += len(rows)
                     if len(rows) >= result_limit:
                         metrics["saturated_queries"] += 1
-                    metrics[family_prefix + "raw_results"] = (
-                        metrics.get(family_prefix + "raw_results", 0) + len(rows)
-                    )
+                    metrics[family_prefix + "raw_results"] = metrics.get(
+                        family_prefix + "raw_results", 0
+                    ) + len(rows)
                     metrics[query_prefix + "raw_results"] = len(rows)
                     family_accepted = 0
                     for row in rows:
@@ -105,7 +107,8 @@ class JobSpyProvider:
                     errors.append(f"{family.name}/{query}: {type(exc).__name__}: {exc}")
 
         deduped = {
-            f"{item.provider}:{item.provider_job_id or item.source_url}": item for item in observations
+            f"{item.provider}:{item.provider_job_id or item.source_url}": item
+            for item in observations
         }
         completed = datetime.now(UTC)
         metrics["accepted_before_dedupe"] = len(observations)
@@ -157,7 +160,7 @@ class JobSpyProvider:
         url = str(value("job_url"))
         title = str(value("title"))
         company = str(value("company"))
-        if not url or not title:
+        if not url or not title or not company:
             return None
         raw_description = str(value("description"))
         job_id = str(value("id")) or url.rstrip("/").split("/")[-1].split("?")[0]

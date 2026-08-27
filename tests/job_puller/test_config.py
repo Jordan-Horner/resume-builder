@@ -8,7 +8,7 @@ from job_puller.work_modes import WorkMode
 
 
 def test_example_config_is_valid():
-    path = Path(__file__).parents[1] / "config" / "search.example.yml"
+    path = Path(__file__).parents[2] / "config" / "job-puller" / "search.example.yml"
     config = load_config(path)
     assert config.schema_version == 1
     assert config.providers.linkedin.enabled

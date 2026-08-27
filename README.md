@@ -11,7 +11,7 @@ Resume Builder gives an AI agent a private, organized record of your career. It
 brings together useful details scattered across old resumes, LinkedIn exports,
 and career notes so they remain available for future resumes.
 
-**Requires:** a local source checkout · Python 3.10 or newer · Codex or Claude Code
+**Requires:** a local source checkout · Python 3.11 or newer · Codex or Claude Code
 
 ## Start here
 
@@ -142,6 +142,7 @@ resume-builder/          Reusable engine
 └── workspace/           Your ignored, private Git repository
     ├── vault/           Career sources and facts
     ├── directions/      Roles you may pursue
+    ├── job-search/      Private inventory, search settings, and shortlist
     ├── targets/         Job postings you choose to save
     └── resumes/         Your resume source files
 ```
@@ -155,6 +156,29 @@ your career files. During setup, choose either:
 
 Nothing is uploaded without confirmation. A private backup is recommended because
 local Git cannot recover files after device loss.
+
+## Build and screen a job inventory
+
+Resume Builder includes a local inventory backend for LinkedIn, Indeed, and
+direct employer ATS boards. Collection is manual: there is no server, scheduler,
+or authenticated LinkedIn automation. Mutable inventory and personal search
+preferences stay under the private workspace.
+
+```bash
+resume-builder jobs update
+resume-builder jobs status
+resume-builder jobs shortlist
+resume-builder jobs screen <job-id>
+```
+
+`update` collects from enabled providers and preserves valid jobs even when they
+do not match the current work-mode preference. `shortlist` cheaply separates
+interest, constraints, and exact resume keyword visibility across the active
+inventory. It reuses unchanged analyses based on posting, resume, preference,
+and prescreen versions. Its bounded keyword-readiness value is diagnostic—not an
+ATS score or a hiring prediction. Ask the agent to screen a shortlisted job ID
+for the deeper semantic evidence review; only jobs you choose to pursue become
+tracked target snapshots.
 
 If a repository has ever contained real career data, keep its complete Git history
 private. Removing personal files from the latest version does not remove them from

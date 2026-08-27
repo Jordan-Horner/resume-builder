@@ -30,7 +30,9 @@ def test_json_ld_enrichment(monkeypatch):
             return httpx.Response(200, text=html, request=httpx.Request("GET", url))
 
     monkeypatch.setattr("job_puller.enrichment.httpx.Client", FakeClient)
-    item = JobObservation("linkedin", "1", "Backend Engineer", "Example", "https://example.com/job/1")
+    item = JobObservation(
+        "linkedin", "1", "Backend Engineer", "Example", "https://example.com/job/1"
+    )
     enriched = enrich_observation(item)
     assert len(enriched.description_text) >= 200
     assert enriched.direct_apply_url == "https://example.com/apply/1"

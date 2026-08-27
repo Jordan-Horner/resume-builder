@@ -31,6 +31,7 @@ PRIVATE_ROOTS = {
     "vault",
     "workspace",
 }
+PUBLIC_WHEEL_PACKAGES = {"job_puller", "resume_builder"}
 
 
 def _safe_parts(name: str) -> tuple[str, ...]:
@@ -76,7 +77,7 @@ def audit_wheel(path: Path, denylist: tuple[bytes, ...]) -> None:
             parts = _safe_parts(name)
             if not parts:
                 continue
-            if parts[0] != "resume_builder" and not parts[0].endswith(".dist-info"):
+            if parts[0] not in PUBLIC_WHEEL_PACKAGES and not parts[0].endswith(".dist-info"):
                 raise ValueError(f"unexpected wheel path: {name}")
             if (
                 parts[0] == "resume_builder"
@@ -91,6 +92,7 @@ def audit_wheel(path: Path, denylist: tuple[bytes, ...]) -> None:
             if _payload_has_denylist(name, archive.read(name), denylist):
                 raise ValueError(f"private denylist match in wheel member: {name}")
         required = {
+            "job_puller/cli.py",
             "resume_builder/cli.py",
             "resume_builder/evidence_questions.py",
             "resume_builder/resources/workspace/vault/README.md",

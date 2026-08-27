@@ -13,10 +13,10 @@ from .linkedin import LinkedInGuestProvider
 __all__ = [
     "AshbyProvider",
     "GreenhouseProvider",
-    "JobSpyProvider",
     "JazzHRProvider",
-    "LinkedInGuestProvider",
+    "JobSpyProvider",
     "LeverProvider",
+    "LinkedInGuestProvider",
     "RipplingProvider",
     "SmartRecruitersProvider",
     "WorkdayProvider",

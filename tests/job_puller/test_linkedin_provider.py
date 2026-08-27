@@ -25,7 +25,7 @@ def card(job_id: int, title: str, *, location: str = "United States") -> str:
     return f"""
     <div class="base-search-card" data-entity-urn="urn:li:jobPosting:{job_id}">
       <a class="base-card__full-link"
-         href="https://www.linkedin.com/jobs/view/{title.lower().replace(' ', '-')}-{job_id}?trackingId=x">
+         href="https://www.linkedin.com/jobs/view/{title.lower().replace(" ", "-")}-{job_id}?trackingId=x">
       </a>
       <h3 class="base-search-card__title">{title}</h3>
       <h4 class="base-search-card__subtitle">Example Corp</h4>
@@ -35,7 +35,9 @@ def card(job_id: int, title: str, *, location: str = "United States") -> str:
     """
 
 
-def detail(description: str = "This is a fully remote role building reliable cloud services.") -> str:
+def detail(
+    description: str = "This is a fully remote role building reliable cloud services.",
+) -> str:
     return f"""
     <section>
       <div class="show-more-less-html__markup"><p>{description}</p></div>
@@ -106,10 +108,21 @@ def test_search_parser_extracts_stable_id_and_strips_tracking():
     assert cards[0].posted_at == datetime(2026, 8, 26, tzinfo=UTC)
 
 
+def test_search_parser_rejects_missing_company_identity():
+    html = card(123456789, "Senior SRE").replace("Example Corp", "")
+
+    cards, invalid = parse_search_cards(html)
+
+    assert cards == []
+    assert invalid == 1
+
+
 def test_detail_parser_extracts_description_and_criteria():
     parsed = parse_job_detail(detail())
     assert parsed is not None
-    assert parsed.description_text == "This is a fully remote role building reliable cloud services."
+    assert (
+        parsed.description_text == "This is a fully remote role building reliable cloud services."
+    )
     assert parsed.employment_type == "Full-time"
     assert parsed.criteria == {"Employment type": "Full-time"}
 
@@ -169,9 +182,7 @@ def test_provider_stops_on_a_repeated_page():
 
 
 def test_provider_reports_scan_limit_before_candidate_target():
-    page = card(1, "SRE") + "".join(
-        card(job_id, "Sales Representative") for job_id in range(2, 11)
-    )
+    page = card(1, "SRE") + "".join(card(job_id, "Sales Representative") for job_id in range(2, 11))
     client = FakeLinkedInClient(pages={0: page}, details={"1": detail()})
     result = provider(client, results_wanted=2, max_cards_scanned=10).fetch(SINCE)
     assert result.success
@@ -228,8 +239,7 @@ def test_remote_evidence_does_not_treat_hybrid_cloud_as_a_work_arrangement():
             "Cloud SRE",
             "United States",
             "This is a fully remote role supporting hybrid cloud infrastructure.",
-        )
-        .status
+        ).status
         == "verified"
     )
 
