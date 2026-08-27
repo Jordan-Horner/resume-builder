@@ -219,6 +219,22 @@ class InventoryDatabase:
             ).fetchone()
         return datetime.fromisoformat(row[0]) if row else None
 
+    def active_application_links(self) -> list[dict[str, object]]:
+        """Return direct application links that currently back active inventory jobs."""
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT o.direct_apply_url AS url, o.company_raw AS company, COUNT(*) AS observations
+                   FROM observations o
+                   JOIN job_observation_links l ON l.observation_id=o.id
+                   JOIN jobs j ON j.id=l.job_id
+                   WHERE o.direct_apply_url<>''
+                     AND o.provider IN ('indeed','linkedin')
+                     AND j.status IN ('active','reopened')
+                   GROUP BY o.direct_apply_url, o.company_raw
+                   ORDER BY observations DESC, company, url"""
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def reconcile_exact_duplicates(self) -> int:
         with self.transaction() as conn:
             return self._reconcile_exact_duplicates(conn)

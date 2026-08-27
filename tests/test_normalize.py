@@ -8,6 +8,13 @@ def test_canonical_url_removes_tracking_and_fragment():
     )
 
 
+def test_canonical_url_removes_lever_source_tracking():
+    assert (
+        canonical_url("https://jobs.lever.co/acme/1?lever-source=Indeed")
+        == "https://jobs.lever.co/acme/1"
+    )
+
+
 def test_html_to_text_removes_script():
     text = html_to_text("<main><h1>Role</h1><script>bad()</script><p>Build APIs</p></main>")
     assert "Role" in text

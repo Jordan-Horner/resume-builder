@@ -16,6 +16,14 @@ from .providers import (
     WorkdayProvider,
 )
 
+ATS_PROVIDER_CLASSES = {
+    "greenhouse": GreenhouseProvider,
+    "lever": LeverProvider,
+    "ashby": AshbyProvider,
+    "smartrecruiters": SmartRecruitersProvider,
+    "workday": WorkdayProvider,
+}
+
 
 @dataclass(slots=True)
 class RunSummary:
@@ -35,9 +43,9 @@ class InventoryService:
         self.config = config
         self.database = database
 
-    def providers(self):
+    def providers(self, selected: set[str] | None = None):
         result = []
-        if self.config.providers.linkedin.enabled:
+        if self.config.providers.linkedin.enabled and (selected is None or "linkedin" in selected):
             result.append(
                 LinkedInGuestProvider(
                     self.config.providers.linkedin,
@@ -46,21 +54,34 @@ class InventoryService:
                     detail_cache=self.database,
                 )
             )
-        if self.config.providers.indeed.enabled:
+        if self.config.providers.indeed.enabled and (selected is None or "indeed" in selected):
             result.append(JobSpyProvider("indeed", self.config.providers.indeed, self.config.search))
-        classes = {
-            "greenhouse": GreenhouseProvider,
-            "lever": LeverProvider,
-            "ashby": AshbyProvider,
-            "smartrecruiters": SmartRecruitersProvider,
-            "workday": WorkdayProvider,
-        }
-        for name, provider_class in classes.items():
+        for name, provider_class in ATS_PROVIDER_CLASSES.items():
+            if selected is not None and name not in selected:
+                continue
             settings = getattr(self.config.providers, name)
             if settings.enabled:
                 for board in settings.boards:
-                    result.append(provider_class(board, self.config.request_timeout_seconds))
+                    if board.enabled:
+                        result.append(
+                            provider_class(
+                                board,
+                                self.config.request_timeout_seconds,
+                                self.config.search,
+                            )
+                        )
         return result
+
+    def ats_providers(self, name: str, *, include_disabled: bool = False):
+        provider_class = ATS_PROVIDER_CLASSES[name]
+        settings = getattr(self.config.providers, name)
+        if not settings.enabled and not include_disabled:
+            return []
+        return [
+            provider_class(board, self.config.request_timeout_seconds, self.config.search)
+            for board in settings.boards
+            if board.enabled or include_disabled
+        ]
 
     def cutoff(self, source_key: str, now: datetime | None = None) -> datetime:
         now = now or datetime.now(UTC)
@@ -69,9 +90,9 @@ class InventoryService:
             return checkpoint - timedelta(hours=self.config.checkpoint_overlap_hours)
         return now - timedelta(days=self.config.initial_lookback_days)
 
-    def scrape(self) -> list[RunSummary]:
+    def scrape(self, selected: set[str] | None = None) -> list[RunSummary]:
         summaries = []
-        for provider in self.providers():
+        for provider in self.providers(selected):
             cutoff = self.cutoff(provider.source_key)
             result = provider.fetch(cutoff)
             if result.observations:

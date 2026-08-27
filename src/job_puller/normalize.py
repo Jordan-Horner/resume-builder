@@ -8,7 +8,17 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup
 
-TRACKING_KEYS = {"ref", "refid", "trackingid", "trk", "utm_source", "utm_medium", "utm_campaign", "source"}
+TRACKING_KEYS = {
+    "lever-source",
+    "ref",
+    "refid",
+    "source",
+    "trackingid",
+    "trk",
+    "utm_campaign",
+    "utm_medium",
+    "utm_source",
+}
 
 
 def clean_text(value: str | None) -> str:

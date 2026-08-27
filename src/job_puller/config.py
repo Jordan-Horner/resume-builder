@@ -75,9 +75,29 @@ class LinkedInProviderSettings(CommercialProvider):
 class AtsBoard(StrictModel):
     id: str
     name: str
+    enabled: bool = True
+    tags: list[str] = Field(default_factory=list)
     api_url: str | None = None
     careers_url: str | None = None
     extra: dict = Field(default_factory=dict)
+
+    @field_validator("id", "name")
+    @classmethod
+    def require_board_identity(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("ATS board id and name cannot be blank")
+        return cleaned
+
+    @field_validator("tags")
+    @classmethod
+    def normalize_tags(cls, tags: list[str]) -> list[str]:
+        cleaned = [tag.strip().casefold() for tag in tags]
+        if any(not tag for tag in cleaned):
+            raise ValueError("ATS board tags cannot be blank")
+        if len(set(cleaned)) != len(cleaned):
+            raise ValueError("ATS board tags must be unique")
+        return cleaned
 
 
 class AtsProvider(StrictModel):
@@ -95,9 +115,23 @@ class Providers(StrictModel):
     workday: AtsProvider = Field(default_factory=AtsProvider)
 
 
+class BoardRegistryProviders(StrictModel):
+    greenhouse: list[AtsBoard] = Field(default_factory=list)
+    lever: list[AtsBoard] = Field(default_factory=list)
+    ashby: list[AtsBoard] = Field(default_factory=list)
+    smartrecruiters: list[AtsBoard] = Field(default_factory=list)
+    workday: list[AtsBoard] = Field(default_factory=list)
+
+
+class BoardRegistry(StrictModel):
+    schema_version: Literal[1] = 1
+    providers: BoardRegistryProviders = Field(default_factory=BoardRegistryProviders)
+
+
 class InventoryConfig(StrictModel):
     schema_version: Literal[1] = 1
     database_path: str = "data/inventory.db"
+    board_registry_path: str | None = None
     raw_payload_retention_days: int = Field(default=30, ge=1)
     initial_lookback_days: int = Field(default=7, ge=1, le=90)
     checkpoint_overlap_hours: int = Field(default=6, ge=0, le=48)
@@ -137,12 +171,47 @@ def load_config(path: Path) -> InventoryConfig:
     if not isinstance(data, dict):
         raise ValueError(f"configuration root must be a mapping: {path}")
     try:
-        return InventoryConfig.model_validate(data)
+        config = InventoryConfig.model_validate(data)
+    except ValidationError as exc:
+        raise ValueError(str(exc)) from exc
+    if not config.board_registry_path:
+        return config
+    registry_path = resolve_project_path(path, config.board_registry_path)
+    registry = load_board_registry(registry_path)
+    provider_updates = {}
+    for name in type(registry.providers).model_fields:
+        settings = getattr(config.providers, name)
+        registry_boards = getattr(registry.providers, name)
+        combined = [*settings.boards, *registry_boards]
+        identities = [board.id.casefold() for board in combined]
+        if len(set(identities)) != len(identities):
+            raise ValueError(f"duplicate {name} board id across configuration and registry")
+        provider_updates[name] = settings.model_copy(update={"boards": combined})
+    return config.model_copy(
+        update={"providers": config.providers.model_copy(update=provider_updates)}
+    )
+
+
+def load_board_registry(path: Path) -> BoardRegistry:
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ValueError(f"board registry file not found: {path}") from exc
+    except yaml.YAMLError as exc:
+        raise ValueError(f"invalid YAML in {path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise ValueError(f"board registry root must be a mapping: {path}")
+    try:
+        return BoardRegistry.model_validate(data)
     except ValidationError as exc:
         raise ValueError(str(exc)) from exc
 
 
 def resolve_database_path(config_path: Path, configured: str) -> Path:
+    return resolve_project_path(config_path, configured)
+
+
+def resolve_project_path(config_path: Path, configured: str) -> Path:
     path = Path(configured).expanduser()
     if path.is_absolute():
         return path

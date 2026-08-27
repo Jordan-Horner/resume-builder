@@ -1,0 +1,7 @@
+schema_version: 1
+providers:
+  greenhouse: []
+  lever: []
+  ashby: []
+  smartrecruiters: []
+  workday: []

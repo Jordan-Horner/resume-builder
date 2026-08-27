@@ -39,3 +39,12 @@ def test_service_uses_direct_linkedin_provider(tmp_path):
     assert isinstance(providers[0], LinkedInGuestProvider)
     assert providers[0].source_key == "linkedin:guest"
     assert providers[0].detail_cache is db
+
+
+def test_service_can_select_one_provider_type(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    configured = config()
+    configured.providers.indeed.enabled = True
+    providers = InventoryService(configured, db).providers({"indeed"})
+    assert len(providers) == 1
+    assert providers[0].name == "indeed"

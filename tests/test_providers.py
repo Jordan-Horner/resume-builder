@@ -3,12 +3,14 @@ from datetime import UTC, datetime
 import httpx
 
 from job_puller.config import AtsBoard, CommercialProvider, SearchSettings
+from job_puller.eligibility import family_keyword_queries
 from job_puller.providers.ats import (
     AshbyProvider,
     GreenhouseProvider,
     LeverProvider,
     SmartRecruitersProvider,
     WorkdayProvider,
+    _workday_posted_at,
 )
 from job_puller.providers.jobspy_provider import JobSpyProvider
 
@@ -127,6 +129,7 @@ def test_workday_uses_configured_cxs_endpoint():
         id="example",
         name="Example",
         api_url="https://example.wd5.myworkdayjobs.com/wday/cxs/example/jobs/jobs",
+        careers_url="https://example.wd5.myworkdayjobs.com/en-US/jobs",
     )
     provider = WorkdayProvider(board)
     payload = {
@@ -142,7 +145,86 @@ def test_workday_uses_configured_cxs_endpoint():
     }
     job = provider._fetch(FakeClient(post_payloads=[payload]), SINCE)[0]
     assert job.provider_job_id == "REQ-1"
-    assert job.source_url == "https://example.wd5.myworkdayjobs.com/job/remote/1"
+    assert job.source_url == "https://example.wd5.myworkdayjobs.com/en-US/jobs/job/remote/1"
+
+
+def test_workday_parses_relative_posting_age():
+    now = datetime(2026, 8, 27, 18, tzinfo=UTC)
+    assert _workday_posted_at("Posted Today", now) == now
+    assert _workday_posted_at("Posted Yesterday", now) == datetime(2026, 8, 26, 18, tzinfo=UTC)
+    assert _workday_posted_at("Posted 5 Days Ago", now) == datetime(2026, 8, 22, 18, tzinfo=UTC)
+
+
+def test_workday_compiles_one_keyword_query_per_search_family():
+    search = SearchSettings(
+        families=[
+            {
+                "name": "reliability",
+                "titles": ["site reliability engineer", "SRE", "cloud engineer"],
+            },
+            {"name": "development", "titles": ["backend engineer", "python developer"]},
+        ]
+    )
+    assert family_keyword_queries(search) == ["site reliability sre cloud", "backend python"]
+
+
+def test_workday_paginates_when_later_pages_report_zero_total():
+    board = AtsBoard(
+        id="example",
+        name="Example",
+        api_url="https://example.wd5.myworkdayjobs.com/wday/cxs/example/jobs/jobs",
+        extra={"limit": 2},
+    )
+    pages = [
+        {
+            "total": 3 if page == 0 else 0,
+            "jobPostings": [
+                {
+                    "title": "SRE",
+                    "externalPath": f"/job/{job_id}",
+                    "locationsText": "Remote",
+                    "bulletFields": [job_id],
+                }
+                for job_id in job_ids
+            ],
+        }
+        for page, job_ids in enumerate((("1", "2"), ("3",)))
+    ]
+    jobs = WorkdayProvider(board)._fetch(FakeClient(post_payloads=pages), SINCE)
+    assert [job.provider_job_id for job in jobs] == ["1", "2", "3"]
+
+
+def test_ats_filter_keeps_only_recent_remote_target_titles():
+    search = SearchSettings(
+        remote_only=True,
+        families=[{"name": "reliability", "titles": ["site reliability engineer", "SRE"]}],
+    )
+    provider = GreenhouseProvider(AtsBoard(id="example", name="Example"), search=search)
+    observations = [
+        JobSpyProvider("indeed", CommercialProvider(), search)._normalize(
+            {
+                "id": job_id,
+                "title": title,
+                "company": "Example",
+                "job_url": f"https://example/jobs/{job_id}",
+                "is_remote": remote,
+                "city": location,
+                "date_posted": posted,
+            },
+            "reliability",
+        )
+        for job_id, title, remote, location, posted in [
+            ("keep", "Senior Site Reliability Engineer", True, "Remote", "2026-08-26"),
+            ("title", "Sales Engineer", True, "Remote", "2026-08-26"),
+            ("remote", "Site Reliability Engineer", False, "New York", "2026-08-26"),
+            ("old", "Site Reliability Engineer", True, "Remote", "2026-08-01"),
+        ]
+    ]
+    accepted, metrics = provider._eligible([item for item in observations if item], SINCE)
+    assert [item.provider_job_id for item in accepted] == ["keep"]
+    assert metrics["title_rejected"] == 1
+    assert metrics["remote_rejected"] == 1
+    assert metrics["freshness_rejected"] == 1
 
 
 def test_jobspy_adapter_normalizes_dataframe_row():

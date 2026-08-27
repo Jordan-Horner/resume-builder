@@ -15,6 +15,12 @@ A provider must:
 
 Commercial-board results are discovery observations and never authoritative for closure. Direct ATS list results may be authoritative when pagination completes successfully.
 
+Direct ATS boards are kept in a separate private registry. Discovery reads only commercial-source application URLs
+already present in active inventory, recognizes known public ATS URL shapes, and writes new entries disabled. Registry tags are inert
+metadata reserved for reusable company profiles such as a future FAANG+ view. When an ATS adapter applies title,
+remote, or freshness eligibility to a complete board response, it must not claim that the filtered subset is an
+authoritative whole-board snapshot.
+
 ## Commercial-board title queries
 
 Search families contain semantic title aliases, not raw provider syntax. A commercial-board adapter must compile

@@ -20,6 +20,33 @@ def test_relative_database_path_is_project_relative():
     assert resolved == Path(__file__).parents[1] / "data" / "inventory.db"
 
 
+def test_external_board_registry_is_loaded(tmp_path):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "boards.yml").write_text(
+        """schema_version: 1
+providers:
+  greenhouse:
+    - {id: acme, name: Acme, enabled: false, tags: [faang-plus]}
+""",
+        encoding="utf-8",
+    )
+    path = config_dir / "search.yml"
+    path.write_text(
+        """schema_version: 1
+board_registry_path: config/boards.yml
+search:
+  families: [{name: reliability, titles: [SRE]}]
+""",
+        encoding="utf-8",
+    )
+    config = load_config(path)
+    board = config.providers.greenhouse.boards[0]
+    assert board.id == "acme"
+    assert board.enabled is False
+    assert board.tags == ["faang-plus"]
+
+
 def test_unknown_config_key_surfaces(tmp_path):
     path = tmp_path / "search.yml"
     path.write_text(

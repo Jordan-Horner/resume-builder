@@ -1,5 +1,6 @@
 schema_version: 1
 database_path: data/inventory.db
+board_registry_path: config/boards.yml
 raw_payload_retention_days: 30
 initial_lookback_days: 7
 checkpoint_overlap_hours: 6

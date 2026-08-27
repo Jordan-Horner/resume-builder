@@ -19,7 +19,13 @@ uv sync --extra dev
 uv run job-puller config validate
 ```
 
-The personal `config/search.yml` and everything under `data/` are ignored by Git. Start from `config/search.example.yml` on another installation.
+The personal `config/search.yml`, `config/boards.yml`, and everything under `data/` are ignored by Git. Start from
+the two example configuration files on another installation:
+
+```bash
+cp config/search.example.yml config/search.yml
+cp config/boards.example.yml config/boards.yml
+```
 
 Search configuration describes reusable title families rather than provider query syntax. Each family can be
 enabled independently. LinkedIn receives one compatible Boolean query per family through its public guest jobs
@@ -40,7 +46,10 @@ Manually update inventory:
 
 ```bash
 uv run job-puller scrape
+uv run job-puller scrape --provider greenhouse
 ```
+
+Repeat `--provider` to update a selected group. Omitting it runs every enabled provider.
 
 Commercial-board runs print a filter waterfall showing raw results, invalid records, title rejections, remote
 rejections, stale records, duplicates, and accepted observations. The same metrics are retained with the scrape
@@ -90,36 +99,58 @@ jobs, while the partial run remains unsuccessful so its checkpoint cannot advanc
 
 ## Adding direct ATS boards
 
-Each board is explicit. Examples:
+Discover supported boards from the direct application links already stored in inventory:
+
+```bash
+uv run job-puller boards discover
+```
+
+Discovery recognizes Greenhouse, Lever, Ashby, SmartRecruiters, and Workday links. Known Greenhouse short links are
+resolved without requesting custom or untrusted redirect destinations. Results are merged into the private
+`config/boards.yml` registry and new
+boards are always disabled so rediscovery cannot silently expand collection. Existing enablement and tags are
+preserved.
+
+Test one vendor at a time without changing inventory:
+
+```bash
+uv run job-puller boards check --provider greenhouse
+uv run job-puller boards check --provider ashby
+uv run job-puller boards check --provider workday
+```
+
+After review, set `enabled: true` on the boards worth monitoring. A whole ATS board is filtered locally through the
+same enabled title families, remote-only rule, and incremental cutoff used by commercial discovery, preventing
+unrelated company openings from flooding inventory. Boards may carry reusable tags such as `faang-plus`; tags are
+metadata for future search profiles and do not change collection behavior yet.
+
+Each board is explicit. Registry examples:
 
 ```yaml
+schema_version: 1
 providers:
   greenhouse:
-    enabled: true
-    boards:
-      - id: example
-        name: Example Company
+    - id: example
+      name: Example Company
+      enabled: true
+      tags: [faang-plus]
   lever:
-    enabled: true
-    boards:
-      - id: example
-        name: Example Company
+    - id: example
+      name: Example Company
+      enabled: true
   ashby:
-    enabled: true
-    boards:
-      - id: Example
-        name: Example Company
+    - id: Example
+      name: Example Company
+      enabled: true
   smartrecruiters:
-    enabled: true
-    boards:
-      - id: ExampleCompany
-        name: Example Company
+    - id: ExampleCompany
+      name: Example Company
+      enabled: true
   workday:
-    enabled: true
-    boards:
-      - id: example-workday
-        name: Example Company
-        api_url: https://example.wd5.myworkdayjobs.com/wday/cxs/example/jobs/jobs
+    - id: example-workday
+      name: Example Company
+      enabled: true
+      api_url: https://example.wd5.myworkdayjobs.com/wday/cxs/example/jobs/jobs
 ```
 
 Branded or unusual boards may set `api_url` explicitly. Workday always requires its public CXS endpoint because tenant and site names cannot be derived safely from a display name.

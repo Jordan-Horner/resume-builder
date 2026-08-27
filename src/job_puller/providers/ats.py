@@ -1,10 +1,18 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+import re
+from datetime import UTC, datetime, timedelta
 
 import httpx
 
-from job_puller.config import AtsBoard
+from job_puller.config import AtsBoard, SearchSettings
+from job_puller.eligibility import (
+    enabled_titles,
+    family_keyword_queries,
+    recent_matches,
+    remote_matches,
+    title_matches,
+)
 from job_puller.models import JobObservation, ProviderResult
 from job_puller.normalize import clean_text, html_to_text, parse_datetime
 
@@ -12,16 +20,20 @@ from job_puller.normalize import clean_text, html_to_text, parse_datetime
 class HttpProvider:
     name = "http"
 
-    def __init__(self, board: AtsBoard, timeout: float = 30):
+    def __init__(
+        self, board: AtsBoard, timeout: float = 30, search: SearchSettings | None = None
+    ):
         self.board = board
         self.timeout = timeout
+        self.search = search
         self.source_key = f"{self.name}:{board.id}"
 
     def fetch(self, since: datetime) -> ProviderResult:
         started = datetime.now(UTC)
         try:
             with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:
-                observations = self._fetch(client, since)
+                raw_observations = self._fetch(client, since)
+            observations, metrics = self._eligible(raw_observations, since)
             completed = datetime.now(UTC)
             return ProviderResult(
                 self.source_key,
@@ -30,8 +42,9 @@ class HttpProvider:
                 started,
                 completed,
                 True,
-                suspicious_empty=not observations,
-                authoritative_complete=bool(observations),
+                suspicious_empty=not raw_observations,
+                authoritative_complete=bool(raw_observations) and self.search is None,
+                metrics=metrics,
             )
         except Exception as exc:
             return ProviderResult(
@@ -47,10 +60,37 @@ class HttpProvider:
     def _fetch(self, client: httpx.Client, since: datetime) -> list[JobObservation]:
         raise NotImplementedError
 
-    @staticmethod
-    def _recent(observation: JobObservation, since: datetime) -> bool:
-        return observation.posted_at is None or observation.posted_at >= since
-
+    def _eligible(
+        self, observations: list[JobObservation], since: datetime
+    ) -> tuple[list[JobObservation], dict[str, int]]:
+        metrics = {
+            "raw_results": len(observations),
+            "invalid": 0,
+            "title_rejected": 0,
+            "remote_rejected": 0,
+            "freshness_rejected": 0,
+            "accepted": 0,
+        }
+        if self.search is None:
+            metrics["accepted"] = len(observations)
+            return observations, metrics
+        titles = enabled_titles(self.search)
+        accepted = []
+        for observation in observations:
+            if not observation.provider_job_id or not observation.title or not observation.source_url:
+                metrics["invalid"] += 1
+            elif not title_matches(observation.title, titles):
+                metrics["title_rejected"] += 1
+            elif not remote_matches(observation, self.search):
+                metrics["remote_rejected"] += 1
+            elif not recent_matches(observation, since):
+                metrics["freshness_rejected"] += 1
+            else:
+                if self.search.remote_only:
+                    observation.remote = True
+                accepted.append(observation)
+        metrics["accepted"] = len(accepted)
+        return accepted, metrics
 
 class GreenhouseProvider(HttpProvider):
     name = "greenhouse"
@@ -213,41 +253,74 @@ class WorkdayProvider(HttpProvider):
         if not self.board.api_url:
             raise ValueError(f"Workday board {self.board.id!r} requires api_url")
         limit = int(self.board.extra.get("limit", 20))
-        offset = 0
-        result = []
-        while True:
-            payload = {"appliedFacets": {}, "limit": limit, "offset": offset, "searchText": ""}
-            payload.update(self.board.extra.get("payload", {}))
-            payload["limit"] = limit
-            payload["offset"] = offset
-            response = client.post(self.board.api_url, json=payload)
-            response.raise_for_status()
-            data = response.json()
-            items = data.get("jobPostings") or []
-            origin = self.board.api_url.split("/wday/cxs/")[0]
-            for item in items:
-                external = str(item.get("externalPath") or "")
-                source_url = f"{origin}{external}" if external.startswith("/") else external
-                observation = JobObservation(
-                    provider=self.name,
-                    provider_board_id=self.board.id,
-                    provider_job_id=str(
-                        item.get("bulletFields", [""])[0] if item.get("bulletFields") else external
-                    ),
-                    title=clean_text(item.get("title")),
-                    company=self.board.name,
-                    source_url=source_url,
-                    direct_apply_url=source_url,
-                    location=clean_text(item.get("locationsText")),
-                    description_text="",
-                    posted_at=parse_datetime(item.get("postedOn")),
-                    raw_payload=item,
-                    parser_version="workday-v1",
-                )
-                if source_url:
-                    result.append(observation)
-            total = int(data.get("total") or len(items))
-            if not items or offset + len(items) >= total:
-                break
-            offset += len(items)
-        return result
+        max_results = int(self.board.extra.get("max_results_per_query", 1000))
+        # Workday search is token-oriented rather than exact-title matching. One
+        # keyword query per configured family covers its aliases without issuing a
+        # separate paginated crawl for every title; the strict local title gate
+        # below still decides what enters inventory.
+        queries = family_keyword_queries(self.search) if self.search else [""]
+        result: dict[str, JobObservation] = {}
+        origin = self.board.careers_url or self.board.api_url.split("/wday/cxs/")[0]
+        fetched_at = datetime.now(UTC)
+        for query in queries:
+            offset = 0
+            seen_pages: set[tuple[str, ...]] = set()
+            while offset < max_results:
+                payload = {
+                    "appliedFacets": {},
+                    "limit": limit,
+                    "offset": offset,
+                    "searchText": query,
+                }
+                payload.update(self.board.extra.get("payload", {}))
+                payload["limit"] = limit
+                payload["offset"] = offset
+                payload["searchText"] = query
+                response = client.post(self.board.api_url, json=payload)
+                response.raise_for_status()
+                items = response.json().get("jobPostings") or []
+                signature = tuple(str(item.get("externalPath") or "") for item in items)
+                if not items or signature in seen_pages:
+                    break
+                seen_pages.add(signature)
+                for item in items:
+                    external = str(item.get("externalPath") or "")
+                    source_url = f"{origin}{external}" if external.startswith("/") else external
+                    observation = JobObservation(
+                        provider=self.name,
+                        provider_board_id=self.board.id,
+                        provider_job_id=str(
+                            item.get("bulletFields", [""])[0]
+                            if item.get("bulletFields")
+                            else external
+                        ),
+                        title=clean_text(item.get("title")),
+                        company=self.board.name,
+                        source_url=source_url,
+                        direct_apply_url=source_url,
+                        location=clean_text(item.get("locationsText")),
+                        description_text="",
+                        posted_at=_workday_posted_at(item.get("postedOn"), fetched_at),
+                        raw_payload=item,
+                        parser_version="workday-v2",
+                    )
+                    if source_url:
+                        result[observation.provider_job_id or source_url] = observation
+                if len(items) < limit:
+                    break
+                offset += len(items)
+        return list(result.values())
+
+
+def _workday_posted_at(value: object, now: datetime | None = None) -> datetime | None:
+    parsed = parse_datetime(value)
+    if parsed is not None:
+        return parsed
+    current = now or datetime.now(UTC)
+    text = clean_text(str(value or "")).casefold()
+    if text == "posted today":
+        return current
+    if text == "posted yesterday":
+        return current - timedelta(days=1)
+    match = re.fullmatch(r"posted (\d+)\+? days? ago", text)
+    return current - timedelta(days=int(match.group(1))) if match else None

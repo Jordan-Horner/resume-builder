@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from job_puller.config import CommercialProvider, SearchSettings
+from job_puller.eligibility import remote_matches, title_matches
 from job_puller.models import JobObservation, ProviderResult
 from job_puller.normalize import html_to_text, normalized_key, parse_datetime
 
@@ -125,12 +126,7 @@ class JobSpyProvider:
         )
 
     def _remote_eligible(self, observation: JobObservation) -> bool:
-        if not self.search.remote_only:
-            return True
-        location = observation.location.lower()
-        if "remote" in location:
-            return True
-        return observation.remote is True
+        return remote_matches(observation, self.search)
 
     def _recent_enough(self, observation: JobObservation, since: datetime) -> bool:
         if observation.posted_at is None:
@@ -147,12 +143,7 @@ class JobSpyProvider:
 
     @staticmethod
     def _title_matches(title: str, titles: list[str]) -> bool:
-        normalized_title = f" {normalized_key(title)} "
-        return any(
-            f" {normalized_key(candidate)} " in normalized_title
-            for candidate in titles
-            if normalized_key(candidate)
-        )
+        return title_matches(title, titles)
 
     def _normalize(self, row: dict[str, Any], family: str) -> JobObservation | None:
         def value(name: str, default: Any = "") -> Any:
