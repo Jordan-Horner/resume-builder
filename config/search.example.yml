@@ -11,29 +11,19 @@ search:
   families:
     - name: reliability-cloud-operations
       terms:
-        - site reliability engineer
-        - devops engineer
-        - cloud engineer
+        - '"site reliability engineer" OR "devops engineer" OR "cloud engineer"'
     - name: production-support-operations
       terms:
-        - production support engineer
-        - application support engineer
-        - technical operations engineer
+        - '"production support engineer" OR "application support engineer" OR "technical operations engineer"'
     - name: ai-assisted-operations
       terms:
-        - AI automation engineer
-        - AI production support engineer
+        - '"AI automation engineer" OR "AI production support engineer"'
     - name: systems-configuration-integrations
       terms:
-        - systems engineer
-        - system administrator
-        - integration engineer
+        - '"systems engineer" OR "system administrator" OR "integration engineer"'
     - name: backend-api-cloud-development
       terms:
-        - backend software engineer
-        - python backend engineer
-        - API engineer
-        - cloud software engineer
+        - '"backend software engineer" OR "python backend engineer" OR "API engineer" OR "cloud software engineer"'
 
 providers:
   linkedin:
@@ -59,4 +49,3 @@ providers:
   workday:
     enabled: true
     boards: []
-
