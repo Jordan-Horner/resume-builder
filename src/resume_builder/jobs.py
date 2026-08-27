@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
+import io
 import json
 import re
 import sys
@@ -22,8 +24,10 @@ from .atomic import atomic_write_json, atomic_write_text
 DEFAULT_CONFIG = Path("job-search/config/search.yml")
 DEFAULT_PREFERENCES = Path("job-search/preferences.yml")
 DEFAULT_OUTPUT = Path("job-search/shortlist.json")
-PRESCREEN_VERSION = 2
+DEFAULT_REVIEW_OUTPUT = Path("job-search/jobs-review.csv")
+PRESCREEN_VERSION = 3
 TOKEN = re.compile(r"[a-z][a-z0-9+#.]{2,}")
+PHRASE_TOKEN = re.compile(r"[a-z0-9]+")
 STOPWORDS = {
     "and",
     "are",
@@ -88,8 +92,14 @@ def _load_preferences(path: Path) -> dict[str, Any]:
         "accepted_work_modes",
         "desired_title_terms",
         "interest_terms",
+        "excluded_title_terms",
+        "senior_title_terms",
+        "accepted_senior_role_terms",
         "unwanted_title_terms",
         "excluded_companies",
+        "accepted_location_terms",
+        "excluded_location_terms",
+        "include_unknown_locations",
         "minimum_salary",
         "resume_globs",
     }
@@ -102,8 +112,13 @@ def _load_preferences(path: Path) -> dict[str, Any]:
         "accepted_work_modes",
         "desired_title_terms",
         "interest_terms",
+        "excluded_title_terms",
+        "senior_title_terms",
+        "accepted_senior_role_terms",
         "unwanted_title_terms",
         "excluded_companies",
+        "accepted_location_terms",
+        "excluded_location_terms",
         "resume_globs",
     )
     for field in list_fields:
@@ -113,6 +128,9 @@ def _load_preferences(path: Path) -> dict[str, Any]:
     minimum_salary = payload.get("minimum_salary")
     if minimum_salary is not None and not isinstance(minimum_salary, (int, float)):
         raise ValueError("minimum_salary must be a number or null")
+    include_unknown = payload.get("include_unknown_locations", True)
+    if not isinstance(include_unknown, bool):
+        raise ValueError("include_unknown_locations must be true or false")
     return payload
 
 
@@ -138,6 +156,56 @@ def _contains_any(value: str, terms: list[str]) -> list[str]:
     return [term for term in terms if term.casefold() in normalized]
 
 
+def _contains_phrases(value: str, terms: list[str]) -> list[str]:
+    """Match configurable phrases without substring collisions such as US/Australia."""
+    normalized = f" {' '.join(PHRASE_TOKEN.findall(value.casefold()))} "
+    return [
+        term
+        for term in terms
+        if f" {' '.join(PHRASE_TOKEN.findall(term.casefold()))} " in normalized
+    ]
+
+
+def _format_salary(job: dict[str, object]) -> str:
+    salary_min = job.get("salary_min")
+    salary_max = job.get("salary_max")
+    if not isinstance(salary_min, (int, float)) and not isinstance(salary_max, (int, float)):
+        return "Not listed"
+    currency = str(job.get("salary_currency") or "")
+    prefix = "$" if currency == "USD" else f"{currency} " if currency else ""
+    interval = str(job.get("salary_interval") or "").strip()
+    suffix = f" {interval}" if interval else ""
+    if isinstance(salary_min, (int, float)) and isinstance(salary_max, (int, float)):
+        return f"{prefix}{salary_min:.0f}-{prefix}{salary_max:.0f}{suffix}"
+    if isinstance(salary_min, (int, float)):
+        return f"From {prefix}{salary_min:.0f}{suffix}"
+    return f"Up to {prefix}{salary_max:.0f}{suffix}"
+
+
+def _write_review_csv(results: list[dict[str, Any]], output_path: Path) -> int:
+    eligible = [item for item in results if item["prescreen"]["review_eligible"]]
+    eligible.sort(
+        key=lambda item: (
+            str(item["title"]).casefold(),
+            -float(item.get("salary_max") or item.get("salary_min") or -1),
+            str(item["company"]).casefold(),
+        )
+    )
+    stream = io.StringIO(newline="")
+    writer = csv.DictWriter(stream, fieldnames=("title", "company", "salary"))
+    writer.writeheader()
+    for item in eligible:
+        writer.writerow(
+            {
+                "title": item["title"],
+                "company": item["company"] or "Unknown company",
+                "salary": _format_salary(item),
+            }
+        )
+    atomic_write_text(output_path, stream.getvalue())
+    return len(eligible)
+
+
 def _prescreen(
     job: dict[str, object], preferences: dict[str, Any], resume_terms: set[str]
 ) -> dict[str, object]:
@@ -146,8 +214,20 @@ def _prescreen(
     description = str(job["description_text"])
     desired = _contains_any(title, preferences.get("desired_title_terms", []))
     interesting = _contains_any(f"{title}\n{description}", preferences.get("interest_terms", []))
+    excluded_title = _contains_any(title, preferences.get("excluded_title_terms", []))
+    seniority = _contains_phrases(title, preferences.get("senior_title_terms", []))
+    accepted_senior_role = _contains_phrases(
+        title, preferences.get("accepted_senior_role_terms", [])
+    )
+    seniority_match = not seniority or bool(accepted_senior_role)
     unwanted = _contains_any(title, preferences.get("unwanted_title_terms", []))
     excluded_company = _contains_any(company, preferences.get("excluded_companies", []))
+    location = str(job.get("location") or "")
+    accepted_location = _contains_phrases(location, preferences.get("accepted_location_terms", []))
+    excluded_location = _contains_phrases(location, preferences.get("excluded_location_terms", []))
+    location_match = bool(accepted_location) or (
+        not excluded_location and preferences.get("include_unknown_locations", True)
+    )
     accepted_modes = set(preferences.get("accepted_work_modes") or [])
     modes = set(job["work_modes"] if isinstance(job["work_modes"], list) else [])
     mode_match = not accepted_modes or bool(accepted_modes & modes)
@@ -161,12 +241,31 @@ def _prescreen(
         and isinstance(salary_min, (int, float))
         and salary_min < minimum_salary
     )
+    complete = bool(
+        title.strip() and company.strip() and job.get("description_quality") == "complete"
+    )
+    review_eligible = bool(
+        complete
+        and not excluded_title
+        and seniority_match
+        and not excluded_company
+        and mode_match
+        and location_match
+        and not salary_below
+    )
 
-    if excluded_company or not mode_match or salary_below:
+    if (
+        excluded_title
+        or not seniority_match
+        or excluded_company
+        or not mode_match
+        or not location_match
+        or salary_below
+    ):
         category = "SKIP"
     elif unwanted:
         category = "EASY BUT UNWANTED"
-    elif not title.strip() or not company.strip() or job.get("description_quality") != "complete":
+    elif not complete:
         category = "NEEDS REVIEW"
     elif desired and readiness >= 35:
         category = "SCREEN NEXT"
@@ -178,9 +277,17 @@ def _prescreen(
         category = "SKIP"
     return {
         "category": category,
+        "review_eligible": review_eligible,
         "interest": {"desired_title_terms": desired, "interest_terms": interesting},
         "constraints": {
             "work_mode_match": mode_match,
+            "location_match": location_match,
+            "accepted_location_terms": accepted_location,
+            "excluded_location_terms": excluded_location,
+            "excluded_title_terms": excluded_title,
+            "seniority_terms": seniority,
+            "accepted_senior_role_terms": accepted_senior_role,
+            "seniority_match": seniority_match,
             "excluded_company": bool(excluded_company),
             "salary_below_minimum": salary_below,
             "unwanted_title_terms": unwanted,
@@ -249,6 +356,7 @@ def _shortlist(config_path: Path, preferences_path: Path, limit: int) -> int:
         "jobs": results,
     }
     atomic_write_json(output_path, payload)
+    review_count = _write_review_csv(results, DEFAULT_REVIEW_OUTPUT)
     lines = ["# Job Shortlist", "", f"Active jobs: {len(results)}; reused: {reused}", ""]
     for item in results[: max(1, limit)]:
         screen = item["prescreen"]
@@ -259,6 +367,7 @@ def _shortlist(config_path: Path, preferences_path: Path, limit: int) -> int:
     atomic_write_text(output_path.with_suffix(".md"), "\n".join(lines) + "\n")
     print(f"Prescreened {len(results)} active jobs; reused {reused} unchanged analyses.")
     print(f"Shortlist: {output_path.with_suffix('.md')}")
+    print(f"Review queue: {DEFAULT_REVIEW_OUTPUT} ({review_count} jobs)")
     return 0
 
 

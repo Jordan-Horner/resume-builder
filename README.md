@@ -175,10 +175,17 @@ resume-builder jobs screen <job-id>
 do not match the current work-mode preference. `shortlist` cheaply separates
 interest, constraints, and exact resume keyword visibility across the active
 inventory. It reuses unchanged analyses based on posting, resume, preference,
-and prescreen versions. Its bounded keyword-readiness value is diagnostic—not an
-ATS score or a hiring prediction. Ask the agent to screen a shortlisted job ID
-for the deeper semantic evidence review; only jobs you choose to pursue become
-tracked target snapshots.
+and prescreen versions. It also writes `job-search/jobs-review.csv`, a compact
+title/company/salary queue sorted by title and descending salary. Personal
+work-mode, location, title, company, and salary filters affect this review queue
+without deleting jobs from inventory. Location include/exclude terms and the
+unknown-location policy are configurable in `job-search/preferences.yml` for
+different countries and regions. An optional seniority gate can retain senior
+roles only for configured role families instead of rejecting every title that
+contains `Senior`, `Sr.`, `Lead`, `Staff`, or `Principal`. Its bounded keyword-readiness value is
+diagnostic—not an ATS score or a hiring prediction. Ask the agent to screen a
+shortlisted job ID for the deeper semantic evidence review; only jobs you choose
+to pursue become tracked target snapshots.
 
 If a repository has ever contained real career data, keep its complete Git history
 private. Removing personal files from the latest version does not remove them from

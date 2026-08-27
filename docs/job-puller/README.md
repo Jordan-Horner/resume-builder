@@ -65,6 +65,14 @@ resume-builder jobs shortlist
 resume-builder jobs screen <job-id>
 ```
 
+`jobs shortlist` also creates `job-search/jobs-review.csv`, containing only jobs
+eligible under the current personal review filters. Configure hard title terms,
+company terms, accepted and excluded location terms, unknown-location handling,
+work modes, minimum salary, and optional senior-title role families in the
+private `job-search/preferences.yml`.
+Filtering never deletes collected inventory, so changing a preference can make
+previously hidden jobs visible again without another provider request.
+
 Repeat `--provider` to update a selected group. Omitting it runs every enabled provider.
 
 Reconcile exact provider identities after importing historical inventory:

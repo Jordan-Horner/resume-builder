@@ -13,11 +13,21 @@ interest_terms:
   - Python
   - APIs
   - cloud
+# Hard filters affect only the personal review queue. Matching inventory records
+# remain available if these preferences change later.
+excluded_title_terms: []
+# Optional seniority gate: when a title contains one of the senior terms, it
+# must also contain an accepted senior role term to enter the review queue.
+senior_title_terms: []
+accepted_senior_role_terms: []
 unwanted_title_terms:
   - computer repair
   - desktop technician
   - field service technician
 excluded_companies: []
+accepted_location_terms: []
+excluded_location_terms: []
+include_unknown_locations: true
 minimum_salary: null
 resume_globs:
   - resumes/baselines/*.md
