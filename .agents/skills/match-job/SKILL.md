@@ -20,7 +20,8 @@ in the engine checkout.
 ## Workflow
 
 1. Read the repository `AGENTS.md` and the
-   [match contract](references/match-contract.md). Read the existing target,
+   [match contract](references/match-contract.md) and the
+   [shared grading contract](references/grading-contract.md). Read the existing target,
    closest direction, baseline, tailored resume, and relevant Git history when
    they exist. Read the build skill's
    [resume quality contract](../build-resume/references/resume-quality-contract.md)
@@ -82,6 +83,11 @@ in the engine checkout.
    sufficiency as `high`, `medium`, or `low`, with a short reason. Never infer a
    missing capability from a tool list, adjacent experience, or the posting.
    `undecidable` is not the same as `not_met`.
+   Record those judgments in the shared grading contract's version 1
+   classification case, run `resume-builder match classify`, and attach the
+   same case to the detailed audit with `--classification-case`. Treat the
+   classifier's fixed label as controlling; resume polish, exact retrieval, or
+   a broad positive critique cannot upgrade it.
 8. Compare the baseline and tailored version when both exist. Report what
    retrieval was gained or lost, which evidence IDs were added or removed, and
    whether tailoring made the candidate argument clearer. Treat the

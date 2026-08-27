@@ -81,6 +81,18 @@ the deeper critique only when hybrid routing selected that branch.
 Its structured `user_handoff` marks presentation as required
 and supplies the artifact path, absolute path, pending approval state, next
 action, organized presentation fields, and ready-to-post `rendered_markdown`.
+The handoff also includes compact `match_feedback` derived from the current
+direction audit and durable evidence-question ledger. Render `Match coverage:
+<score>%` directly below the preview title, label it as evidence coverage rather
+than a universal ATS score or employer-decision prediction, and omit generic
+fit, strongest-match, and weak-area sections. When the ledger contains open,
+validated questions for this resume, render those as targeted questions that
+could materially improve it. Resolved, declined, unknown, or accepted gaps must
+not reappear. Do not render a separate language-review status or general
+preview-instruction paragraph between the match line and the resume link; the
+structured presentation may retain that state for programmatic consumers. Keep
+this review context in the handoff rather than inserting it
+into the employer-facing resume HTML or minted PDF.
 The agent must post `rendered_markdown` as the user-facing response rather than
 printing the command JSON or reducing the handoff to a bare link. Generating the
 HTML alone does not complete the preview step. The HTML explicitly identifies

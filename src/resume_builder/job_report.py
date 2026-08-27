@@ -96,12 +96,48 @@ def markdown_report(result: dict[str, Any]) -> str:
                 f"- Evidence IDs removed: {_list(delta['evidence']['removed_fact_ids'])}",
             ]
         )
+    if semantic := result.get("semantic_review"):
+        lines.extend(
+            [
+                "",
+                "## Semantic classification",
+                "",
+                f"**Match: {_inline(semantic['label'])}**",
+                "",
+                _inline(semantic["reason"]),
+                "",
+                "| Criterion | Requirement type | Status | Sufficiency | Confidence | Gap |",
+                "|---|---|---|---|---|---|",
+            ]
+        )
+        for criterion in semantic["criteria"]:
+            lines.append(
+                "| {criterion} | {requirement_type} | {status} | {sufficiency} | {confidence} | {gap} |".format(
+                    criterion=_cell(criterion["criterion_id"]),
+                    requirement_type=_cell(criterion["requirement_type"]),
+                    status=_cell(criterion["status"]),
+                    sufficiency=_cell(criterion["evidence_sufficiency"]),
+                    confidence=_cell(criterion["confidence"]),
+                    gap=_cell(criterion["gap"] or "—"),
+                )
+            )
+        lines.extend(
+            [
+                "",
+                f"Controlling criteria: {_list(semantic['controlling_criterion_ids'])}",
+                f"Lifestyle risks: {_list(semantic['lifestyle_risk_ids'])}",
+            ]
+        )
     lines.extend(
         [
             "",
             "## Required judgment",
             "",
-            "Review each posting criterion against cited resume evidence. Use met, partial, not_met, or undecidable; do not convert this lexical report into a percentage or pass prediction.",
+            (
+                "The semantic classification above is the controlling resume-only match."
+                if result.get("semantic_review")
+                else "Review each posting criterion against cited resume evidence. Use met, partial, not_met, or undecidable; do not convert this lexical report into a percentage or pass prediction."
+            ),
             "",
         ]
     )

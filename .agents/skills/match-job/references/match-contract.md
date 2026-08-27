@@ -96,6 +96,12 @@ boundary so captured text cannot create headings, links, HTML, or table rows.
 
 ## Semantic criterion review
 
+Record the complete semantic review through the
+[shared grading contract](grading-contract.md). The shared classifier applies
+the same gate order used by quick job screens and may be attached to the match
+report. A detailed review can refine a screen judgment after deeper evidence
+search, but any changed status must be explained rather than silently upgraded.
+
 Use exactly four statuses:
 
 | Status | Meaning |

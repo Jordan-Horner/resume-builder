@@ -35,6 +35,10 @@ Update my Incident Management resume without losing approved content.
 What important experience is missing from this draft?
 ```
 
+Quick screens and detailed matches use the same gate-first semantic classifier.
+It keeps required role evidence separate from resume polish and exact keyword
+retrieval, and it never reports an ATS score or interview probability.
+
 <details>
 <summary>Manual installation</summary>
 

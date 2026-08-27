@@ -11,6 +11,13 @@ opportunity; they never become candidate facts.
 
 ## Match decision
 
+Use the shared grading contract under
+`../match-job/references/grading-contract.md`. Build the transient criterion
+matrix from the material requirements and demonstrated resume evidence, then
+run `resume-builder match classify`. Its fixed label controls the `Match` line.
+Do not upgrade that label because the resume is polished, the candidate has
+transferable potential, or exact terms happen to be present.
+
 Classify only material posting requirements before choosing the label:
 
 - **Mandatory and role-defining** — central to the role's daily work and stated

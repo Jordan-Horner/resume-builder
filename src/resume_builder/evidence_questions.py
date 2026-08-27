@@ -237,6 +237,40 @@ def question_plan(plan: Path, project_root: Path, *, apply: bool = False) -> dic
     }
 
 
+def open_questions(project_root: Path, resume: Path) -> list[dict[str, str]]:
+    """Return the unresolved, previously validated questions for one resume."""
+    root = project_root.expanduser().resolve()
+    resume_path = (
+        resume.expanduser().resolve()
+        if resume.is_absolute()
+        else contained_path(root, resume.as_posix(), "evidence-question resume")
+    )
+    if not resume_path.is_relative_to((root / "resumes").resolve()):
+        raise ValueError("evidence-question resume must be under resumes/")
+    relative_resume = resume_path.relative_to(root).as_posix()
+    history = _load_history(root)
+    entries = history["entries"]
+    assert isinstance(entries, list)
+    current = [
+        entry
+        for entry in entries
+        if isinstance(entry, dict)
+        and entry.get("resume") == relative_resume
+        and entry.get("status") == "asked"
+    ]
+    current.sort(key=lambda entry: int(entry.get("priority", 0)))
+    return [
+        {
+            "gap_key": _nonempty(entry.get("gap_key"), "evidence-question gap_key"),
+            "question": _nonempty(entry.get("question"), "evidence-question question"),
+            "expected_value": _nonempty(
+                entry.get("expected_value"), "evidence-question expected_value"
+            ),
+        }
+        for entry in current
+    ]
+
+
 def resolve_question(
     project_root: Path,
     *,

@@ -13,6 +13,7 @@ Run a resume-only audit with:
 
 ```bash
 resume-builder match validate
+resume-builder match classify /tmp/job-screen-classification.json
 resume-builder match targets/<posting>.md resumes/baselines/<direction>.md
 ```
 

@@ -517,6 +517,7 @@ def test_agent_contract_requires_preview_handoff_to_be_presented() -> None:
 def test_match_job_skill_preserves_job_specific_boundaries() -> None:
     skill_text = (MATCH_SKILL / "SKILL.md").read_text(encoding="utf-8")
     contract = (MATCH_SKILL / "references" / "match-contract.md").read_text(encoding="utf-8")
+    grading = (MATCH_SKILL / "references" / "grading-contract.md").read_text(encoding="utf-8")
     interface = yaml.safe_load((MATCH_SKILL / "agents" / "openai.yaml").read_text())
     normalized_skill = " ".join(skill_text.split())
 
@@ -530,6 +531,8 @@ def test_match_job_skill_preserves_job_specific_boundaries() -> None:
     assert "Never report a universal ATS percentage" in skill_text
     assert "Never inject every posting keyword" in skill_text
     assert "Never mint a PDF" in skill_text
+    assert "resume-builder match classify" in skill_text
+    assert "--classification-case" in skill_text
     assert "rebuild" in normalized_skill
     assert "hydrate" in normalized_skill
     assert "direction" in normalized_skill
@@ -537,6 +540,9 @@ def test_match_job_skill_preserves_job_specific_boundaries() -> None:
     assert "body_sha256" in contract
     assert "baseline and tailored" in contract
     assert "resume-only match" in contract
+    assert "mandatory-role-defining" in grading
+    assert "Resume polish" in grading
+    assert "Weak match" in grading
     assert interface["interface"]["display_name"] == "Match Job"
     assert "$match-job" in interface["interface"]["default_prompt"]
 
@@ -553,6 +559,8 @@ def test_screen_job_skill_is_compact_read_only_triage() -> None:
     assert "do not create one merely to screen" in normalized_skill
     assert "scripts/fetch_posting.py" in skill_text
     assert "public job-board API" in normalized_skill
+    assert "resume-builder match classify" in normalized_skill
+    assert "Use its label unchanged" in skill_text
     assert "use browser rendering only" in normalized_skill
     assert "one-page" in normalized_skill
     assert "Match" in contract

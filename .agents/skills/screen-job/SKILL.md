@@ -15,7 +15,9 @@ absolute `workspace` value as the root of any private vault, resume, target,
 direction, or build path. Keep real posting content and candidate analysis out
 of the engine checkout.
 
-Read [the screen contract](references/screen-contract.md) before every screen.
+Read [the screen contract](references/screen-contract.md) and the match skill's
+[shared grading contract](../match-job/references/grading-contract.md) before
+every screen.
 
 ## Workflow
 
@@ -51,6 +53,10 @@ Read [the screen contract](references/screen-contract.md) before every screen.
    - canonical evidence available for a later rebuild;
    - missing detail that a pointed user story could resolve; and
    - a genuine requirement or preference gap.
+   Create the shared grading contract's transient version 1 classification case
+   outside the workspace and run `resume-builder match classify` before writing
+   the screen. Use its label unchanged. Do not persist the posting, candidate
+   evidence, or classification case merely to screen.
 6. Give the compact contract output. Lead with `Match` immediately after the
    title, then show the closest resume, strongest overlap, primary gap, and ATS
    visibility as short scan-friendly lines. Never add a separate recommendation

@@ -48,7 +48,7 @@ def _question_plan(tmp_path: Path, *, count: int = 1) -> Path:
 
 
 def test_question_plan_records_stable_gaps_and_skips_rephrasing(tmp_path: Path) -> None:
-    root, _ = _project(tmp_path)
+    root, resume = _project(tmp_path)
     plan = _question_plan(tmp_path)
 
     preview = evidence_questions.question_plan(plan, root)
@@ -60,6 +60,13 @@ def test_question_plan_records_stable_gaps_and_skips_rephrasing(tmp_path: Path) 
     repeated = evidence_questions.question_plan(plan, root)
     assert repeated["askable"] == []
     assert repeated["already_recorded"][0]["status"] == "asked"
+    assert evidence_questions.open_questions(root, resume) == [
+        {
+            "gap_key": "incident-response.scale-1",
+            "question": "How many teams did you coordinate in incident example 1?",
+            "expected_value": "Clarifies the scale of a target-critical leadership story.",
+        }
+    ]
 
 
 def test_question_plan_caps_rounds_and_rejects_generic_or_unsearched_gaps(

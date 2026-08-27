@@ -17,6 +17,8 @@ from .artifact_paths import default_resume_output_base
 from .artifact_status import build_manifest_freshness
 from .atomic import atomic_write_json, atomic_write_text
 from .compilation import build_resume, relative_output, sha256_file
+from .directions import audit_direction, parse_direction
+from .evidence_questions import open_questions
 from .job_target import parse_target, project_target_path
 from .language_review import current_language_review
 from .rendering import contained_project_path, known_fact_ids, load_payload, render_payload
@@ -30,7 +32,7 @@ from .selection_review import (
     selection_review_paths,
     selection_strategy_digest,
 )
-from .synthesis import load_synthesis_plan
+from .synthesis import SynthesisPlan, load_synthesis_plan
 
 APPROVED_NOTICE = "Language reviewed · Edit or mint when ready"
 ATTENTION_NOTICE = "Language reviewed · Wording needs attention before minting"
@@ -53,6 +55,7 @@ def _handoff_presentation(
     career_verdict: str = "not-reviewed",
     career_note: str | None = None,
     job_label: str | None = None,
+    match_feedback: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return the user-facing structure for the preview/edit loop."""
     resume_label = "tailored resume" if tailored else "resume"
@@ -84,13 +87,39 @@ def _handoff_presentation(
         )
         guidance = "Review the flagged wording before creating the final PDF."
         response_prompt = "Tell me how you want to revise the flagged wording."
-    return {
+    presentation: dict[str, Any] = {
         "title": f"{job_label} Resume Preview" if job_label else "Resume Preview",
         "summary": summary,
         "review_heading": "Review your resume",
         "guidance_heading": "What to check",
         "guidance": guidance,
         "response_prompt": response_prompt,
+    }
+    if match_feedback is not None:
+        presentation["match_feedback"] = match_feedback
+    return presentation
+
+
+def _match_feedback(
+    *,
+    plan: SynthesisPlan,
+    payload: dict[str, Any],
+    vault_root: Path,
+    project_root: Path,
+    resume: Path,
+) -> dict[str, Any]:
+    """Return match coverage and tracked questions that can improve the resume."""
+    profile, _ = parse_direction(plan.direction)
+    direction = audit_direction(profile, payload, vault_root.resolve(), plan=plan)
+    return {
+        "coverage_label": "Match coverage",
+        "coverage_score": int(direction["evidence_score"]),
+        "coverage_note": (
+            "Evidence coverage for this resume direction; not a universal ATS score or "
+            "hiring prediction."
+        ),
+        "questions_heading": "Targeted questions that could improve this resume",
+        "questions": open_questions(project_root, resume),
     }
 
 
@@ -223,17 +252,34 @@ def _require_resolved_role_balance(
 
 def _render_handoff_markdown(presentation: dict[str, Any], artifact_markdown: str) -> str:
     """Render the structured preview handoff for direct presentation."""
-    return "\n\n".join(
+    sections = [
+        f"## {presentation['title']}",
+    ]
+    match = presentation.get("match_feedback")
+    if isinstance(match, dict):
+        sections.append(
+            f"**{match['coverage_label']}: {match['coverage_score']}%**\n\n"
+            f"_{match['coverage_note']}_"
+        )
+    sections.extend(
         [
-            f"## {presentation['title']}",
-            presentation["summary"],
             f"### {presentation['review_heading']}",
             artifact_markdown,
+        ]
+    )
+    if isinstance(match, dict) and match["questions"]:
+        questions = "\n".join(
+            f"{index}. {item['question']}" for index, item in enumerate(match["questions"], 1)
+        )
+        sections.append(f"### {match['questions_heading']}\n\n{questions}")
+    sections.extend(
+        [
             f"### {presentation['guidance_heading']}",
             presentation["guidance"],
             presentation["response_prompt"],
         ]
     )
+    return "\n\n".join(sections)
 
 
 def _current_build(
@@ -474,6 +520,13 @@ def preview_resume(
         if isinstance(evidence, dict) and isinstance(evidence.get("structured_claims_checked"), int)
         else "legacy-not-separated"
     )
+    match_feedback = _match_feedback(
+        plan=plan,
+        payload=payload,
+        vault_root=vault_root,
+        project_root=project_root,
+        resume=resume_path,
+    )
     presentation = _handoff_presentation(
         tailored=resume_path.parent.name == "tailored",
         language_status=str(language["status"]),
@@ -481,6 +534,7 @@ def preview_resume(
         career_verdict=career_verdict,
         career_note=career_record.get("next_action") if career_record else None,
         job_label=job_context["label"] if job_context is not None else None,
+        match_feedback=match_feedback,
     )
     user_handoff: dict[str, Any] = {
         "required": True,
@@ -525,6 +579,7 @@ def preview_resume(
             "issues": language["issues"],
         },
         "career_review": career_record,
+        "match_feedback": match_feedback,
         "hybrid_review": route,
         "preview_mode": {
             **PREVIEW_MODE,

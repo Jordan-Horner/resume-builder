@@ -29,6 +29,11 @@ from .job_target import (
     target_paths,
     validate_target,
 )
+from .match_grading import (
+    classify_match,
+    load_classification_case,
+    validate_against_match,
+)
 from .rendering import contained_project_path, object_value
 
 __all__ = [
@@ -39,6 +44,7 @@ __all__ = [
     "SOURCE_KINDS",
     "TARGET_FIELDS",
     "body_sha256",
+    "classify_match",
     "compare_audits",
     "exact_retrieval",
     "main",
@@ -193,6 +199,7 @@ def match_job(
     *,
     baseline: Path | None = None,
     output_base: Path | None = None,
+    classification_case: Path | None = None,
     vault_root: Path = Path("vault"),
 ) -> dict[str, Any]:
     """Create a reproducible target/resume audit and optional baseline delta."""
@@ -251,6 +258,11 @@ def match_job(
             "delta": compare_audits(baseline_audit, audit),
         }
 
+    if classification_case is not None:
+        semantic_review = classify_match(load_classification_case(classification_case))
+        validate_against_match(semantic_review, result)
+        result["semantic_review"] = semantic_review
+
     base_argument = output_base or (
         Path("build/matches") / f"{target_path.stem}--{resume_path.stem}"
     )
@@ -266,6 +278,20 @@ def match_job(
     atomic_write_json(json_path, result)
     atomic_write_text(markdown_path, markdown_report(result))
     return result
+
+
+def classify_main(argv: Sequence[str]) -> int:
+    """Classify one transient semantic criterion matrix without writing artifacts."""
+    parser = argparse.ArgumentParser(description="Classify a semantic job-match case")
+    parser.add_argument("case", type=Path)
+    args = parser.parse_args(argv)
+    try:
+        result = classify_match(load_classification_case(args.case))
+    except (OSError, ValueError) as exc:
+        print(json.dumps({"error": str(exc)}, indent=2), file=sys.stderr)
+        return 2
+    print(json.dumps(result, indent=2))
+    return 0
 
 
 def validate_main(argv: Sequence[str]) -> int:
@@ -302,11 +328,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     if arguments and arguments[0] == "validate":
         return validate_main(arguments[1:])
+    if arguments and arguments[0] == "classify":
+        return classify_main(arguments[1:])
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", type=Path)
     parser.add_argument("resume", type=Path)
     parser.add_argument("--baseline", type=Path)
     parser.add_argument("--output-base", type=Path)
+    parser.add_argument("--classification-case", type=Path)
     parser.add_argument("--vault-root", type=Path, default=Path("vault"))
     args = parser.parse_args(arguments)
     try:
@@ -315,6 +344,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.resume,
             baseline=args.baseline,
             output_base=args.output_base,
+            classification_case=args.classification_case,
             vault_root=args.vault_root,
         )
     except (OSError, ValueError) as exc:
@@ -330,6 +360,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         ],
         "outputs": result["outputs"],
     }
+    if semantic_review := result.get("semantic_review"):
+        summary["match"] = semantic_review["label"]
+        summary["controlling_criterion_ids"] = semantic_review["controlling_criterion_ids"]
     print(json.dumps(summary, indent=2))
     return 0
 

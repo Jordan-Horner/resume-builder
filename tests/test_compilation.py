@@ -612,6 +612,36 @@ def test_preview_requires_language_review_then_publishes_html_for_editing(
 
     assert run_main(previewing.main, resume, "--vault-root", vault) == 2
     write_language_review(tmp_path, resume)
+    questions_path = tmp_path / "editorial" / "evidence-questions.json"
+    questions_path.parent.mkdir(parents=True)
+    questions_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "entries": [
+                    {
+                        "gap_key": "support-operations.scale",
+                        "gap": "scale",
+                        "subject": "Investigation workflow",
+                        "priority": 1,
+                        "question": "How many people or teams used the investigation workflow?",
+                        "expected_value": "Adds adoption scale to the workflow outcome.",
+                        "evidence_searched": {
+                            "canonical_facts": True,
+                            "registered_sources": True,
+                            "notes": "The existing facts do not state adoption scale.",
+                        },
+                        "resume": "resumes/baselines/support-operations.md",
+                        "status": "asked",
+                        "asked_at": "2026-01-01T00:00:00+00:00",
+                        "resolved_at": None,
+                        "source_id": None,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
     assert run_main(previewing.main, resume, "--vault-root", vault) == 0
 
     html_path = tmp_path / "build" / "resumes" / "support-operations" / "resume.html"
@@ -670,6 +700,22 @@ def test_preview_requires_language_review_then_publishes_html_for_editing(
             "guidance_heading": "What to check",
             "guidance": ("Confirm that the content feels accurate and sounds like you."),
             "response_prompt": 'Reply "Mint" to create the PDF, or tell me what to change.',
+            "match_feedback": {
+                "coverage_label": "Match coverage",
+                "coverage_score": 100,
+                "coverage_note": (
+                    "Evidence coverage for this resume direction; not a universal ATS score or "
+                    "hiring prediction."
+                ),
+                "questions_heading": "Targeted questions that could improve this resume",
+                "questions": [
+                    {
+                        "gap_key": "support-operations.scale",
+                        "question": "How many people or teams used the investigation workflow?",
+                        "expected_value": "Adds adoption scale to the workflow outcome.",
+                    }
+                ],
+            },
         },
     }
 
@@ -686,10 +732,13 @@ def test_preview_requires_language_review_then_publishes_html_for_editing(
     assert str(html_path.resolve()) in handoff["artifact"]["markdown"]
     assert handoff["rendered_markdown"] == (
         "## Resume Preview\n\n"
-        "Your resume passed its independent language review. Review it and tell me what to "
-        'change. When it looks right, reply "Mint" to create the PDF.\n\n'
+        "**Match coverage: 100%**\n\n"
+        "_Evidence coverage for this resume direction; not a universal ATS score or hiring "
+        "prediction._\n\n"
         "### Review your resume\n\n"
         f"[Open the full resume preview](<{html_path.resolve()}>)\n\n"
+        "### Targeted questions that could improve this resume\n\n"
+        "1. How many people or teams used the investigation workflow?\n\n"
         "### What to check\n\n"
         "Confirm that the content feels accurate and sounds like you.\n\n"
         'Reply "Mint" to create the PDF, or tell me what to change.'

@@ -308,6 +308,11 @@ Git tools do not. Never write candidate data into same-named engine folders.
     `exclusive-current-stage`, return that rendered Markdown as the complete
     final handoff without adding earlier-stage confirmations, workflow examples,
     approval prompts, test summaries, or other prose. Treat
+    the rendered handoff's match line as required review context: it must lead
+    with `Match coverage: <score>%` and distinguish evidence coverage from a
+    universal ATS score. Do not render generic fit, strongest-match, or weak-area
+    sections or a separate language-review status paragraph. Instead, show open, validated questions from the durable
+    evidence-question ledger when answers could materially improve the resume. Treat
     `supersedes_prior_handoffs` as expiring every earlier confirmation render.
     Answer any simultaneous process question in commentary before previewing,
     not beside the exclusive preview handoff. Stay in the preview → edit → preview loop until the user says

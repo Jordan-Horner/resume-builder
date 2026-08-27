@@ -201,6 +201,39 @@ def nested_keys(value: Any) -> set[str]:
     return set()
 
 
+def classification_case() -> dict[str, object]:
+    return {
+        "version": 1,
+        "evidence_complete": True,
+        "criteria": [
+            {
+                "criterion_id": "incident-response",
+                "importance": "required",
+                "requirement_type": "mandatory-role-defining",
+                "status": "met",
+                "evidence_sufficiency": "high",
+                "confidence": "high",
+                "evidence_blocks": ["experience[0].bullets[0]"],
+                "evidence_fact_ids": ["OPS-001"],
+                "substitution_basis": "",
+                "gap": "",
+            },
+            {
+                "criterion_id": "ai-workflows",
+                "importance": "preferred",
+                "requirement_type": "preferred",
+                "status": "met",
+                "evidence_sufficiency": "high",
+                "confidence": "high",
+                "evidence_blocks": ["experience[0].bullets[0]"],
+                "evidence_fact_ids": ["OPS-001"],
+                "substitution_basis": "",
+                "gap": "",
+            },
+        ],
+    }
+
+
 def test_target_contract_validates_snapshot_and_semantic_boundary(tmp_path: Path) -> None:
     target = tmp_path / "example-incident-operations-2026-08-17.md"
     target.write_text(target_markdown(), encoding="utf-8")
@@ -309,6 +342,42 @@ def test_match_writes_reproducible_report_and_baseline_delta(tmp_path: Path) -> 
     report = report_path.read_text(encoding="utf-8")
     assert "not an ATS score or hiring verdict" in report
     assert "Retrieval gained: ai-workflows" in report
+
+
+def test_match_can_attach_shared_semantic_classification(tmp_path: Path) -> None:
+    vault, target, baseline, tailored = project(tmp_path)
+    case_path = tmp_path / "classification.json"
+    case_path.write_text(json.dumps(classification_case()), encoding="utf-8")
+
+    result = job_matching.match_job(
+        target,
+        tailored,
+        baseline=baseline,
+        classification_case=case_path,
+        vault_root=vault,
+    )
+
+    assert result["semantic_review"]["label"] == "Strong match"
+    report_path = tmp_path / result["outputs"][1]
+    report = report_path.read_text(encoding="utf-8")
+    assert "## Semantic classification" in report
+    assert "**Match: Strong match**" in report
+
+
+def test_match_rejects_classification_that_omits_target_criterion(tmp_path: Path) -> None:
+    vault, target, _, tailored = project(tmp_path)
+    incomplete = classification_case()
+    incomplete["criteria"] = incomplete["criteria"][:1]  # type: ignore[index]
+    case_path = tmp_path / "classification.json"
+    case_path.write_text(json.dumps(incomplete), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="cover every resume-evaluable target criterion"):
+        job_matching.match_job(
+            target,
+            tailored,
+            classification_case=case_path,
+            vault_root=vault,
+        )
 
 
 def test_markdown_report_neutralizes_untrusted_posting_text(tmp_path: Path) -> None:
