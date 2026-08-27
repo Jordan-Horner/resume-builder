@@ -49,6 +49,10 @@ search:
         - AI engineer
 
 providers:
+  jazzhr:
+    enabled: true
+  rippling:
+    enabled: true
   linkedin:
     enabled: true
     results_wanted: 10

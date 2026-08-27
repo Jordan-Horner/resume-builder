@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
 import re
 from datetime import UTC, datetime, timedelta
+from urllib.parse import urljoin, urlsplit
 
 import httpx
+from bs4 import BeautifulSoup
 
 from job_puller.config import AtsBoard, SearchSettings
 from job_puller.eligibility import (
@@ -91,6 +94,214 @@ class HttpProvider:
                 accepted.append(observation)
         metrics["accepted"] = len(accepted)
         return accepted, metrics
+
+
+class CandidateDetailProvider(HttpProvider):
+    """Filter compact board listings before requesting full job details."""
+
+    def fetch(self, since: datetime) -> ProviderResult:
+        started = datetime.now(UTC)
+        metrics = {
+            "raw_results": 0,
+            "invalid": 0,
+            "title_rejected": 0,
+            "remote_rejected": 0,
+            "freshness_rejected": 0,
+            "duplicates": 0,
+            "detail_errors": 0,
+            "accepted": 0,
+        }
+        observations: list[JobObservation] = []
+        detail_errors: list[str] = []
+        try:
+            with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:
+                cards = self._candidates(client)
+                metrics["raw_results"] = len(cards)
+                titles = enabled_titles(self.search) if self.search else []
+                seen_job_ids: set[str] = set()
+                for card in cards:
+                    if not card["job_id"] or not card["title"] or not card["url"]:
+                        metrics["invalid"] += 1
+                        continue
+                    if card["job_id"] in seen_job_ids:
+                        metrics["duplicates"] += 1
+                        continue
+                    seen_job_ids.add(card["job_id"])
+                    if self.search and not title_matches(card["title"], titles):
+                        metrics["title_rejected"] += 1
+                        continue
+                    try:
+                        observation = self._detail(client, card)
+                    except (httpx.HTTPError, ValueError, json.JSONDecodeError) as exc:
+                        metrics["detail_errors"] += 1
+                        detail_errors.append(
+                            f"{card['job_id']}: {type(exc).__name__}: {exc}"
+                        )
+                        continue
+                    if self.search and not remote_matches(observation, self.search):
+                        metrics["remote_rejected"] += 1
+                    elif self.search and not recent_matches(observation, since):
+                        metrics["freshness_rejected"] += 1
+                    else:
+                        if self.search and self.search.remote_only:
+                            observation.remote = True
+                        observations.append(observation)
+                metrics["accepted"] = len(observations)
+            completed = datetime.now(UTC)
+            return ProviderResult(
+                self.source_key,
+                self.name,
+                observations,
+                started,
+                completed,
+                not detail_errors,
+                "; ".join(detail_errors) or None,
+                suspicious_empty=not cards,
+                authoritative_complete=bool(cards) and self.search is None and not detail_errors,
+                metrics=metrics,
+            )
+        except Exception as exc:
+            return ProviderResult(
+                self.source_key,
+                self.name,
+                observations,
+                started,
+                datetime.now(UTC),
+                False,
+                f"{type(exc).__name__}: {exc}",
+                metrics=metrics,
+            )
+
+    def _fetch(self, client: httpx.Client, since: datetime) -> list[JobObservation]:
+        return [self._detail(client, card) for card in self._candidates(client)]
+
+    def _candidates(self, client: httpx.Client) -> list[dict[str, str]]:
+        raise NotImplementedError
+
+    def _detail(self, client: httpx.Client, card: dict[str, str]) -> JobObservation:
+        raise NotImplementedError
+
+
+class JazzHRProvider(CandidateDetailProvider):
+    """Collect public JazzHR boards hosted on ApplyToJob."""
+
+    name = "jazzhr"
+
+    def _candidates(self, client: httpx.Client) -> list[dict[str, str]]:
+        url = self.board.careers_url or f"https://{self.board.id}.applytojob.com/"
+        response = client.get(url)
+        response.raise_for_status()
+        cards = []
+        soup = BeautifulSoup(response.text, "html.parser")
+        for item in soup.select("li.list-group-item"):
+            link = item.select_one("h3 a[href*='/apply/']")
+            if link is None:
+                continue
+            source_url = urljoin(str(response.url), str(link.get("href") or ""))
+            match = re.search(r"/apply/([^/?#]+)", urlsplit(source_url).path)
+            location_node = item.select_one(".fa-map-marker")
+            location = clean_text(location_node.parent.get_text(" ") if location_node else "")
+            cards.append(
+                {
+                    "job_id": match.group(1) if match else "",
+                    "title": clean_text(link.get_text(" ")),
+                    "url": source_url,
+                    "location": location,
+                }
+            )
+        return cards
+
+    def _detail(self, client: httpx.Client, card: dict[str, str]) -> JobObservation:
+        response = client.get(card["url"])
+        response.raise_for_status()
+        payload = _job_posting_json(response.text)
+        description = str(payload.get("description") or "")
+        location = _json_ld_location(payload) or card["location"]
+        source_url = str(payload.get("url") or response.url)
+        return JobObservation(
+            provider=self.name,
+            provider_board_id=self.board.id,
+            provider_job_id=card["job_id"],
+            title=clean_text(payload.get("title") or card["title"]),
+            company=self.board.name,
+            source_url=source_url,
+            direct_apply_url=source_url,
+            location=location,
+            description_html=description,
+            description_text=html_to_text(description),
+            posted_at=parse_datetime(payload.get("datePosted")),
+            employment_type=clean_text(payload.get("employmentType")) or None,
+            remote=(
+                str(payload.get("jobLocationType") or "").casefold() == "telecommute"
+                or "remote" in card["location"].casefold()
+            ),
+            raw_payload=payload,
+            parser_version="jazzhr-jsonld-v1",
+        )
+
+
+class RipplingProvider(CandidateDetailProvider):
+    """Collect public Rippling ATS boards through the API used by their job pages."""
+
+    name = "rippling"
+
+    def _candidates(self, client: httpx.Client) -> list[dict[str, str]]:
+        base = self.board.api_url or f"https://ats.rippling.com/api/v2/board/{self.board.id}/jobs"
+        response = client.get(base, params={"page": 0, "pageSize": 1000})
+        response.raise_for_status()
+        payload = response.json()
+        total_pages = int(payload.get("totalPages") or 1)
+        if total_pages > 1:
+            raise ValueError(
+                f"Rippling board {self.board.id!r} exceeds the public API's 1000-job page limit"
+            )
+        candidates = []
+        for item in payload.get("items") or []:
+            locations = item.get("locations") or []
+            location = "; ".join(
+                clean_text(entry.get("name")) for entry in locations if isinstance(entry, dict)
+            )
+            candidates.append(
+                {
+                    "job_id": str(item.get("id") or ""),
+                    "title": clean_text(item.get("name")),
+                    "url": str(item.get("url") or ""),
+                    "location": location,
+                }
+            )
+        return candidates
+
+    def _detail(self, client: httpx.Client, card: dict[str, str]) -> JobObservation:
+        base = self.board.api_url or f"https://ats.rippling.com/api/v2/board/{self.board.id}/jobs"
+        response = client.get(f"{base.rstrip('/')}/{card['job_id']}")
+        response.raise_for_status()
+        payload = response.json()
+        description_parts = payload.get("description") or {}
+        description = "\n".join(
+            str(description_parts.get(key) or "") for key in ("company", "role")
+        )
+        locations = payload.get("workLocations") or []
+        location = "; ".join(clean_text(item) for item in locations) or card["location"]
+        employment_type = payload.get("employmentType") or {}
+        source_url = str(payload.get("url") or card["url"])
+        return JobObservation(
+            provider=self.name,
+            provider_board_id=self.board.id,
+            provider_job_id=str(payload.get("uuid") or card["job_id"]),
+            title=clean_text(payload.get("name") or card["title"]),
+            company=self.board.name,
+            source_url=source_url,
+            direct_apply_url=source_url,
+            location=location,
+            description_html=description,
+            description_text=html_to_text(description),
+            posted_at=parse_datetime(payload.get("createdOn")),
+            employment_type=clean_text(employment_type.get("id")) or None,
+            remote=any("remote" in clean_text(item).casefold() for item in locations),
+            raw_payload=payload,
+            parser_version="rippling-api-v1",
+        )
+
 
 class GreenhouseProvider(HttpProvider):
     name = "greenhouse"
@@ -324,3 +535,44 @@ def _workday_posted_at(value: object, now: datetime | None = None) -> datetime |
         return current - timedelta(days=1)
     match = re.fullmatch(r"posted (\d+)\+? days? ago", text)
     return current - timedelta(days=int(match.group(1))) if match else None
+
+
+def _job_posting_json(html: str) -> dict:
+    soup = BeautifulSoup(html, "html.parser")
+    for script in soup.select("script[type='application/ld+json']"):
+        payload = json.loads(script.string or script.get_text())
+        candidates = payload if isinstance(payload, list) else [payload]
+        for candidate in candidates:
+            if isinstance(candidate, dict) and candidate.get("@type") == "JobPosting":
+                return candidate
+            if isinstance(candidate, dict):
+                for nested in candidate.get("@graph", []):
+                    if isinstance(nested, dict) and nested.get("@type") == "JobPosting":
+                        return nested
+    raise ValueError("job page does not contain JobPosting JSON-LD")
+
+
+def _json_ld_location(payload: dict) -> str:
+    remote_regions = payload.get("applicantLocationRequirements") or []
+    if isinstance(remote_regions, dict):
+        remote_regions = [remote_regions]
+    names = [clean_text(region.get("name")) for region in remote_regions if isinstance(region, dict)]
+    if names:
+        return ", ".join(name for name in names if name)
+    locations = payload.get("jobLocation") or []
+    if isinstance(locations, dict):
+        locations = [locations]
+    parts = []
+    for location in locations:
+        if not isinstance(location, dict):
+            continue
+        address = location.get("address") or {}
+        if isinstance(address, dict):
+            text = ", ".join(
+                clean_text(address.get(key))
+                for key in ("addressLocality", "addressRegion", "addressCountry")
+                if address.get(key)
+            )
+            if text:
+                parts.append(text)
+    return "; ".join(parts)

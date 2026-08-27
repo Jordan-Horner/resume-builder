@@ -689,7 +689,9 @@ class InventoryDatabase:
                 """SELECT 1 FROM observations o
                    JOIN job_observation_links l ON l.observation_id=o.id
                    WHERE l.job_id=?
-                     AND o.provider IN ('greenhouse','lever','ashby','smartrecruiters','workday')
+                     AND o.provider IN (
+                         'jazzhr','rippling','greenhouse','lever','ashby','smartrecruiters','workday'
+                     )
                      AND o.missing_streak=0 LIMIT 1""",
                 (job_id,),
             ).fetchone()
@@ -862,6 +864,8 @@ class InventoryDatabase:
         if not row:
             return
         priority = {
+            "jazzhr": 100,
+            "rippling": 100,
             "greenhouse": 100,
             "lever": 100,
             "ashby": 100,

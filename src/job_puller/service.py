@@ -9,14 +9,18 @@ from .enrichment import enrich_observation
 from .providers import (
     AshbyProvider,
     GreenhouseProvider,
+    JazzHRProvider,
     JobSpyProvider,
     LeverProvider,
     LinkedInGuestProvider,
+    RipplingProvider,
     SmartRecruitersProvider,
     WorkdayProvider,
 )
 
 ATS_PROVIDER_CLASSES = {
+    "jazzhr": JazzHRProvider,
+    "rippling": RipplingProvider,
     "greenhouse": GreenhouseProvider,
     "lever": LeverProvider,
     "ashby": AshbyProvider,

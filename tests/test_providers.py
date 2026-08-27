@@ -2,12 +2,15 @@ from datetime import UTC, datetime
 
 import httpx
 
+import job_puller.providers.ats as ats_module
 from job_puller.config import AtsBoard, CommercialProvider, SearchSettings
 from job_puller.eligibility import family_keyword_queries
 from job_puller.providers.ats import (
     AshbyProvider,
     GreenhouseProvider,
+    JazzHRProvider,
     LeverProvider,
+    RipplingProvider,
     SmartRecruitersProvider,
     WorkdayProvider,
     _workday_posted_at,
@@ -55,6 +58,140 @@ def test_greenhouse_normalizes_full_description():
     jobs = provider._fetch(client, SINCE)
     assert jobs[0].provider_job_id == "1"
     assert jobs[0].description_text == "Build cloud systems"
+
+
+def test_jazzhr_prefilters_cards_and_parses_structured_detail():
+    board_html = """
+    <ul><li class="list-group-item">
+      <h3><a href="/apply/abc123/cloud-engineer">Senior Cloud Engineer</a></h3>
+      <ul><li><i class="fa fa-map-marker"></i> Remote</li></ul>
+    </li></ul>
+    """
+    detail_html = """
+    <script type="application/ld+json">
+    {"@type":"JobPosting","title":"Senior Cloud Engineer","description":"<p>Build cloud systems</p>",
+     "datePosted":"2026-08-26","employmentType":"FULL_TIME","jobLocationType":"TELECOMMUTE",
+     "applicantLocationRequirements":{"@type":"Country","name":"United States"},
+     "url":"https://acme.applytojob.com/apply/abc123/cloud-engineer"}
+    </script>
+    """
+
+    class HtmlClient:
+        def __init__(self):
+            self.pages = [board_html, detail_html]
+
+        def get(self, url):
+            return httpx.Response(
+                200,
+                text=self.pages.pop(0),
+                request=httpx.Request("GET", url),
+            )
+
+    provider = JazzHRProvider(AtsBoard(id="acme", name="Acme"))
+    job = provider._fetch(HtmlClient(), SINCE)[0]
+    assert job.provider_job_id == "abc123"
+    assert job.description_text == "Build cloud systems"
+    assert job.location == "United States"
+    assert job.remote is True
+
+
+def test_jazzhr_keeps_remote_evidence_from_board_card():
+    detail_html = """
+    <script type="application/ld+json">
+    {"@type":"JobPosting","title":"Platform Engineer","description":"<p>Operate services</p>",
+     "datePosted":"2026-08-26","applicantLocationRequirements":{"name":"United States"},
+     "url":"https://acme.applytojob.com/apply/abc123/platform-engineer"}
+    </script>
+    """
+    client = type(
+        "HtmlClient",
+        (),
+        {
+            "get": lambda self, url: httpx.Response(
+                200, text=detail_html, request=httpx.Request("GET", url)
+            )
+        },
+    )()
+    provider = JazzHRProvider(AtsBoard(id="acme", name="Acme"))
+    job = provider._detail(
+        client,
+        {
+            "job_id": "abc123",
+            "title": "Platform Engineer",
+            "url": "https://acme.applytojob.com/apply/abc123/platform-engineer",
+            "location": "Remote",
+        },
+    )
+    assert job.location == "United States"
+    assert job.remote is True
+
+
+def test_rippling_uses_public_list_and_detail_apis():
+    list_payload = {
+        "items": [
+            {
+                "id": "abc123",
+                "name": "AWS DevOps Engineer",
+                "url": "https://ats.rippling.com/acme/jobs/abc123",
+                "locations": [
+                    {"name": "Remote (United States)", "workplaceType": "REMOTE"}
+                ],
+            }
+        ],
+        "totalPages": 1,
+    }
+    detail_payload = {
+        "uuid": "abc123",
+        "name": "AWS DevOps Engineer",
+        "description": {"company": "<p>Acme</p>", "role": "<p>Operate AWS</p>"},
+        "workLocations": ["Remote (United States)"],
+        "employmentType": {"id": "Salaried, full-time"},
+        "createdOn": "2026-08-26T10:00:00Z",
+        "url": "https://ats.rippling.com/acme/jobs/abc123",
+    }
+    provider = RipplingProvider(AtsBoard(id="acme", name="Acme"))
+    job = provider._fetch(FakeClient(get_payloads=[list_payload, detail_payload]), SINCE)[0]
+    assert job.provider_job_id == "abc123"
+    assert "Operate AWS" in job.description_text
+    assert job.employment_type == "Salaried, full-time"
+    assert job.remote is True
+
+
+def test_candidate_detail_provider_deduplicates_list_ids(monkeypatch):
+    item = {
+        "id": "abc123",
+        "name": "AWS DevOps Engineer",
+        "url": "https://ats.rippling.com/acme/jobs/abc123",
+        "locations": [{"name": "Remote (United States)", "workplaceType": "REMOTE"}],
+    }
+    list_payload = {"items": [item, item], "totalPages": 1}
+    detail_payload = {
+        "uuid": "abc123",
+        "name": "AWS DevOps Engineer",
+        "description": {"role": "<p>Operate AWS</p>"},
+        "workLocations": ["Remote (United States)"],
+        "createdOn": "2026-08-26T10:00:00Z",
+        "url": item["url"],
+    }
+
+    class ContextClient(FakeClient):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+    client = ContextClient(get_payloads=[list_payload, detail_payload])
+    monkeypatch.setattr(ats_module.httpx, "Client", lambda **kwargs: client)
+    search = SearchSettings(
+        remote_only=True,
+        families=[{"name": "cloud", "titles": ["devops engineer"]}],
+    )
+    result = RipplingProvider(AtsBoard(id="acme", name="Acme"), search=search).fetch(SINCE)
+    assert result.success is True
+    assert len(result.observations) == 1
+    assert result.metrics["raw_results"] == 2
+    assert result.metrics["duplicates"] == 1
 
 
 def test_lever_normalizes_apply_url():

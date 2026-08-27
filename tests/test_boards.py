@@ -13,6 +13,8 @@ from job_puller.config import AtsBoard, BoardRegistry, BoardRegistryProviders, l
 
 def test_recognizes_supported_board_urls():
     cases = {
+        "https://acme.applytojob.com/apply/abc/cloud-engineer": ("jazzhr", "acme"),
+        "https://ats.rippling.com/acme/jobs/abc": ("rippling", "acme"),
         "https://job-boards.greenhouse.io/acme/jobs/1": ("greenhouse", "acme"),
         "https://jobs.lever.co/acme/1": ("lever", "acme"),
         "https://jobs.ashbyhq.com/Acme/1": ("ashby", "Acme"),

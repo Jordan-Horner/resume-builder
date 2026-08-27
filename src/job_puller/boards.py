@@ -12,7 +12,15 @@ import yaml
 
 from .config import AtsBoard, BoardRegistry, BoardRegistryProviders, load_board_registry
 
-SUPPORTED_PROVIDERS = ("greenhouse", "lever", "ashby", "smartrecruiters", "workday")
+SUPPORTED_PROVIDERS = (
+    "jazzhr",
+    "rippling",
+    "greenhouse",
+    "lever",
+    "ashby",
+    "smartrecruiters",
+    "workday",
+)
 GREENHOUSE_HOSTS = {
     "boards.greenhouse.io",
     "job-boards.greenhouse.io",
@@ -47,6 +55,22 @@ def _segments(url: str) -> tuple[str, list[str]]:
 
 def recognize_board(url: str, company: str = "") -> tuple[str, AtsBoard] | None:
     host, segments = _segments(url)
+    if host.endswith(".applytojob.com"):
+        board_id = host.removesuffix(".applytojob.com")
+        return "jazzhr", AtsBoard(
+            id=board_id,
+            name=company or board_id,
+            enabled=False,
+            careers_url=f"https://{board_id}.applytojob.com/",
+        )
+    if host == "ats.rippling.com" and len(segments) >= 2 and segments[1] == "jobs":
+        board_id = segments[0]
+        return "rippling", AtsBoard(
+            id=board_id,
+            name=company or board_id,
+            enabled=False,
+            careers_url=f"https://ats.rippling.com/{board_id}/jobs",
+        )
     if host in GREENHOUSE_HOSTS and segments:
         board_id = segments[0]
         return "greenhouse", AtsBoard(

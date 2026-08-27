@@ -114,7 +114,8 @@ Discover supported boards from the direct application links already stored in in
 uv run job-puller boards discover
 ```
 
-Discovery recognizes Greenhouse, Lever, Ashby, SmartRecruiters, and Workday links. Known Greenhouse short links are
+Discovery recognizes JazzHR/ApplyToJob, Rippling, Greenhouse, Lever, Ashby, SmartRecruiters, and Workday links.
+Known Greenhouse short links are
 resolved without requesting custom or untrusted redirect destinations. Results are merged into the private
 `config/boards.yml` registry and new
 boards are always disabled so rediscovery cannot silently expand collection. Existing enablement and tags are
@@ -138,6 +139,16 @@ Each board is explicit. Registry examples:
 ```yaml
 schema_version: 1
 providers:
+  jazzhr:
+    - id: example
+      name: Example Company
+      enabled: true
+      careers_url: https://example.applytojob.com/
+  rippling:
+    - id: example
+      name: Example Company
+      enabled: true
+      careers_url: https://ats.rippling.com/example/jobs
   greenhouse:
     - id: example
       name: Example Company
@@ -162,7 +173,11 @@ providers:
       api_url: https://example.wd5.myworkdayjobs.com/wday/cxs/example/jobs/jobs
 ```
 
-Branded or unusual boards may set `api_url` explicitly. Workday always requires its public CXS endpoint because tenant and site names cannot be derived safely from a display name.
+JazzHR listing pages and Rippling's public board API are title-filtered before full job details are requested, which
+keeps broad company boards efficient. Rippling retrieves up to the public API's 1,000-job maximum in one listing
+request and reports an error instead of silently truncating a larger board. Branded or unusual boards may set
+`api_url` explicitly. Workday always requires its public CXS endpoint because tenant and site names cannot be
+derived safely from a display name.
 
 ## Data model
 

@@ -108,6 +108,8 @@ class AtsProvider(StrictModel):
 class Providers(StrictModel):
     linkedin: LinkedInProviderSettings = Field(default_factory=LinkedInProviderSettings)
     indeed: CommercialProvider = Field(default_factory=CommercialProvider)
+    jazzhr: AtsProvider = Field(default_factory=AtsProvider)
+    rippling: AtsProvider = Field(default_factory=AtsProvider)
     greenhouse: AtsProvider = Field(default_factory=AtsProvider)
     lever: AtsProvider = Field(default_factory=AtsProvider)
     ashby: AtsProvider = Field(default_factory=AtsProvider)
@@ -116,6 +118,8 @@ class Providers(StrictModel):
 
 
 class BoardRegistryProviders(StrictModel):
+    jazzhr: list[AtsBoard] = Field(default_factory=list)
+    rippling: list[AtsBoard] = Field(default_factory=list)
     greenhouse: list[AtsBoard] = Field(default_factory=list)
     lever: list[AtsBoard] = Field(default_factory=list)
     ashby: list[AtsBoard] = Field(default_factory=list)

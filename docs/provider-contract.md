@@ -13,7 +13,10 @@ A provider must:
 - treat `since` as a retrieval bound only when the source actually honors it.
 - report retrieval and filtering metrics when the provider applies local eligibility rules.
 
-Commercial-board results are discovery observations and never authoritative for closure. Direct ATS list results may be authoritative when pagination completes successfully.
+Commercial-board results are discovery observations and never authoritative for closure. Direct ATS list results
+may be authoritative when pagination completes successfully. JazzHR and Rippling list every public opening first,
+then fetch details only for locally matching titles; their normal filtered runs are therefore not authoritative
+whole-board snapshots.
 
 Direct ATS boards are kept in a separate private registry. Discovery reads only commercial-source application URLs
 already present in active inventory, recognizes known public ATS URL shapes, and writes new entries disabled. Registry tags are inert
