@@ -59,3 +59,34 @@ providers:
     )
     with pytest.raises(ValueError, match="unknown families: missing"):
         load_config(path)
+
+
+def test_remote_linkedin_requires_descriptions(tmp_path):
+    path = tmp_path / "search.yml"
+    path.write_text(
+        """schema_version: 1
+search:
+  remote_only: true
+  families: [{name: reliability, titles: [SRE]}]
+providers:
+  linkedin: {enabled: true, fetch_descriptions: false}
+""",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="requires description fetching"):
+        load_config(path)
+
+
+def test_linkedin_scan_capacity_must_cover_largest_target(tmp_path):
+    path = tmp_path / "search.yml"
+    path.write_text(
+        """schema_version: 1
+search:
+  families: [{name: reliability, titles: [SRE]}]
+providers:
+  linkedin: {results_wanted: 25, max_cards_scanned: 10}
+""",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="max_cards_scanned"):
+        load_config(path)

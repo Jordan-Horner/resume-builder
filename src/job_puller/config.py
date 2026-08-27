@@ -56,6 +56,22 @@ class CommercialProvider(StrictModel):
         return limits
 
 
+class LinkedInProviderSettings(CommercialProvider):
+    results_wanted: int = Field(default=10, ge=1, le=1000)
+    request_delay_seconds: float = Field(default=3.2, ge=0, le=30)
+    incremental_lookback_hours: int = Field(default=48, ge=1, le=168)
+    max_cards_scanned: int = Field(default=50, ge=1, le=1000)
+    detail_cache_hours: int = Field(default=24, ge=1, le=168)
+    remote_policy: Literal["strict", "balanced", "source"] = "strict"
+
+    @model_validator(mode="after")
+    def require_scan_capacity(self) -> LinkedInProviderSettings:
+        largest_target = max([self.results_wanted, *self.family_results_wanted.values()])
+        if self.max_cards_scanned < largest_target:
+            raise ValueError("LinkedIn max_cards_scanned must cover every configured result target")
+        return self
+
+
 class AtsBoard(StrictModel):
     id: str
     name: str
@@ -70,7 +86,7 @@ class AtsProvider(StrictModel):
 
 
 class Providers(StrictModel):
-    linkedin: CommercialProvider = Field(default_factory=CommercialProvider)
+    linkedin: LinkedInProviderSettings = Field(default_factory=LinkedInProviderSettings)
     indeed: CommercialProvider = Field(default_factory=CommercialProvider)
     greenhouse: AtsProvider = Field(default_factory=AtsProvider)
     lever: AtsProvider = Field(default_factory=AtsProvider)
@@ -102,6 +118,12 @@ class InventoryConfig(StrictModel):
                     f"{provider_name} family result limits reference unknown families: "
                     f"{', '.join(sorted(unknown))}"
                 )
+        if (
+            self.search.remote_only
+            and self.providers.linkedin.enabled
+            and not self.providers.linkedin.fetch_descriptions
+        ):
+            raise ValueError("remote-only LinkedIn collection requires description fetching")
         return self
 
 

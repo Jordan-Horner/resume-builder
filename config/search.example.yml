@@ -50,8 +50,13 @@ search:
 providers:
   linkedin:
     enabled: true
-    results_wanted: 25
+    results_wanted: 10
     fetch_descriptions: true
+    request_delay_seconds: 3.2
+    incremental_lookback_hours: 48
+    max_cards_scanned: 50
+    detail_cache_hours: 24
+    remote_policy: strict
   indeed:
     enabled: true
     results_wanted: 100

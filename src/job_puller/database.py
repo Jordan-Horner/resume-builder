@@ -10,10 +10,11 @@ from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from .detail_cache import CachedProviderDetail
 from .models import JobObservation, ProviderResult
 from .normalize import canonical_url, description_hash, normalized_key
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 MIGRATION_1 = """
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -134,7 +135,23 @@ MIGRATION_2 = """
 ALTER TABLE scrape_runs ADD COLUMN metrics_json TEXT NOT NULL DEFAULT '{}';
 """
 
-MIGRATIONS = {1: MIGRATION_1, 2: MIGRATION_2}
+MIGRATION_3 = """
+CREATE TABLE IF NOT EXISTS provider_detail_cache (
+    provider TEXT NOT NULL,
+    provider_job_id TEXT NOT NULL,
+    parser_version TEXT NOT NULL,
+    response_body TEXT NOT NULL,
+    fetched_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    PRIMARY KEY(provider, provider_job_id, parser_version)
+);
+CREATE INDEX IF NOT EXISTS idx_provider_detail_cache_expiry
+ON provider_detail_cache(expires_at);
+CREATE INDEX IF NOT EXISTS idx_jobs_exact_content
+ON jobs(normalized_company, normalized_title, description_hash);
+"""
+
+MIGRATIONS = {1: MIGRATION_1, 2: MIGRATION_2, 3: MIGRATION_3}
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -179,6 +196,8 @@ class InventoryDatabase:
                     "INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)",
                     (version, _iso(datetime.now(UTC))),
                 )
+            if current < 3:
+                self._reconcile_exact_duplicates(conn)
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
@@ -199,6 +218,99 @@ class InventoryDatabase:
                 "SELECT last_success_at FROM checkpoints WHERE source_key = ?", (source_key,)
             ).fetchone()
         return datetime.fromisoformat(row[0]) if row else None
+
+    def reconcile_exact_duplicates(self) -> int:
+        with self.transaction() as conn:
+            return self._reconcile_exact_duplicates(conn)
+
+    def _reconcile_exact_duplicates(self, conn: sqlite3.Connection) -> int:
+        groups = conn.execute(
+            """SELECT normalized_company, normalized_title, description_hash
+               FROM jobs WHERE description_hash<>''
+               GROUP BY normalized_company, normalized_title, description_hash
+               HAVING COUNT(*) > 1"""
+        ).fetchall()
+        merged = 0
+        now = datetime.now(UTC)
+        for company, title, content_hash in groups:
+            rows = conn.execute(
+                """SELECT id FROM jobs
+                   WHERE normalized_company=? AND normalized_title=? AND description_hash=?
+                   ORDER BY first_seen_at, id""",
+                (company, title, content_hash),
+            ).fetchall()
+            survivor = rows[0][0]
+            for row in rows[1:]:
+                duplicate = row[0]
+                observation_ids = [
+                    item[0]
+                    for item in conn.execute(
+                        "SELECT observation_id FROM job_observation_links WHERE job_id=?",
+                        (duplicate,),
+                    ).fetchall()
+                ]
+                conn.execute(
+                    "DELETE FROM possible_duplicates WHERE left_job_id=? OR right_job_id=?",
+                    (duplicate, duplicate),
+                )
+                conn.execute(
+                    "UPDATE job_observation_links SET job_id=?, merge_reason=?, merge_confidence=? "
+                    "WHERE job_id=?",
+                    (survivor, "exact_company_title_description", 0.98, duplicate),
+                )
+                conn.execute("DELETE FROM jobs_fts WHERE job_id=?", (duplicate,))
+                conn.execute("DELETE FROM jobs WHERE id=?", (duplicate,))
+                for observation_id in observation_ids:
+                    self._refresh_job(conn, observation_id, now)
+                merged += 1
+            self._record_possible_duplicates(conn, survivor, now)
+        return merged
+
+    def get_provider_detail(
+        self, provider: str, provider_job_id: str, parser_version: str
+    ) -> CachedProviderDetail | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT response_body, fetched_at, expires_at
+                   FROM provider_detail_cache
+                   WHERE provider=? AND provider_job_id=? AND parser_version=?""",
+                (provider, provider_job_id, parser_version),
+            ).fetchone()
+        if row is None:
+            return None
+        return CachedProviderDetail(
+            response_body=row[0],
+            fetched_at=datetime.fromisoformat(row[1]),
+            expires_at=datetime.fromisoformat(row[2]),
+        )
+
+    def put_provider_detail(
+        self,
+        provider: str,
+        provider_job_id: str,
+        parser_version: str,
+        response_body: str,
+        fetched_at: datetime,
+        expires_at: datetime,
+    ) -> None:
+        with self.transaction() as conn:
+            conn.execute(
+                """INSERT INTO provider_detail_cache(
+                    provider, provider_job_id, parser_version, response_body, fetched_at, expires_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(provider, provider_job_id, parser_version) DO UPDATE SET
+                    response_body=excluded.response_body,
+                    fetched_at=excluded.fetched_at,
+                    expires_at=excluded.expires_at""",
+                (
+                    provider,
+                    provider_job_id,
+                    parser_version,
+                    response_body,
+                    _iso(fetched_at),
+                    _iso(expires_at),
+                ),
+            )
 
     def record_result(self, result: ProviderResult) -> tuple[int, int]:
         run_id = str(uuid.uuid4())
@@ -245,6 +357,10 @@ class InventoryDatabase:
                 self._apply_authoritative_liveness(conn, result.source_key, result.completed_at)
             conn.execute(
                 "UPDATE observations SET raw_payload_json = NULL WHERE raw_payload_expires_at < ?",
+                (_iso(result.completed_at),),
+            )
+            conn.execute(
+                "DELETE FROM provider_detail_cache WHERE expires_at < ?",
                 (_iso(result.completed_at),),
             )
         return inserted, updated
@@ -413,6 +529,21 @@ class InventoryDatabase:
             ).fetchone()
             if row:
                 return row[0], "canonical_url", 1.0
+        text = observation.description_text.strip()
+        content_hash = description_hash(text) if text else ""
+        if content_hash:
+            row = conn.execute(
+                """SELECT id FROM jobs
+                   WHERE normalized_company=? AND normalized_title=? AND description_hash=?
+                   LIMIT 1""",
+                (
+                    normalized_key(observation.company),
+                    normalized_key(observation.title),
+                    content_hash,
+                ),
+            ).fetchone()
+            if row:
+                return row[0], "exact_company_title_description", 0.98
         return None, "", 0.0
 
     def _create_job(

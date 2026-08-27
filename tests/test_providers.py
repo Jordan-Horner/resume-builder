@@ -237,17 +237,6 @@ def test_indeed_freshness_uses_calendar_date():
     assert provider._recent_enough(job, datetime(2026, 8, 27, 18, tzinfo=UTC))
 
 
-def test_linkedin_compiles_provider_specific_boolean_query():
-    provider = JobSpyProvider(
-        "linkedin",
-        CommercialProvider(),
-        SearchSettings(families=[{"name": "reliability", "titles": ["site reliability engineer"]}]),
-    )
-    assert provider._provider_queries(["site reliability engineer", "SRE"]) == [
-        '("site reliability engineer" OR SRE)'
-    ]
-
-
 def test_indeed_fetch_reports_filter_waterfall(monkeypatch):
     captured = []
 

@@ -5,7 +5,13 @@ from job_puller.database import MIGRATION_1, InventoryDatabase
 from job_puller.models import JobObservation, ProviderResult
 
 
-def observation(provider="linkedin", job_id="1", source="https://linkedin.com/jobs/view/1", direct=""):
+def observation(
+    provider="linkedin",
+    job_id="1",
+    source="https://linkedin.com/jobs/view/1",
+    direct="",
+    description="Production support and API operations. ",
+):
     return JobObservation(
         provider=provider,
         provider_job_id=job_id,
@@ -14,8 +20,8 @@ def observation(provider="linkedin", job_id="1", source="https://linkedin.com/jo
         source_url=source,
         direct_apply_url=direct,
         location="United States (Remote)",
-        description_html="<p>" + "Production support and API operations. " * 10 + "</p>",
-        description_text="Production support and API operations. " * 10,
+        description_html="<p>" + description * 10 + "</p>",
+        description_text=description * 10,
         remote=True,
         raw_payload={"id": job_id},
     )
@@ -69,8 +75,13 @@ def test_existing_v1_database_migrates_to_run_metrics(tmp_path):
     with db.connect() as conn:
         version = conn.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0]
         columns = {row[1] for row in conn.execute("PRAGMA table_info(scrape_runs)")}
-    assert version == 2
+    assert version == 3
     assert "metrics_json" in columns
+    with db.connect() as conn:
+        cache_table = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='provider_detail_cache'"
+        ).fetchone()
+    assert cache_table is not None
 
 
 def test_repeated_observation_is_idempotent(tmp_path):
@@ -133,7 +144,12 @@ def test_two_authoritative_absences_close_without_deleting(tmp_path):
     initial.authoritative_complete = True
     db.record_result(initial)
 
-    replacement = observation(provider="greenhouse", job_id="2", source="https://boards.example/jobs/2")
+    replacement = observation(
+        provider="greenhouse",
+        job_id="2",
+        source="https://boards.example/jobs/2",
+        description="A different active requisition. ",
+    )
     second = result(replacement, when=first_time + timedelta(hours=1))
     second.authoritative_complete = True
     db.record_result(second)
@@ -153,7 +169,71 @@ def test_similarity_creates_review_suggestion_not_merge(tmp_path):
     db = InventoryDatabase(tmp_path / "inventory.db")
     db.migrate()
     db.record_result(result(observation(job_id="1", source="https://example.com/jobs/1")))
-    db.record_result(result(observation(job_id="2", source="https://example.com/jobs/2")))
+    db.record_result(
+        result(
+            observation(
+                job_id="2",
+                source="https://example.com/jobs/2",
+                description="A similar title with different responsibilities. ",
+            )
+        )
+    )
     assert db.stats()["jobs"] == 2
     with db.connect() as conn:
         assert conn.execute("SELECT COUNT(*) FROM possible_duplicates").fetchone()[0] == 1
+
+
+def test_exact_company_title_description_merges_location_variants(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    first = observation(job_id="1", source="https://example.com/jobs/1")
+    second = observation(job_id="2", source="https://example.com/jobs/2")
+    second.location = "Remote, New York"
+    db.record_result(result(first))
+    db.record_result(result(second))
+    assert db.stats()["jobs"] == 1
+    assert db.stats()["observations"] == 2
+    with db.connect() as conn:
+        reasons = {
+            row[0] for row in conn.execute("SELECT merge_reason FROM job_observation_links")
+        }
+    assert reasons == {"new_canonical_job", "exact_company_title_description"}
+
+
+def test_provider_detail_cache_is_parser_versioned(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    fetched = datetime.now(UTC)
+    expires = fetched + timedelta(hours=24)
+    db.put_provider_detail("linkedin", "123", "parser-v1", "<html>one</html>", fetched, expires)
+    entry = db.get_provider_detail("linkedin", "123", "parser-v1")
+    assert entry is not None
+    assert entry.response_body == "<html>one</html>"
+    assert entry.expires_at == expires
+    assert db.get_provider_detail("linkedin", "123", "parser-v2") is None
+
+
+def test_reconcile_existing_exact_duplicates_preserves_observations(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    first = observation(job_id="1", source="https://example.com/jobs/1")
+    second = observation(
+        job_id="2",
+        source="https://example.com/jobs/2",
+        description="Initially different responsibilities. ",
+    )
+    db.record_result(result(first))
+    db.record_result(result(second))
+    with db.transaction() as conn:
+        target = conn.execute(
+            "SELECT description_text, description_hash FROM jobs ORDER BY first_seen_at, id LIMIT 1"
+        ).fetchone()
+        conn.execute(
+            """UPDATE jobs SET description_text=?, description_hash=?
+               WHERE id<>(SELECT id FROM jobs ORDER BY first_seen_at, id LIMIT 1)""",
+            (target[0], target[1]),
+        )
+
+    assert db.reconcile_exact_duplicates() == 1
+    assert db.stats()["jobs"] == 1
+    assert db.stats()["observations"] == 2

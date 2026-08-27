@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 from job_puller.config import InventoryConfig
 from job_puller.database import InventoryDatabase
+from job_puller.providers.linkedin import LinkedInGuestProvider
 from job_puller.service import InventoryService
 
 
@@ -27,4 +28,14 @@ def test_initial_cutoff_is_seven_days(tmp_path):
     db.migrate()
     service = InventoryService(config(), db)
     now = datetime(2026, 8, 27, tzinfo=UTC)
-    assert service.cutoff("jobspy:linkedin", now) == now - timedelta(days=7)
+    assert service.cutoff("linkedin:guest", now) == now - timedelta(days=7)
+
+
+def test_service_uses_direct_linkedin_provider(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    providers = InventoryService(config(), db).providers()
+    assert len(providers) == 1
+    assert isinstance(providers[0], LinkedInGuestProvider)
+    assert providers[0].source_key == "linkedin:guest"
+    assert providers[0].detail_cache is db

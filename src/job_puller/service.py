@@ -11,6 +11,7 @@ from .providers import (
     GreenhouseProvider,
     JobSpyProvider,
     LeverProvider,
+    LinkedInGuestProvider,
     SmartRecruitersProvider,
     WorkdayProvider,
 )
@@ -37,7 +38,14 @@ class InventoryService:
     def providers(self):
         result = []
         if self.config.providers.linkedin.enabled:
-            result.append(JobSpyProvider("linkedin", self.config.providers.linkedin, self.config.search))
+            result.append(
+                LinkedInGuestProvider(
+                    self.config.providers.linkedin,
+                    self.config.search,
+                    self.config.request_timeout_seconds,
+                    detail_cache=self.database,
+                )
+            )
         if self.config.providers.indeed.enabled:
             result.append(JobSpyProvider("indeed", self.config.providers.indeed, self.config.search))
         classes = {

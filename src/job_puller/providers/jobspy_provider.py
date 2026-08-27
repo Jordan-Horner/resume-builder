@@ -11,7 +11,7 @@ from job_puller.normalize import html_to_text, normalized_key, parse_datetime
 
 class JobSpyProvider:
     def __init__(self, site: str, settings: CommercialProvider, search: SearchSettings):
-        if site not in {"linkedin", "indeed"}:
+        if site != "indeed":
             raise ValueError(f"unsupported JobSpy site: {site}")
         self.name = site
         self.source_key = f"jobspy:{site}"
@@ -64,7 +64,7 @@ class JobSpyProvider:
                         "description_format": "html",
                         "verbose": 0,
                     }
-                    if self.name == "indeed" and self.search.remote_only:
+                    if self.search.remote_only:
                         # Indeed treats freshness and remote as mutually exclusive server filters.
                         # Ask Indeed for remote jobs, then apply freshness locally below.
                         kwargs["is_remote"] = True
@@ -72,8 +72,6 @@ class JobSpyProvider:
                         kwargs["hours_old"] = hours_old
                         if self.search.remote_only:
                             kwargs["is_remote"] = True
-                    if self.name == "linkedin":
-                        kwargs["linkedin_fetch_description"] = self.settings.fetch_descriptions
                     frame = scrape_jobs(**kwargs)
                     rows = frame.to_dict(orient="records")
                     metrics["raw_results"] += len(rows)
@@ -95,6 +93,8 @@ class JobSpyProvider:
                         elif not self._recent_enough(observation, since):
                             metrics["freshness_rejected"] += 1
                         else:
+                            if self.search.remote_only:
+                                observation.remote = True
                             observations.append(observation)
                             family_accepted += 1
                     metrics[family_prefix + "accepted_before_dedupe"] = (
@@ -128,25 +128,22 @@ class JobSpyProvider:
         if not self.search.remote_only:
             return True
         location = observation.location.lower()
-        return observation.remote is True or "remote" in location
+        if "remote" in location:
+            return True
+        return observation.remote is True
 
     def _recent_enough(self, observation: JobObservation, since: datetime) -> bool:
         if observation.posted_at is None:
             return False
-        if self.name == "indeed":
-            # JobSpy exposes Indeed's publication value as a calendar date. Comparing its
-            # midnight timestamp to an intra-day checkpoint would lose same-day postings.
-            return observation.posted_at.date() >= since.date()
-        return observation.posted_at >= since
+        # JobSpy exposes Indeed's publication value as a calendar date. Comparing its
+        # midnight timestamp to an intra-day checkpoint would lose same-day postings.
+        return observation.posted_at.date() >= since.date()
 
     def _provider_queries(self, titles: list[str]) -> list[str]:
-        if self.name == "indeed":
-            # Indeed's website supports Boolean/title syntax, but the GraphQL route used by
-            # JobSpy can return a generic fallback page for those expressions. Plain title
-            # searches plus a strict local title gate have proven reliable in live tests.
-            return titles
-        clauses = [f'"{title}"' if " " in title else title for title in titles]
-        return [f"({' OR '.join(clauses)})"]
+        # Indeed's website supports Boolean/title syntax, but the GraphQL route used by
+        # JobSpy can return a generic fallback page for those expressions. Plain title
+        # searches plus a strict local title gate have proven reliable in live tests.
+        return titles
 
     @staticmethod
     def _title_matches(title: str, titles: list[str]) -> bool:

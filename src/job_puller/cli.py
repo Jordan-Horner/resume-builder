@@ -104,6 +104,17 @@ def main(argv: list[str] | None = None) -> int:
                 f"capped={summary.metrics.get('saturated_queries', 0)} "
                 f"accepted={summary.metrics.get('accepted', 0)}"
             )
+            if "qualified_cards" in summary.metrics:
+                print(
+                    "  linkedin: "
+                    f"pages={summary.metrics.get('search_pages', 0)} "
+                    f"scanned={summary.metrics.get('cards_scanned', 0)} "
+                    f"qualified={summary.metrics.get('qualified_cards', 0)} "
+                    f"targets={summary.metrics.get('candidate_target_reached', 0)} "
+                    f"scan_limits={summary.metrics.get('scan_limit_reached', 0)} "
+                    f"details={summary.metrics.get('detail_requests', 0)} "
+                    f"cache_hits={summary.metrics.get('detail_cache_hits', 0)}"
+                )
         if summary.error:
             print(f"  {summary.error}", file=sys.stderr)
         failed += int(not summary.success or summary.suspicious_empty)
