@@ -13,7 +13,7 @@ from pathlib import Path
 from .models import JobObservation, ProviderResult
 from .normalize import canonical_url, description_hash, normalized_key
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 MIGRATION_1 = """
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -130,6 +130,12 @@ CREATE VIRTUAL TABLE IF NOT EXISTS jobs_fts USING fts5(
 );
 """
 
+MIGRATION_2 = """
+ALTER TABLE scrape_runs ADD COLUMN metrics_json TEXT NOT NULL DEFAULT '{}';
+"""
+
+MIGRATIONS = {1: MIGRATION_1, 2: MIGRATION_2}
+
 
 def _iso(value: datetime | None) -> str | None:
     return value.astimezone(UTC).isoformat() if value else None
@@ -167,11 +173,12 @@ class InventoryDatabase:
             stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
             shutil.copy2(self.path, backup_dir / f"{self.path.stem}-pre-v{SCHEMA_VERSION}-{stamp}.db")
         with self.connect() as conn:
-            conn.executescript(MIGRATION_1)
-            conn.execute(
-                "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (?, ?)",
-                (SCHEMA_VERSION, _iso(datetime.now(UTC))),
-            )
+            for version in range(current + 1, SCHEMA_VERSION + 1):
+                conn.executescript(MIGRATIONS[version])
+                conn.execute(
+                    "INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)",
+                    (version, _iso(datetime.now(UTC))),
+                )
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
@@ -207,8 +214,8 @@ class InventoryDatabase:
             conn.execute(
                 """INSERT INTO scrape_runs(
                     id, source_key, provider, started_at, completed_at, success, suspicious_empty,
-                    observation_count, inserted_count, updated_count, error
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    observation_count, inserted_count, updated_count, error, metrics_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     run_id,
                     result.source_key,
@@ -221,6 +228,7 @@ class InventoryDatabase:
                     inserted,
                     updated,
                     result.error,
+                    json.dumps(result.metrics, sort_keys=True),
                 ),
             )
             if result.success and not result.suspicious_empty:

@@ -43,3 +43,4 @@ class ProviderResult:
     error: str | None = None
     suspicious_empty: bool = False
     authoritative_complete: bool = False
+    metrics: dict[str, int] = field(default_factory=dict)

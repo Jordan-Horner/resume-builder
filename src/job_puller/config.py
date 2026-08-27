@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 
 class StrictModel(BaseModel):
@@ -13,7 +13,20 @@ class StrictModel(BaseModel):
 
 class SearchFamily(StrictModel):
     name: str
-    terms: list[str] = Field(min_length=1)
+    enabled: bool = True
+    titles: list[str] = Field(min_length=1)
+
+    @field_validator("titles")
+    @classmethod
+    def validate_titles(cls, titles: list[str]) -> list[str]:
+        cleaned = [title.strip() for title in titles]
+        if any(not title for title in cleaned):
+            raise ValueError("job titles cannot be blank")
+        if any('"' in title for title in cleaned):
+            raise ValueError('job titles cannot contain double quotes')
+        if len({title.casefold() for title in cleaned}) != len(cleaned):
+            raise ValueError("job titles must be unique within a family")
+        return cleaned
 
 
 class SearchSettings(StrictModel):
@@ -21,11 +34,26 @@ class SearchSettings(StrictModel):
     remote_only: bool = True
     families: list[SearchFamily] = Field(min_length=1)
 
+    @model_validator(mode="after")
+    def require_enabled_family(self) -> SearchSettings:
+        if not any(family.enabled for family in self.families):
+            raise ValueError("at least one search family must be enabled")
+        return self
+
 
 class CommercialProvider(StrictModel):
     enabled: bool = True
     results_wanted: int = Field(default=50, ge=1, le=1000)
     fetch_descriptions: bool = True
+    request_delay_seconds: float = Field(default=0, ge=0, le=30)
+    family_results_wanted: dict[str, int] = Field(default_factory=dict)
+
+    @field_validator("family_results_wanted")
+    @classmethod
+    def validate_family_results_wanted(cls, limits: dict[str, int]) -> dict[str, int]:
+        if any(limit < 1 or limit > 1000 for limit in limits.values()):
+            raise ValueError("family result limits must be between 1 and 1000")
+        return limits
 
 
 class AtsBoard(StrictModel):
@@ -65,6 +93,15 @@ class InventoryConfig(StrictModel):
     def require_provider(self) -> InventoryConfig:
         if not any(getattr(self.providers, name).enabled for name in type(self.providers).model_fields):
             raise ValueError("at least one provider must be enabled")
+        family_names = {family.name for family in self.search.families}
+        for provider_name in ("linkedin", "indeed"):
+            limits = getattr(self.providers, provider_name).family_results_wanted
+            unknown = set(limits) - family_names
+            if unknown:
+                raise ValueError(
+                    f"{provider_name} family result limits reference unknown families: "
+                    f"{', '.join(sorted(unknown))}"
+                )
         return self
 
 

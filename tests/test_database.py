@@ -1,6 +1,7 @@
+import json
 from datetime import UTC, datetime, timedelta
 
-from job_puller.database import InventoryDatabase
+from job_puller.database import MIGRATION_1, InventoryDatabase
 from job_puller.models import JobObservation, ProviderResult
 
 
@@ -41,6 +42,35 @@ def test_migrate_and_insert(tmp_path):
     assert db.stats()["jobs"] == 1
     assert db.stats()["observations"] == 1
     assert db.stats()["complete_descriptions"] == 1
+
+
+def test_run_metrics_are_persisted(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    run = result(observation())
+    run.metrics = {"raw_results": 10, "accepted": 1}
+    db.record_result(run)
+    with db.connect() as conn:
+        stored = conn.execute("SELECT metrics_json FROM scrape_runs").fetchone()[0]
+    assert json.loads(stored) == run.metrics
+
+
+def test_existing_v1_database_migrates_to_run_metrics(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    with db.connect() as conn:
+        conn.executescript(MIGRATION_1)
+        conn.execute(
+            "INSERT INTO schema_migrations(version, applied_at) VALUES (1, ?)",
+            (datetime.now(UTC).isoformat(),),
+        )
+
+    db.migrate()
+
+    with db.connect() as conn:
+        version = conn.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0]
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(scrape_runs)")}
+    assert version == 2
+    assert "metrics_json" in columns
 
 
 def test_repeated_observation_is_idempotent(tmp_path):

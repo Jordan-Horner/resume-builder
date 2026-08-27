@@ -8,7 +8,7 @@ from job_puller.service import InventoryService
 def config():
     return InventoryConfig.model_validate(
         {
-            "search": {"families": [{"name": "backend", "terms": ["backend engineer"]}]},
+            "search": {"families": [{"name": "backend", "titles": ["backend engineer"]}]},
             "providers": {
                 "linkedin": {"enabled": True},
                 "indeed": {"enabled": False},

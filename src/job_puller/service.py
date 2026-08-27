@@ -26,6 +26,7 @@ class RunSummary:
     inserted: int
     updated: int
     error: str | None
+    metrics: dict[str, int]
 
 
 class InventoryService:
@@ -81,6 +82,7 @@ class InventoryService:
                     inserted,
                     updated,
                     result.error,
+                    result.metrics,
                 )
             )
         return summaries

@@ -149,7 +149,7 @@ def test_jobspy_adapter_normalizes_dataframe_row():
     provider = JobSpyProvider(
         "indeed",
         CommercialProvider(),
-        SearchSettings(families=[{"name": "support", "terms": ["production support engineer"]}]),
+        SearchSettings(families=[{"name": "support", "titles": ["production support engineer"]}]),
     )
     job = provider._normalize(
         {
@@ -176,7 +176,7 @@ def test_jobspy_remote_filter_does_not_trust_description_mentions():
     provider = JobSpyProvider(
         "indeed",
         CommercialProvider(),
-        SearchSettings(families=[{"name": "support", "terms": ["production support engineer"]}]),
+        SearchSettings(families=[{"name": "support", "titles": ["production support engineer"]}]),
     )
     job = provider._normalize(
         {
@@ -197,20 +197,170 @@ def test_jobspy_remote_filter_does_not_trust_description_mentions():
 
 
 def test_jobspy_title_gate_accepts_seniority_variants():
-    query = '"production support engineer" OR "site reliability engineer"'
-    assert JobSpyProvider._title_matches("Senior Production Support Engineer", query)
-    assert JobSpyProvider._title_matches("Cloud Site Reliability Engineer II", query)
-    assert not JobSpyProvider._title_matches("Inbound Sales Account Executive", query)
+    titles = ["production support engineer", "site reliability engineer", "SRE"]
+    assert JobSpyProvider._title_matches("Senior Production Support Engineer", titles)
+    assert JobSpyProvider._title_matches("Cloud Site Reliability Engineer II", titles)
+    assert JobSpyProvider._title_matches("Director of Cloud SRE", titles)
+    assert not JobSpyProvider._title_matches("Inbound Sales Account Executive", titles)
+    assert not JobSpyProvider._title_matches("SREcruiting Coordinator", titles)
 
 
-def test_indeed_expands_boolean_family_into_base_queries():
+def test_indeed_uses_plain_individual_title_queries():
     provider = JobSpyProvider(
         "indeed",
         CommercialProvider(),
-        SearchSettings(families=[{"name": "support", "terms": ["support engineer"]}]),
+        SearchSettings(families=[{"name": "reliability", "titles": ["site reliability engineer"]}]),
     )
-    query = '"production support engineer" OR "site reliability engineer"'
-    assert provider._provider_queries(query) == [
-        "production support engineer",
+    assert provider._provider_queries(["site reliability engineer", "SRE"]) == [
         "site reliability engineer",
+        "SRE",
     ]
+
+
+def test_indeed_freshness_uses_calendar_date():
+    provider = JobSpyProvider(
+        "indeed",
+        CommercialProvider(),
+        SearchSettings(families=[{"name": "reliability", "titles": ["SRE"]}]),
+    )
+    job = provider._normalize(
+        {
+            "id": "same-day",
+            "title": "SRE",
+            "company": "Example",
+            "job_url": "https://example/same-day",
+            "date_posted": "2026-08-27",
+        },
+        "reliability",
+    )
+    assert job is not None
+    assert provider._recent_enough(job, datetime(2026, 8, 27, 18, tzinfo=UTC))
+
+
+def test_linkedin_compiles_provider_specific_boolean_query():
+    provider = JobSpyProvider(
+        "linkedin",
+        CommercialProvider(),
+        SearchSettings(families=[{"name": "reliability", "titles": ["site reliability engineer"]}]),
+    )
+    assert provider._provider_queries(["site reliability engineer", "SRE"]) == [
+        '("site reliability engineer" OR SRE)'
+    ]
+
+
+def test_indeed_fetch_reports_filter_waterfall(monkeypatch):
+    captured = []
+
+    class Frame:
+        def to_dict(self, orient):
+            assert orient == "records"
+            base = {
+                "company": "Example",
+                "description": "A complete description",
+                "is_remote": True,
+                "location": "Remote, US",
+            }
+            return [
+                {
+                    **base,
+                    "id": "1",
+                    "title": "Senior Site Reliability Engineer",
+                    "job_url": "https://example/1",
+                    "date_posted": "2026-08-26",
+                },
+                {
+                    **base,
+                    "id": "1",
+                    "title": "Senior Site Reliability Engineer",
+                    "job_url": "https://example/1",
+                    "date_posted": "2026-08-26",
+                },
+                {
+                    **base,
+                    "id": "2",
+                    "title": "Old Site Reliability Engineer",
+                    "job_url": "https://example/2",
+                    "date_posted": "2026-08-19",
+                },
+                {
+                    **base,
+                    "id": "3",
+                    "title": "Sales Engineer",
+                    "job_url": "https://example/3",
+                    "date_posted": "2026-08-26",
+                },
+                {
+                    **base,
+                    "id": "4",
+                    "title": "Platform Site Reliability Engineer",
+                    "job_url": "https://example/4",
+                    "date_posted": "2026-08-26",
+                    "is_remote": False,
+                    "location": "New York, NY",
+                },
+            ]
+
+    def fake_scrape_jobs(**kwargs):
+        captured.append(kwargs)
+        return Frame()
+
+    monkeypatch.setattr("jobspy.scrape_jobs", fake_scrape_jobs)
+    provider = JobSpyProvider(
+        "indeed",
+        CommercialProvider(
+            results_wanted=100,
+            family_results_wanted={"reliability": 200},
+        ),
+        SearchSettings(families=[{"name": "reliability", "titles": ["site reliability engineer"]}]),
+    )
+    result = provider.fetch(SINCE)
+
+    assert captured[0]["search_term"] == "site reliability engineer"
+    assert captured[0]["results_wanted"] == 200
+    assert captured[0]["is_remote"] is True
+    assert "hours_old" not in captured[0]
+    assert len(result.observations) == 1
+    assert result.metrics == {
+        "queries": 1,
+        "raw_results": 5,
+        "invalid": 0,
+        "title_rejected": 1,
+        "remote_rejected": 1,
+        "freshness_rejected": 1,
+        "accepted_before_dedupe": 2,
+        "duplicates": 1,
+        "accepted": 1,
+        "saturated_queries": 0,
+        "family.reliability.raw_results": 5,
+        "family.reliability.accepted_before_dedupe": 2,
+        "family.reliability.query.site reliability engineer.raw_results": 5,
+        "family.reliability.query.site reliability engineer.accepted_before_dedupe": 2,
+    }
+
+
+def test_jobspy_partial_query_failure_does_not_advance_as_success(monkeypatch):
+    calls = 0
+
+    class EmptyFrame:
+        def to_dict(self, orient):
+            assert orient == "records"
+            return []
+
+    def partly_failing_scrape(**kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("blocked")
+        return EmptyFrame()
+
+    monkeypatch.setattr("jobspy.scrape_jobs", partly_failing_scrape)
+    provider = JobSpyProvider(
+        "indeed",
+        CommercialProvider(),
+        SearchSettings(families=[{"name": "reliability", "titles": ["SRE", "cloud engineer"]}]),
+    )
+    result = provider.fetch(SINCE)
+
+    assert result.success is False
+    assert result.suspicious_empty is False
+    assert "blocked" in (result.error or "")

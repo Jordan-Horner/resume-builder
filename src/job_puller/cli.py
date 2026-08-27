@@ -92,6 +92,18 @@ def main(argv: list[str] | None = None) -> int:
             f"[{state}] {summary.source_key}: fetched={summary.fetched} "
             f"new={summary.inserted} updated={summary.updated}"
         )
+        if summary.metrics:
+            print(
+                "  filters: "
+                f"raw={summary.metrics.get('raw_results', 0)} "
+                f"invalid={summary.metrics.get('invalid', 0)} "
+                f"title={summary.metrics.get('title_rejected', 0)} "
+                f"remote={summary.metrics.get('remote_rejected', 0)} "
+                f"stale={summary.metrics.get('freshness_rejected', 0)} "
+                f"duplicates={summary.metrics.get('duplicates', 0)} "
+                f"capped={summary.metrics.get('saturated_queries', 0)} "
+                f"accepted={summary.metrics.get('accepted', 0)}"
+            )
         if summary.error:
             print(f"  {summary.error}", file=sys.stderr)
         failed += int(not summary.success or summary.suspicious_empty)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import re
+import time
 from datetime import UTC, datetime
 from typing import Any
 
@@ -28,47 +28,90 @@ class JobSpyProvider:
             return ProviderResult(self.source_key, self.name, [], started, datetime.now(UTC), False, str(exc))
 
         hours_old = max(1, int((started - since).total_seconds() / 3600) + 1)
+        metrics = {
+            "queries": 0,
+            "raw_results": 0,
+            "invalid": 0,
+            "title_rejected": 0,
+            "remote_rejected": 0,
+            "freshness_rejected": 0,
+            "accepted_before_dedupe": 0,
+            "duplicates": 0,
+            "accepted": 0,
+            "saturated_queries": 0,
+        }
+        query_number = 0
         for family in self.search.families:
-            for configured_term in family.terms:
-                for query in self._provider_queries(configured_term):
-                    try:
-                        kwargs: dict[str, Any] = {
-                            "site_name": [self.name],
-                            "search_term": query,
-                            "location": self.search.location,
-                            "results_wanted": self.settings.results_wanted,
-                            "country_indeed": "USA",
-                            "description_format": "html",
-                            "verbose": 0,
-                        }
-                        if self.name == "indeed" and self.search.remote_only:
-                            # Indeed treats freshness and remote as mutually exclusive server filters.
-                            # Ask Indeed for remote jobs, then apply freshness locally below.
+            if not family.enabled:
+                continue
+            family_prefix = f"family.{family.name}."
+            for query in self._provider_queries(family.titles):
+                query_prefix = family_prefix + f"query.{normalized_key(query)}."
+                result_limit = self.settings.family_results_wanted.get(
+                    family.name, self.settings.results_wanted
+                )
+                if query_number and self.settings.request_delay_seconds:
+                    time.sleep(self.settings.request_delay_seconds)
+                query_number += 1
+                metrics["queries"] += 1
+                try:
+                    kwargs: dict[str, Any] = {
+                        "site_name": [self.name],
+                        "search_term": query,
+                        "location": self.search.location,
+                        "results_wanted": result_limit,
+                        "country_indeed": "USA",
+                        "description_format": "html",
+                        "verbose": 0,
+                    }
+                    if self.name == "indeed" and self.search.remote_only:
+                        # Indeed treats freshness and remote as mutually exclusive server filters.
+                        # Ask Indeed for remote jobs, then apply freshness locally below.
+                        kwargs["is_remote"] = True
+                    else:
+                        kwargs["hours_old"] = hours_old
+                        if self.search.remote_only:
                             kwargs["is_remote"] = True
+                    if self.name == "linkedin":
+                        kwargs["linkedin_fetch_description"] = self.settings.fetch_descriptions
+                    frame = scrape_jobs(**kwargs)
+                    rows = frame.to_dict(orient="records")
+                    metrics["raw_results"] += len(rows)
+                    if len(rows) >= result_limit:
+                        metrics["saturated_queries"] += 1
+                    metrics[family_prefix + "raw_results"] = (
+                        metrics.get(family_prefix + "raw_results", 0) + len(rows)
+                    )
+                    metrics[query_prefix + "raw_results"] = len(rows)
+                    family_accepted = 0
+                    for row in rows:
+                        observation = self._normalize(row, family.name)
+                        if observation is None:
+                            metrics["invalid"] += 1
+                        elif not self._title_matches(observation.title, family.titles):
+                            metrics["title_rejected"] += 1
+                        elif not self._remote_eligible(observation):
+                            metrics["remote_rejected"] += 1
+                        elif not self._recent_enough(observation, since):
+                            metrics["freshness_rejected"] += 1
                         else:
-                            kwargs["hours_old"] = hours_old
-                            if self.search.remote_only:
-                                kwargs["is_remote"] = True
-                        if self.name == "linkedin":
-                            kwargs["linkedin_fetch_description"] = self.settings.fetch_descriptions
-                        frame = scrape_jobs(**kwargs)
-                        for row in frame.to_dict(orient="records"):
-                            observation = self._normalize(row, family.name)
-                            if (
-                                observation
-                                and self._title_matches(observation.title, configured_term)
-                                and self._remote_eligible(observation)
-                                and self._recent_enough(observation, since)
-                            ):
-                                observations.append(observation)
-                    except Exception as exc:
-                        errors.append(f"{family.name}/{query}: {type(exc).__name__}: {exc}")
+                            observations.append(observation)
+                            family_accepted += 1
+                    metrics[family_prefix + "accepted_before_dedupe"] = (
+                        metrics.get(family_prefix + "accepted_before_dedupe", 0) + family_accepted
+                    )
+                    metrics[query_prefix + "accepted_before_dedupe"] = family_accepted
+                except Exception as exc:
+                    errors.append(f"{family.name}/{query}: {type(exc).__name__}: {exc}")
 
         deduped = {
             f"{item.provider}:{item.provider_job_id or item.source_url}": item for item in observations
         }
         completed = datetime.now(UTC)
-        success = not errors or bool(deduped)
+        metrics["accepted_before_dedupe"] = len(observations)
+        metrics["accepted"] = len(deduped)
+        metrics["duplicates"] = len(observations) - len(deduped)
+        success = not errors
         return ProviderResult(
             self.source_key,
             self.name,
@@ -77,7 +120,8 @@ class JobSpyProvider:
             completed,
             success,
             "; ".join(errors)[:4000] or None,
-            suspicious_empty=success and not deduped,
+            suspicious_empty=success and metrics["raw_results"] == 0,
+            metrics=metrics,
         )
 
     def _remote_eligible(self, observation: JobObservation) -> bool:
@@ -86,25 +130,32 @@ class JobSpyProvider:
         location = observation.location.lower()
         return observation.remote is True or "remote" in location
 
-    @staticmethod
-    def _recent_enough(observation: JobObservation, since: datetime) -> bool:
-        return observation.posted_at is None or observation.posted_at >= since
+    def _recent_enough(self, observation: JobObservation, since: datetime) -> bool:
+        if observation.posted_at is None:
+            return False
+        if self.name == "indeed":
+            # JobSpy exposes Indeed's publication value as a calendar date. Comparing its
+            # midnight timestamp to an intra-day checkpoint would lose same-day postings.
+            return observation.posted_at.date() >= since.date()
+        return observation.posted_at >= since
 
-    def _provider_queries(self, configured_term: str) -> list[str]:
-        if self.name != "indeed":
-            return [configured_term]
-        phrases = re.findall(r'"([^"]+)"', configured_term)
-        if phrases:
-            return phrases
-        return [part.strip() for part in re.split(r"\s+OR\s+", configured_term) if part.strip()]
+    def _provider_queries(self, titles: list[str]) -> list[str]:
+        if self.name == "indeed":
+            # Indeed's website supports Boolean/title syntax, but the GraphQL route used by
+            # JobSpy can return a generic fallback page for those expressions. Plain title
+            # searches plus a strict local title gate have proven reliable in live tests.
+            return titles
+        clauses = [f'"{title}"' if " " in title else title for title in titles]
+        return [f"({' OR '.join(clauses)})"]
 
     @staticmethod
-    def _title_matches(title: str, query: str) -> bool:
-        phrases = re.findall(r'"([^"]+)"', query)
-        if not phrases:
-            phrases = [part.strip() for part in re.split(r"\s+OR\s+", query, flags=re.IGNORECASE)]
-        normalized_title = normalized_key(title)
-        return any(normalized_key(phrase) in normalized_title for phrase in phrases if normalized_key(phrase))
+    def _title_matches(title: str, titles: list[str]) -> bool:
+        normalized_title = f" {normalized_key(title)} "
+        return any(
+            f" {normalized_key(candidate)} " in normalized_title
+            for candidate in titles
+            if normalized_key(candidate)
+        )
 
     def _normalize(self, row: dict[str, Any], family: str) -> JobObservation | None:
         def value(name: str, default: Any = "") -> Any:
