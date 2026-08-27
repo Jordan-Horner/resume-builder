@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from .work_modes import WorkArrangement, WorkMode, classify_work_arrangement
+
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
@@ -28,8 +30,23 @@ class JobObservation:
     salary_interval: str | None = None
     employment_type: str | None = None
     remote: bool | None = None
+    work_arrangement: WorkArrangement | None = None
     raw_payload: dict[str, Any] = field(default_factory=dict)
     parser_version: str = "1"
+
+    def __post_init__(self) -> None:
+        if self.work_arrangement is None:
+            self.work_arrangement = classify_work_arrangement(
+                title=self.title,
+                location=self.location,
+                description=self.description_text,
+                legacy_remote=self.remote,
+            )
+
+    @property
+    def work_modes(self) -> frozenset[WorkMode]:
+        assert self.work_arrangement is not None
+        return self.work_arrangement.available_modes
 
 
 @dataclass(slots=True)

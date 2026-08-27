@@ -13,6 +13,23 @@ A provider must:
 - treat `since` as a retrieval bound only when the source actually honors it.
 - report retrieval and filtering metrics when the provider applies local eligibility rules.
 
+## Work-arrangement contract
+
+Providers normalize work arrangements into `remote`, `hybrid`, `onsite`, or `unknown`. `unknown` means the source
+did not provide enough evidence; a false or missing legacy `remote` flag is never proof of onsite work. A posting
+may advertise multiple valid arrangements, and providers must preserve that set when the source exposes structured
+location-level workplace types.
+
+Structured provider fields take priority and must retain their field name, provider, and matched value as evidence.
+When no structured value exists, the shared classifier may use the displayed location or explicit scheduling
+phrases in the description. It deliberately does not classify bare title phrases such as `hybrid cloud` or
+`remote support`. Canonical jobs inherit the complete mode set from their preferred observation; all observation
+evidence remains available for auditing even when another provider becomes preferred.
+
+The inventory persists observation modes and their evidence in `observation_work_modes`, and the canonical mode
+set in `job_work_modes`. The legacy `jobs.work_mode` column is a display projection: one mode is stored directly,
+multiple modes appear as `mixed`, and no evidence appears as `unknown`.
+
 Commercial-board results are discovery observations and never authoritative for closure. Direct ATS list results
 may be authoritative when pagination completes successfully. JazzHR and Rippling list every public opening first,
 then fetch details only for locally matching titles; their normal filtered runs are therefore not authoritative

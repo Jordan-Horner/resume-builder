@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 
 from job_puller.database import MIGRATION_1, InventoryDatabase
 from job_puller.models import JobObservation, ProviderResult
+from job_puller.work_modes import WorkMode, explicit_arrangement
 
 
 def observation(
@@ -75,13 +76,66 @@ def test_existing_v1_database_migrates_to_run_metrics(tmp_path):
     with db.connect() as conn:
         version = conn.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0]
         columns = {row[1] for row in conn.execute("PRAGMA table_info(scrape_runs)")}
-    assert version == 4
+    assert version == 5
     assert "metrics_json" in columns
     with db.connect() as conn:
         cache_table = conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='provider_detail_cache'"
         ).fetchone()
     assert cache_table is not None
+    with db.connect() as conn:
+        mode_tables = {
+            row[0]
+            for row in conn.execute(
+                """SELECT name FROM sqlite_master
+                   WHERE type='table' AND name IN ('observation_work_modes','job_work_modes')"""
+            )
+        }
+    assert mode_tables == {"observation_work_modes", "job_work_modes"}
+
+
+def test_legacy_false_remote_is_persisted_as_unknown_not_onsite(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    item = observation()
+    item.remote = False
+    item.work_arrangement = None
+    item.__post_init__()
+
+    db.record_result(result(item))
+
+    with db.connect() as conn:
+        observation_modes = conn.execute(
+            "SELECT mode FROM observation_work_modes"
+        ).fetchall()
+        job = conn.execute("SELECT work_mode FROM jobs").fetchone()
+        job_modes = conn.execute("SELECT mode FROM job_work_modes").fetchall()
+    assert [row[0] for row in observation_modes] == ["unknown"]
+    assert job[0] == "unknown"
+    assert [row[0] for row in job_modes] == ["unknown"]
+
+
+def test_multiple_explicit_work_modes_are_preserved(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    item = observation()
+    item.work_arrangement = explicit_arrangement(
+        [WorkMode.REMOTE, WorkMode.ONSITE],
+        source="provider",
+        rule="structured_locations",
+    )
+
+    db.record_result(result(item))
+
+    with db.connect() as conn:
+        observation_modes = {
+            row[0] for row in conn.execute("SELECT mode FROM observation_work_modes")
+        }
+        job = conn.execute("SELECT work_mode FROM jobs").fetchone()
+        job_modes = {row[0] for row in conn.execute("SELECT mode FROM job_work_modes")}
+    assert observation_modes == {"remote", "onsite"}
+    assert job[0] == "mixed"
+    assert job_modes == {"remote", "onsite"}
 
 
 def test_repeated_observation_is_idempotent(tmp_path):

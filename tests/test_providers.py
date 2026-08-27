@@ -16,6 +16,7 @@ from job_puller.providers.ats import (
     _workday_posted_at,
 )
 from job_puller.providers.jobspy_provider import JobSpyProvider
+from job_puller.work_modes import WorkMode
 
 
 def response(method, url, payload):
@@ -157,6 +158,35 @@ def test_rippling_uses_public_list_and_detail_apis():
     assert job.remote is True
 
 
+def test_rippling_preserves_multiple_structured_work_modes():
+    list_payload = {
+        "items": [
+            {
+                "id": "abc123",
+                "name": "Platform Engineer",
+                "url": "https://ats.rippling.com/acme/jobs/abc123",
+                "locations": [
+                    {"name": "United States", "workplaceType": "REMOTE"},
+                    {"name": "New York", "workplaceType": "ON_SITE"},
+                ],
+            }
+        ],
+        "totalPages": 1,
+    }
+    detail_payload = {
+        "uuid": "abc123",
+        "name": "Platform Engineer",
+        "description": {"role": "<p>Operate services</p>"},
+        "workLocations": ["United States", "New York"],
+        "url": "https://ats.rippling.com/acme/jobs/abc123",
+    }
+    provider = RipplingProvider(AtsBoard(id="acme", name="Acme"))
+
+    job = provider._fetch(FakeClient(get_payloads=[list_payload, detail_payload]), SINCE)[0]
+
+    assert job.work_modes == {WorkMode.REMOTE, WorkMode.ONSITE}
+
+
 def test_candidate_detail_provider_deduplicates_list_ids(monkeypatch):
     item = {
         "id": "abc123",
@@ -218,6 +248,30 @@ def test_lever_normalizes_apply_url():
     job = provider._fetch(client, SINCE)[0]
     assert job.remote is True
     assert job.direct_apply_url.endswith("/apply")
+
+
+def test_lever_preserves_structured_hybrid_workplace_type():
+    provider = LeverProvider(AtsBoard(id="example", name="Example"))
+    client = FakeClient(
+        get_payloads=[
+            [
+                {
+                    "id": "1",
+                    "text": "SRE",
+                    "hostedUrl": "https://jobs.lever.co/example/1",
+                    "descriptionPlain": "Operate services",
+                    "categories": {
+                        "location": "New York",
+                        "workplaceType": "hybrid",
+                    },
+                }
+            ]
+        ]
+    )
+
+    job = provider._fetch(client, SINCE)[0]
+
+    assert job.work_modes == {WorkMode.HYBRID}
 
 
 def test_ashby_normalizes_job():

@@ -5,6 +5,7 @@ from datetime import datetime
 from .config import SearchSettings
 from .models import JobObservation
 from .normalize import normalized_key
+from .work_modes import WorkMode
 
 GENERIC_TITLE_TERMS = {
     "engineer",
@@ -45,10 +46,8 @@ def family_keyword_queries(search: SearchSettings) -> list[str]:
 
 
 def remote_matches(observation: JobObservation, search: SearchSettings) -> bool:
-    if not search.remote_only:
-        return True
-    location = normalized_key(observation.location)
-    return observation.remote is True or " remote " in f" {location} "
+    accepted = search.accepted_work_modes or {WorkMode.REMOTE}
+    return bool(observation.work_modes & accepted)
 
 
 def recent_matches(observation: JobObservation, since: datetime) -> bool:

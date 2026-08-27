@@ -8,6 +8,7 @@ from job_puller.config import CommercialProvider, SearchSettings
 from job_puller.eligibility import remote_matches, title_matches
 from job_puller.models import JobObservation, ProviderResult
 from job_puller.normalize import html_to_text, normalized_key, parse_datetime
+from job_puller.work_modes import WorkMode, explicit_arrangement
 
 
 class JobSpyProvider:
@@ -166,6 +167,15 @@ class JobSpyProvider:
         location = ", ".join(location_parts) or str(value("location"))
         remote_value = value("is_remote", None)
         remote = bool(remote_value) if remote_value is not None else None
+        work_arrangement = (
+            explicit_arrangement(
+                [WorkMode.REMOTE],
+                source="jobspy_structured_field",
+                rule="is_remote_true",
+            )
+            if remote is True
+            else None
+        )
         raw_payload = {key: (None if self._is_nan(item) else item) for key, item in row.items()}
         raw_payload["search_family"] = family
         return JobObservation(
@@ -185,6 +195,7 @@ class JobSpyProvider:
             salary_interval=str(value("interval")) or None,
             employment_type=str(value("job_type")) or None,
             remote=remote,
+            work_arrangement=work_arrangement,
             raw_payload=raw_payload,
             parser_version="jobspy-v1",
         )

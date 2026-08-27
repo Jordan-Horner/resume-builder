@@ -4,6 +4,7 @@ import pytest
 
 from job_puller.cli import _default_config_path
 from job_puller.config import load_config, resolve_database_path
+from job_puller.work_modes import WorkMode
 
 
 def test_example_config_is_valid():
@@ -101,6 +102,36 @@ providers:
         encoding="utf-8",
     )
     with pytest.raises(ValueError, match="requires description fetching"):
+        load_config(path)
+
+
+def test_accepted_work_modes_replace_legacy_remote_only(tmp_path):
+    path = tmp_path / "search.yml"
+    path.write_text(
+        """schema_version: 1
+search:
+  accepted_work_modes: [remote, hybrid]
+  families: [{name: reliability, titles: [SRE]}]
+""",
+        encoding="utf-8",
+    )
+    config = load_config(path)
+    assert config.search.accepted_work_modes == {WorkMode.REMOTE, WorkMode.HYBRID}
+    assert config.search.remote_only is False
+
+
+def test_work_mode_config_rejects_legacy_and_new_fields_together(tmp_path):
+    path = tmp_path / "search.yml"
+    path.write_text(
+        """schema_version: 1
+search:
+  remote_only: true
+  accepted_work_modes: [remote]
+  families: [{name: reliability, titles: [SRE]}]
+""",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="accepted_work_modes or legacy remote_only"):
         load_config(path)
 
 

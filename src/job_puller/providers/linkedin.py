@@ -18,6 +18,7 @@ from job_puller.config import LinkedInProviderSettings, SearchSettings
 from job_puller.detail_cache import ProviderDetailCache
 from job_puller.models import JobObservation, ProviderResult
 from job_puller.normalize import html_to_text, normalized_key, parse_datetime
+from job_puller.work_modes import WorkMode, explicit_arrangement
 
 _BASE_URL = "https://www.linkedin.com"
 _SEARCH_URL = f"{_BASE_URL}/jobs-guest/jobs/api/seeMoreJobPostings/search"
@@ -529,6 +530,14 @@ class LinkedInGuestProvider:
         if detail:
             raw_payload["criteria"] = detail.criteria
             raw_payload["detail_html"] = detail.raw_html
+        work_arrangement = None
+        if remote_evidence.status == "verified":
+            work_arrangement = explicit_arrangement(
+                [WorkMode.REMOTE],
+                source=f"linkedin_{remote_evidence.source}",
+                rule=remote_evidence.rule,
+                matched_text=remote_evidence.matched_text,
+            )
         return JobObservation(
             provider=self.name,
             provider_job_id=card.job_id,
@@ -542,6 +551,7 @@ class LinkedInGuestProvider:
             posted_at=card.posted_at,
             employment_type=detail.employment_type if detail else None,
             remote=True if self.search.remote_only else "remote" in card.location.casefold(),
+            work_arrangement=work_arrangement,
             raw_payload=raw_payload,
             parser_version=_PARSER_VERSION,
         )

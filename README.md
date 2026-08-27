@@ -60,9 +60,14 @@ uv run job-puller reconcile
 Reconciliation retains every source observation and merges canonical jobs only when a verified URL alias or exact
 provider requisition identity agrees.
 
-Commercial-board runs print a filter waterfall showing raw results, invalid records, title rejections, remote
+Commercial-board runs print a filter waterfall showing raw results, invalid records, title rejections, work-mode
 rejections, stale records, duplicates, and accepted observations. The same metrics are retained with the scrape
 run in SQLite for later diagnostics.
+
+`search.accepted_work_modes` selects any combination of `remote`, `hybrid`, `onsite`, and `unknown`. The default
+configuration uses `[remote]`. The former `remote_only` setting remains readable for older private configurations,
+but new configurations should use the typed list. A job can expose more than one available arrangement, so the
+inventory stores modes in relational tables rather than forcing every posting into a single label.
 
 Commercial providers use a default result target and may override it for specific families with
 `family_results_wanted`. For LinkedIn, the target counts title- and freshness-qualified cards rather than raw
@@ -130,7 +135,7 @@ uv run job-puller boards check --provider workday
 ```
 
 After review, set `enabled: true` on the boards worth monitoring. A whole ATS board is filtered locally through the
-same enabled title families, remote-only rule, and incremental cutoff used by commercial discovery, preventing
+same enabled title families, accepted work modes, and incremental cutoff used by commercial discovery, preventing
 unrelated company openings from flooding inventory. Boards may carry reusable tags such as `faang-plus`; tags are
 metadata for future search profiles and do not change collection behavior yet.
 

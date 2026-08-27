@@ -6,6 +6,8 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
+from .work_modes import WorkMode
+
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -32,12 +34,24 @@ class SearchFamily(StrictModel):
 class SearchSettings(StrictModel):
     location: str = "United States"
     remote_only: bool = True
+    accepted_work_modes: set[WorkMode] | None = None
     families: list[SearchFamily] = Field(min_length=1)
 
     @model_validator(mode="after")
     def require_enabled_family(self) -> SearchSettings:
         if not any(family.enabled for family in self.families):
             raise ValueError("at least one search family must be enabled")
+        if "accepted_work_modes" in self.model_fields_set and "remote_only" in self.model_fields_set:
+            raise ValueError("set accepted_work_modes or legacy remote_only, not both")
+        if self.accepted_work_modes is None:
+            self.accepted_work_modes = (
+                {WorkMode.REMOTE}
+                if self.remote_only
+                else {WorkMode.REMOTE, WorkMode.HYBRID, WorkMode.ONSITE, WorkMode.UNKNOWN}
+            )
+        elif not self.accepted_work_modes:
+            raise ValueError("accepted_work_modes cannot be empty")
+        self.remote_only = self.accepted_work_modes == {WorkMode.REMOTE}
         return self
 
 

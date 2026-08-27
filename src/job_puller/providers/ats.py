@@ -18,6 +18,34 @@ from job_puller.eligibility import (
 )
 from job_puller.models import JobObservation, ProviderResult
 from job_puller.normalize import clean_text, html_to_text, parse_datetime
+from job_puller.work_modes import WorkArrangement, WorkMode, explicit_arrangement
+
+
+def _provider_work_arrangement(
+    values: list[object], *, provider: str, rule: str
+) -> WorkArrangement | None:
+    modes: set[WorkMode] = set()
+    matched: list[str] = []
+    for value in values:
+        text = clean_text(value)
+        normalized = text.casefold().replace("_", "-")
+        if normalized in {"remote", "telecommute", "work-from-home", "wfh"}:
+            modes.add(WorkMode.REMOTE)
+        elif normalized == "hybrid":
+            modes.add(WorkMode.HYBRID)
+        elif normalized in {"onsite", "on-site", "in-office", "office-based"}:
+            modes.add(WorkMode.ONSITE)
+        else:
+            continue
+        matched.append(text)
+    if not modes:
+        return None
+    return explicit_arrangement(
+        modes,
+        source=f"{provider}_structured_field",
+        rule=rule,
+        matched_text="; ".join(matched),
+    )
 
 
 class HttpProvider:
@@ -218,6 +246,18 @@ class JazzHRProvider(CandidateDetailProvider):
         description = str(payload.get("description") or "")
         location = _json_ld_location(payload) or card["location"]
         source_url = str(payload.get("url") or response.url)
+        arrangement = _provider_work_arrangement(
+            [payload.get("jobLocationType")],
+            provider=self.name,
+            rule="job_location_type",
+        )
+        if arrangement is None and "remote" in card["location"].casefold():
+            arrangement = explicit_arrangement(
+                [WorkMode.REMOTE],
+                source="jazzhr_board_card",
+                rule="remote_location",
+                matched_text=card["location"],
+            )
         return JobObservation(
             provider=self.name,
             provider_board_id=self.board.id,
@@ -235,6 +275,7 @@ class JazzHRProvider(CandidateDetailProvider):
                 str(payload.get("jobLocationType") or "").casefold() == "telecommute"
                 or "remote" in card["location"].casefold()
             ),
+            work_arrangement=arrangement,
             raw_payload=payload,
             parser_version="jazzhr-jsonld-v1",
         )
@@ -267,6 +308,11 @@ class RipplingProvider(CandidateDetailProvider):
                     "title": clean_text(item.get("name")),
                     "url": str(item.get("url") or ""),
                     "location": location,
+                    "work_modes": ",".join(
+                        clean_text(entry.get("workplaceType"))
+                        for entry in locations
+                        if isinstance(entry, dict) and entry.get("workplaceType")
+                    ),
                 }
             )
         return candidates
@@ -284,6 +330,11 @@ class RipplingProvider(CandidateDetailProvider):
         location = "; ".join(clean_text(item) for item in locations) or card["location"]
         employment_type = payload.get("employmentType") or {}
         source_url = str(payload.get("url") or card["url"])
+        arrangement = _provider_work_arrangement(
+            card.get("work_modes", "").split(","),
+            provider=self.name,
+            rule="location_workplace_types",
+        )
         return JobObservation(
             provider=self.name,
             provider_board_id=self.board.id,
@@ -298,6 +349,7 @@ class RipplingProvider(CandidateDetailProvider):
             posted_at=parse_datetime(payload.get("createdOn")),
             employment_type=clean_text(employment_type.get("id")) or None,
             remote=any("remote" in clean_text(item).casefold() for item in locations),
+            work_arrangement=arrangement,
             raw_payload=payload,
             parser_version="rippling-api-v1",
         )
@@ -348,6 +400,11 @@ class LeverProvider(HttpProvider):
         for item in response.json():
             description = str(item.get("description") or item.get("descriptionPlain") or "")
             categories = item.get("categories") or {}
+            arrangement = _provider_work_arrangement(
+                [categories.get("workplaceType")],
+                provider=self.name,
+                rule="categories_workplace_type",
+            )
             observation = JobObservation(
                 provider=self.name,
                 provider_board_id=self.board.id,
@@ -362,6 +419,7 @@ class LeverProvider(HttpProvider):
                 posted_at=parse_datetime(item.get("createdAt")),
                 employment_type=clean_text(categories.get("commitment")) or None,
                 remote="remote" in clean_text(categories.get("workplaceType")).lower(),
+                work_arrangement=arrangement,
                 raw_payload=item,
                 parser_version="lever-v1",
             )
@@ -380,6 +438,17 @@ class AshbyProvider(HttpProvider):
         result = []
         for item in response.json().get("jobs", []):
             description = str(item.get("descriptionHtml") or item.get("descriptionPlain") or "")
+            arrangement = _provider_work_arrangement(
+                [item.get("workplaceType")],
+                provider=self.name,
+                rule="workplace_type",
+            )
+            if arrangement is None and item.get("isRemote") is True:
+                arrangement = explicit_arrangement(
+                    [WorkMode.REMOTE],
+                    source="ashby_structured_field",
+                    rule="is_remote_true",
+                )
             observation = JobObservation(
                 provider=self.name,
                 provider_board_id=self.board.id,
@@ -394,6 +463,7 @@ class AshbyProvider(HttpProvider):
                 posted_at=parse_datetime(item.get("publishedAt")),
                 employment_type=clean_text(item.get("employmentType")) or None,
                 remote=bool(item.get("isRemote")) if item.get("isRemote") is not None else None,
+                work_arrangement=arrangement,
                 raw_payload=item,
                 parser_version="ashby-v1",
             )

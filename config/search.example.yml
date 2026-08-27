@@ -8,7 +8,7 @@ request_timeout_seconds: 30
 
 search:
   location: United States
-  remote_only: true
+  accepted_work_modes: [remote]
   families:
     - name: reliability-cloud-operations
       enabled: true

@@ -14,8 +14,9 @@ from pathlib import Path
 from .detail_cache import CachedProviderDetail
 from .models import JobObservation, ProviderResult
 from .normalize import canonical_url, description_hash, normalized_key
+from .work_modes import WorkArrangement, WorkMode, display_work_mode
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 MIGRATION_1 = """
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -163,7 +164,47 @@ CREATE INDEX IF NOT EXISTS idx_application_url_alias_target
 ON application_url_aliases(target_url);
 """
 
-MIGRATIONS = {1: MIGRATION_1, 2: MIGRATION_2, 3: MIGRATION_3, 4: MIGRATION_4}
+MIGRATION_5 = """
+CREATE TABLE IF NOT EXISTS observation_work_modes (
+    observation_id TEXT NOT NULL REFERENCES observations(id) ON DELETE CASCADE,
+    mode TEXT NOT NULL CHECK(mode IN ('remote','hybrid','onsite','unknown')),
+    evidence_source TEXT NOT NULL,
+    evidence_rule TEXT NOT NULL,
+    evidence_text TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY(observation_id, mode, evidence_source, evidence_rule)
+);
+CREATE INDEX IF NOT EXISTS idx_observation_work_modes_mode
+ON observation_work_modes(mode, observation_id);
+CREATE TABLE IF NOT EXISTS job_work_modes (
+    job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    mode TEXT NOT NULL CHECK(mode IN ('remote','hybrid','onsite','unknown')),
+    PRIMARY KEY(job_id, mode)
+);
+CREATE INDEX IF NOT EXISTS idx_job_work_modes_mode
+ON job_work_modes(mode, job_id);
+
+INSERT OR IGNORE INTO observation_work_modes(
+    observation_id, mode, evidence_source, evidence_rule, evidence_text
+)
+SELECT id,
+       CASE WHEN remote=1 THEN 'remote' ELSE 'unknown' END,
+       'legacy',
+       CASE WHEN remote=1 THEN 'legacy_remote_true' ELSE 'legacy_not_remote_is_unknown' END,
+       ''
+FROM observations;
+
+UPDATE jobs SET work_mode='unknown' WHERE work_mode<>'remote';
+INSERT OR IGNORE INTO job_work_modes(job_id, mode)
+SELECT id, CASE WHEN work_mode='remote' THEN 'remote' ELSE 'unknown' END FROM jobs;
+"""
+
+MIGRATIONS = {
+    1: MIGRATION_1,
+    2: MIGRATION_2,
+    3: MIGRATION_3,
+    4: MIGRATION_4,
+    5: MIGRATION_5,
+}
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -562,6 +603,51 @@ class InventoryDatabase:
         ).fetchone()
         return row[0] if row else url
 
+    def _replace_observation_work_modes(
+        self,
+        conn: sqlite3.Connection,
+        observation_id: str,
+        arrangement: WorkArrangement,
+    ) -> None:
+        conn.execute(
+            "DELETE FROM observation_work_modes WHERE observation_id=?",
+            (observation_id,),
+        )
+        evidenced_modes: set[WorkMode] = set()
+        for item in arrangement.evidence:
+            conn.execute(
+                """INSERT INTO observation_work_modes(
+                       observation_id, mode, evidence_source, evidence_rule, evidence_text
+                   ) VALUES (?, ?, ?, ?, ?)""",
+                (observation_id, item.mode.value, item.source, item.rule, item.matched_text),
+            )
+            evidenced_modes.add(item.mode)
+        for mode in arrangement.available_modes - evidenced_modes:
+            conn.execute(
+                """INSERT INTO observation_work_modes(
+                       observation_id, mode, evidence_source, evidence_rule, evidence_text
+                   ) VALUES (?, ?, 'inferred', 'mode_without_evidence', '')""",
+                (observation_id, mode.value),
+            )
+
+    def _observation_work_modes(
+        self, conn: sqlite3.Connection, observation_id: str
+    ) -> frozenset[WorkMode]:
+        rows = conn.execute(
+            "SELECT DISTINCT mode FROM observation_work_modes WHERE observation_id=?",
+            (observation_id,),
+        ).fetchall()
+        return frozenset(WorkMode(row[0]) for row in rows) or frozenset({WorkMode.UNKNOWN})
+
+    def _replace_job_work_modes(
+        self, conn: sqlite3.Connection, job_id: str, modes: frozenset[WorkMode]
+    ) -> None:
+        conn.execute("DELETE FROM job_work_modes WHERE job_id=?", (job_id,))
+        conn.executemany(
+            "INSERT INTO job_work_modes(job_id, mode) VALUES (?, ?)",
+            ((job_id, mode.value) for mode in sorted(modes, key=lambda item: item.value)),
+        )
+
     def _upsert_observation(
         self, conn: sqlite3.Connection, observation: JobObservation, source_key: str, seen_at: datetime
     ) -> bool:
@@ -665,6 +751,10 @@ class InventoryDatabase:
                     observation_id,
                 ),
             )
+        assert observation.work_arrangement is not None
+        self._replace_observation_work_modes(
+            conn, observation_id, observation.work_arrangement
+        )
         self._refresh_job(conn, observation_id, seen_at)
         return not bool(existing)
 
@@ -796,9 +886,7 @@ class InventoryDatabase:
     ) -> str:
         job_id = str(uuid.uuid4())
         apply_url = canonical_url(observation.direct_apply_url) or canonical_url(observation.source_url)
-        work_mode = (
-            "remote" if observation.remote is True else "onsite" if observation.remote is False else "unknown"
-        )
+        work_mode = display_work_mode(observation.work_modes)
         conn.execute(
             """INSERT INTO jobs(
                 id, normalized_company, normalized_title, display_company, display_title, location, work_mode,
@@ -829,6 +917,7 @@ class InventoryDatabase:
                 quality,
             ),
         )
+        self._replace_job_work_modes(conn, job_id, observation.work_modes)
         self._record_possible_duplicates(conn, job_id, seen_at)
         return job_id
 
@@ -883,6 +972,7 @@ class InventoryDatabase:
         candidate_score = priority.get(row[4], 10) + (20 if row[10] == "complete" else 0)
         status = "reopened" if row[1] in {"closed", "possibly_closed"} else row[1]
         if candidate_score >= current_score:
+            candidate_modes = self._observation_work_modes(conn, observation_id)
             conn.execute(
                 """UPDATE jobs SET display_company=?, display_title=?,
                     normalized_company=?, normalized_title=?,
@@ -899,7 +989,7 @@ class InventoryDatabase:
                     normalized_key(row[5]),
                     normalized_key(row[6]),
                     row[7],
-                    "remote" if row[19] == 1 else "onsite" if row[19] == 0 else "unknown",
+                    display_work_mode(candidate_modes),
                     row[18],
                     row[14],
                     row[15],
@@ -916,6 +1006,7 @@ class InventoryDatabase:
                     row[0],
                 ),
             )
+            self._replace_job_work_modes(conn, row[0], candidate_modes)
         else:
             conn.execute(
                 "UPDATE jobs SET last_seen_at=?, status=?, closed_at=NULL WHERE id=?",
