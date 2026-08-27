@@ -51,6 +51,15 @@ uv run job-puller scrape --provider greenhouse
 
 Repeat `--provider` to update a selected group. Omitting it runs every enabled provider.
 
+Reconcile exact provider identities after importing historical inventory:
+
+```bash
+uv run job-puller reconcile
+```
+
+Reconciliation retains every source observation and merges canonical jobs only when a verified URL alias or exact
+provider requisition identity agrees.
+
 Commercial-board runs print a filter waterfall showing raw results, invalid records, title rejections, remote
 rejections, stale records, duplicates, and accepted observations. The same metrics are retained with the scrape
 run in SQLite for later diagnostics.

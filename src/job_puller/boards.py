@@ -26,6 +26,7 @@ class DiscoveryReport:
     scanned_links: int = 0
     recognized_links: int = 0
     redirect_failures: list[str] = field(default_factory=list)
+    verified_redirects: list[tuple[str, str]] = field(default_factory=list)
     host_counts: Counter[str] = field(default_factory=Counter)
 
 
@@ -155,6 +156,7 @@ def discover_boards(
             if host == "grnh.se" and "greenhouse" in selected:
                 try:
                     candidate_url = _greenhouse_redirect(url, client)
+                    report.verified_redirects.append((url, candidate_url))
                 except (httpx.HTTPError, ValueError) as exc:
                     report.redirect_failures.append(f"{url}: {type(exc).__name__}: {exc}")
                     continue

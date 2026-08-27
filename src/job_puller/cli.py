@@ -48,6 +48,9 @@ def _parser() -> argparse.ArgumentParser:
     config.add_argument("action", choices=["validate"])
     stats = commands.add_parser("stats", help="Show inventory counts")
     stats.add_argument("--json", action="store_true", dest="as_json")
+    commands.add_parser(
+        "reconcile", help="Consolidate exact provider identities while retaining observations"
+    )
     boards = commands.add_parser("boards", help="Discover and manage direct ATS boards")
     board_commands = boards.add_subparsers(dest="boards_action", required=True)
     discover = board_commands.add_parser(
@@ -106,6 +109,12 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"{key.replace('_', ' ').title()}: {value}")
         return 0
 
+    if args.command == "reconcile":
+        merged = database.reconcile_provider_identities()
+        print(f"Reconciled canonical jobs: {merged}")
+        print(f"Observations retained: {database.stats()['observations']}")
+        return 0
+
     if args.command == "boards":
         if args.boards_action == "check":
             service = InventoryService(config, database)
@@ -135,6 +144,9 @@ def main(argv: list[str] | None = None) -> int:
         )
         registry = merge_registries(load_or_empty_registry(output_path), discovered)
         write_board_registry(output_path, registry)
+        aliases, canonicalized, merged = database.record_verified_redirects(
+            report.verified_redirects
+        )
         provider_counts = {
             name: len(getattr(discovered.providers, name)) for name in SUPPORTED_PROVIDERS
         }
@@ -148,6 +160,9 @@ def main(argv: list[str] | None = None) -> int:
             + ", ".join(f"{name}={count}" for name, count in provider_counts.items())
         )
         print("New boards are disabled until reviewed and enabled in the registry.")
+        print(
+            f"Verified redirects: {aliases}; canonicalized={canonicalized}; merged_jobs={merged}."
+        )
         if report.redirect_failures:
             print(f"Greenhouse redirect failures: {len(report.redirect_failures)}", file=sys.stderr)
             for failure in report.redirect_failures[:10]:

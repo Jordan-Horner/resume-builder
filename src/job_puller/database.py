@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 import sqlite3
 import uuid
@@ -14,7 +15,7 @@ from .detail_cache import CachedProviderDetail
 from .models import JobObservation, ProviderResult
 from .normalize import canonical_url, description_hash, normalized_key
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 MIGRATION_1 = """
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -151,11 +152,35 @@ CREATE INDEX IF NOT EXISTS idx_jobs_exact_content
 ON jobs(normalized_company, normalized_title, description_hash);
 """
 
-MIGRATIONS = {1: MIGRATION_1, 2: MIGRATION_2, 3: MIGRATION_3}
+MIGRATION_4 = """
+CREATE TABLE IF NOT EXISTS application_url_aliases (
+    alias_url TEXT PRIMARY KEY,
+    target_url TEXT NOT NULL,
+    verified_at TEXT NOT NULL,
+    CHECK(alias_url<>target_url)
+);
+CREATE INDEX IF NOT EXISTS idx_application_url_alias_target
+ON application_url_aliases(target_url);
+"""
+
+MIGRATIONS = {1: MIGRATION_1, 2: MIGRATION_2, 3: MIGRATION_3, 4: MIGRATION_4}
 
 
 def _iso(value: datetime | None) -> str | None:
     return value.astimezone(UTC).isoformat() if value else None
+
+
+def _workday_reference_matches(provider_job_id: str, url: str) -> bool:
+    job_id = provider_job_id.strip()
+    if not job_id or not url:
+        return False
+    return bool(
+        re.search(
+            rf"(?:_|/){re.escape(job_id)}(?:-\d+)?(?:[/?#]|$)",
+            url,
+            flags=re.IGNORECASE,
+        )
+    )
 
 
 class InventoryDatabase:
@@ -198,6 +223,9 @@ class InventoryDatabase:
                 )
             if current < 3:
                 self._reconcile_exact_duplicates(conn)
+            if current < 4:
+                self._recanonicalize_observation_urls(conn)
+                self._reconcile_url_duplicates(conn)
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
@@ -239,6 +267,157 @@ class InventoryDatabase:
         with self.transaction() as conn:
             return self._reconcile_exact_duplicates(conn)
 
+    def record_verified_redirects(self, redirects: list[tuple[str, str]]) -> tuple[int, int, int]:
+        """Persist Greenhouse short-link redirects and reconcile exact URL matches."""
+        recorded = 0
+        updated = 0
+        now = _iso(datetime.now(UTC))
+        with self.transaction() as conn:
+            for source, target in redirects:
+                alias_url = canonical_url(source)
+                target_url = canonical_url(target)
+                if not alias_url.startswith("https://grnh.se/") or not target_url.startswith("https://"):
+                    continue
+                cursor = conn.execute(
+                    """INSERT INTO application_url_aliases(alias_url, target_url, verified_at)
+                       VALUES (?, ?, ?)
+                       ON CONFLICT(alias_url) DO UPDATE SET
+                         target_url=excluded.target_url, verified_at=excluded.verified_at""",
+                    (alias_url, target_url, now),
+                )
+                recorded += cursor.rowcount
+                cursor = conn.execute(
+                    """UPDATE observations SET canonical_apply_url=?
+                       WHERE canonical_apply_url=? AND direct_apply_url<>''""",
+                    (target_url, alias_url),
+                )
+                updated += cursor.rowcount
+            merged = self._reconcile_url_duplicates(conn)
+        return recorded, updated, merged
+
+    def reconcile_provider_identities(self) -> int:
+        """Merge exact Workday requisition identities across syndicated URL variants."""
+        with self.transaction() as conn:
+            rows = conn.execute(
+                """SELECT DISTINCT
+                         ats_job.id AS ats_job_id,
+                         ats.provider_job_id AS provider_job_id,
+                         commercial_job.id AS commercial_job_id,
+                         commercial.direct_apply_url AS commercial_url
+                   FROM observations ats
+                   JOIN job_observation_links ats_link ON ats_link.observation_id=ats.id
+                   JOIN jobs ats_job ON ats_job.id=ats_link.job_id
+                   JOIN jobs commercial_job
+                     ON commercial_job.normalized_company=ats_job.normalized_company
+                    AND commercial_job.normalized_title=ats_job.normalized_title
+                    AND commercial_job.id<>ats_job.id
+                   JOIN job_observation_links commercial_link
+                     ON commercial_link.job_id=commercial_job.id
+                   JOIN observations commercial
+                     ON commercial.id=commercial_link.observation_id
+                   WHERE ats.provider='workday'
+                     AND commercial.provider IN ('indeed','linkedin')
+                     AND commercial.direct_apply_url<>''"""
+            ).fetchall()
+            matches: dict[str, set[str]] = {}
+            for row in rows:
+                if _workday_reference_matches(row[1], row[3]):
+                    matches.setdefault(row[0], set()).add(row[2])
+            merged = 0
+            now = datetime.now(UTC)
+            for ats_job_id, commercial_jobs in matches.items():
+                if len(commercial_jobs) != 1:
+                    continue
+                survivor = next(iter(commercial_jobs))
+                self._merge_job_into(
+                    conn,
+                    survivor,
+                    ats_job_id,
+                    "exact_provider_job_identity",
+                    1.0,
+                    now,
+                )
+                merged += 1
+        return merged
+
+    def _recanonicalize_observation_urls(self, conn: sqlite3.Connection) -> None:
+        rows = conn.execute(
+            "SELECT id, source_url, direct_apply_url FROM observations"
+        ).fetchall()
+        for row in rows:
+            conn.execute(
+                """UPDATE observations
+                   SET canonical_source_url=?, canonical_apply_url=? WHERE id=?""",
+                (
+                    canonical_url(row[1]),
+                    self._canonical_application_url(conn, row[2]),
+                    row[0],
+                ),
+            )
+
+    def _reconcile_url_duplicates(self, conn: sqlite3.Connection) -> int:
+        urls = conn.execute(
+            """WITH observation_urls AS (
+                   SELECT id, canonical_source_url AS url FROM observations
+                   WHERE canonical_source_url<>''
+                   UNION
+                   SELECT id, canonical_apply_url AS url FROM observations
+                   WHERE canonical_apply_url<>''
+               )
+               SELECT u.url FROM observation_urls u
+               JOIN job_observation_links l ON l.observation_id=u.id
+               GROUP BY u.url HAVING COUNT(DISTINCT l.job_id)>1"""
+        ).fetchall()
+        merged = 0
+        now = datetime.now(UTC)
+        for (url,) in urls:
+            rows = conn.execute(
+                """SELECT DISTINCT l.job_id, j.first_seen_at
+                   FROM observations o
+                   JOIN job_observation_links l ON l.observation_id=o.id
+                   JOIN jobs j ON j.id=l.job_id
+                   WHERE o.canonical_source_url=? OR o.canonical_apply_url=?
+                   ORDER BY j.first_seen_at, l.job_id""",
+                (url, url),
+            ).fetchall()
+            if len(rows) < 2:
+                continue
+            survivor = rows[0][0]
+            for row in rows[1:]:
+                self._merge_job_into(conn, survivor, row[0], "canonical_url", 1.0, now)
+                merged += 1
+        return merged
+
+    def _merge_job_into(
+        self,
+        conn: sqlite3.Connection,
+        survivor: str,
+        duplicate: str,
+        reason: str,
+        confidence: float,
+        now: datetime,
+    ) -> None:
+        observation_ids = [
+            item[0]
+            for item in conn.execute(
+                "SELECT observation_id FROM job_observation_links WHERE job_id=?",
+                (duplicate,),
+            ).fetchall()
+        ]
+        conn.execute(
+            "DELETE FROM possible_duplicates WHERE left_job_id=? OR right_job_id=?",
+            (duplicate, duplicate),
+        )
+        conn.execute(
+            """UPDATE job_observation_links
+               SET job_id=?, merge_reason=?, merge_confidence=? WHERE job_id=?""",
+            (survivor, reason, confidence, duplicate),
+        )
+        conn.execute("DELETE FROM jobs_fts WHERE job_id=?", (duplicate,))
+        conn.execute("DELETE FROM jobs WHERE id=?", (duplicate,))
+        for observation_id in observation_ids:
+            self._refresh_job(conn, observation_id, now)
+
     def _reconcile_exact_duplicates(self, conn: sqlite3.Connection) -> int:
         groups = conn.execute(
             """SELECT normalized_company, normalized_title, description_hash
@@ -257,27 +436,14 @@ class InventoryDatabase:
             ).fetchall()
             survivor = rows[0][0]
             for row in rows[1:]:
-                duplicate = row[0]
-                observation_ids = [
-                    item[0]
-                    for item in conn.execute(
-                        "SELECT observation_id FROM job_observation_links WHERE job_id=?",
-                        (duplicate,),
-                    ).fetchall()
-                ]
-                conn.execute(
-                    "DELETE FROM possible_duplicates WHERE left_job_id=? OR right_job_id=?",
-                    (duplicate, duplicate),
+                self._merge_job_into(
+                    conn,
+                    survivor,
+                    row[0],
+                    "exact_company_title_description",
+                    0.98,
+                    now,
                 )
-                conn.execute(
-                    "UPDATE job_observation_links SET job_id=?, merge_reason=?, merge_confidence=? "
-                    "WHERE job_id=?",
-                    (survivor, "exact_company_title_description", 0.98, duplicate),
-                )
-                conn.execute("DELETE FROM jobs_fts WHERE job_id=?", (duplicate,))
-                conn.execute("DELETE FROM jobs WHERE id=?", (duplicate,))
-                for observation_id in observation_ids:
-                    self._refresh_job(conn, observation_id, now)
                 merged += 1
             self._record_possible_duplicates(conn, survivor, now)
         return merged
@@ -339,6 +505,7 @@ class InventoryDatabase:
                 )
                 inserted += int(was_inserted)
                 updated += int(not was_inserted)
+            self._reconcile_url_duplicates(conn)
             conn.execute(
                 """INSERT INTO scrape_runs(
                     id, source_key, provider, started_at, completed_at, success, suspicious_empty,
@@ -386,6 +553,15 @@ class InventoryDatabase:
         stable = "|".join([observation.provider, observation.provider_board_id, identity])
         return hashlib.sha256(stable.encode("utf-8")).hexdigest()
 
+    def _canonical_application_url(self, conn: sqlite3.Connection, value: str) -> str:
+        url = canonical_url(value)
+        if not url:
+            return ""
+        row = conn.execute(
+            "SELECT target_url FROM application_url_aliases WHERE alias_url=?", (url,)
+        ).fetchone()
+        return row[0] if row else url
+
     def _upsert_observation(
         self, conn: sqlite3.Connection, observation: JobObservation, source_key: str, seen_at: datetime
     ) -> bool:
@@ -405,7 +581,7 @@ class InventoryDatabase:
             observation.source_url,
             canonical_url(observation.source_url),
             observation.direct_apply_url,
-            canonical_url(observation.direct_apply_url),
+            self._canonical_application_url(conn, observation.direct_apply_url),
             observation.title,
             observation.company,
             observation.location,
@@ -465,7 +641,7 @@ class InventoryDatabase:
                     observation.source_url,
                     canonical_url(observation.source_url),
                     observation.direct_apply_url,
-                    canonical_url(observation.direct_apply_url),
+                    self._canonical_application_url(conn, observation.direct_apply_url),
                     observation.title,
                     observation.company,
                     observation.location,
@@ -535,7 +711,10 @@ class InventoryDatabase:
     def _find_canonical_job(
         self, conn: sqlite3.Connection, observation: JobObservation
     ) -> tuple[str | None, str, float]:
-        urls = {canonical_url(observation.source_url), canonical_url(observation.direct_apply_url)} - {""}
+        urls = {
+            canonical_url(observation.source_url),
+            self._canonical_application_url(conn, observation.direct_apply_url),
+        } - {""}
         for url in urls:
             row = conn.execute(
                 """SELECT l.job_id FROM observations o
@@ -545,6 +724,9 @@ class InventoryDatabase:
             ).fetchone()
             if row:
                 return row[0], "canonical_url", 1.0
+        identity_match = self._find_provider_identity_job(conn, observation)
+        if identity_match:
+            return identity_match, "exact_provider_job_identity", 1.0
         text = observation.description_text.strip()
         content_hash = description_hash(text) if text else ""
         if content_hash:
@@ -561,6 +743,45 @@ class InventoryDatabase:
             if row:
                 return row[0], "exact_company_title_description", 0.98
         return None, "", 0.0
+
+    def _find_provider_identity_job(
+        self, conn: sqlite3.Connection, observation: JobObservation
+    ) -> str | None:
+        company = normalized_key(observation.company)
+        title = normalized_key(observation.title)
+        if observation.provider == "workday" and observation.provider_job_id:
+            rows = conn.execute(
+                """SELECT DISTINCT l.job_id, o.direct_apply_url
+                   FROM observations o
+                   JOIN job_observation_links l ON l.observation_id=o.id
+                   JOIN jobs j ON j.id=l.job_id
+                   WHERE o.provider IN ('indeed','linkedin')
+                     AND j.normalized_company=? AND j.normalized_title=?""",
+                (company, title),
+            ).fetchall()
+            matches = {
+                row[0]
+                for row in rows
+                if _workday_reference_matches(observation.provider_job_id, row[1])
+            }
+            return next(iter(matches)) if len(matches) == 1 else None
+        if observation.provider in {"indeed", "linkedin"} and observation.direct_apply_url:
+            rows = conn.execute(
+                """SELECT DISTINCT l.job_id, o.provider_job_id
+                   FROM observations o
+                   JOIN job_observation_links l ON l.observation_id=o.id
+                   JOIN jobs j ON j.id=l.job_id
+                   WHERE o.provider='workday'
+                     AND j.normalized_company=? AND j.normalized_title=?""",
+                (company, title),
+            ).fetchall()
+            matches = {
+                row[0]
+                for row in rows
+                if _workday_reference_matches(row[1], observation.direct_apply_url)
+            }
+            return next(iter(matches)) if len(matches) == 1 else None
+        return None
 
     def _create_job(
         self,

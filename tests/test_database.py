@@ -75,7 +75,7 @@ def test_existing_v1_database_migrates_to_run_metrics(tmp_path):
     with db.connect() as conn:
         version = conn.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0]
         columns = {row[1] for row in conn.execute("PRAGMA table_info(scrape_runs)")}
-    assert version == 3
+    assert version == 4
     assert "metrics_json" in columns
     with db.connect() as conn:
         cache_table = conn.execute(
@@ -116,6 +116,101 @@ def test_direct_url_merges_observations_and_prefers_ats(tmp_path):
     with db.connect() as conn:
         row = conn.execute("SELECT canonical_apply_url FROM jobs").fetchone()
         assert row[0] == ats_url
+
+
+def test_verified_greenhouse_redirect_merges_without_losing_observations(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    short_url = "https://grnh.se/example"
+    target_url = "https://job-boards.greenhouse.io/example/jobs/42?gh_src=example"
+    commercial = observation(
+        provider="indeed",
+        job_id="indeed-42",
+        direct=short_url,
+        description="Short syndicated description. ",
+    )
+    ats = observation(
+        provider="greenhouse",
+        job_id="42",
+        source="https://job-boards.greenhouse.io/example/jobs/42",
+        direct="https://job-boards.greenhouse.io/example/jobs/42",
+        description="Complete direct ATS description. ",
+    )
+    db.record_result(result(commercial))
+    db.record_result(result(ats))
+    assert db.stats()["jobs"] == 2
+
+    recorded, updated, merged = db.record_verified_redirects([(short_url, target_url)])
+
+    assert (recorded, updated, merged) == (1, 1, 1)
+    assert db.stats()["jobs"] == 1
+    assert db.stats()["observations"] == 2
+    with db.connect() as conn:
+        providers = {
+            row[0] for row in conn.execute("SELECT provider FROM observations").fetchall()
+        }
+        merge_reasons = {
+            row[0]
+            for row in conn.execute("SELECT merge_reason FROM job_observation_links").fetchall()
+        }
+    assert providers == {"indeed", "greenhouse"}
+    assert "canonical_url" in merge_reasons
+
+
+def test_verified_alias_prevents_future_greenhouse_duplicate(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    short_url = "https://grnh.se/example"
+    target_url = "https://job-boards.greenhouse.io/example/jobs/42"
+    db.record_verified_redirects([(short_url, target_url)])
+    db.record_result(
+        result(
+            observation(
+                provider="indeed",
+                job_id="indeed-42",
+                direct=short_url,
+                description="Syndicated description. ",
+            )
+        )
+    )
+    db.record_result(
+        result(
+            observation(
+                provider="greenhouse",
+                job_id="42",
+                source=target_url,
+                direct=target_url,
+                description="Direct description. ",
+            )
+        )
+    )
+    assert db.stats()["jobs"] == 1
+    assert db.stats()["observations"] == 2
+
+
+def test_workday_requisition_identity_merges_url_variants(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    commercial = observation(
+        provider="indeed",
+        job_id="indeed-r29937",
+        direct=(
+            "https://example.wd5.myworkdayjobs.com/en-US/Careers/job/Remote/"
+            "Senior-Engineer_R29937"
+        ),
+        description="Syndicated description. ",
+    )
+    ats = observation(
+        provider="workday",
+        job_id="R29937",
+        source="https://example.wd5.myworkdayjobs.com/job/Remote/Senior-Engineer_R29937",
+        direct="https://example.wd5.myworkdayjobs.com/job/Remote/Senior-Engineer_R29937",
+        description="Direct Workday description. ",
+    )
+    db.record_result(result(commercial))
+    db.record_result(result(ats))
+    assert db.stats()["jobs"] == 1
+    assert db.stats()["observations"] == 2
 
 
 def test_successful_run_advances_checkpoint(tmp_path):

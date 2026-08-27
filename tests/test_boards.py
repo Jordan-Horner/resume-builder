@@ -47,6 +47,9 @@ def test_discovery_follows_only_known_greenhouse_redirects():
         client=client,
     )
     assert report.recognized_links == 2
+    assert report.verified_redirects == [
+        ("https://grnh.se/example", "https://boards.greenhouse.io/acme/jobs/42")
+    ]
     assert registry.providers.greenhouse[0].id == "acme"
     assert registry.providers.greenhouse[0].name == "Acme"
 
@@ -95,6 +98,9 @@ def test_discovery_does_not_request_custom_greenhouse_careers_host():
     )
     assert not registry.providers.greenhouse
     assert not report.redirect_failures
+    assert report.verified_redirects == [
+        ("https://grnh.se/example", "https://careers.example.com/job/42?gh_jid=42")
+    ]
     assert requested_hosts == ["grnh.se"]
 
 

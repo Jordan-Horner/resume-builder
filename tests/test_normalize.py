@@ -15,6 +15,13 @@ def test_canonical_url_removes_lever_source_tracking():
     )
 
 
+def test_canonical_url_collapses_repeated_query_pairs():
+    assert (
+        canonical_url("https://example.com/job?gh_jid=42&gh_jid=42")
+        == "https://example.com/job?gh_jid=42"
+    )
+
+
 def test_html_to_text_removes_script():
     text = html_to_text("<main><h1>Role</h1><script>bad()</script><p>Build APIs</p></main>")
     assert "Role" in text

@@ -9,6 +9,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from bs4 import BeautifulSoup
 
 TRACKING_KEYS = {
+    "gh_src",
     "lever-source",
     "ref",
     "refid",
@@ -46,6 +47,7 @@ def canonical_url(value: str | None) -> str:
     query = [
         (k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k.lower() not in TRACKING_KEYS
     ]
+    query = list(dict.fromkeys(query))
     path = parts.path.rstrip("/") or "/"
     return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), path, urlencode(query), ""))
 

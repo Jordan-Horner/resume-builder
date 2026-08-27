@@ -71,6 +71,11 @@ Canonical inventory may merge observations only on an exact canonical URL or the
 company, exact normalized title, and exact non-empty description hash. The latter merge reason is
 `exact_company_title_description`; fuzzy title similarity remains review-only.
 
+Verified Greenhouse short-link redirects are stored as durable URL aliases. Workday syndicated copies may also
+merge on an exact requisition ID embedded in the commercial application URL when normalized company and title both
+agree and the match identifies one canonical job. Both paths retain every observation; neither permits fuzzy
+company/title-only consolidation.
+
 Commercial-board metrics include the query count, raw result count, invalid rows, title rejections, remote
 rejections, freshness rejections, pre-deduplication acceptance, duplicates, and final acceptance. Family- and
 query-level raw and pre-deduplication counts are included in the persisted metrics payload.

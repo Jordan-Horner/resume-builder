@@ -17,8 +17,8 @@ CLI
 
 Provider modules own transport, source-shape translation, and source-aware eligibility accounting. The service owns
 checkpoints and orchestration. The database owns transactions, migrations, observation identity, canonical links,
-lifecycle state, source preference, and full-text indexing. No downstream consumer may depend on JobSpy or provider
-payload shapes.
+lifecycle state, verified application URL aliases, source preference, and full-text indexing. No downstream consumer
+may depend on JobSpy or provider payload shapes.
 
 Commercial providers also own local eligibility accounting because they know which source limitations forced each
 filter to run locally. Aggregate and family-level metrics flow through `ProviderResult`, appear in the CLI run
