@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from typing import Any
 
 from job_puller.config import CommercialProvider, SearchSettings
 from job_puller.models import JobObservation, ProviderResult
-from job_puller.normalize import html_to_text, parse_datetime
+from job_puller.normalize import html_to_text, normalized_key, parse_datetime
 
 
 class JobSpyProvider:
@@ -28,27 +29,40 @@ class JobSpyProvider:
 
         hours_old = max(1, int((started - since).total_seconds() / 3600) + 1)
         for family in self.search.families:
-            for term in family.terms:
-                try:
-                    kwargs: dict[str, Any] = {
-                        "site_name": [self.name],
-                        "search_term": term,
-                        "location": self.search.location,
-                        "results_wanted": self.settings.results_wanted,
-                        "hours_old": hours_old,
-                        "country_indeed": "USA",
-                        "description_format": "html",
-                        "verbose": 0,
-                    }
-                    if self.name == "linkedin":
-                        kwargs["linkedin_fetch_description"] = self.settings.fetch_descriptions
-                    frame = scrape_jobs(**kwargs)
-                    for row in frame.to_dict(orient="records"):
-                        observation = self._normalize(row, family.name)
-                        if observation and self._remote_eligible(observation):
-                            observations.append(observation)
-                except Exception as exc:
-                    errors.append(f"{family.name}/{term}: {type(exc).__name__}: {exc}")
+            for configured_term in family.terms:
+                for query in self._provider_queries(configured_term):
+                    try:
+                        kwargs: dict[str, Any] = {
+                            "site_name": [self.name],
+                            "search_term": query,
+                            "location": self.search.location,
+                            "results_wanted": self.settings.results_wanted,
+                            "country_indeed": "USA",
+                            "description_format": "html",
+                            "verbose": 0,
+                        }
+                        if self.name == "indeed" and self.search.remote_only:
+                            # Indeed treats freshness and remote as mutually exclusive server filters.
+                            # Ask Indeed for remote jobs, then apply freshness locally below.
+                            kwargs["is_remote"] = True
+                        else:
+                            kwargs["hours_old"] = hours_old
+                            if self.search.remote_only:
+                                kwargs["is_remote"] = True
+                        if self.name == "linkedin":
+                            kwargs["linkedin_fetch_description"] = self.settings.fetch_descriptions
+                        frame = scrape_jobs(**kwargs)
+                        for row in frame.to_dict(orient="records"):
+                            observation = self._normalize(row, family.name)
+                            if (
+                                observation
+                                and self._title_matches(observation.title, configured_term)
+                                and self._remote_eligible(observation)
+                                and self._recent_enough(observation, since)
+                            ):
+                                observations.append(observation)
+                    except Exception as exc:
+                        errors.append(f"{family.name}/{query}: {type(exc).__name__}: {exc}")
 
         deduped = {
             f"{item.provider}:{item.provider_job_id or item.source_url}": item for item in observations
@@ -70,8 +84,27 @@ class JobSpyProvider:
         if not self.search.remote_only:
             return True
         location = observation.location.lower()
-        description = observation.description_text.lower()
-        return observation.remote is True or "remote" in location or "remote" in description[:2000]
+        return observation.remote is True or "remote" in location
+
+    @staticmethod
+    def _recent_enough(observation: JobObservation, since: datetime) -> bool:
+        return observation.posted_at is None or observation.posted_at >= since
+
+    def _provider_queries(self, configured_term: str) -> list[str]:
+        if self.name != "indeed":
+            return [configured_term]
+        phrases = re.findall(r'"([^"]+)"', configured_term)
+        if phrases:
+            return phrases
+        return [part.strip() for part in re.split(r"\s+OR\s+", configured_term) if part.strip()]
+
+    @staticmethod
+    def _title_matches(title: str, query: str) -> bool:
+        phrases = re.findall(r'"([^"]+)"', query)
+        if not phrases:
+            phrases = [part.strip() for part in re.split(r"\s+OR\s+", query, flags=re.IGNORECASE)]
+        normalized_title = normalized_key(title)
+        return any(normalized_key(phrase) in normalized_title for phrase in phrases if normalized_key(phrase))
 
     def _normalize(self, row: dict[str, Any], family: str) -> JobObservation | None:
         def value(name: str, default: Any = "") -> Any:

@@ -170,3 +170,47 @@ def test_jobspy_adapter_normalizes_dataframe_row():
     assert job is not None
     assert job.provider_job_id == "in-1"
     assert job.direct_apply_url == "https://example.com/jobs/1"
+
+
+def test_jobspy_remote_filter_does_not_trust_description_mentions():
+    provider = JobSpyProvider(
+        "indeed",
+        CommercialProvider(),
+        SearchSettings(families=[{"name": "support", "terms": ["production support engineer"]}]),
+    )
+    job = provider._normalize(
+        {
+            "id": "in-2",
+            "title": "Support Engineer",
+            "company": "Example",
+            "job_url": "https://indeed.com/viewjob?jk=2",
+            "description": "Employees may occasionally work remotely.",
+            "is_remote": False,
+            "city": "New York",
+            "state": "NY",
+            "country": "US",
+        },
+        "support",
+    )
+    assert job is not None
+    assert provider._remote_eligible(job) is False
+
+
+def test_jobspy_title_gate_accepts_seniority_variants():
+    query = '"production support engineer" OR "site reliability engineer"'
+    assert JobSpyProvider._title_matches("Senior Production Support Engineer", query)
+    assert JobSpyProvider._title_matches("Cloud Site Reliability Engineer II", query)
+    assert not JobSpyProvider._title_matches("Inbound Sales Account Executive", query)
+
+
+def test_indeed_expands_boolean_family_into_base_queries():
+    provider = JobSpyProvider(
+        "indeed",
+        CommercialProvider(),
+        SearchSettings(families=[{"name": "support", "terms": ["support engineer"]}]),
+    )
+    query = '"production support engineer" OR "site reliability engineer"'
+    assert provider._provider_queries(query) == [
+        "production support engineer",
+        "site reliability engineer",
+    ]
