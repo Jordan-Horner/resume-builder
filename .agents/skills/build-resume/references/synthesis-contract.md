@@ -222,7 +222,18 @@ Select evidence in this order:
 3. the strongest canonical evidence under the quality contract's hierarchy;
 4. distinct contribution within the page and information budget.
 
-Apply the same ordering inside `summary_job`. For a real posting, name the
+Before applying that ordering inside `summary_job`, define the summary's reader
+decision. Record the one hiring-relevant conclusion the reader should reach,
+the likely misunderstanding or fragmented career story the summary must
+correct, the evidence-supported career through-line, and why that pattern is
+valuable for the employer's work. These elements define the purpose of the
+summary; they are planning guidance, not polished resume copy. Use evidence to
+make that position credible rather than allowing the evidence list to become
+the position. Select normally one representative proof anchor and at most one
+compact breadth or progression signal; do not plan several roles or independent
+accomplishments as a miniature career history.
+
+Apply the same ordering inside `summary_job` after defining that purpose. For a real posting, name the
 required role-defining criteria the summary must establish, the canonical facts
 that provide the strongest direct proof, and at most one differentiator or
 reviewer-risk answer that earns top-third space. Do not let chronology alone

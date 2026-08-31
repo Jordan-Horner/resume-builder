@@ -187,7 +187,22 @@ Git tools do not. Never write candidate data into same-named engine folders.
    facts assigned to the visible action, object, scope, and outcome; the final
    evidence comment must equal that union. Let the selected
    evidence and `summary_job` determine the
-   summary; do not reuse a generic title-plus-years introduction. For a
+   summary; do not reuse a generic title-plus-years introduction. Before
+   ranking facts or drafting prose, define the summary's purpose as a reader
+   decision: the one hiring-relevant conclusion the target reader should reach,
+   the likely misunderstanding or fragmented career story the summary must
+   correct, the candidate's evidence-supported career through-line, and the
+   value that through-line offers the employer. Use evidence to make that
+   position credible; do not let the evidence list become the position. Keep
+   that purpose in the planning logic, then express it in plain, direct resume
+   language. The visible summary does not need to announce the value proposition
+   abstractly. A concise role identity plus two clearly scoped experience areas
+   is valid when it gives the reader the intended frame. Prefer literal actions,
+   systems, environments, and responsibilities over slogans, metaphors, or
+   polished benefit language. Use normally one proof anchor and, only when it
+   changes the hiring read, one compact breadth or progression signal. Do not
+   prove the conclusion by recounting several roles or independent
+   accomplishments. For a
    job-tailored resume, rank summary material by employer decision value before
    drafting: lead with direct proof for the posting's required role-defining
    work, then the strongest supported proof for its primary responsibilities,
@@ -204,7 +219,9 @@ Git tools do not. Never write candidate data into same-named engine folders.
    mirror the posting's requirement order, enumerate every matched technology,
    or restate the first experience bullet in condensed form. Let experience and
    skills carry the remaining retrieval terms. Apply the quality contract's
-   requirement-echo, scope-precision, and summary-to-body tests before review.
+   reader-conclusion, resume-framing, plain-direct-opening,
+   proof-concentration, requirement-echo, scope-precision, and summary-to-body
+   tests before review.
    Require the summary to answer both “why this candidate fits this job” and
    “what evidence makes that fit credible” using claims demonstrated later in
    the resume. Treat Core

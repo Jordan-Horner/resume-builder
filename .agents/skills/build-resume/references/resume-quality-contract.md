@@ -242,6 +242,46 @@ formula. Avoid generic praise, unsupported leadership framing, exhaustive
 keyword lists, repeated direction vocabulary, and claims that are not
 demonstrated later in the document.
 
+### Decide the reader conclusion first
+
+The summary is a positioning device, not merely an evidence-selection surface.
+Its primary purpose is to establish the lens through which a recruiter should
+interpret the candidate's titles, transitions, and later accomplishments. Before
+ranking facts or drafting prose, decide:
+
+1. **Reader conclusion:** What one hiring-relevant belief should the target
+   reader form about this candidate?
+2. **Framing problem:** What material misunderstanding, objection, or fragmented
+   career story might the reader otherwise carry into the experience section?
+3. **Career through-line:** What repeated, evidence-supported operating pattern
+   connects the candidate's roles and makes the target direction credible?
+4. **Employer value:** Why is that pattern useful for the work the employer
+   needs done, beyond possession of the named tools?
+5. **Proof burden:** What representative evidence is sufficient to make that
+   conclusion believable without trying to prove the entire resume at once?
+
+State this purpose privately in one or two plain sentences before selecting
+summary evidence. The reader conclusion controls evidence choice and wording;
+the target criteria inform it but do not replace it. Use the selected facts to
+make the position credible. Never treat the facts, technologies, or requirement
+labels themselves as the position.
+
+Use the private through-line to select and frame the evidence, but do not force
+the visible prose to state an abstract value proposition. Write the finished
+summary in plain, direct resume language. A concise role identity followed by
+two clearly scoped experience areas is valid when it gives the reader the
+intended frame. Prefer literal descriptions of actions, systems, environments,
+and responsibilities over slogans, metaphors, personality claims, or polished
+benefit language when a direct statement of the supported experience would be
+clearer and more credible. Judge the wording in context rather than maintaining
+a phrase blacklist; abstract framing remains appropriate when it conveys a
+real, evidence-supported relationship that literal detail would obscure.
+
+Support the frame with normally one representative proof anchor and, only when
+it changes the hiring read, one compact breadth or progression signal. Do not
+prove the conclusion by recounting multiple roles or independent accomplishments
+in miniature.
+
 For a resume tailored to a real posting, apply a job-value hierarchy before
 writing the summary:
 
@@ -282,7 +322,26 @@ Exact retrieval belongs across the complete resume; the summary should carry
 only the few terms needed to make its central argument understandable and
 discoverable.
 
-Before approving a summary, apply three additional tests:
+Before approving a summary, apply seven additional tests:
+
+- **Reader-conclusion test:** After reading only the summary, can the reviewer
+  state in one natural sentence what kind of professional this is, why that
+  person would be valuable in the target role, and how the representative proof
+  supports that conclusion? If the reviewer can only repeat tools,
+  requirements, or chronology, the summary has not established a position.
+- **Resume-framing test:** Does the summary help the reader correctly interpret
+  the candidate's titles, transitions, or non-linear background? If removing it
+  would not materially change how the rest of the resume is understood, revise
+  the purpose or question whether the current framing earns the space.
+- **Plain-direct-opening test:** Would a capable hiring manager naturally use
+  this language to describe the candidate to another manager? Prefer a direct
+  role, action, object, and scope when abstract framing adds no useful meaning.
+  A conventional role-and-experience opening is acceptable when it clearly
+  resolves the framing problem.
+- **Proof-concentration test:** Does one representative anchor make the position
+  believable, with at most one compact breadth or progression signal? If the
+  summary recounts multiple roles or independent accomplishments, return the
+  secondary proof to experience.
 
 - **Requirement-echo test:** Could the wording have been produced mainly by
   rearranging the posting's requirements? If so, rewrite it around the
