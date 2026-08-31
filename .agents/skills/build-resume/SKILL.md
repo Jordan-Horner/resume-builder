@@ -187,7 +187,27 @@ Git tools do not. Never write candidate data into same-named engine folders.
    facts assigned to the visible action, object, scope, and outcome; the final
    evidence comment must equal that union. Let the selected
    evidence and `summary_job` determine the
-   summary; do not reuse a generic title-plus-years introduction. Treat Core
+   summary; do not reuse a generic title-plus-years introduction. For a
+   job-tailored resume, rank summary material by employer decision value before
+   drafting: lead with direct proof for the posting's required role-defining
+   work, then the strongest supported proof for its primary responsibilities,
+   then one differentiator or outcome. Use the `match-job` statuses and reviewer
+   risk map to make this ranking explicit. Do not spend summary space on a
+   recent but lower-value implementation detail when stronger evidence answers
+   a more important requirement, and do not use polished wording or keyword
+   density to disguise a `partial`, `undecidable`, or unsupported criterion.
+   After ranking the evidence, synthesize it into a natural professional
+   introduction rather than a compressed match report. Normally give the
+   summary three jobs: establish one credible professional identity or
+   operating pattern, anchor it with one representative proof point, and add at
+   most one breadth, progression, outcome, or reviewer-risk signal. Do not
+   mirror the posting's requirement order, enumerate every matched technology,
+   or restate the first experience bullet in condensed form. Let experience and
+   skills carry the remaining retrieval terms. Apply the quality contract's
+   requirement-echo, scope-precision, and summary-to-body tests before review.
+   Require the summary to answer both “why this candidate fits this job” and
+   “what evidence makes that fit credible” using claims demonstrated later in
+   the resume. Treat Core
    Competencies as optional and include it only when the labels improve scanning
    beyond what the summary, experience, and skills already show. After drafting,
    run the quality contract's audience-calibrated specificity pass across the

@@ -242,6 +242,61 @@ formula. Avoid generic praise, unsupported leadership framing, exhaustive
 keyword lists, repeated direction vocabulary, and claims that are not
 demonstrated later in the document.
 
+For a resume tailored to a real posting, apply a job-value hierarchy before
+writing the summary:
+
+1. Lead with direct evidence for required, role-defining criteria that the
+   `match-job` review classifies as `met`.
+2. Add the strongest supported evidence for the employer's primary day-to-day
+   responsibilities, favoring concrete scope, operating conditions, outcomes,
+   or ownership over tool presence.
+3. Use the remaining space for one differentiator, outcome, or piece of
+   counter-evidence that materially reduces a reviewer risk.
+4. Leave `partial`, `undecidable`, and unsupported criteria accurately bounded;
+   keyword repetition cannot turn them into demonstrated fit.
+
+Recency is a tiebreaker, not the ranking rule. A recent feature, workflow, or
+internal tool must not displace older but stronger evidence that more directly
+answers a required target criterion. The summary should not attempt to mention
+every selected story. It should establish the smallest high-value argument that
+answers two questions on a cold read: why this candidate fits this specific job,
+and what visible proof makes that fit credible.
+
+Treat that argument as an introduction, not a compressed match report. Ranking
+criteria determines what deserves emphasis; it does not determine the
+summary's sentence order or require one phrase per criterion. Normally compose
+the summary in two or three concise sentences, approximately three to five
+rendered lines, with these distinct jobs:
+
+1. establish one credible professional identity or operating pattern in
+   reader-centered language;
+2. anchor that identity with one representative accomplishment, scope signal,
+   or outcome; and
+3. optionally add one broader pattern, progression signal, differentiator, or
+   reviewer-risk answer that changes the hiring read.
+
+This is a flexible information budget, not a fixed template. Omit the third job
+when the first two make the case. Do not mirror the posting's requirement order,
+join criterion labels into a sentence, or enumerate every matched technology.
+Exact retrieval belongs across the complete resume; the summary should carry
+only the few terms needed to make its central argument understandable and
+discoverable.
+
+Before approving a summary, apply three additional tests:
+
+- **Requirement-echo test:** Could the wording have been produced mainly by
+  rearranging the posting's requirements? If so, rewrite it around the
+  candidate's demonstrated operating pattern and representative proof.
+- **Scope-precision test:** Does an umbrella phrase imply broader ownership than
+  the evidence supports—for example, converting application operations into
+  platform administration? If so, name the supported action and object more
+  precisely.
+- **Summary-to-body test:** Does the summary frame the evidence and create a
+  reason to continue, or merely compress the first bullet and skills inventory?
+  Keep the framing; move architecture inventories, implementation details, and
+  secondary keywords to experience or skills unless they are themselves the
+  differentiating proof.
+
 Calibrate specificity to the section, evidence, and intended audience. Choose
 the clearest supported wording that preserves decision-relevant meaning. Keep
 specialist terminology when it demonstrates a differentiating capability, is
@@ -327,6 +382,15 @@ list as a writing system:
 - [Columbia Career Education: Resume Checklist](https://www.careereducation.columbia.edu/sites/default/files/Resume%20Checklist.pdf)
   checks whether bullets explain what the candidate did, how, and why or with
   what measurable impact.
+- [Yale Office of Career Strategy: Resume Sections—Summary](https://cdn.ocs.yale.edu/wp-content/uploads/sites/77/2022/07/CV_Resume_Conversion-GSAS-2022.pdf)
+  describes the summary as brief, specific, tailored, evidence-backed, and
+  occupying valuable resume space.
+- [Columbia Career Education: Creating a Summary/Profile Statement](https://www.careereducation.columbia.edu/sites/default/files/cce_cpg_16-17.pdf)
+  recommends a concise two-to-five-phrase snapshot that prioritizes the
+  qualifications most important to the employer.
+- [Harvard Mignone Center: Creating a Strong Resume](https://careerservices.fas.harvard.edu/resources/create-a-strong-resume/)
+  emphasizes specific, direct, fact-based language designed for fast human and
+  system scanning.
 
 These are editorial heuristics, not permission to fabricate a result, number,
 causal link, authorship level, or universal bullet count. Canonical evidence and

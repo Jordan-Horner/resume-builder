@@ -222,6 +222,21 @@ Select evidence in this order:
 3. the strongest canonical evidence under the quality contract's hierarchy;
 4. distinct contribution within the page and information budget.
 
+Apply the same ordering inside `summary_job`. For a real posting, name the
+required role-defining criteria the summary must establish, the canonical facts
+that provide the strongest direct proof, and at most one differentiator or
+reviewer-risk answer that earns top-third space. Do not let chronology alone
+promote a recent supporting feature over stronger target evidence, and do not
+plan summary language as a compensating keyword list for `partial`,
+`undecidable`, or unsupported criteria.
+
+Also state the candidate-centered operating pattern that should organize those
+facts and select normally one representative proof anchor. The plan must not
+translate the target criteria into a sentence checklist. Record which matched
+terms can remain in experience or skills instead of the summary, and require a
+requirement-echo check after drafting so the introduction sounds derived from
+the candidate's evidence rather than rearranged from the posting.
+
 Make a compact reviewer-risk map before finalizing the plan. Identify at most
 three plausible doubts that would materially change the hiring read, connect
 each to canonical counter-evidence or an explicit gap, and let the result change
@@ -362,8 +377,11 @@ hiring contribution.
 - Use `importance` to describe the story's role in the argument, not as a proxy
   for fact quality. Omitting a supporting story never deletes it from the vault
   or from Git history.
-- Give the summary a resume-specific synthesis job. Do not use the field to
-  store a stock sentence or force the same introduction across directions.
+- Give the summary a resume-specific synthesis job. For a real posting, it must
+  identify the highest-value required criteria the opening will prove and why
+  the selected evidence is the strongest available answer. Do not use the field
+  to store a stock sentence, force the same introduction across directions, or
+  prioritize a lower-value recent detail over stronger job-relevant proof.
 - Ensure every role-scoped employment fact used by the summary is demonstrated
   again later in the document. Profile, skills, and organization-scoped facts
   may establish context without mechanical repetition or guessed chronology.
