@@ -322,6 +322,13 @@ Exact retrieval belongs across the complete resume; the summary should carry
 only the few terms needed to make its central argument understandable and
 discoverable.
 
+Reject any summary sentence whose main function is to inventory technologies,
+capabilities, responsibilities, or matched requirements, even when every item
+is supported. A comma-separated list is a strong warning sign, but judge the
+sentence by its function rather than punctuation or prohibited phrases. Breadth
+belongs in the experience evidence or Technical Skills section unless one
+compact scope signal materially changes the summary's central hiring argument.
+
 Before approving a summary, apply seven additional tests:
 
 - **Reader-conclusion test:** After reading only the summary, can the reviewer

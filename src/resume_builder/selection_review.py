@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -171,6 +172,114 @@ def selection_strategy_payload(
 def selection_strategy_digest(plan: SynthesisPlan, selection: dict[str, Any]) -> str:
     """Hash selection meaning while ignoring wording and prose-derived diagnostics."""
     return selection_digest(selection_strategy_payload(plan, selection))
+
+
+def additive_summary_evidence_only(
+    previous: dict[str, Any],
+    current: dict[str, Any],
+) -> bool:
+    """Return whether a reviewed strategy only gained summary evidence.
+
+    Summary evidence additions support prose that still receives its own language
+    and career review. They do not change selected stories, omissions, role arcs,
+    target context, concept fit, or reviewer risks, so reopening the independent
+    selection review adds no strategy judgment.
+    """
+    previous_selection = previous.get("selection")
+    current_selection = current.get("selection")
+    if not isinstance(previous_selection, dict) or not isinstance(current_selection, dict):
+        return False
+    previous_value = previous_selection.get("summary_fact_ids")
+    current_value = current_selection.get("summary_fact_ids")
+    previous_summary = (
+        {item for item in previous_value if isinstance(item, str)}
+        if isinstance(previous_value, list)
+        else set()
+    )
+    current_summary = (
+        {item for item in current_value if isinstance(item, str)}
+        if isinstance(current_value, list)
+        else set()
+    )
+    if not previous_summary < current_summary:
+        return False
+    normalized = json.loads(json.dumps(current))
+    normalized_selection = normalized.get("selection")
+    if not isinstance(normalized_selection, dict):
+        return False
+    normalized_selection["summary_fact_ids"] = sorted(previous_summary)
+    return normalized == previous
+
+
+def reviewed_strategy_payload(record: Path, project_root: Path) -> dict[str, Any] | None:
+    """Load a currently valid approved review's frozen strategy before replacement."""
+    if selection_review_freshness(record, project_root):
+        return None
+    raw = _load_json(record, "selection review")
+    package_ref = raw.get("selection_package")
+    if not isinstance(package_ref, dict) or not isinstance(package_ref.get("path"), str):
+        return None
+    package = contained_path(project_root, package_ref["path"], "selection package")
+    return _package_strategy_payload(_load_json(package, "selection package"))
+
+
+def carry_forward_selection_review(
+    record: Path,
+    package: Path,
+    project_root: Path,
+    *,
+    added_summary_fact_ids: Sequence[str],
+) -> None:
+    """Repin an approved selection review after an additive summary-evidence change."""
+    raw = _load_json(record, "selection review")
+    package_data = _load_json(package, "selection package")
+    if raw.get("status") != "approved":
+        raise ValueError("only an approved selection review can be carried forward")
+    expected_stories = [
+        (item.get("id"), item.get("selected"))
+        for item in package_data.get("stories", [])
+        if isinstance(item, dict)
+    ]
+    actual_stories = [
+        (item.get("id"), item.get("selected"))
+        for item in raw.get("stories", [])
+        if isinstance(item, dict)
+    ]
+    expected_exclusions = [
+        item.get("fact_id")
+        for item in package_data.get("review_context", {}).get("exclusions", [])
+        if isinstance(item, dict)
+    ]
+    actual_exclusions = [
+        item.get("fact_id") for item in raw.get("exclusions", []) if isinstance(item, dict)
+    ]
+    expected_arcs = [
+        item.get("role_ids") for item in package_data.get("role_arcs", []) if isinstance(item, dict)
+    ]
+    actual_arcs = [
+        item.get("role_ids") for item in raw.get("role_arcs", []) if isinstance(item, dict)
+    ]
+    if (
+        actual_stories != expected_stories
+        or actual_exclusions != expected_exclusions
+        or actual_arcs != expected_arcs
+    ):
+        raise ValueError("selection review cannot be carried across a changed strategy inventory")
+    inputs = package_data.get("inputs")
+    if not isinstance(inputs, dict):
+        raise ValueError("selection package inputs are invalid")
+    carried = {
+        **raw,
+        "finalized_at": datetime.now(timezone.utc).isoformat(),
+        "selection_package": _path_record(package, project_root),
+        "inputs": inputs,
+        "role_balance": package_data.get("role_balance"),
+        "carried_forward": {
+            "reason": "additive-summary-evidence-only",
+            "added_summary_fact_ids": sorted(set(added_summary_fact_ids)),
+        },
+    }
+    atomic_write_json(record, carried)
 
 
 def _normalized_core_job(value: object) -> object:

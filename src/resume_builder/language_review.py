@@ -33,6 +33,12 @@ LANGUAGE_REVIEW_STANDARD = {
         "deliverable, operation, or change. Reject a grammatically complete but "
         "semantically generic object when the reader still cannot tell what work occurred."
     ),
+    "summary_inventory_rule": (
+        "Reject a summary sentence whose main function is to inventory technologies, "
+        "capabilities, responsibilities, or matched requirements. A summary must establish "
+        "a clear hiring position and use only the limited detail needed to support it; move "
+        "secondary retrieval terms to experience or technical skills."
+    ),
     "boundary": (
         "Apply these rules through contextual meaning, not exact-word matching, a "
         "banned-term list, or a requirement to explain every implementation detail."

@@ -667,6 +667,8 @@ def test_resume_quality_contract_teaches_principles_not_copywriting() -> None:
     assert "Apply a one-point budget" in quality
     assert "normally carry no more than two supporting details" in normalized_quality
     assert "three or more parallel items" in normalized_quality
+    assert "main function is to inventory" in normalized_quality
+    assert "judge the sentence by its function" in normalized_quality
     assert "Would a capable manager plausibly use this language" in normalized_quality
     assert "Do not enforce a banned-word list" in normalized_quality
     assert "direct relationships over constructed modifiers" in normalized_quality

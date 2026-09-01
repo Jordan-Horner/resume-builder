@@ -817,6 +817,7 @@ def test_language_review_reuses_unchanged_approved_blocks(tmp_path: Path) -> Non
         "system, deliverable, operation, or change"
         in cold["review_standard"]["concrete_object_rule"]
     )
+    assert "main function is to inventory" in cold["review_standard"]["summary_inventory_rule"]
     assert "exact-word matching" in cold["review_standard"]["boundary"]
     assert "banned-term list" in cold["review_standard"]["boundary"]
 
@@ -1733,6 +1734,78 @@ def test_semantically_identical_package_rewrite_does_not_reopen_selection_review
         == []
     )
     assert selection_review.selection_review_freshness(record, tmp_path) == []
+
+
+def test_additive_summary_evidence_carries_selection_review_forward(tmp_path: Path) -> None:
+    vault, resume = project(tmp_path)
+    compilation.build_resume(resume, vault_root=vault)
+    record = approve_selection_review(tmp_path, resume)
+    original_plan = synthesis.load_synthesis_plan(
+        tmp_path / "resumes" / "plans" / "support-operations.yaml",
+        tmp_path,
+        vault,
+    )
+    original_manifest = json.loads(
+        (tmp_path / "build" / "resumes" / resume.stem / "resume.manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    selection_guard.write_selection_seal(
+        tmp_path,
+        resume,
+        selection_guard.build_selection(original_plan, original_manifest["synthesis"]),
+        record,
+    )
+    new_fact = vault / "facts" / "profile" / "PROFILE-004.md"
+    new_fact.write_text(
+        (vault / "facts" / "profile" / "PROFILE-003.md")
+        .read_text(encoding="utf-8")
+        .replace("PROFILE-003", "PROFILE-004", 1),
+        encoding="utf-8",
+    )
+    plan = tmp_path / "resumes" / "plans" / "support-operations.yaml"
+    plan.write_text(
+        plan.read_text(encoding="utf-8").replace(
+            "summary_fact_ids: [PROFILE-003]",
+            "summary_fact_ids: [PROFILE-003, PROFILE-004]",
+        ),
+        encoding="utf-8",
+    )
+    resume.write_text(
+        resume.read_text(encoding="utf-8").replace(
+            "<!-- evidence: PROFILE-003 -->",
+            "<!-- evidence: PROFILE-003 PROFILE-004 -->",
+            1,
+        ),
+        encoding="utf-8",
+    )
+    compilation.build_resume(resume, vault_root=vault)
+    write_language_review(tmp_path, resume)
+
+    verified = verification.verify_resume(
+        resume,
+        vault_root=vault,
+        skip_vault_validation=True,
+    )
+
+    assert verified["checks"]["selection_review"]["status"] == "approved"
+    carried = json.loads(record.read_text(encoding="utf-8"))
+    assert carried["carried_forward"] == {
+        "reason": "additive-summary-evidence-only",
+        "added_summary_fact_ids": ["PROFILE-004"],
+    }
+
+
+def test_non_summary_strategy_change_does_not_carry_selection_review(tmp_path: Path) -> None:
+    previous = {
+        "selection": {"summary_fact_ids": ["FACT-001"], "stories": []},
+        "concept_fit": [],
+    }
+    current = json.loads(json.dumps(previous))
+    current["selection"]["summary_fact_ids"].append("FACT-002")
+    current["concept_fit"].append({"concept_id": "new-risk"})
+
+    assert selection_review.additive_summary_evidence_only(previous, current) is False
 
 
 def test_wording_only_edit_carries_forward_sealed_career_judgment(

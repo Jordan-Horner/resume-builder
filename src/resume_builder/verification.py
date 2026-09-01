@@ -26,10 +26,14 @@ from .review_records import (
 )
 from .selection_guard import build_selection, guard_selection
 from .selection_review import (
+    additive_summary_evidence_only,
     build_selection_review_package,
+    carry_forward_selection_review,
+    reviewed_strategy_payload,
     selection_review_freshness,
     selection_review_paths,
     selection_strategy_digest,
+    selection_strategy_payload,
 )
 from .synthesis import load_synthesis_plan
 from .validation import validate_vault
@@ -313,6 +317,8 @@ def verify_resume(
         synthesis,
         target=_optional_path_record(target_path, project_root),
     )
+    selection_paths = selection_review_paths(project_root, resume_path)
+    previous_strategy = reviewed_strategy_payload(selection_paths["record"], project_root)
     selection_guard = guard_selection(project_root, resume_path, selection)
     if (
         role_balance.get("status") == "reviewer-decision"
@@ -336,7 +342,30 @@ def verify_resume(
         role_balance=role_balance,
     )
     strategy_sha256 = selection_strategy_digest(plan, selection)
-    selection_paths = selection_review_paths(project_root, resume_path)
+    current_strategy = selection_strategy_payload(plan, selection)
+    if (
+        previous_strategy is not None
+        and selection_guard.get("status") == "selection-preserved"
+        and additive_summary_evidence_only(previous_strategy, current_strategy)
+    ):
+        previous_selection = previous_strategy.get("selection")
+        current_selection = current_strategy.get("selection")
+        previous_summary = set(
+            previous_selection.get("summary_fact_ids", [])
+            if isinstance(previous_selection, dict)
+            else []
+        )
+        current_summary = set(
+            current_selection.get("summary_fact_ids", [])
+            if isinstance(current_selection, dict)
+            else []
+        )
+        carry_forward_selection_review(
+            selection_paths["record"],
+            selection_package,
+            project_root,
+            added_summary_fact_ids=sorted(current_summary - previous_summary),
+        )
     selection_reasons = selection_review_freshness(
         selection_paths["record"],
         project_root,

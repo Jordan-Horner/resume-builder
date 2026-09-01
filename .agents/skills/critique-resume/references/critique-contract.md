@@ -460,6 +460,12 @@ tradeoff with `resume-builder review strategy-approve`. Reviewer criticism,
 page pressure, and a cleaner score are not strategy approval. Do not replace
 this concrete change gate with a quality score that can be optimized by
 shrinking the document.
+Adding canonical evidence to an existing summary claim does not reopen the
+independent selection review when the target, concept fit, reviewer risks,
+selected and omitted stories, exclusions, and role arcs are otherwise exactly
+unchanged. Carry the approved selection decisions forward with an explicit
+`additive-summary-evidence-only` audit marker. The changed summary still needs
+its normal independent language check and any route-required career review.
 When the compiled build uses accepted rules or open feedback revisions, the generated decisions
 file uses version 3. It retains version 2 wording repairs and adds a separate
 `feedback_review` populated from the evidence appendix. Complete the cold
