@@ -318,9 +318,7 @@ def test_exact_wording_requires_explicit_acceptance_opt_in(
     assert result["route"] == "memory+wording"
     assert result["preferred_sentence"] == sentence
     rule = json.loads(
-        (tmp_path / "editorial" / "rules" / f"{result['rule']}.json").read_text(
-            encoding="utf-8"
-        )
+        (tmp_path / "editorial" / "rules" / f"{result['rule']}.json").read_text(encoding="utf-8")
     )
     assert rule["revisions"][0]["preferred_examples"] == [sentence]
 
