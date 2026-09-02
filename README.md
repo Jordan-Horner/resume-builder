@@ -166,18 +166,21 @@ preferences stay under the private workspace.
 
 ```bash
 resume-builder jobs update
+resume-builder jobs new
 resume-builder jobs status
 resume-builder jobs shortlist
 resume-builder jobs screen <job-id>
 ```
 
 `update` collects from enabled providers and preserves valid jobs even when they
-do not match the current work-mode preference. `shortlist` cheaply separates
+do not match the current work-mode preference. `new` performs that refresh and
+returns only active canonical jobs that were not already present in the database;
+it does not recycle the existing backlog. `shortlist` cheaply separates
 interest, constraints, and exact resume keyword visibility across the active
 inventory. It reuses unchanged analyses based on posting, resume, preference,
 and prescreen versions. It also writes `job-search/jobs-review.csv`, a compact
 title/company/salary queue sorted by title and descending salary. Personal
-work-mode, location, title, company, and salary filters affect this review queue
+work-mode, location, title, company, salary, and per-job disposition filters affect this review queue
 without deleting jobs from inventory. Location include/exclude terms and the
 unknown-location policy are configurable in `job-search/preferences.yml` for
 different countries and regions. An optional seniority gate can retain senior

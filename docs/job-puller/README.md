@@ -60,10 +60,26 @@ From a discovered Resume Builder workspace, prefer the unified commands:
 ```bash
 resume-builder jobs update
 resume-builder jobs update --provider indeed
+resume-builder jobs new
+resume-builder jobs new --provider indeed
 resume-builder jobs status
 resume-builder jobs shortlist
 resume-builder jobs screen <job-id>
 ```
+
+Use `jobs new` for recurring discovery. It snapshots every canonical job ID in
+the database, refreshes the selected providers, and writes a shortlist containing
+only active canonical jobs that did not exist before that refresh. Existing,
+updated, reopened, and cross-source duplicate jobs are not new. The command
+writes `job-search/latest-refresh.json`, `job-search/new-jobs.json`, and
+`job-search/new-jobs.md`. An interrupted refresh leaves an `in_progress`
+manifest and the next run recovers canonical jobs created after that interrupted
+run began. A provider failure produces a failed or explicitly partial result
+instead of falling back to the prior shortlist.
+
+The provider scrape summary reports `new_observations`, which counts newly seen
+provider records and must not be interpreted as newly created canonical jobs.
+`jobs new` is the canonical database-delta view.
 
 `jobs shortlist` also creates `job-search/jobs-review.csv`, containing only jobs
 eligible under the current personal review filters. Configure hard title terms,
@@ -72,6 +88,8 @@ work modes, minimum salary, and optional senior-title role families in the
 private `job-search/preferences.yml`.
 Filtering never deletes collected inventory, so changing a preference can make
 previously hidden jobs visible again without another provider request.
+Prescreen reuse is invalidated when any decision-relevant inventory field changes,
+including a corrected location, work mode, salary, title, company, or description.
 
 Repeat `--provider` to update a selected group. Omitting it runs every enabled provider.
 

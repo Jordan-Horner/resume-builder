@@ -129,6 +129,11 @@ indexes. The scripts under
   or quickly evaluate one real job before deciding whether to invest in formal
   matching or tailoring. Keep the screen read-only and within its one-page
   output contract.
+- When the user asks to check for new jobs, run `resume-builder jobs new` and
+  show only its canonical database delta. Do not substitute general web-search
+  results when that refresh fails or is interrupted. Use the full shortlist or
+  independent web discovery only when the user explicitly asks to reconsider
+  existing inventory or broaden discovery beyond the configured providers.
 - Run the independent natural-language portion of the career-professional
   review for every new resume and every changed narrative block. Use the
   standalone `review language-package` and `review language-finalize` path so

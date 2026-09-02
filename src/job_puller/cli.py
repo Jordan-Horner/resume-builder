@@ -189,7 +189,7 @@ def main(argv: list[str] | None = None) -> int:
         state = "EMPTY" if summary.suspicious_empty else "OK" if summary.success else "FAILED"
         print(
             f"[{state}] {summary.source_key}: fetched={summary.fetched} "
-            f"new={summary.inserted} updated={summary.updated}"
+            f"new_observations={summary.inserted} updated_observations={summary.updated}"
         )
         if summary.metrics:
             print(

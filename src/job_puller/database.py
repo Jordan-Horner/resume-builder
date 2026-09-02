@@ -1060,6 +1060,44 @@ class InventoryDatabase:
                 ).fetchone()[0],
             }
 
+    def job_ids(self) -> set[str]:
+        """Return every canonical job ID, including inactive and reopened jobs."""
+        with self.connect() as conn:
+            return {str(row[0]) for row in conn.execute("SELECT id FROM jobs")}
+
+    def active_job_ids_first_seen_since(self, started_at: datetime) -> set[str]:
+        """Return active canonical jobs first created after an interrupted refresh began."""
+        with self.connect() as conn:
+            return {
+                str(row[0])
+                for row in conn.execute(
+                    """SELECT id FROM jobs
+                       WHERE status IN ('active','reopened') AND first_seen_at >= ?""",
+                    (_iso(started_at),),
+                )
+            }
+
+    def scrape_runs_since(self, started_at: datetime) -> list[dict[str, object]]:
+        """Return provider coverage recorded during one orchestration refresh."""
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT source_key, provider, success, suspicious_empty, error
+                   FROM scrape_runs
+                   WHERE started_at >= ?
+                   ORDER BY started_at, id""",
+                (_iso(started_at),),
+            ).fetchall()
+        return [
+            {
+                "source_key": str(row[0]),
+                "provider": str(row[1]),
+                "success": bool(row[2]),
+                "suspicious_empty": bool(row[3]),
+                "error": row[4],
+            }
+            for row in rows
+        ]
+
     def active_inventory(self) -> list[dict[str, object]]:
         """Return the stable, consumer-facing active inventory projection."""
         with self.connect() as conn:

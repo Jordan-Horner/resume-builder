@@ -10,6 +10,7 @@ import json
 import re
 import sys
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -25,7 +26,10 @@ DEFAULT_CONFIG = Path("job-search/config/search.yml")
 DEFAULT_PREFERENCES = Path("job-search/preferences.yml")
 DEFAULT_OUTPUT = Path("job-search/shortlist.json")
 DEFAULT_REVIEW_OUTPUT = Path("job-search/jobs-review.csv")
-PRESCREEN_VERSION = 3
+DEFAULT_NEW_OUTPUT = Path("job-search/new-jobs.json")
+DEFAULT_NEW_REVIEW_OUTPUT = Path("job-search/new-jobs-review.csv")
+DEFAULT_LATEST_REFRESH = Path("job-search/latest-refresh.json")
+PRESCREEN_VERSION = 4
 TOKEN = re.compile(r"[a-z][a-z0-9+#.]{2,}")
 PHRASE_TOKEN = re.compile(r"[a-z0-9]+")
 STOPWORDS = {
@@ -61,6 +65,11 @@ def parser() -> argparse.ArgumentParser:
     commands = command_parser.add_subparsers(dest="command", required=True)
     update = commands.add_parser("update", help="Run enabled inventory providers")
     update.add_argument("--provider", action="append")
+    new = commands.add_parser(
+        "new", help="Refresh providers and shortlist only jobs new to the canonical database"
+    )
+    new.add_argument("--provider", action="append")
+    new.add_argument("--limit", type=int, default=50)
     commands.add_parser("status", help="Show inventory and shortlist status")
     shortlist = commands.add_parser("shortlist", help="Prescreen new or changed active jobs")
     shortlist.add_argument("--limit", type=int, default=50)
@@ -97,6 +106,7 @@ def _load_preferences(path: Path) -> dict[str, Any]:
         "accepted_senior_role_terms",
         "unwanted_title_terms",
         "excluded_companies",
+        "job_dispositions",
         "accepted_location_terms",
         "excluded_location_terms",
         "include_unknown_locations",
@@ -131,11 +141,36 @@ def _load_preferences(path: Path) -> dict[str, Any]:
     include_unknown = payload.get("include_unknown_locations", True)
     if not isinstance(include_unknown, bool):
         raise ValueError("include_unknown_locations must be true or false")
+    dispositions = payload.get("job_dispositions", {})
+    if not isinstance(dispositions, dict) or any(
+        not isinstance(job_id, str)
+        or not isinstance(status, str)
+        or status not in {"applied", "not_interested"}
+        for job_id, status in dispositions.items()
+    ):
+        raise ValueError("job_dispositions must map job IDs to applied or not_interested")
     return payload
 
 
 def _hash_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _prescreen_job_hash(job: dict[str, Any]) -> str:
+    """Hash every inventory field that can change a prescreen decision or output."""
+    fields = (
+        "title",
+        "company",
+        "location",
+        "work_modes",
+        "description_hash",
+        "description_quality",
+        "salary_min",
+        "salary_max",
+        "salary_currency",
+        "salary_interval",
+    )
+    return _hash_text(json.dumps({field: job.get(field) for field in fields}, sort_keys=True))
 
 
 def _resume_corpus(preferences: dict[str, Any]) -> tuple[str, str]:
@@ -222,6 +257,10 @@ def _prescreen(
     seniority_match = not seniority or bool(accepted_senior_role)
     unwanted = _contains_any(title, preferences.get("unwanted_title_terms", []))
     excluded_company = _contains_any(company, preferences.get("excluded_companies", []))
+    dispositions = preferences.get("job_dispositions", {})
+    disposition = (
+        dispositions.get(str(job.get("id") or "")) if isinstance(dispositions, dict) else None
+    )
     location = str(job.get("location") or "")
     accepted_location = _contains_phrases(location, preferences.get("accepted_location_terms", []))
     excluded_location = _contains_phrases(location, preferences.get("excluded_location_terms", []))
@@ -249,12 +288,15 @@ def _prescreen(
         and not excluded_title
         and seniority_match
         and not excluded_company
+        and not disposition
         and mode_match
         and location_match
         and not salary_below
     )
 
-    if (
+    if disposition:
+        category = str(disposition).replace("_", " ").upper()
+    elif (
         excluded_title
         or not seniority_match
         or excluded_company
@@ -289,6 +331,7 @@ def _prescreen(
             "accepted_senior_role_terms": accepted_senior_role,
             "seniority_match": seniority_match,
             "excluded_company": bool(excluded_company),
+            "disposition": disposition,
             "salary_below_minimum": salary_below,
             "unwanted_title_terms": unwanted,
         },
@@ -300,11 +343,19 @@ def _prescreen(
     }
 
 
-def _shortlist(config_path: Path, preferences_path: Path, limit: int) -> int:
+def _shortlist(
+    config_path: Path,
+    preferences_path: Path,
+    limit: int,
+    *,
+    included_job_ids: set[str] | None = None,
+    output_path: Path = DEFAULT_OUTPUT,
+    review_output_path: Path = DEFAULT_REVIEW_OUTPUT,
+    heading: str = "Job Shortlist",
+) -> int:
     preferences = _load_preferences(preferences_path)
     resume_text, resume_hash = _resume_corpus(preferences)
     preference_hash = _hash_text(json.dumps(preferences, sort_keys=True))
-    output_path = DEFAULT_OUTPUT
     prior: dict[str, dict[str, Any]] = {}
     if output_path.exists():
         payload = json.loads(output_path.read_text(encoding="utf-8"))
@@ -314,12 +365,14 @@ def _shortlist(config_path: Path, preferences_path: Path, limit: int) -> int:
     resume_terms = _terms(resume_text)
     for inventory_job in _database(config_path).active_inventory():
         job: dict[str, Any] = inventory_job
+        if included_job_ids is not None and str(job["id"]) not in included_job_ids:
+            continue
         key = _hash_text(
             "|".join(
                 (
                     str(PRESCREEN_VERSION),
                     str(job["id"]),
-                    str(job["description_hash"]),
+                    _prescreen_job_hash(job),
                     resume_hash,
                     preference_hash,
                 )
@@ -340,6 +393,8 @@ def _shortlist(config_path: Path, preferences_path: Path, limit: int) -> int:
         "NEEDS REVIEW": 3,
         "EASY BUT UNWANTED": 4,
         "SKIP": 5,
+        "APPLIED": 6,
+        "NOT INTERESTED": 7,
     }
     results.sort(
         key=lambda item: (
@@ -356,19 +411,122 @@ def _shortlist(config_path: Path, preferences_path: Path, limit: int) -> int:
         "jobs": results,
     }
     atomic_write_json(output_path, payload)
-    review_count = _write_review_csv(results, DEFAULT_REVIEW_OUTPUT)
-    lines = ["# Job Shortlist", "", f"Active jobs: {len(results)}; reused: {reused}", ""]
-    for item in results[: max(1, limit)]:
+    review_count = _write_review_csv(results, review_output_path)
+    visible_results = [
+        item for item in results if not item["prescreen"]["constraints"].get("disposition")
+    ]
+    count_label = "Active jobs" if included_job_ids is None else "Jobs in this refresh"
+    lines = [f"# {heading}", "", f"{count_label}: {len(results)}; reused: {reused}", ""]
+    for item in visible_results[: max(1, limit)]:
         screen = item["prescreen"]
         lines.append(
             f"- **{screen['category']}** — {item['title']} at {item['company']} "
             f"(keyword readiness {screen['keyword_readiness']['percent']}%) — {item['id']}"
         )
     atomic_write_text(output_path.with_suffix(".md"), "\n".join(lines) + "\n")
-    print(f"Prescreened {len(results)} active jobs; reused {reused} unchanged analyses.")
+    print(f"Prescreened {len(results)} jobs; reused {reused} unchanged analyses.")
     print(f"Shortlist: {output_path.with_suffix('.md')}")
-    print(f"Review queue: {DEFAULT_REVIEW_OUTPUT} ({review_count} jobs)")
+    print(f"Review queue: {review_output_path} ({review_count} jobs)")
     return 0
+
+
+def _provider_args(config_path: Path, providers: list[str] | None) -> list[str]:
+    forwarded = ["--config", str(config_path), "scrape"]
+    for provider in providers or []:
+        forwarded.extend(("--provider", provider))
+    return forwarded
+
+
+def _recover_pending_new_job_ids(database: InventoryDatabase) -> set[str]:
+    if not DEFAULT_LATEST_REFRESH.exists():
+        return set()
+    prior = json.loads(DEFAULT_LATEST_REFRESH.read_text(encoding="utf-8"))
+    if prior.get("status") == "processing":
+        values = prior.get("new_to_database_job_ids", [])
+        return {str(value) for value in values if isinstance(value, str)}
+    if prior.get("status") != "in_progress":
+        return set()
+    started_at = prior.get("started_at")
+    if not isinstance(started_at, str):
+        return set()
+    return database.active_job_ids_first_seen_since(datetime.fromisoformat(started_at))
+
+
+def _new_jobs(
+    config_path: Path,
+    preferences_path: Path,
+    limit: int,
+    providers: list[str] | None,
+) -> int:
+    database = _database(config_path)
+    recovered_job_ids = _recover_pending_new_job_ids(database)
+    before_ids = database.job_ids()
+    started_at = datetime.now(UTC)
+    selected_providers = sorted(set(providers or []))
+    manifest: dict[str, object] = {
+        "schema_version": 1,
+        "status": "in_progress",
+        "started_at": started_at.isoformat(),
+        "completed_at": None,
+        "provider_selection": selected_providers or ["all_enabled"],
+        "new_to_database_job_ids": [],
+    }
+    atomic_write_json(DEFAULT_LATEST_REFRESH, manifest)
+
+    refresh_status = puller_main(_provider_args(config_path, providers))
+    after_ids = database.job_ids()
+    active_ids = {str(job["id"]) for job in database.active_inventory()}
+    provider_runs = database.scrape_runs_since(started_at)
+    new_job_ids = sorted((((after_ids - before_ids) & active_ids) | recovered_job_ids) & active_ids)
+    has_successful_provider = any(
+        run.get("success") and not run.get("suspicious_empty") for run in provider_runs
+    )
+    outcome = (
+        "complete"
+        if refresh_status == 0
+        else "partial"
+        if has_successful_provider or new_job_ids
+        else "failed"
+    )
+    manifest.update(
+        {
+            "status": "processing",
+            "completed_at": datetime.now(UTC).isoformat(),
+            "refresh_exit_code": refresh_status,
+            "provider_runs": provider_runs,
+            "recovered_job_ids": sorted(recovered_job_ids),
+            "new_to_database_job_ids": new_job_ids,
+        }
+    )
+    atomic_write_json(DEFAULT_LATEST_REFRESH, manifest)
+
+    heading = {
+        "complete": "New Jobs",
+        "partial": "New Jobs — Partial Refresh",
+        "failed": "New Jobs — Refresh Failed",
+    }[outcome]
+    _shortlist(
+        config_path,
+        preferences_path,
+        limit,
+        included_job_ids=set(new_job_ids),
+        output_path=DEFAULT_NEW_OUTPUT,
+        review_output_path=DEFAULT_NEW_REVIEW_OUTPUT,
+        heading=heading,
+    )
+    manifest["status"] = outcome
+    atomic_write_json(DEFAULT_LATEST_REFRESH, manifest)
+    if outcome == "complete":
+        print(f"New to database: {len(new_job_ids)} job(s).")
+    elif outcome == "partial":
+        print(
+            f"Partial refresh: {len(new_job_ids)} new job(s) were found, but provider coverage "
+            "was incomplete.",
+            file=sys.stderr,
+        )
+    else:
+        print("Refresh failed; no complete new-job result is available.", file=sys.stderr)
+    return refresh_status
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -376,10 +534,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     config_path = args.config.expanduser()
     try:
         if args.command == "update":
-            forwarded = ["--config", str(config_path), "scrape"]
-            for provider in args.provider or []:
-                forwarded.extend(("--provider", provider))
-            return puller_main(forwarded)
+            return puller_main(_provider_args(config_path, args.provider))
+        if args.command == "new":
+            return _new_jobs(config_path, args.preferences.expanduser(), args.limit, args.provider)
         if args.command == "status":
             stats = _database(config_path).stats()
             for key, value in stats.items():

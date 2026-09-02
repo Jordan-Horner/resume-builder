@@ -25,6 +25,9 @@ unwanted_title_terms:
   - desktop technician
   - field service technician
 excluded_companies: []
+# Suppress only an exact opening while retaining future roles from the company.
+# Values: applied or not_interested.
+job_dispositions: {}
 accepted_location_terms: []
 excluded_location_terms: []
 include_unknown_locations: true

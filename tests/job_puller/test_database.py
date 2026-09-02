@@ -66,6 +66,46 @@ def test_active_inventory_exposes_stable_consumer_projection(tmp_path):
     assert inventory[0]["url"] == "https://example.com/apply/1"
 
 
+def test_job_ids_include_inactive_canonical_jobs(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    db.record_result(result(observation()))
+    job_id = next(iter(db.job_ids()))
+    with db.connect() as conn:
+        conn.execute("UPDATE jobs SET status='closed' WHERE id=?", (job_id,))
+
+    assert db.active_inventory() == []
+    assert db.job_ids() == {job_id}
+
+
+def test_active_job_ids_first_seen_since_excludes_historical_and_closed_jobs(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    started_at = datetime.now(UTC) - timedelta(minutes=1)
+    db.record_result(result(observation(job_id="new")))
+    active_id = next(iter(db.job_ids()))
+    closed = observation(job_id="closed", source="https://example.com/closed")
+    closed.company = "Closed Example, Inc."
+    db.record_result(result(closed))
+    closed_id = next(job_id for job_id in db.job_ids() if job_id != active_id)
+    recent = observation(
+        job_id="recent",
+        source="https://example.com/recent",
+        description="Distinct recent infrastructure engineering description. ",
+    )
+    recent.company = "Recent Example, Inc."
+    db.record_result(result(recent))
+    recent_id = next(job_id for job_id in db.job_ids() if job_id not in {active_id, closed_id})
+    with db.connect() as conn:
+        conn.execute("UPDATE jobs SET status='closed' WHERE id=?", (closed_id,))
+        conn.execute(
+            "UPDATE jobs SET first_seen_at=? WHERE id=?",
+            ((started_at - timedelta(days=1)).isoformat(), active_id),
+        )
+
+    assert db.active_job_ids_first_seen_since(started_at) == {recent_id}
+
+
 def test_run_metrics_are_persisted(tmp_path):
     db = InventoryDatabase(tmp_path / "inventory.db")
     db.migrate()
@@ -75,6 +115,25 @@ def test_run_metrics_are_persisted(tmp_path):
     with db.connect() as conn:
         stored = conn.execute("SELECT metrics_json FROM scrape_runs").fetchone()[0]
     assert json.loads(stored) == run.metrics
+
+
+def test_scrape_runs_since_reports_provider_coverage(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    started_at = datetime.now(UTC) - timedelta(minutes=1)
+    db.record_result(result(observation()))
+
+    runs = db.scrape_runs_since(started_at)
+
+    assert runs == [
+        {
+            "source_key": "test:linkedin",
+            "provider": "linkedin",
+            "success": True,
+            "suspicious_empty": False,
+            "error": None,
+        }
+    ]
 
 
 def test_existing_v1_database_migrates_to_run_metrics(tmp_path):
