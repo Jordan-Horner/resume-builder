@@ -11,6 +11,8 @@ from typing import Any
 
 from pypdf import PdfReader
 
+from .ats_readability import build_ats_readability_report
+
 BAD_GLYPHS = re.compile(r"[\ufb00-\ufb06\ufffd\u25a1]")
 
 
@@ -96,7 +98,9 @@ def audit_pdf(path: Path, payload: dict[str, Any]) -> dict[str, Any]:
     """Require usable text on every page and preservation of every factual block."""
     try:
         reader = PdfReader(path)
+        encrypted = reader.is_encrypted
         pages = [page.extract_text() or "" for page in reader.pages]
+        image_objects = sum(len(page.images) for page in reader.pages)
     except Exception as exc:
         raise ValueError(f"PDF extraction audit failed: {exc}") from exc
     if not pages:
@@ -105,18 +109,29 @@ def audit_pdf(path: Path, payload: dict[str, Any]) -> dict[str, Any]:
     if empty_pages:
         raise ValueError(f"PDF extraction audit failed: pages have no text: {empty_pages}")
     extracted = "\n".join(pages)
-    if BAD_GLYPHS.search(extracted):
-        raise ValueError("PDF extraction audit failed: unsupported or replacement glyph detected")
+    bad_glyphs = bool(BAD_GLYPHS.search(extracted))
     missing: list[str] = []
     for owner, claim in extraction_blocks(payload):
         if not tokens_recovered(claim, extracted):
             missing.append(owner)
-    if missing:
-        raise ValueError(f"PDF extraction audit failed: factual blocks not recoverable: {missing}")
+    readability = build_ats_readability_report(
+        pages,
+        payload,
+        missing_blocks=missing,
+        bad_glyphs=bad_glyphs,
+        encrypted=encrypted,
+        image_objects=image_objects,
+        file_size_bytes=path.stat().st_size,
+    )
+    if readability["status"] != "PASS":
+        raise ValueError(
+            "ATS readability audit failed: " + ", ".join(readability["blocking_failures"])
+        )
     return {
         "pages": len(pages),
         "extractable_pages": len(pages),
         "claims_recovered": len(extraction_blocks(payload)),
+        "ats_readability": readability,
     }
 
 

@@ -241,6 +241,25 @@ promote a recent supporting feature over stronger target evidence, and do not
 plan summary language as a compensating keyword list for `partial`,
 `undecidable`, or unsupported criteria.
 
+Also plan the opening qualification signal. Prefer directly relevant experience
+and supported scope, using years only when duration materially strengthens the
+target argument. Let relevant education or certifications qualify the candidate
+only when required, differentiating, or stronger than the available experience
+signal; experience ranks first when both apply. Then plan the transition from
+qualification to what the candidate has actually done and the representative
+proof that makes it credible. Do not force a title-plus-years sentence or treat
+general career duration as target-role experience.
+
+Tie the planned identity to `target_mode`. For `direct`, use the demonstrated
+target operating domain rather than mechanically repeating a formal title from
+an adjacent lane. For `adjacent`, name the evidence-supported bridge and
+operating context without claiming the target role. For `exploratory`, plan a
+proof-led opening instead of a target identity. Record why the qualification is
+supported and require the drafted opener to pass the quality contract's
+role-family positioning test. A broad career label is not safer when it
+hides stronger direct evidence and causes the reader to classify the candidate
+for the wrong work.
+
 Also state the candidate-centered operating pattern that should organize those
 facts and select normally one representative proof anchor. The plan must not
 translate the target criteria into a sentence checklist. Record which matched

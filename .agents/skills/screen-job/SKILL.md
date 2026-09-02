@@ -24,8 +24,9 @@ every screen.
 1. Confirm that one real posting is in scope. Accept a URL, pasted description,
    supplied file, existing record under `targets/`, or an inventory job ID. For
    an inventory ID, run `resume-builder jobs screen <job-id>` from the workspace
-   and use its preserved description, source URL, provider provenance, and
-   prescreen evidence. A title alone is not enough.
+   and use its preserved description, source URL, direct application URL when
+   available, provider provenance, and prescreen evidence. A title alone is not
+   enough.
 2. Read the complete posting. For Greenhouse and Ashby URLs, first run
    `python .agents/skills/screen-job/scripts/fetch_posting.py <url>` to use the
    provider's public job-board API. For other providers or an API failure, try a
@@ -60,11 +61,13 @@ every screen.
    outside the workspace and run `resume-builder match classify` before writing
    the screen. Use its label unchanged. Do not persist the posting, candidate
    evidence, or classification case merely to screen.
-6. Give the compact contract output. Lead with `Match` immediately after the
-   title, then show the closest resume, strongest overlap, primary gap, and ATS
-   visibility as short scan-friendly lines. Never add a separate recommendation
-   label or sections titled "Is this a stretch?" or "Do you have a matching
-   resume?"
+6. Give the compact contract output. Put the canonical application link in the
+   title using the contract's short `Apply ↗` label, preferring a verified
+   direct-employer application URL over an aggregator or discovery URL. Lead
+   with `Match` immediately after the title, then show the closest resume,
+   strongest overlap, primary gap, and ATS visibility as short scan-friendly
+   lines. Never add a separate recommendation label or sections titled "Is this
+   a stretch?" or "Do you have a matching resume?"
 7. Ask no more than three short questions, and only when an answer could change
    the match or immediate next action, materially improve the match, or capture
    a valuable reusable story. Search canonical facts and registered source

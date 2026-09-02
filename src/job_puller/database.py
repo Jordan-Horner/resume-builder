@@ -16,7 +16,7 @@ from .models import JobObservation, ProviderResult
 from .normalize import canonical_url, description_hash, normalized_key
 from .work_modes import WorkArrangement, WorkMode, display_work_mode
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 7
 
 MIGRATION_1 = """
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -198,12 +198,46 @@ INSERT OR IGNORE INTO job_work_modes(job_id, mode)
 SELECT id, CASE WHEN work_mode='remote' THEN 'remote' ELSE 'unknown' END FROM jobs;
 """
 
+MIGRATION_6 = """
+CREATE TABLE IF NOT EXISTS possible_reposts (
+    earlier_job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    later_job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    reason TEXT NOT NULL,
+    confidence REAL NOT NULL,
+    first_seen_gap_days INTEGER NOT NULL,
+    detected_at TEXT NOT NULL,
+    PRIMARY KEY(earlier_job_id, later_job_id),
+    CHECK(earlier_job_id<>later_job_id)
+);
+CREATE INDEX IF NOT EXISTS idx_possible_reposts_later
+ON possible_reposts(later_job_id, detected_at);
+"""
+
+MIGRATION_7 = """
+ALTER TABLE scrape_runs ADD COLUMN outcome TEXT NOT NULL DEFAULT 'failed';
+ALTER TABLE scrape_runs ADD COLUMN retryable INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE scrape_runs ADD COLUMN error_category TEXT;
+UPDATE scrape_runs SET
+    outcome=CASE
+        WHEN success=1 AND suspicious_empty=0 AND observation_count>0 THEN 'healthy'
+        WHEN success=1 AND suspicious_empty=0 THEN 'healthy-empty'
+        WHEN observation_count>0 THEN 'partial'
+        ELSE 'failed'
+    END,
+    retryable=CASE WHEN suspicious_empty=1 THEN 1 ELSE 0 END,
+    error_category=CASE WHEN suspicious_empty=1 THEN 'suspicious-empty' ELSE NULL END;
+CREATE INDEX IF NOT EXISTS idx_scrape_runs_outcome
+ON scrape_runs(outcome, completed_at);
+"""
+
 MIGRATIONS = {
     1: MIGRATION_1,
     2: MIGRATION_2,
     3: MIGRATION_3,
     4: MIGRATION_4,
     5: MIGRATION_5,
+    6: MIGRATION_6,
+    7: MIGRATION_7,
 }
 
 
@@ -554,8 +588,9 @@ class InventoryDatabase:
             conn.execute(
                 """INSERT INTO scrape_runs(
                     id, source_key, provider, started_at, completed_at, success, suspicious_empty,
-                    observation_count, inserted_count, updated_count, error, metrics_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    observation_count, inserted_count, updated_count, error, metrics_json,
+                    outcome, retryable, error_category
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     run_id,
                     result.source_key,
@@ -569,6 +604,9 @@ class InventoryDatabase:
                     updated,
                     result.error,
                     json.dumps(result.metrics, sort_keys=True),
+                    result.outcome.value,
+                    int(result.retryable),
+                    result.error_category,
                 ),
             )
             if result.success and not result.suspicious_empty:
@@ -1081,7 +1119,8 @@ class InventoryDatabase:
         """Return provider coverage recorded during one orchestration refresh."""
         with self.connect() as conn:
             rows = conn.execute(
-                """SELECT source_key, provider, success, suspicious_empty, error
+                """SELECT source_key, provider, success, suspicious_empty, error,
+                          outcome, retryable, error_category
                    FROM scrape_runs
                    WHERE started_at >= ?
                    ORDER BY started_at, id""",
@@ -1094,9 +1133,54 @@ class InventoryDatabase:
                 "success": bool(row[2]),
                 "suspicious_empty": bool(row[3]),
                 "error": row[4],
+                "outcome": str(row[5]),
+                "retryable": bool(row[6]),
+                "error_category": row[7],
             }
             for row in rows
         ]
+
+    def source_health(self) -> list[dict[str, object]]:
+        """Return one current health summary per configured source seen by the inventory."""
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT source_key, provider, completed_at, outcome, retryable,
+                          error_category, error, metrics_json
+                   FROM scrape_runs ORDER BY source_key, completed_at DESC, id DESC"""
+            ).fetchall()
+            checkpoints = {
+                str(row[0]): str(row[1])
+                for row in conn.execute(
+                    "SELECT source_key, last_success_at FROM checkpoints"
+                ).fetchall()
+            }
+        grouped: dict[str, list[sqlite3.Row]] = {}
+        for row in rows:
+            grouped.setdefault(str(row[0]), []).append(row)
+        health: list[dict[str, object]] = []
+        healthy = {"healthy", "healthy-empty", "capped"}
+        for source_key, source_rows in sorted(grouped.items()):
+            latest = source_rows[0]
+            problem_streak = 0
+            for row in source_rows:
+                if str(row[3]) in healthy:
+                    break
+                problem_streak += 1
+            health.append(
+                {
+                    "source_key": source_key,
+                    "provider": str(latest[1]),
+                    "outcome": str(latest[3]),
+                    "last_run_at": str(latest[2]),
+                    "last_success_at": checkpoints.get(source_key),
+                    "problem_streak": problem_streak,
+                    "retryable": bool(latest[4]),
+                    "error_category": latest[5],
+                    "error": latest[6],
+                    "metrics": json.loads(str(latest[7])),
+                }
+            )
+        return health
 
     def active_inventory(self) -> list[dict[str, object]]:
         """Return the stable, consumer-facing active inventory projection."""
@@ -1127,3 +1211,112 @@ class InventoryDatabase:
             item["providers"] = sorted(filter(None, set(str(item["providers"]).split(","))))
             inventory.append(item)
         return inventory
+
+    def application_candidates(self, job_ids: set[str]) -> list[dict[str, object]]:
+        """Return stable identity fields for legacy applied-job migration."""
+        if not job_ids:
+            return []
+        placeholders = ",".join("?" for _ in job_ids)
+        with self.connect() as conn:
+            rows = conn.execute(
+                f"""SELECT j.id, j.display_company AS company, j.display_title AS role,
+                            COALESCE(NULLIF(j.canonical_apply_url, ''),
+                                     MAX(NULLIF(o.direct_apply_url, '')),
+                                     MAX(o.source_url), '') AS url
+                     FROM jobs j
+                     LEFT JOIN job_observation_links l ON l.job_id=j.id
+                     LEFT JOIN observations o ON o.id=l.observation_id
+                     WHERE j.id IN ({placeholders})
+                     GROUP BY j.id ORDER BY j.id""",
+                tuple(sorted(job_ids)),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def refresh_possible_reposts(
+        self,
+        *,
+        window_days: int = 90,
+        min_span_days: int = 1,
+        aggregator_companies: set[str] | None = None,
+    ) -> list[dict[str, object]]:
+        """Derive conservative same-company, same-title repost relationships."""
+        if window_days < 1 or min_span_days < 1 or min_span_days > window_days:
+            raise ValueError("repost span must be positive and no greater than the window")
+        aggregators = {normalized_key(value) for value in (aggregator_companies or set())}
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT j.id, j.normalized_company, j.normalized_title, j.display_company,
+                          j.display_title, j.first_seen_at,
+                          COALESCE(NULLIF(j.canonical_apply_url, ''), MAX(o.canonical_source_url), '')
+                             AS representative_url,
+                          GROUP_CONCAT(DISTINCT COALESCE(NULLIF(o.provider_job_id, ''),
+                                                        o.canonical_source_url)) AS identities,
+                          j.status, j.closed_at
+                   FROM jobs j
+                   LEFT JOIN job_observation_links l ON l.job_id=j.id
+                   LEFT JOIN observations o ON o.id=l.observation_id
+                   GROUP BY j.id
+                   ORDER BY j.first_seen_at, j.id"""
+            ).fetchall()
+            candidates: list[dict[str, object]] = []
+            for left_index, earlier in enumerate(rows):
+                if str(earlier[1]) in aggregators:
+                    continue
+                earlier_seen = datetime.fromisoformat(str(earlier[5]))
+                earlier_tokens = frozenset(str(earlier[2]).split())
+                if not earlier_tokens:
+                    continue
+                for later in rows[left_index + 1 :]:
+                    if earlier[1] != later[1]:
+                        continue
+                    if earlier_tokens != frozenset(str(later[2]).split()):
+                        continue
+                    later_seen = datetime.fromisoformat(str(later[5]))
+                    gap = (later_seen.date() - earlier_seen.date()).days
+                    if gap < min_span_days or gap > window_days:
+                        continue
+                    if earlier[8] != "closed" or not earlier[9]:
+                        continue
+                    closed_at = datetime.fromisoformat(str(earlier[9]))
+                    if closed_at > later_seen:
+                        continue
+                    earlier_identities = set(str(earlier[7] or "").split(","))
+                    later_identities = set(str(later[7] or "").split(","))
+                    if earlier_identities & later_identities:
+                        continue
+                    if earlier[6] and later[6] and earlier[6] == later[6]:
+                        continue
+                    candidates.append(
+                        {
+                            "earlier_job_id": str(earlier[0]),
+                            "later_job_id": str(later[0]),
+                            "company": str(later[3]),
+                            "title": str(later[4]),
+                            "first_seen_gap_days": gap,
+                            "reason": (
+                                "same employer and exact title-token identity under a new posting "
+                                "identity after the earlier posting closed"
+                            ),
+                            "confidence": 0.85,
+                        }
+                    )
+            conn.execute("DELETE FROM possible_reposts")
+            detected_at = _iso(datetime.now(UTC))
+            conn.executemany(
+                """INSERT INTO possible_reposts(
+                       earlier_job_id, later_job_id, reason, confidence,
+                       first_seen_gap_days, detected_at
+                   ) VALUES (?, ?, ?, ?, ?, ?)""",
+                (
+                    (
+                        item["earlier_job_id"],
+                        item["later_job_id"],
+                        item["reason"],
+                        item["confidence"],
+                        item["first_seen_gap_days"],
+                        detected_at,
+                    )
+                    for item in candidates
+                ),
+            )
+        return candidates

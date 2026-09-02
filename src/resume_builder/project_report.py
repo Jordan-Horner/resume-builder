@@ -141,7 +141,7 @@ def _mint_status(resume: Path, project_root: Path) -> dict[str, Any]:
     except ValueError as exc:
         return _status("invalid", mint_path, project_root, [str(exc)])
     reasons: list[str] = []
-    if manifest.get("version") != 4 or manifest.get("phase") != "mint" or not manifest.get("valid"):
+    if manifest.get("version") != 5 or manifest.get("phase") != "mint" or not manifest.get("valid"):
         reasons.append("mint manifest does not describe a successful supported mint")
     compiler = manifest.get("compiler")
     if not isinstance(compiler, dict) or compiler.get("version") != __version__:
@@ -153,7 +153,7 @@ def _mint_status(resume: Path, project_root: Path) -> dict[str, Any]:
         pinned_keys.append("submission_output")
     if manifest.get("version") in {1, 2}:
         pinned_keys.append("review_record" if manifest.get("version") == 2 else "editorial_review")
-    if manifest.get("version") == 4:
+    if manifest.get("version") in {4, 5}:
         pinned_keys.append("language_review")
     for key in pinned_keys:
         reason = _record_freshness(manifest.get(key), project_root, f"mint {key}")
@@ -190,12 +190,16 @@ def _mint_status(resume: Path, project_root: Path) -> dict[str, Any]:
     pdf_audit = manifest.get("pdf_audit")
     extraction = pdf_audit.get("extraction") if isinstance(pdf_audit, dict) else None
     pages = extraction.get("pages") if isinstance(extraction, dict) else None
+    readability = extraction.get("ats_readability") if isinstance(extraction, dict) else None
+    if not isinstance(readability, dict) or readability.get("status") != "PASS":
+        reasons.append("mint has no successful current ATS readability report")
     return _status(
         "stale" if reasons else "current",
         mint_path,
         project_root,
         reasons,
         pages=pages,
+        ats_readability=readability,
     )
 
 

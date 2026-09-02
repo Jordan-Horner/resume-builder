@@ -295,6 +295,56 @@ writing the summary:
 4. Leave `partial`, `undecidable`, and unsupported criteria accurately bounded;
    keyword repetition cannot turn them into demonstrated fit.
 
+### Use a qualification-first opening
+
+By default, begin the visible summary with a concise, evidence-supported
+qualification statement before describing representative work. Directly
+relevant experience outranks education when both are applicable because it is
+normally the stronger hiring signal. Use a supported number of years when it
+helps establish credible scope, but duration alone cannot convert general
+career tenure into target-role experience or prove fit.
+
+The qualification must also give the reader the correct hiring frame. Do not
+default to the candidate's formal title, most recent department, or the broadest
+label that covers the whole career. A professional identity may name the target
+operating domain when sufficient direct evidence demonstrates that work, even if
+the employment titles use adjacent language. This describes the supported work;
+it does not authorize an unearned title, seniority level, or scope of ownership.
+Reject a broad prior-role identity when a recruiter would reasonably sort the
+candidate into the wrong role family despite stronger target-relevant evidence
+later in the resume.
+
+Calibrate the opening to the evidence relationship:
+
+- **Direct:** use a professional identity or operating pattern for the intended
+  role family when the selected facts sufficiently demonstrate it; do not let
+  an adjacent formal title hide that evidence.
+- **Adjacent:** name the demonstrated bridge into the target and its operating
+  context without presenting the candidate as already holding the target role.
+- **Exploratory:** lead with the strongest concrete transferable work when a
+  target identity would overstate the evidence.
+
+Apply a role-family positioning test: after reading only the opening clause,
+would a recruiter place the candidate in the intended hiring category for
+evidence-supported reasons? Revise an opener that foregrounds a legacy or
+adjacent role family, generic career tenure, or an overly broad label while
+withholding the direct evidence that makes the target credible. This is a
+contextual positioning test, not permission to copy the posting's title.
+
+Include education or certifications in the opening only when they are required,
+materially relevant, or genuinely differentiating. They may lead for an
+early-career candidate or a role whose qualification depends on specialized
+study; otherwise keep experience first. Do not force both signals into the
+opening merely because both are available.
+
+After qualifying the candidate, state what the candidate has done in the
+target-relevant operating context and anchor that account with the selected
+representative proof. The qualification-first opening controls information
+order, not sentence wording: it does not require a claimed target title, a stock
+`title + years` formula, or a list of credentials. Omit or reframe the opening
+qualification when the available signal would be weak, misleading, or less
+valuable than direct proof.
+
 Recency is a tiebreaker, not the ranking rule. A recent feature, workflow, or
 internal tool must not displace older but stronger evidence that more directly
 answers a required target criterion. The summary should not attempt to mention
@@ -342,9 +392,15 @@ Before approving a summary, apply seven additional tests:
   the purpose or question whether the current framing earns the space.
 - **Plain-direct-opening test:** Would a capable hiring manager naturally use
   this language to describe the candidate to another manager? Prefer a direct
-  role, action, object, and scope when abstract framing adds no useful meaning.
-  A conventional role-and-experience opening is acceptable when it clearly
-  resolves the framing problem.
+  qualification grounded in relevant experience, followed by the action,
+  object, and scope, when abstract framing adds no useful meaning. A
+  conventional role-and-experience opening is acceptable when it clearly
+  resolves the framing problem; it fails when general tenure or a claimed title
+  substitutes for demonstrated target-role qualification.
+- **Role-family-positioning test:** Does the opening put the candidate in the intended role
+  family using demonstrated work, or does it foreground an adjacent title,
+  legacy function, or generic umbrella label that would misclassify the
+  candidate? Correct the frame without claiming unsupported target experience.
 - **Proof-concentration test:** Does one representative anchor make the position
   believable, with at most one compact breadth or progression signal? If the
   summary recounts multiple roles or independent accomplishments, return the

@@ -175,7 +175,7 @@ def mint_resume(
     if page_error is None:
         atomic_write_bytes(submission_path, pdf_path.read_bytes())
     manifest = {
-        "version": 4,
+        "version": 5,
         "phase": "mint",
         "valid": page_error is None,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -237,6 +237,7 @@ def mint_resume(
         },
         "job_context": job_context,
         "pages": pages,
+        "ats_readability": pdf_audit["extraction"].get("ats_readability"),
         "warnings": list(build_manifest.get("warnings", [])),
     }
 

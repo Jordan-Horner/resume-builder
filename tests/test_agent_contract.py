@@ -476,6 +476,9 @@ def test_build_resume_references_define_evidence_and_regression_contracts() -> N
     assert "not minimum or maximum bullet counts" in normalized_synthesis
     assert "Follow subtraction with redistribution" in synthesis
     assert "not a visible summary of every detail inside the fact" in normalized_synthesis
+    assert "Apply the same ordering inside `summary_job`" in synthesis
+    assert "highest-value required criteria" in normalized_synthesis
+    assert "partial`, `undecidable`, or unsupported criteria" in normalized_synthesis
     assert "Run a subtraction test" in synthesis
     assert "honest lead is only `used`" in normalized_synthesis
     assert "never authorize stronger authorship or authority" in normalized_synthesis
@@ -566,6 +569,9 @@ def test_screen_job_skill_is_compact_read_only_triage() -> None:
     assert "Match" in contract
     assert "Closest resume" in contract
     assert "ATS visibility" in contract
+    assert "[Apply ↗](<canonical application URL>)" in contract
+    assert "verified direct-employer application URL" in normalized_contract
+    assert "do not repeat the application link" in normalized_contract
     assert "Undisclosed Client" in contract
     assert "never title the screen with the intermediary" in normalized_contract
     assert "integer number of years in business" in normalized_contract
@@ -580,6 +586,8 @@ def test_screen_job_skill_is_compact_read_only_triage() -> None:
     assert "job-specific benefits are absent, show `Not specified`" in normalized_contract
     assert contract.index("| **Pay**") < contract.index("| **Benefits**")
     assert "show hourly pay only when the posting states an hourly rate" in normalized_skill
+    assert "short `Apply ↗` label" in normalized_skill
+    assert "direct-employer application URL over an aggregator" in normalized_skill
     assert "Do not derive or display an hourly rate from annual compensation" in contract
     assert "general consultant FAQ does not establish benefits" in normalized_contract
     assert "roughly 350 words" in normalized_contract
@@ -645,6 +653,24 @@ def test_resume_quality_contract_teaches_principles_not_copywriting() -> None:
     assert "evidence-opportunity list" in quality
     assert "Rebuild from the expanded vault" in quality
     assert "stock title-plus-years formula" in normalized_quality
+    assert "job-value hierarchy" in normalized_quality
+    assert "required, role-defining criteria" in normalized_quality
+    assert "Recency is a tiebreaker, not the ranking rule" in normalized_quality
+    assert "why this candidate fits this specific job" in normalized_quality
+    assert "keyword repetition cannot turn them into demonstrated fit" in normalized_quality
+    assert "qualification-first opening" in normalized_quality
+    assert "Directly relevant experience outranks education" in normalized_quality
+    assert "education or certifications" in normalized_quality
+    assert "duration alone" in normalized_quality
+    assert "state what the candidate has done" in normalized_quality
+    assert "role-family positioning test" in normalized_quality
+    assert "candidate's formal title" in normalized_quality
+    assert "sufficient direct evidence" in normalized_quality
+    assert "repeated direct evidence" not in normalized_quality
+    assert "Direct:" in quality
+    assert "Adjacent:" in quality
+    assert "Exploratory:" in quality
+    assert "not permission to copy the posting's title" in normalized_quality
     assert "Competencies are optional" in quality
     assert "Calibrate specificity to the section, evidence, and intended audience" in quality
     assert "preserves decision-relevant meaning" in normalized_quality

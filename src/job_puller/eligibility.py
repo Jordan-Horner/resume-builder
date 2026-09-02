@@ -18,17 +18,30 @@ GENERIC_TITLE_TERMS = {
 }
 
 
-def title_matches(title: str, titles: list[str]) -> bool:
+def title_matches(
+    title: str,
+    titles: list[str],
+    excluded_titles: list[str] | None = None,
+) -> bool:
     normalized_title = f" {normalized_key(title)} "
-    return any(
+    accepted = any(
         f" {normalized_key(candidate)} " in normalized_title
         for candidate in titles
         if normalized_key(candidate)
     )
+    excluded = any(
+        f" {normalized_key(candidate)} " in normalized_title
+        for candidate in (excluded_titles or [])
+        if normalized_key(candidate)
+    )
+    return accepted and not excluded
 
 
-def enabled_titles(search: SearchSettings) -> list[str]:
-    return [title for family in search.families if family.enabled for title in family.titles]
+def matches_enabled_family(title: str, search: SearchSettings) -> bool:
+    return any(
+        family.enabled and title_matches(title, family.accepted_titles, family.excluded_titles)
+        for family in search.families
+    )
 
 
 def family_keyword_queries(search: SearchSettings) -> list[str]:

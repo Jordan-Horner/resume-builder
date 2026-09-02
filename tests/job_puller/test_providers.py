@@ -366,11 +366,24 @@ def test_smartrecruiters_fetches_detail():
         "postingUrl": "https://jobs.smartrecruiters.com/Example/1",
         "applyUrl": "https://jobs.smartrecruiters.com/Example/1/apply",
         "releasedDate": "2026-08-26T10:00:00Z",
-        "location": {"city": "Remote", "country": "us"},
+        "location": {
+            "city": "San Francisco",
+            "region": "CA",
+            "country": "us",
+            "remote": True,
+            "hybrid": False,
+        },
+        "compensation": {"min": 70, "max": 90, "currency": "USD", "period": "HOURLY"},
         "jobAd": {"sections": {"jobDescription": {"text": "<p>Support production APIs</p>"}}},
     }
     job = provider._fetch(FakeClient(get_payloads=[list_payload, detail_payload]), SINCE)[0]
     assert "Support production APIs" in job.description_text
+    assert job.remote is True
+    assert job.work_modes == {WorkMode.REMOTE}
+    assert job.salary_min == 70
+    assert job.salary_max == 90
+    assert job.salary_currency == "USD"
+    assert job.salary_interval == "HOURLY"
 
 
 def test_workday_uses_configured_cxs_endpoint():
@@ -514,6 +527,69 @@ def test_jobspy_adapter_normalizes_dataframe_row():
     assert job.direct_apply_url == "https://example.com/jobs/1"
 
 
+def test_jobspy_corrects_corroborated_ontario_canada_geocoding_conflict():
+    provider = JobSpyProvider(
+        "indeed",
+        CommercialProvider(),
+        SearchSettings(families=[{"name": "support", "titles": ["support engineer"]}]),
+    )
+    job = provider._normalize(
+        {
+            "id": "in-canada",
+            "title": "Senior Technical Support Engineer",
+            "company": "Example",
+            "job_url": "https://indeed.com/viewjob?jk=canada",
+            "description": (
+                "<h2>Location</h2><p>There is a strong preference for candidates "
+                "based in Ontario.</p><p>Compensation Range: CA$100K - CA$120K</p>"
+            ),
+            "is_remote": True,
+            "city": "Ontario",
+            "state": "CA",
+            "country": "US",
+            "currency": "USD",
+            "min_amount": 100000,
+            "max_amount": 120000,
+        },
+        "support",
+    )
+
+    assert job is not None
+    assert job.location == "Ontario, Canada"
+    assert job.salary_currency == "CAD"
+    assert job.raw_payload["country"] == "US"
+    assert job.raw_payload["currency"] == "USD"
+
+
+def test_jobspy_does_not_reclassify_real_ontario_california_job_without_evidence():
+    provider = JobSpyProvider(
+        "indeed",
+        CommercialProvider(),
+        SearchSettings(families=[{"name": "support", "titles": ["support engineer"]}]),
+    )
+    job = provider._normalize(
+        {
+            "id": "in-california",
+            "title": "Support Engineer",
+            "company": "Example",
+            "job_url": "https://indeed.com/viewjob?jk=california",
+            "description": (
+                "<p>Work from our Ontario, California office.</p>"
+                "<p>A separate Canadian range starts at CA$100K.</p>"
+            ),
+            "city": "Ontario",
+            "state": "CA",
+            "country": "US",
+            "currency": "USD",
+        },
+        "support",
+    )
+
+    assert job is not None
+    assert job.location == "Ontario, CA, US"
+    assert job.salary_currency == "USD"
+
+
 def test_jobspy_remote_filter_does_not_trust_description_mentions():
     provider = JobSpyProvider(
         "indeed",
@@ -545,6 +621,13 @@ def test_jobspy_title_gate_accepts_seniority_variants():
     assert JobSpyProvider._title_matches("Director of Cloud SRE", titles)
     assert not JobSpyProvider._title_matches("Inbound Sales Account Executive", titles)
     assert not JobSpyProvider._title_matches("SREcruiting Coordinator", titles)
+
+
+def test_jobspy_title_gate_accepts_aliases_and_honors_family_exclusions():
+    titles = ["support engineer", "application support analyst"]
+    excluded = ["desktop support", "help desk"]
+    assert JobSpyProvider._title_matches("Senior Application Support Analyst", titles, excluded)
+    assert not JobSpyProvider._title_matches("Desktop Support Engineer", titles, excluded)
 
 
 def test_indeed_uses_plain_individual_title_queries():
@@ -666,6 +749,7 @@ def test_indeed_fetch_reports_filter_waterfall(monkeypatch):
         "family.reliability.accepted_before_dedupe": 3,
         "family.reliability.query.site reliability engineer.raw_results": 5,
         "family.reliability.query.site reliability engineer.accepted_before_dedupe": 3,
+        "rejected_title.sales engineer": 1,
     }
 
 

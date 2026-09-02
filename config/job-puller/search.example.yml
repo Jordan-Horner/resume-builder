@@ -21,11 +21,40 @@ search:
     - name: production-support-operations
       enabled: true
       titles:
+        - support engineer
         - production support engineer
         - application support engineer
         - technical support engineer
+        - cloud support engineer
+        - platform support engineer
+        - product support engineer
         - technical operations engineer
         - production operations engineer
+      # Aliases pass the local title gate without adding another provider request.
+      title_aliases:
+        - production support
+        - application support
+        - applications support
+        - production support analyst
+        - application support analyst
+        - production support specialist
+        - application support specialist
+        - technology support
+        - technical escalation engineer
+        - application operations engineer
+        - customer reliability engineer
+      # Exclusions define the semantic family boundary, not personal preferences.
+      # Valid jobs outside the configured families are not collected.
+      excluded_titles:
+        - help desk
+        - service desk
+        - desktop support
+        - desktop technician
+        - field service technician
+        - computer repair
+        - cost support
+        - pre-sales
+        - presales
     - name: systems-configuration-integrations
       enabled: true
       titles:
@@ -41,6 +70,8 @@ search:
         - backend software engineer
         - python developer
         - API engineer
+      title_aliases:
+        - backend SWE
     - name: automation-ai
       enabled: true
       titles:

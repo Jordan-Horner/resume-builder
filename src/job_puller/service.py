@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -42,6 +43,9 @@ class RunSummary:
     updated: int
     error: str | None
     metrics: dict[str, int]
+    outcome: str
+    retryable: bool
+    error_category: str | None
 
 
 class InventoryService:
@@ -111,7 +115,18 @@ class InventoryService:
             if on_provider_start is not None:
                 on_provider_start(index, total, provider.source_key)
             cutoff = self.cutoff(provider.source_key)
-            result = provider.fetch(cutoff)
+            attempts = 0
+            while True:
+                attempts += 1
+                result = provider.fetch(cutoff)
+                if (
+                    attempts >= self.config.provider_retry_attempts
+                    or not result.retryable
+                    or result.observations
+                ):
+                    break
+                time.sleep(self.config.provider_retry_backoff_seconds * attempts)
+            result.metrics["fetch_attempts"] = attempts
             if result.observations:
                 enriched = []
                 for observation in result.observations:
@@ -131,6 +146,9 @@ class InventoryService:
                     updated,
                     result.error,
                     result.metrics,
+                    result.outcome.value,
+                    result.retryable,
+                    result.error_category,
                 )
             )
         return summaries

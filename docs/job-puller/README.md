@@ -34,11 +34,17 @@ cp config/job-puller/preferences.example.yml workspace/job-search/preferences.ym
 ```
 
 Search configuration describes reusable title families rather than provider query syntax. Each family can be
-enabled independently. LinkedIn receives one compatible Boolean query per family through its public guest jobs
-surface. Indeed receives one plain query
-per title because the GraphQL transport used by JobSpy does not reliably honor Indeed.com's Boolean/title syntax;
-a strict local title gate removes description-only matches. Senior, lead, staff, and principal variants match a
-configured base title automatically, while acronyms such as `SRE` must be listed explicitly.
+enabled independently. `titles` are sent to providers and also admitted by the local title gate. Optional
+`title_aliases` widen the local gate without spending another provider request, while `excluded_titles` override a
+match to keep adjacent categories outside the family. All three are phrase rules rather than regular expressions.
+Keep personal choices such as companies, salary, and acceptable seniority in `preferences.yml`; family exclusions
+should describe the reusable role boundary.
+
+LinkedIn receives one compatible Boolean query per family through its public guest jobs surface. Indeed receives
+one plain query per `titles` entry because the GraphQL transport used by JobSpy does not reliably honor
+Indeed.com's Boolean/title syntax; the local title gate removes description-only matches. Senior, lead, staff, and
+principal variants match a configured base title automatically, while acronyms such as `SRE` must be listed
+explicitly.
 
 ## Commands
 
@@ -62,9 +68,11 @@ resume-builder jobs update
 resume-builder jobs update --provider indeed
 resume-builder jobs new
 resume-builder jobs new --provider indeed
+resume-builder jobs new --retry-failed
 resume-builder jobs status
 resume-builder jobs shortlist
 resume-builder jobs screen <job-id>
+resume-builder jobs verify <job-id>
 ```
 
 Use `jobs new` for recurring discovery. It snapshots every canonical job ID in
@@ -79,6 +87,19 @@ interrupted refresh leaves an `in_progress`
 manifest and the next run recovers canonical jobs created after that interrupted
 run began. A provider failure produces a failed or explicitly partial result
 instead of falling back to the prior shortlist.
+
+Every provider run is stored with one typed outcome: `healthy`, `healthy-empty`,
+`capped`, `partial`, `blocked`, or `failed`. Transient failures with no retained
+observations receive at most one retry by default; blocked and capped sources are
+not retried automatically. `jobs status` reports the latest source outcome and
+consecutive problem-run count. `jobs new --retry-failed` reads the latest refresh
+manifest and reruns only provider types explicitly marked retryable.
+
+`jobs verify <job-id>` performs a conservative live-URL check. A 404 or 410 is
+treated as closed only when the canonical job is backed by a configured direct
+ATS source. Redirects are reported, access challenges are marked blocked, and
+aggregator-only URLs remain inconclusive. `jobs screen` includes the same check
+before presenting its evidence.
 
 The provider scrape summary reports `new_observations`, which counts newly seen
 provider records and must not be interpreted as newly created canonical jobs.
@@ -107,7 +128,8 @@ provider requisition identity agrees.
 
 Commercial-board runs print a filter waterfall showing raw results, invalid records, title rejections, work-mode
 profile mismatches, stale records, duplicates, and accepted observations. The same metrics are retained with the scrape
-run in SQLite for later diagnostics.
+run in SQLite for later diagnostics. When title rejection occurs, the summary also prints the ten most common
+rejected titles so a user can distinguish provider noise from a missing family alias.
 
 `search.accepted_work_modes` selects any combination of `remote`, `hybrid`, `onsite`, and `unknown`. The default
 configuration uses `[remote]`. The former `remote_only` setting remains readable for older private configurations,
@@ -129,6 +151,19 @@ uv run job-puller stats
 uv run job-puller stats --json
 ```
 
+Resume Builder can also derive conservative possible-repost relationships from
+the canonical history:
+
+```bash
+resume-builder jobs reposts
+resume-builder jobs reposts --aggregator "Example Job Board"
+```
+
+The signal requires the same normalized employer and exact title-token identity
+under distinct posting identities on different dates. Concurrent openings,
+shared provider identities, and configured multi-employer aggregators are
+excluded. The result is advisory and never closes or dismisses a job.
+
 Use `--config /absolute/path/to/search.yml` before the command to select another configuration.
 An editable local installation automatically finds this project's configuration when invoked from another directory.
 `JOB_PULLER_CONFIG` can set a different reusable default.
@@ -145,6 +180,11 @@ from Indeed and enforces the initial lookback or checkpoint cutoff locally. Inde
 precision, so same-day postings remain eligible throughout that day and stable identities make the overlap safe.
 A response containing older jobs but no newly eligible jobs is a healthy empty update; a response containing no
 raw jobs is treated as suspicious.
+
+Indeed occasionally geocodes Ontario, Canada as Ontario, California in a USA-scoped result and may label Canadian
+compensation as USD. Job Puller corrects that conflict only when the posting independently states that candidates
+should be based in Ontario and publishes a Canadian-dollar range. The original JobSpy row remains preserved as raw
+provider evidence.
 
 LinkedIn collection uses its logged-out search and job-detail HTML fragments without personal cookies or an
 authenticated browser. Search cards are paginated with absolute offsets, deduplicated, title-gated, and
@@ -186,6 +226,10 @@ After review, set `enabled: true` on the boards worth monitoring. A whole ATS bo
 same enabled title families, accepted work modes, and incremental cutoff used by commercial discovery, preventing
 unrelated company openings from flooding inventory. Boards may carry reusable tags such as `faang-plus`; tags are
 metadata for future search profiles and do not change collection behavior yet.
+
+SmartRecruiters reads the platform's structured remote/hybrid location flags and compensation fields when present.
+Title aliases are still applied locally, so profiles that want software-engineering acronyms should include forms
+such as `backend SWE` alongside their descriptive titles.
 
 Each board is explicit. Registry examples:
 

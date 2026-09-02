@@ -4,6 +4,7 @@ import math
 import random
 import re
 import time
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -16,6 +17,7 @@ from bs4 import BeautifulSoup, Tag
 
 from job_puller.config import LinkedInProviderSettings, SearchSettings
 from job_puller.detail_cache import ProviderDetailCache
+from job_puller.eligibility import title_matches
 from job_puller.models import JobObservation, ProviderResult
 from job_puller.normalize import html_to_text, normalized_key, parse_datetime
 from job_puller.work_modes import WorkMode, explicit_arrangement
@@ -316,6 +318,7 @@ class LinkedInGuestProvider:
             "saturated_queries": 0,
         }
         candidates: dict[str, _Candidate] = {}
+        rejected_titles: Counter[str] = Counter()
         fatal_errors: list[str] = []
         partial_errors: list[str] = []
         rolling_since = started - timedelta(hours=self.settings.incremental_lookback_hours)
@@ -381,8 +384,13 @@ class LinkedInGuestProvider:
                             metrics["card_duplicates"] += 1
                             continue
                         seen_for_query.add(card.job_id)
-                        if not self._title_matches(card.title, family.titles):
+                        if not self._title_matches(
+                            card.title,
+                            family.accepted_titles,
+                            family.excluded_titles,
+                        ):
                             metrics["title_rejected"] += 1
+                            rejected_titles[normalized_key(card.title)] += 1
                             continue
                         if not self._recent_enough(card.posted_at, effective_since):
                             metrics["freshness_rejected"] += 1
@@ -493,6 +501,9 @@ class LinkedInGuestProvider:
 
         metrics["accepted"] = len(observations)
         metrics["duplicates"] = metrics["accepted_before_dedupe"] - metrics["accepted"]
+        metrics.update(
+            {f"rejected_title.{title}": count for title, count in rejected_titles.most_common(10)}
+        )
         completed = datetime.now(UTC)
         errors = fatal_errors + partial_errors
         success = not errors
@@ -581,13 +592,12 @@ class LinkedInGuestProvider:
         return f"({' OR '.join(clauses)})"
 
     @staticmethod
-    def _title_matches(title: str, titles: list[str]) -> bool:
-        normalized_title = f" {normalized_key(title)} "
-        return any(
-            f" {normalized_key(candidate)} " in normalized_title
-            for candidate in titles
-            if normalized_key(candidate)
-        )
+    def _title_matches(
+        title: str,
+        titles: list[str],
+        excluded_titles: list[str] | None = None,
+    ) -> bool:
+        return title_matches(title, titles, excluded_titles)
 
     @staticmethod
     def _recent_enough(posted_at: datetime | None, since: datetime) -> bool:

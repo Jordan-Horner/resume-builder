@@ -17,8 +17,10 @@ class SearchFamily(StrictModel):
     name: str
     enabled: bool = True
     titles: list[str] = Field(min_length=1)
+    title_aliases: list[str] = Field(default_factory=list)
+    excluded_titles: list[str] = Field(default_factory=list)
 
-    @field_validator("titles")
+    @field_validator("titles", "title_aliases", "excluded_titles")
     @classmethod
     def validate_titles(cls, titles: list[str]) -> list[str]:
         cleaned = [title.strip() for title in titles]
@@ -27,8 +29,24 @@ class SearchFamily(StrictModel):
         if any('"' in title for title in cleaned):
             raise ValueError("job titles cannot contain double quotes")
         if len({title.casefold() for title in cleaned}) != len(cleaned):
-            raise ValueError("job titles must be unique within a family")
+            raise ValueError("job title rules must be unique within each list")
         return cleaned
+
+    @model_validator(mode="after")
+    def require_distinct_title_rules(self) -> SearchFamily:
+        accepted = [*self.titles, *self.title_aliases]
+        if len({title.casefold() for title in accepted}) != len(accepted):
+            raise ValueError("titles and title_aliases must not overlap")
+        if {title.casefold() for title in accepted} & {
+            title.casefold() for title in self.excluded_titles
+        }:
+            raise ValueError("accepted and excluded title rules must not overlap")
+        return self
+
+    @property
+    def accepted_titles(self) -> list[str]:
+        """Title phrases admitted locally after a provider search."""
+        return [*self.titles, *self.title_aliases]
 
 
 class SearchSettings(StrictModel):
@@ -157,6 +175,8 @@ class InventoryConfig(StrictModel):
     initial_lookback_days: int = Field(default=7, ge=1, le=90)
     checkpoint_overlap_hours: int = Field(default=6, ge=0, le=48)
     request_timeout_seconds: float = Field(default=30, ge=5, le=180)
+    provider_retry_attempts: int = Field(default=2, ge=1, le=3)
+    provider_retry_backoff_seconds: float = Field(default=1, ge=0, le=30)
     search: SearchSettings
     providers: Providers = Field(default_factory=Providers)
 

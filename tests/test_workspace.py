@@ -79,6 +79,7 @@ def test_engine_repository_tracks_no_private_workspace_paths() -> None:
         "resumes/",
         "targets/",
         "editorial/",
+        "applications/",
         "career/",
         "evals/cases/",
     )
@@ -105,6 +106,7 @@ def test_initialize_local_workspace_creates_independent_repository(tmp_path: Pat
     assert (target / ".git").is_dir()
     assert (target / "vault" / "vault.json").is_file()
     assert (target / "vault" / "README.md").is_file()
+    assert (target / "applications" / "README.md").is_file()
     assert (target / "templates" / "resume-template.html").is_file()
     assert (target / "templates" / "resume-templates" / "technical-classic.yaml").is_file()
     assert (target / "templates" / "themes" / "clean-teal.yaml").is_file()

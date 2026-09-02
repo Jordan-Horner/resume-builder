@@ -195,9 +195,26 @@ Git tools do not. Never write candidate data into same-named engine folders.
    value that through-line offers the employer. Use evidence to make that
    position credible; do not let the evidence list become the position. Keep
    that purpose in the planning logic, then express it in plain, direct resume
-   language. The visible summary does not need to announce the value proposition
-   abstractly. A concise role identity plus two clearly scoped experience areas
-   is valid when it gives the reader the intended frame. Prefer literal actions,
+   language. Begin by qualifying the candidate through the strongest directly
+   relevant experience signal; use supported years when they add meaningful
+   scope, and use education or certifications only when required or materially
+   differentiating. Experience outranks education when both apply, while career
+   duration alone must not be presented as target-role experience. Make that
+   qualification place the candidate in the intended role family when
+   sufficient direct evidence supports it, even when the candidate's formal or
+   most recent title comes from an adjacent role family. A professional identity
+   is a supported description of demonstrated work, not a copy of the current
+   title and not permission to claim an unearned target role. Reject a broad
+   prior-role label when it would cause a recruiter to classify the candidate
+   outside the intended role family despite stronger direct evidence. For
+   adjacent evidence, use the demonstrated bridge into the target; for
+   exploratory evidence, lead with the concrete transferable work instead of
+   claiming the target identity. Then state what the candidate has done and
+   anchor it with the selected representative proof. This ordering must not
+   become a stock title-plus-years formula. The
+   visible summary does not need to announce the value proposition abstractly.
+   A concise role identity plus two clearly scoped experience areas is valid
+   when it gives the reader the intended frame. Prefer literal actions,
    systems, environments, and responsibilities over slogans, metaphors, or
    polished benefit language. Use normally one proof anchor and, only when it
    changes the hiring read, one compact breadth or progression signal. Do not
@@ -219,7 +236,7 @@ Git tools do not. Never write candidate data into same-named engine folders.
    mirror the posting's requirement order, enumerate every matched technology,
    or restate the first experience bullet in condensed form. Let experience and
    skills carry the remaining retrieval terms. Apply the quality contract's
-   reader-conclusion, resume-framing, plain-direct-opening,
+   reader-conclusion, resume-framing, plain-direct-opening, role-family-positioning,
    proof-concentration, requirement-echo, scope-precision, and summary-to-body
    tests before review.
    Require the summary to answer both “why this candidate fits this job” and

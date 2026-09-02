@@ -167,9 +167,12 @@ preferences stay under the private workspace.
 ```bash
 resume-builder jobs update
 resume-builder jobs new
+resume-builder jobs new --retry-failed
 resume-builder jobs status
 resume-builder jobs shortlist
 resume-builder jobs screen <job-id>
+resume-builder jobs verify <job-id>
+resume-builder jobs reposts
 ```
 
 `update` collects from enabled providers and preserves valid jobs even when they
@@ -189,6 +192,46 @@ contains `Senior`, `Sr.`, `Lead`, `Staff`, or `Principal`. Its bounded keyword-r
 diagnostic—not an ATS score or a hiring prediction. Ask the agent to screen a
 shortlisted job ID for the deeper semantic evidence review; only jobs you choose
 to pursue become tracked target snapshots.
+
+Provider refreshes retain typed outcomes (`healthy`, `healthy-empty`, `capped`,
+`partial`, `blocked`, or `failed`). Transient empty failures receive one bounded
+retry, `jobs status` shows each source's latest state and problem streak, and
+`jobs new --retry-failed` reruns only failures marked safe to retry. Screening
+also performs a conservative live-URL check for postings backed by a direct ATS;
+aggregator-only URLs remain inconclusive instead of being guessed open or closed.
+
+## Record applications and outcomes
+
+Application history is private, Git-versioned workspace data. It stays separate
+from the canonical career-fact vault: a submitted answer can cite confirmed facts,
+but it cannot establish a new one.
+
+```bash
+resume-builder application record --company Example --role "Support Engineer" --job-id <job-id>
+resume-builder application record --company Example --role "Support Engineer" --job-id <job-id> --apply
+resume-builder application outcome <application-id> interview --stage "Recruiter screen" --apply
+resume-builder application outcome <application-id> rejected --feedback "Verbatim feedback" --apply
+resume-builder application report
+resume-builder application validate
+```
+
+Writes require `--apply`; otherwise commands return a preview. Events are
+append-only, corrections explicitly supersede an earlier event, and application
+dates are never inferred from posting or inventory dates. Recorded job IDs are
+automatically treated as applied during shortlisting. Outcome reports show raw
+counts and withhold rates until at least ten applications in a group have
+concluded. Reports never modify the match rubric or claim an interview
+probability.
+
+When a job has already been prescreened, `record` automatically pins that
+decision and its analysis hash. `--target`, `--resume`, and `--match-report`
+can additionally pin the submitted artifacts and detailed match record.
+
+Submitted application answers can be preserved with canonical fact citations
+and retrieved for similar future questions. Unknown and `needs-review` fact IDs
+are rejected. `jobs reposts` provides an advisory same-employer, exact-title
+signal while excluding concurrent postings, shared provider identities, and
+configured multi-employer aggregators.
 
 If a repository has ever contained real career data, keep its complete Git history
 private. Removing personal files from the latest version does not remove them from

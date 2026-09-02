@@ -73,11 +73,20 @@ def write_workspace_files(root: Path, configuration: dict[str, object]) -> None:
         "diagnostics, and audited working files. You normally do not need to open it.\n\n"
         "Canonical career facts and editable resume sources remain under `vault/` and\n"
         "`resumes/`. Files under `exports/` and `build/` can be regenerated from those\n"
-        "sources.\n",
+        "sources. Private application events and submitted answers remain under\n"
+        "`applications/`; they are not career evidence.\n",
     )
     VaultLayout.load(root / "vault", allow_missing=True).initialize()
     workspace_resources = files("resume_builder.resources") / "workspace"
-    for directory in ("vault", "resumes", "directions", "targets", "editorial", "exports"):
+    for directory in (
+        "vault",
+        "resumes",
+        "directions",
+        "targets",
+        "editorial",
+        "exports",
+        "applications",
+    ):
         readme = workspace_resources / directory / "README.md"
         atomic_write_text(root / directory / "README.md", readme.read_text(encoding="utf-8"))
     for directory in (

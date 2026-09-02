@@ -130,7 +130,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Checking {len(providers)} {args.provider} board(s)...")
             for provider in providers:
                 result = provider.fetch(service.cutoff(provider.source_key))
-                state = "OK" if result.success and not result.suspicious_empty else "FAILED"
+                state = result.outcome.value.upper()
                 print(
                     f"[{state}] {provider.source_key}: "
                     f"raw={result.metrics.get('raw_results', 0)} "
@@ -138,7 +138,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 if result.error:
                     print(f"  {result.error}", file=sys.stderr)
-                failed += int(state == "FAILED")
+                failed += int(result.outcome.value in {"failed", "blocked", "partial"})
             return 1 if failed else 0
         output_path = resolve_project_path(config_path, args.output)
         discovered, report = discover_boards(
@@ -190,7 +190,7 @@ def main(argv: list[str] | None = None) -> int:
     summaries = service.scrape(selected, on_provider_start=report_provider_start)
     failed = 0
     for summary in summaries:
-        state = "EMPTY" if summary.suspicious_empty else "OK" if summary.success else "FAILED"
+        state = summary.outcome.upper()
         print(
             f"[{state}] {summary.source_key}: fetched={summary.fetched} "
             f"new_observations={summary.inserted} updated_observations={summary.updated}"
@@ -218,9 +218,22 @@ def main(argv: list[str] | None = None) -> int:
                     f"details={summary.metrics.get('detail_requests', 0)} "
                     f"cache_hits={summary.metrics.get('detail_cache_hits', 0)}"
                 )
+            rejected_titles = sorted(
+                (
+                    (key.removeprefix("rejected_title."), count)
+                    for key, count in summary.metrics.items()
+                    if key.startswith("rejected_title.")
+                ),
+                key=lambda item: (-item[1], item[0]),
+            )
+            if rejected_titles:
+                print(
+                    "  top rejected titles: "
+                    + ", ".join(f"{title}={count}" for title, count in rejected_titles[:10])
+                )
         if summary.error:
             print(f"  {summary.error}", file=sys.stderr)
-        failed += int(not summary.success or summary.suspicious_empty)
+        failed += int(summary.outcome in {"failed", "blocked", "partial"})
     stats = database.stats()
     print(
         f"Inventory: {stats['active_jobs']} active jobs, {stats['observations']} source observations"

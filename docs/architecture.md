@@ -29,6 +29,9 @@ editorial approval.
 10. **Minting** treats the explicit mint request as approval of the current
    preview and adds page-budget, overflow, network, JavaScript, and
    text-extraction checks.
+11. **Application history** preserves submitted-artifact pins, append-only
+    outcomes, and evidence-cited answers without turning application prose into
+    career evidence.
 
 ## Trust boundaries
 
@@ -37,6 +40,8 @@ editorial approval.
 | Imported resume or career note | Candidate fact proposals | Canonical truth without review |
 | Role research | Direction and terminology | Candidate experience |
 | Job posting | Selection and match criteria | Candidate experience |
+| Application answer | Retrieval of prior submitted wording | New career facts |
+| Application outcome | Advisory calibration of past decisions | Automatic rubric changes or hiring probabilities |
 | Language model | Drafting and judgment | Unsupported facts or authority |
 | Deterministic compiler | Traceability and structural integrity | Persuasiveness or semantic truth |
 | Selection reviewer | Story choice and complete hiring argument | New facts or resume prose |
@@ -80,6 +85,10 @@ The same dependency direction applies to the other orchestration domains.
 Job matching keeps untrusted posting validation and Markdown rendering in
 separate boundary modules while its public facade owns retrieval orchestration
 and CLI compatibility.
+Application history is a sibling workflow rooted in the private workspace. Its
+records pin targets and submitted resumes by hash, while canonical facts remain
+the only permitted evidence source for answer claims. Job prescreening reads
+only application-linked job IDs to suppress already-applied opportunities.
 Workspace state and remote-privacy inspection are similarly isolated from the
 mutating initialization and connection workflow.
 Project reporting uses typed artifact-status records and shared freshness
@@ -116,3 +125,5 @@ their reviewed budgets.
   approved standalone language record and approved selection review.
 - An explicit mint invocation approves only the exact current preview.
 - PDF minting cannot bypass page-budget or extraction failures.
+- Application events are append-only; corrections supersede rather than rewrite.
+- Outcome reports are deterministic and advisory and never mutate match rules.

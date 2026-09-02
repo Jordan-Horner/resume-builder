@@ -8,6 +8,7 @@ import sys
 from collections.abc import Callable, Sequence
 
 from . import (
+    applications,
     compilation,
     directions,
     evaluations,
@@ -65,6 +66,10 @@ COMMANDS: dict[str, Command] = {
     ),
     "match": (job_matching.main, "Audit a resume against one captured job posting"),
     "jobs": (jobs.main, "Update, inspect, and prescreen the local job inventory"),
+    "application": (
+        applications.main,
+        "Record applications, outcomes, and submitted answers",
+    ),
     "review": (review_records.main, "Manage career-professional prose review"),
     "render": (rendering.main, "Render an evidence-grounded resume as ATS-safe HTML"),
     "synthesis": (synthesis.main, "Validate a versioned resume synthesis plan"),

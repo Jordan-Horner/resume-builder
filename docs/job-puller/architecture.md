@@ -4,6 +4,9 @@
 CLI
   -> configuration validation
   -> semantic title families
+       -> provider query titles
+       -> local acceptance aliases
+       -> family-boundary exclusions
   -> private, reviewable ATS board registry
   -> provider registry
        -> direct HTTP: LinkedIn guest search
@@ -13,6 +16,8 @@ CLI
   -> observation normalization
   -> conservative canonicalization
   -> SQLite inventory + FTS5
+       -> authoritative liveness
+       -> advisory possible-repost relationships
 ```
 
 Provider modules own transport, source-shape translation, and source-aware eligibility accounting. The service owns
@@ -24,4 +29,8 @@ Commercial providers also own local eligibility accounting because they know whi
 filter to run locally. Aggregate and family-level metrics flow through `ProviderResult`, appear in the CLI run
 summary, and are stored as JSON on the scrape run.
 
-Version one deliberately excludes scheduling, a web server, candidate ranking, resume access, application automation, and destructive fuzzy deduplication.
+The collector deliberately excludes scheduling, a web server, application
+automation, and destructive fuzzy deduplication. Resume Builder's separate
+workspace workflow may read the canonical inventory for deterministic
+prescreening and application-linked suppression; providers never read resumes or
+application history.

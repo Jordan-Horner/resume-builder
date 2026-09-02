@@ -7,10 +7,12 @@ import pytest
 
 import resume_builder.jobs as jobs_module
 from resume_builder.jobs import (
+    _contains_bounded,
     _load_preferences,
     _new_jobs,
     _prescreen,
     _prescreen_job_hash,
+    _with_application_dispositions,
     _write_review_csv,
 )
 
@@ -85,6 +87,73 @@ def test_prescreen_hides_only_jobs_with_terminal_dispositions():
     assert applied["review_eligible"] is False
     assert applied["constraints"]["disposition"] == "applied"
     assert other["review_eligible"] is True
+
+
+def test_bounded_exclusions_do_not_match_inside_other_words():
+    assert _contains_bounded("Applied AI Engineer", ["PPLIED"]) == []
+    assert _contains_bounded("PPLIED", ["pplied"]) == ["pplied"]
+
+
+def test_bounded_exclusions_handle_company_suffixes_and_punctuation():
+    assert _contains_bounded("Acme, Inc.", ["Acme"]) == ["Acme"]
+    assert _contains_bounded("Acmeology", ["Acme"]) == []
+    assert _contains_bounded("C# Developer", ["C#"]) == ["C#"]
+
+
+def test_prescreen_company_exclusion_is_boundary_aware():
+    included = _prescreen(
+        job(company="Applied Systems"),
+        preferences(excluded_companies=["PPLIED"]),
+        {"python"},
+    )
+    excluded = _prescreen(
+        job(company="PPLIED"),
+        preferences(excluded_companies=["PPLIED"]),
+        {"python"},
+    )
+
+    assert included["constraints"]["excluded_company"] is False
+    assert excluded["constraints"]["excluded_company"] is True
+
+
+def test_application_history_overlays_legacy_dispositions(tmp_path: Path):
+    applications = tmp_path / "applications"
+    applications.mkdir()
+    (applications / "APP-20260902-example.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "application": {
+                    "id": "APP-20260902-example",
+                    "company": "Example",
+                    "role": "Support Engineer",
+                    "applied_on": "2026-09-02",
+                    "created_at": "2026-09-02T12:00:00+00:00",
+                    "job_id": "job-new-history",
+                },
+                "events": [
+                    {
+                        "id": "EVT-applied",
+                        "status": "applied",
+                        "effective_on": "2026-09-02",
+                        "recorded_at": "2026-09-02T12:00:00+00:00",
+                    }
+                ],
+                "answers": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    merged = _with_application_dispositions(
+        preferences(job_dispositions={"job-legacy": "applied"}),
+        applications,
+    )
+
+    assert merged["job_dispositions"] == {
+        "job-legacy": "applied",
+        "job-new-history": "applied",
+    }
 
 
 def test_prescreen_never_promotes_badly_parsed_inventory():
@@ -306,6 +375,51 @@ def test_new_jobs_marks_failed_refresh_without_reusing_old_delta(tmp_path: Path,
     assert manifest["status"] == "failed"
     assert manifest["new_to_database_job_ids"] == []
     assert captured["included_job_ids"] == set()
+
+
+def test_new_jobs_can_retry_only_retryable_provider_types(tmp_path: Path, monkeypatch):
+    inventory = FakeInventory()
+    manifest_path = tmp_path / "latest-refresh.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "provider_runs": [
+                    {"provider": "indeed", "retryable": True},
+                    {"provider": "linkedin", "retryable": False},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    captured = {}
+    monkeypatch.setattr(jobs_module, "_database", lambda _path: inventory)
+    monkeypatch.setattr(jobs_module, "DEFAULT_LATEST_REFRESH", manifest_path)
+
+    def refresh(args):
+        captured["provider_args"] = args
+        inventory.refreshed = True
+        return 0
+
+    monkeypatch.setattr(jobs_module, "puller_main", refresh)
+    monkeypatch.setattr(jobs_module, "_shortlist", lambda *args, **kwargs: 0)
+
+    assert (
+        _new_jobs(
+            Path("search.yml"),
+            Path("preferences.yml"),
+            25,
+            None,
+            retry_failed=True,
+        )
+        == 0
+    )
+    assert captured["provider_args"] == [
+        "--config",
+        "search.yml",
+        "scrape",
+        "--provider",
+        "indeed",
+    ]
 
 
 def test_new_jobs_labels_partial_provider_coverage(tmp_path: Path, monkeypatch):

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections import Counter
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urljoin, urlsplit
@@ -11,11 +12,10 @@ from bs4 import BeautifulSoup
 
 from job_puller.config import AtsBoard, SearchSettings
 from job_puller.eligibility import (
-    enabled_titles,
     family_keyword_queries,
+    matches_enabled_family,
     recent_matches,
     remote_matches,
-    title_matches,
 )
 from job_puller.models import JobObservation, ProviderResult
 from job_puller.normalize import clean_text, html_to_text, parse_datetime
@@ -104,8 +104,8 @@ class HttpProvider:
         if self.search is None:
             metrics["accepted"] = len(observations)
             return observations, metrics
-        titles = enabled_titles(self.search)
         accepted = []
+        rejected_titles: Counter[str] = Counter()
         for observation in observations:
             if (
                 not observation.provider_job_id
@@ -113,8 +113,9 @@ class HttpProvider:
                 or not observation.source_url
             ):
                 metrics["invalid"] += 1
-            elif not title_matches(observation.title, titles):
+            elif not matches_enabled_family(observation.title, self.search):
                 metrics["title_rejected"] += 1
+                rejected_titles[clean_text(observation.title).casefold()] += 1
             elif not recent_matches(observation, since):
                 metrics["freshness_rejected"] += 1
             else:
@@ -122,6 +123,9 @@ class HttpProvider:
                     metrics["work_mode_mismatch"] += 1
                 accepted.append(observation)
         metrics["accepted"] = len(accepted)
+        metrics.update(
+            {f"rejected_title.{title}": count for title, count in rejected_titles.most_common(10)}
+        )
         return accepted, metrics
 
 
@@ -141,12 +145,12 @@ class CandidateDetailProvider(HttpProvider):
             "accepted": 0,
         }
         observations: list[JobObservation] = []
+        rejected_titles: Counter[str] = Counter()
         detail_errors: list[str] = []
         try:
             with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:
                 cards = self._candidates(client)
                 metrics["raw_results"] = len(cards)
-                titles = enabled_titles(self.search) if self.search else []
                 seen_job_ids: set[str] = set()
                 for card in cards:
                     if not card["job_id"] or not card["title"] or not card["url"]:
@@ -156,8 +160,9 @@ class CandidateDetailProvider(HttpProvider):
                         metrics["duplicates"] += 1
                         continue
                     seen_job_ids.add(card["job_id"])
-                    if self.search and not title_matches(card["title"], titles):
+                    if self.search and not matches_enabled_family(card["title"], self.search):
                         metrics["title_rejected"] += 1
+                        rejected_titles[clean_text(card["title"]).casefold()] += 1
                         continue
                     try:
                         observation = self._detail(client, card)
@@ -172,6 +177,12 @@ class CandidateDetailProvider(HttpProvider):
                             metrics["work_mode_mismatch"] += 1
                         observations.append(observation)
                 metrics["accepted"] = len(observations)
+                metrics.update(
+                    {
+                        f"rejected_title.{title}": count
+                        for title, count in rejected_titles.most_common(10)
+                    }
+                )
             completed = datetime.now(UTC)
             return ProviderResult(
                 self.source_key,
@@ -473,15 +484,15 @@ class AshbyProvider(HttpProvider):
         return result
 
 
-class SmartRecruitersProvider(HttpProvider):
+class SmartRecruitersProvider(CandidateDetailProvider):
     name = "smartrecruiters"
 
-    def _fetch(self, client: httpx.Client, since: datetime) -> list[JobObservation]:
+    def _candidates(self, client: httpx.Client) -> list[dict[str, str]]:
         base = (
             self.board.api_url
             or f"https://api.smartrecruiters.com/v1/companies/{self.board.id}/postings"
         )
-        result = []
+        candidates = []
         offset = 0
         while True:
             response = client.get(base, params={"limit": 100, "offset": offset})
@@ -490,50 +501,70 @@ class SmartRecruitersProvider(HttpProvider):
             items = payload.get("content", [])
             for item in items:
                 job_id = str(item.get("id") or "")
-                detail = item
-                if job_id:
-                    detail_response = client.get(f"{base}/{job_id}")
-                    if detail_response.is_success:
-                        detail = detail_response.json()
-                sections = detail.get("jobAd", {}).get("sections", {})
-                description = "\n".join(
-                    str(section.get("text") or "")
-                    for section in sections.values()
-                    if isinstance(section, dict)
+                candidates.append(
+                    {
+                        "job_id": job_id,
+                        "title": clean_text(item.get("name")),
+                        "url": str(item.get("ref") or f"{base}/{job_id}"),
+                    }
                 )
-                location_data = detail.get("location") or item.get("location") or {}
-                location = ", ".join(
-                    str(location_data.get(key))
-                    for key in ("city", "region", "country")
-                    if location_data.get(key)
-                )
-                observation = JobObservation(
-                    provider=self.name,
-                    provider_board_id=self.board.id,
-                    provider_job_id=job_id,
-                    title=clean_text(detail.get("name") or item.get("name")),
-                    company=self.board.name,
-                    source_url=str(
-                        detail.get("postingUrl") or item.get("ref") or f"{base}/{job_id}"
-                    ),
-                    direct_apply_url=str(detail.get("applyUrl") or detail.get("postingUrl") or ""),
-                    location=location,
-                    description_html=description,
-                    description_text=html_to_text(description),
-                    posted_at=parse_datetime(
-                        detail.get("releasedDate") or item.get("releasedDate")
-                    ),
-                    employment_type=clean_text((detail.get("typeOfEmployment") or {}).get("label"))
-                    or None,
-                    raw_payload=detail,
-                    parser_version="smartrecruiters-v1",
-                )
-                if observation.source_url:
-                    result.append(observation)
             if not items or offset + len(items) >= int(payload.get("totalFound") or len(items)):
                 break
             offset += len(items)
-        return result
+        return candidates
+
+    def _detail(self, client: httpx.Client, card: dict[str, str]) -> JobObservation:
+        response = client.get(card["url"])
+        response.raise_for_status()
+        detail = response.json()
+        sections = detail.get("jobAd", {}).get("sections", {})
+        description = "\n".join(
+            str(section.get("text") or "")
+            for section in sections.values()
+            if isinstance(section, dict)
+        )
+        location_data = detail.get("location") or {}
+        location = ", ".join(
+            str(location_data.get(key))
+            for key in ("city", "region", "country")
+            if location_data.get(key)
+        )
+        arrangement_values = []
+        if location_data.get("remote") is True:
+            arrangement_values.append("remote")
+        if location_data.get("hybrid") is True:
+            arrangement_values.append("hybrid")
+        arrangement = _provider_work_arrangement(
+            arrangement_values,
+            provider=self.name,
+            rule="smartrecruiters_location_flags",
+        )
+        compensation = detail.get("compensation") or {}
+        source_url = str(detail.get("postingUrl") or card["url"])
+        return JobObservation(
+            provider=self.name,
+            provider_board_id=self.board.id,
+            provider_job_id=str(detail.get("id") or card["job_id"]),
+            title=clean_text(detail.get("name") or card["title"]),
+            company=self.board.name,
+            source_url=source_url,
+            direct_apply_url=str(detail.get("applyUrl") or source_url),
+            location=location,
+            description_html=description,
+            description_text=html_to_text(description),
+            posted_at=parse_datetime(detail.get("releasedDate")),
+            salary_min=compensation.get("min"),
+            salary_max=compensation.get("max"),
+            salary_currency=clean_text(compensation.get("currency")) or None,
+            salary_interval=clean_text(compensation.get("period")) or None,
+            employment_type=clean_text((detail.get("typeOfEmployment") or {}).get("label")) or None,
+            remote=location_data.get("remote")
+            if isinstance(location_data.get("remote"), bool)
+            else None,
+            work_arrangement=arrangement,
+            raw_payload=detail,
+            parser_version="smartrecruiters-v2",
+        )
 
 
 class WorkdayProvider(HttpProvider):

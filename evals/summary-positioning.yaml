@@ -1,0 +1,120 @@
+version: 1
+kind: summary-positioning
+method: independent-cold-review
+pass_condition: Every case receives the expected decision from a fresh reviewer using only the supplied target, visible resume context, and language-review standard.
+cases:
+  - id: direct-adjacent-formal-title-revise
+    scenario: direct-adjacent-title
+    target: Data Analyst
+    target_mode: direct
+    formal_title: Operations Coordinator
+    evidence_profile:
+      - Owned recurring SQL analysis used for capacity planning.
+      - Built and maintained operational dashboards used by department leaders.
+    opening: Operations professional with eight years of experience supporting business teams.
+    expected_decision: revise
+    review_reason: The broad prior-role identity withholds sufficient direct analytics evidence and would classify the candidate outside the intended role family.
+
+  - id: direct-adjacent-formal-title-approve
+    scenario: direct-adjacent-title
+    target: Data Analyst
+    target_mode: direct
+    formal_title: Operations Coordinator
+    evidence_profile:
+      - Owned recurring SQL analysis used for capacity planning.
+      - Built and maintained operational dashboards used by department leaders.
+    opening: Data analytics professional who builds recurring analysis and dashboards for operational planning.
+    expected_decision: approved
+    review_reason: The identity reflects demonstrated work without claiming a formal title or unsupported scope.
+
+  - id: direct-single-substantial-project-approve
+    scenario: single-substantial-project
+    target: Digital Accessibility Specialist
+    target_mode: direct
+    formal_title: Web Content Producer
+    evidence_profile:
+      - Led an organization-wide accessibility audit and coordinated remediation of the identified barriers.
+    opening: Digital accessibility professional who led an organization-wide audit and remediation program.
+    expected_decision: approved
+    review_reason: One substantial, directly relevant body of work can sufficiently support the professional identity without repeated projects.
+
+  - id: adjacent-bridge-approve
+    scenario: adjacent-bridge
+    target: Technical Writer
+    target_mode: adjacent
+    formal_title: Product Support Specialist
+    evidence_profile:
+      - Turned recurring product questions into troubleshooting guides used by customers and support teams.
+      - Partnered with engineers to verify procedures before publication.
+    opening: Product support professional who turns complex technical issues into verified customer and support documentation.
+    expected_decision: approved
+    review_reason: The opening names the demonstrated bridge into technical writing without presenting the candidate as already holding the target role.
+
+  - id: adjacent-unsupported-target-title-revise
+    scenario: adjacent-unsupported-title
+    target: Security Analyst
+    target_mode: adjacent
+    formal_title: Service Desk Technician
+    evidence_profile:
+      - Escalated endpoint alerts according to documented procedures.
+      - Reset credentials and resolved access issues for employees.
+    opening: Security analyst experienced in incident investigation and threat response.
+    expected_decision: revise
+    review_reason: The opener claims the target identity and responsibilities beyond the adjacent evidence.
+
+  - id: exploratory-proof-led-approve
+    scenario: exploratory-proof-led
+    target: Data Analyst
+    target_mode: exploratory
+    formal_title: Office Coordinator
+    evidence_profile:
+      - Automated a recurring spreadsheet report and corrected inconsistent source records.
+    opening: Operations coordinator who automated recurring reporting and improved the consistency of its source data.
+    expected_decision: approved
+    review_reason: The proof-led opening presents transferable work without claiming an unsupported analytics identity.
+
+  - id: broad-role-broad-identity-approve
+    scenario: broad-role-false-positive
+    target: Business Operations Specialist
+    target_mode: direct
+    formal_title: Administrative Specialist
+    evidence_profile:
+      - Improved scheduling, reporting, and purchasing workflows across two departments.
+      - Coordinated recurring planning inputs for department leaders.
+    opening: Business operations professional who improves recurring workflows and coordinates planning across departments.
+    expected_decision: approved
+    review_reason: A broad identity is appropriate because it accurately describes the target and the demonstrated operating pattern.
+
+  - id: qualifying-education-approve
+    scenario: qualifying-education
+    target: Entry-Level Civil Engineer
+    target_mode: adjacent
+    formal_title: Engineering Intern
+    evidence_profile:
+      - Completed an accredited civil engineering degree.
+      - Supported field measurements and reviewed project drawings during an internship.
+    opening: Civil engineering graduate with internship experience supporting field measurements and project-drawing review.
+    expected_decision: approved
+    review_reason: Relevant education materially qualifies an early-career candidate and is supported by adjacent practical experience.
+
+  - id: unsupported-target-identity-revise
+    scenario: unsupported-target-identity
+    target: Product Manager
+    target_mode: exploratory
+    formal_title: Customer Service Representative
+    evidence_profile:
+      - Shared recurring customer feedback with a product team.
+    opening: Product manager who turns customer insight into roadmap decisions.
+    expected_decision: revise
+    review_reason: Passing feedback to a product team does not support the target identity or roadmap authority.
+
+  - id: technology-inventory-revise
+    scenario: summary-inventory
+    target: Reliability Engineer
+    target_mode: adjacent
+    formal_title: Systems Administrator
+    evidence_profile:
+      - Investigated service interruptions and automated a recurring recovery check.
+    opening: Technical professional experienced in Linux, containers, monitoring, scripting, networking, databases, and cloud platforms.
+    expected_decision: revise
+    review_reason: The sentence inventories technologies instead of establishing a supported hiring position and representative proof.

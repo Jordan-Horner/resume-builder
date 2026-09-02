@@ -73,6 +73,38 @@ def test_family_title_validation_surfaces_unsafe_quotes(tmp_path):
         load_config(path)
 
 
+def test_family_rejects_overlapping_query_titles_and_aliases(tmp_path):
+    path = tmp_path / "search.yml"
+    path.write_text(
+        """schema_version: 1
+search:
+  families:
+    - name: support
+      titles: [support engineer]
+      title_aliases: [Support Engineer]
+""",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="must not overlap"):
+        load_config(path)
+
+
+def test_family_rejects_a_title_that_is_also_excluded(tmp_path):
+    path = tmp_path / "search.yml"
+    path.write_text(
+        """schema_version: 1
+search:
+  families:
+    - name: support
+      titles: [support engineer]
+      excluded_titles: [Support Engineer]
+""",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="accepted and excluded"):
+        load_config(path)
+
+
 def test_unknown_family_result_limit_surfaces(tmp_path):
     path = tmp_path / "search.yml"
     path.write_text(

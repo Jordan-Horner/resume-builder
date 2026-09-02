@@ -43,7 +43,14 @@ Use `resume-builder compile` directly when diagnosing only that build stage.
 
 Every draft first uses `review language-package`. Its
 `.language.cold.json` file contains all narrative blocks on the first pass and
-only new or changed blocks on later passes, with visible neighbor context.
+only new or changed blocks in its decision scope on later passes, with visible
+neighbor context. Version 2 also carries a read-only `resume_context` containing
+the complete visible narrative, education, certifications, and technical-skills
+content so a reviewer can judge a changed summary against the proof a recruiter
+would see elsewhere in the resume. That context excludes candidate contact
+information, evidence IDs, source documents, synthesis rationale, prior review
+decisions, and proposed rewrites. The reviewer decides only the blocks in
+`blocks`; contextual blocks receive no carried or implied verdict.
 It also carries a versioned `review_standard` whose general context test asks
 whether the visible block identifies the actor, action, object, and
 reader-relevant value without requiring an invented premise, mechanism, or
@@ -107,7 +114,12 @@ numeric claims that do not occur in the specifically cited facts. It reports
 low lexical overlap and non-confirmed facts for human review. Mint-time PDF rendering
 blocks network requests and page JavaScript, waits for fonts, checks horizontal
 overflow, and verifies extractable text on every page and for every factual
-block. The version 6 synthesis plan resolves the page budget. `--max-pages N`
+block. Minting also produces a versioned ATS-readability receipt that scores
+deterministic properties of the final PDF: complete extraction, reading order,
+contact and section recognition, employment structure, supported glyphs,
+encryption, image objects, and file size. Any blocking failure prevents release;
+the score is a parseability diagnostic, not a prediction of ranking, matching,
+or an employer decision. The version 6 synthesis plan resolves the page budget. `--max-pages N`
 may only confirm that same value; change the plan first when the user chooses a
 different budget.
 Overflow is a failed mint while the diagnostic PDF is retained for inspection.

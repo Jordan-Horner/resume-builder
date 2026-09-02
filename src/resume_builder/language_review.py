@@ -12,14 +12,14 @@ from .artifact_status import build_manifest_freshness
 from .atomic import atomic_write_json
 from .compilation import relative_output, sha256_file
 from .layout import contained_path
-from .review_blocks import narrative_block_inventory
+from .review_blocks import NarrativeReviewBlock, narrative_block_inventory
 from .review_schema import sha256_text
 
 LANGUAGE_REVIEW_METHOD = "independent-cold-review"
 LANGUAGE_REVIEW_STATUSES = {"approved", "changes-required"}
 LANGUAGE_BLOCK_DECISIONS = {"approved", "revise"}
 LANGUAGE_REVIEW_STANDARD = {
-    "version": 2,
+    "version": 3,
     "context_test": (
         "Can a reviewer identify the actor, action, object, and why the claim matters "
         "using only the visible block and its supplied context?"
@@ -38,6 +38,13 @@ LANGUAGE_REVIEW_STANDARD = {
         "capabilities, responsibilities, or matched requirements. A summary must establish "
         "a clear hiring position and use only the limited detail needed to support it; move "
         "secondary retrieval terms to experience or technical skills."
+    ),
+    "summary_positioning_rule": (
+        "Judge the summary opening against the intended target and supplied evidence. Reject "
+        "a broad prior-role, legacy-function, or generic umbrella identity when sufficient "
+        "direct evidence supports the intended role family and the opening would cause a "
+        "recruiter to misclassify the candidate. For adjacent or exploratory evidence, "
+        "require an honest bridge or proof-led opening rather than an unsupported target title."
     ),
     "boundary": (
         "Apply these rules through contextual meaning, not exact-word matching, a "
@@ -122,6 +129,47 @@ def _record_blocks(record: dict[str, Any]) -> dict[str, dict[str, Any]]:
     }
 
 
+def _visible_items(
+    payload: dict[str, Any], owner: str, fields: tuple[str, ...]
+) -> list[dict[str, Any]]:
+    """Return visible, non-evidence fields from one compiled resume collection."""
+    values = payload.get(owner, [])
+    if not isinstance(values, list):
+        raise ValueError(f"compiled resume {owner} must be a list")
+    visible: list[dict[str, Any]] = []
+    for index, value in enumerate(values):
+        if not isinstance(value, dict):
+            raise ValueError(f"compiled resume {owner}[{index}] must be an object")
+        visible.append({field: value[field] for field in fields if field in value})
+    return visible
+
+
+def _visible_resume_context(
+    payload: dict[str, Any], inventory: tuple[NarrativeReviewBlock, ...]
+) -> dict[str, Any]:
+    """Return reader-visible context without contact data, evidence, or builder rationale."""
+    candidate = payload.get("candidate")
+    if not isinstance(candidate, dict):
+        raise ValueError("compiled resume candidate must be an object")
+    headline = candidate.get("headline")
+    return {
+        "headline": headline.strip() if isinstance(headline, str) else None,
+        "narrative_blocks": [
+            {
+                "id": block.id,
+                "text": block.text,
+                "context": {
+                    key: value for key, value in block.context.items() if key != "candidate_name"
+                },
+            }
+            for block in inventory
+        ],
+        "education": _visible_items(payload, "education", ("title", "org", "year", "description")),
+        "certifications": _visible_items(payload, "certifications", ("title", "org", "year")),
+        "technical_skills": _visible_items(payload, "skills", ("category", "items")),
+    }
+
+
 def prepare_language_review(
     resume: Path,
     project_root: Path,
@@ -165,6 +213,8 @@ def prepare_language_review(
             prior_approved = _record_blocks(prior)
 
     inventory = narrative_block_inventory(resume_path)
+    payload_path = resume_output_base(resolved_root, resume_path).with_suffix(".json")
+    payload = _load_json(payload_path, "compiled resume")
     pending = [
         block
         for block in inventory
@@ -176,7 +226,7 @@ def prepare_language_review(
     generated_at = datetime.now(timezone.utc).isoformat()
     target_record = _path_record(target_path, resolved_root) if target_path is not None else None
     cold = {
-        "version": 1,
+        "version": 2,
         "phase": "language-cold-read",
         "generated_at": generated_at,
         "resume": _path_record(resume_path, resolved_root),
@@ -184,6 +234,7 @@ def prepare_language_review(
         "target_text": target_path.read_text(encoding="utf-8") if target_path is not None else None,
         "scope": "changed-narrative-prose" if prior_record is not None else "all-narrative-prose",
         "review_standard": LANGUAGE_REVIEW_STANDARD,
+        "resume_context": _visible_resume_context(payload, inventory),
         "blocks": [
             {
                 "id": block.id,

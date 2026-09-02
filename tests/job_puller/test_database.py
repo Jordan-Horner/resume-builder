@@ -132,6 +132,9 @@ def test_scrape_runs_since_reports_provider_coverage(tmp_path):
             "success": True,
             "suspicious_empty": False,
             "error": None,
+            "outcome": "healthy",
+            "retryable": False,
+            "error_category": None,
         }
     ]
 
@@ -150,7 +153,7 @@ def test_existing_v1_database_migrates_to_run_metrics(tmp_path):
     with db.connect() as conn:
         version = conn.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0]
         columns = {row[1] for row in conn.execute("PRAGMA table_info(scrape_runs)")}
-    assert version == 5
+    assert version == 7
     assert "metrics_json" in columns
     with db.connect() as conn:
         cache_table = conn.execute(
@@ -166,6 +169,98 @@ def test_existing_v1_database_migrates_to_run_metrics(tmp_path):
             )
         }
     assert mode_tables == {"observation_work_modes", "job_work_modes"}
+    with db.connect() as conn:
+        repost_table = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='possible_reposts'"
+        ).fetchone()
+    assert repost_table is not None
+
+
+def test_source_health_exposes_latest_outcome_and_problem_streak(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    healthy = result(observation(), datetime(2026, 8, 1, tzinfo=UTC))
+    db.record_result(healthy)
+    for day in (2, 3):
+        failed = ProviderResult(
+            source_key="test:linkedin",
+            provider="linkedin",
+            observations=[],
+            started_at=datetime(2026, 8, day, tzinfo=UTC),
+            completed_at=datetime(2026, 8, day, 0, 1, tzinfo=UTC),
+            success=False,
+            error="connection timeout",
+        )
+        db.record_result(failed)
+
+    assert db.source_health()[0]["outcome"] == "failed"
+    assert db.source_health()[0]["problem_streak"] == 2
+    assert db.source_health()[0]["retryable"] is True
+
+
+def test_possible_reposts_require_distinct_dates_and_posting_identities(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    start = datetime(2026, 7, 1, tzinfo=UTC)
+    first = observation(job_id="old", source="https://example.com/jobs/old")
+    first.description_text = "First version of the production support role. " * 10
+    first.description_html = f"<p>{first.description_text}</p>"
+    second = observation(job_id="new", source="https://example.com/jobs/new")
+    second.description_text = "Later version with a sufficiently different description. " * 10
+    second.description_html = f"<p>{second.description_text}</p>"
+    db.record_result(result(first, start))
+    db.record_result(result(second, start + timedelta(days=30)))
+    with db.connect() as conn:
+        earlier_job_id = conn.execute(
+            "SELECT id FROM jobs WHERE first_seen_at=?", (start.isoformat(),)
+        ).fetchone()[0]
+        conn.execute(
+            "UPDATE jobs SET status='closed', closed_at=? WHERE id=?",
+            ((start + timedelta(days=15)).isoformat(), earlier_job_id),
+        )
+
+    candidates = db.refresh_possible_reposts()
+
+    assert len(candidates) == 1
+    assert candidates[0]["first_seen_gap_days"] == 30
+    assert candidates[0]["confidence"] == 0.85
+
+
+def test_possible_reposts_exclude_concurrent_roles_and_aggregators(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    start = datetime(2026, 7, 1, tzinfo=UTC)
+    first = observation(job_id="one", source="https://example.com/jobs/one")
+    first.description_text = "First distinct role description. " * 10
+    first.description_html = f"<p>{first.description_text}</p>"
+    second = observation(job_id="two", source="https://example.com/jobs/two")
+    second.description_text = "Second distinct role description. " * 10
+    second.description_html = f"<p>{second.description_text}</p>"
+    db.record_result(result(first, start))
+    db.record_result(result(second, start))
+    assert db.refresh_possible_reposts() == []
+
+    with db.connect() as conn:
+        jobs = conn.execute("SELECT id FROM jobs ORDER BY id").fetchall()
+        conn.execute(
+            "UPDATE jobs SET first_seen_at=? WHERE id=?",
+            ((start + timedelta(days=30)).isoformat(), jobs[-1][0]),
+        )
+    assert db.refresh_possible_reposts(aggregator_companies={"Example, Inc."}) == []
+
+
+def test_possible_reposts_exclude_overlapping_active_postings(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    start = datetime(2026, 7, 1, tzinfo=UTC)
+    first = observation(job_id="one", source="https://example.com/jobs/one")
+    first.description_text = "First concurrently active role description. " * 10
+    second = observation(job_id="two", source="https://example.com/jobs/two")
+    second.description_text = "Second concurrently active role description. " * 10
+    db.record_result(result(first, start))
+    db.record_result(result(second, start + timedelta(days=30)))
+
+    assert db.refresh_possible_reposts() == []
 
 
 def test_legacy_false_remote_is_persisted_as_unknown_not_onsite(tmp_path):

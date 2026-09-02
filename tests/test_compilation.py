@@ -807,9 +807,28 @@ def test_language_review_reuses_unchanged_approved_blocks(tmp_path: Path) -> Non
     assert prepared["review_inputs"]["prior_approved_blocks"] == 6
     paths = language_review.language_review_paths(tmp_path, resume)
     cold = json.loads(paths["cold"].read_text(encoding="utf-8"))
+    assert cold["version"] == 2
     assert [block["id"] for block in cold["blocks"]] == ["projects[0].description"]
+    context = cold["resume_context"]
+    assert context["headline"] == "Example Operations | Example Analysis"
+    assert len(context["narrative_blocks"]) == 7
+    assert {block["id"] for block in context["narrative_blocks"]} >= {
+        "summary",
+        "experience[0].bullets[0]",
+        "projects[0].description",
+    }
+    assert all("candidate_name" not in block["context"] for block in context["narrative_blocks"])
+    assert context["education"] == [
+        {"title": "Example Degree", "org": "Example University", "year": "2015"}
+    ]
+    assert context["certifications"] == [
+        {"title": "Example Certification", "org": "Example Issuer", "year": "2024"}
+    ]
+    assert context["technical_skills"] == [{"category": "Systems", "items": ["Tool A", "Tool B"]}]
+    assert "email" not in json.dumps(context).casefold()
+    assert "PROFILE-001" not in json.dumps(context)
     assert cold["review_standard"] == language_review.LANGUAGE_REVIEW_STANDARD
-    assert cold["review_standard"]["version"] == 2
+    assert cold["review_standard"]["version"] == 3
     assert "actor, action, object" in cold["review_standard"]["context_test"]
     assert "unstated premise" in cold["review_standard"]["unstated_premise_rule"]
     assert "semantically generic object" in cold["review_standard"]["concrete_object_rule"]
@@ -818,12 +837,15 @@ def test_language_review_reuses_unchanged_approved_blocks(tmp_path: Path) -> Non
         in cold["review_standard"]["concrete_object_rule"]
     )
     assert "main function is to inventory" in cold["review_standard"]["summary_inventory_rule"]
+    assert "misclassify the candidate" in cold["review_standard"]["summary_positioning_rule"]
+    assert "sufficient direct evidence" in cold["review_standard"]["summary_positioning_rule"]
+    assert "proof-led opening" in cold["review_standard"]["summary_positioning_rule"]
     assert "exact-word matching" in cold["review_standard"]["boundary"]
     assert "banned-term list" in cold["review_standard"]["boundary"]
 
     decisions = json.loads(paths["decisions"].read_text(encoding="utf-8"))
     decisions["reviewer"]["context"] = (
-        "Fresh reviewer received only the changed block with its visible neighboring context."
+        "Fresh reviewer received the changed decision block and read-only visible resume context."
     )
     decisions["language_review"]["status"] = "approved"
     decisions["language_review"]["blocks"][0]["decision"] = "approved"
@@ -2156,7 +2178,12 @@ def test_mint_command_creates_audited_pdf(tmp_path: Path, run_main, monkeypatch)
         output.write_bytes(b"%PDF-compiled-test")
         return {
             "layout": {"horizontal_overflow": False, "overflowing_elements": []},
-            "extraction": {"pages": 1, "extractable_pages": 1, "claims_recovered": 10},
+            "extraction": {
+                "pages": 1,
+                "extractable_pages": 1,
+                "claims_recovered": 10,
+                "ats_readability": {"status": "PASS", "parseability_score": 100},
+            },
         }
 
     monkeypatch.setattr(minting, "render_pdf", fake_render_pdf)
@@ -2176,7 +2203,8 @@ def test_mint_command_creates_audited_pdf(tmp_path: Path, run_main, monkeypatch)
     )
     assert manifest["phase"] == "mint"
     assert manifest["valid"] is True
-    assert manifest["version"] == 4
+    assert manifest["version"] == 5
+    assert manifest["pdf_audit"]["extraction"]["ats_readability"]["status"] == "PASS"
     assert "review_record" not in manifest
     assert manifest["language_review"]["status"] == "approved"
     assert (

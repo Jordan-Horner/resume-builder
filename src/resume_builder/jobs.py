@@ -19,7 +19,10 @@ import yaml
 from job_puller.cli import main as puller_main
 from job_puller.config import load_config, resolve_database_path
 from job_puller.database import InventoryDatabase
+from job_puller.liveness import verify_job_liveness
 
+from .applications import DEFAULT_ROOT as DEFAULT_APPLICATIONS_ROOT
+from .applications import applied_job_ids
 from .atomic import atomic_write_json, atomic_write_text
 
 DEFAULT_CONFIG = Path("job-search/config/search.yml")
@@ -29,7 +32,7 @@ DEFAULT_REVIEW_OUTPUT = Path("job-search/jobs-review.csv")
 DEFAULT_NEW_OUTPUT = Path("job-search/new-jobs.json")
 DEFAULT_NEW_REVIEW_OUTPUT = Path("job-search/new-jobs-review.csv")
 DEFAULT_LATEST_REFRESH = Path("job-search/latest-refresh.json")
-PRESCREEN_VERSION = 4
+PRESCREEN_VERSION = 5
 TOKEN = re.compile(r"[a-z][a-z0-9+#.]{2,}")
 PHRASE_TOKEN = re.compile(r"[a-z0-9]+")
 STOPWORDS = {
@@ -69,12 +72,23 @@ def parser() -> argparse.ArgumentParser:
         "new", help="Refresh providers and shortlist only jobs new to the canonical database"
     )
     new.add_argument("--provider", action="append")
+    new.add_argument(
+        "--retry-failed",
+        action="store_true",
+        help="Retry only provider types whose latest refresh marked them retryable",
+    )
     new.add_argument("--limit", type=int, default=50)
     commands.add_parser("status", help="Show inventory and shortlist status")
     shortlist = commands.add_parser("shortlist", help="Prescreen new or changed active jobs")
     shortlist.add_argument("--limit", type=int, default=50)
     screen = commands.add_parser("screen", help="Show one job and its prescreen evidence")
     screen.add_argument("job_id")
+    verify = commands.add_parser("verify", help="Check whether one direct ATS posting is live")
+    verify.add_argument("job_id")
+    reposts = commands.add_parser("reposts", help="Report conservative possible repost signals")
+    reposts.add_argument("--window-days", type=int, default=90)
+    reposts.add_argument("--min-span-days", type=int, default=1)
+    reposts.add_argument("--aggregator", action="append", default=[])
     return command_parser
 
 
@@ -191,6 +205,19 @@ def _contains_any(value: str, terms: list[str]) -> list[str]:
     return [term for term in terms if term.casefold() in normalized]
 
 
+def _contains_bounded(value: str, terms: list[str]) -> list[str]:
+    """Match terms without collisions such as PPLIED/Applied or US/Australia."""
+    return [
+        term
+        for term in terms
+        if term.strip()
+        and re.search(
+            rf"(?<![a-z0-9]){re.escape(term.strip().casefold())}(?![a-z0-9])",
+            value.casefold(),
+        )
+    ]
+
+
 def _contains_phrases(value: str, terms: list[str]) -> list[str]:
     """Match configurable phrases without substring collisions such as US/Australia."""
     normalized = f" {' '.join(PHRASE_TOKEN.findall(value.casefold()))} "
@@ -215,6 +242,15 @@ def _format_salary(job: dict[str, object]) -> str:
     if isinstance(salary_min, (int, float)):
         return f"From {prefix}{salary_min:.0f}{suffix}"
     return f"Up to {prefix}{salary_max:.0f}{suffix}"
+
+
+def _with_application_dispositions(
+    preferences: dict[str, Any], applications_root: Path = DEFAULT_APPLICATIONS_ROOT
+) -> dict[str, Any]:
+    """Overlay durable application records without removing legacy preferences."""
+    dispositions = dict(preferences.get("job_dispositions", {}))
+    dispositions.update({job_id: "applied" for job_id in applied_job_ids(applications_root)})
+    return {**preferences, "job_dispositions": dispositions}
 
 
 def _write_review_csv(results: list[dict[str, Any]], output_path: Path) -> int:
@@ -249,14 +285,14 @@ def _prescreen(
     description = str(job["description_text"])
     desired = _contains_any(title, preferences.get("desired_title_terms", []))
     interesting = _contains_any(f"{title}\n{description}", preferences.get("interest_terms", []))
-    excluded_title = _contains_any(title, preferences.get("excluded_title_terms", []))
+    excluded_title = _contains_bounded(title, preferences.get("excluded_title_terms", []))
     seniority = _contains_phrases(title, preferences.get("senior_title_terms", []))
     accepted_senior_role = _contains_phrases(
         title, preferences.get("accepted_senior_role_terms", [])
     )
     seniority_match = not seniority or bool(accepted_senior_role)
-    unwanted = _contains_any(title, preferences.get("unwanted_title_terms", []))
-    excluded_company = _contains_any(company, preferences.get("excluded_companies", []))
+    unwanted = _contains_bounded(title, preferences.get("unwanted_title_terms", []))
+    excluded_company = _contains_bounded(company, preferences.get("excluded_companies", []))
     dispositions = preferences.get("job_dispositions", {})
     disposition = (
         dispositions.get(str(job.get("id") or "")) if isinstance(dispositions, dict) else None
@@ -354,6 +390,7 @@ def _shortlist(
     heading: str = "Job Shortlist",
 ) -> int:
     preferences = _load_preferences(preferences_path)
+    preferences = _with_application_dispositions(preferences)
     resume_text, resume_hash = _resume_corpus(preferences)
     preference_hash = _hash_text(json.dumps(preferences, sort_keys=True))
     prior: dict[str, dict[str, Any]] = {}
@@ -406,6 +443,7 @@ def _shortlist(
     payload = {
         "schema_version": 1,
         "prescreen_version": PRESCREEN_VERSION,
+        "generated_at": datetime.now(UTC).isoformat(),
         "resume_hash": resume_hash,
         "preference_hash": preference_hash,
         "jobs": results,
@@ -457,8 +495,27 @@ def _new_jobs(
     preferences_path: Path,
     limit: int,
     providers: list[str] | None,
+    *,
+    retry_failed: bool = False,
 ) -> int:
     database = _database(config_path)
+    if retry_failed:
+        if providers:
+            raise ValueError("--retry-failed cannot be combined with --provider")
+        if not DEFAULT_LATEST_REFRESH.exists():
+            raise ValueError("no prior refresh exists to retry")
+        prior = json.loads(DEFAULT_LATEST_REFRESH.read_text(encoding="utf-8"))
+        providers = sorted(
+            {
+                str(run["provider"])
+                for run in prior.get("provider_runs", [])
+                if isinstance(run, dict)
+                and run.get("retryable") is True
+                and isinstance(run.get("provider"), str)
+            }
+        )
+        if not providers:
+            raise ValueError("the latest refresh has no retryable provider failures")
     recovered_job_ids = _recover_pending_new_job_ids(database)
     before_ids = database.job_ids()
     started_at = datetime.now(UTC)
@@ -479,7 +536,9 @@ def _new_jobs(
     provider_runs = database.scrape_runs_since(started_at)
     new_job_ids = sorted((((after_ids - before_ids) & active_ids) | recovered_job_ids) & active_ids)
     has_successful_provider = any(
-        run.get("success") and not run.get("suspicious_empty") for run in provider_runs
+        run.get("outcome") in {"healthy", "healthy-empty", "capped"}
+        or (run.get("success") and not run.get("suspicious_empty"))
+        for run in provider_runs
     )
     outcome = (
         "complete"
@@ -536,22 +595,63 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "update":
             return puller_main(_provider_args(config_path, args.provider))
         if args.command == "new":
-            return _new_jobs(config_path, args.preferences.expanduser(), args.limit, args.provider)
+            return _new_jobs(
+                config_path,
+                args.preferences.expanduser(),
+                args.limit,
+                args.provider,
+                retry_failed=args.retry_failed,
+            )
         if args.command == "status":
-            stats = _database(config_path).stats()
+            database = _database(config_path)
+            stats = database.stats()
             for key, value in stats.items():
                 print(f"{key.replace('_', ' ').title()}: {value}")
+            health = database.source_health()
+            if health:
+                print("Source Health:")
+                for source in health:
+                    detail = f"; {source['error_category']}" if source["error_category"] else ""
+                    print(
+                        f"  {source['source_key']}: {source['outcome']} "
+                        f"(problem streak {source['problem_streak']}{detail})"
+                    )
             if DEFAULT_OUTPUT.exists():
                 payload = json.loads(DEFAULT_OUTPUT.read_text(encoding="utf-8"))
                 print(f"Prescreened Jobs: {len(payload.get('jobs', []))}")
             return 0
         if args.command == "shortlist":
             return _shortlist(config_path, args.preferences.expanduser(), args.limit)
+        if args.command == "reposts":
+            candidates = _database(config_path).refresh_possible_reposts(
+                window_days=args.window_days,
+                min_span_days=args.min_span_days,
+                aggregator_companies=set(args.aggregator),
+            )
+            print(
+                json.dumps(
+                    {
+                        "possible_reposts": candidates,
+                        "method": (
+                            "Advisory same-employer and exact title-token identity; concurrent "
+                            "postings and shared provider identities are excluded."
+                        ),
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        config = load_config(config_path)
         inventory = {str(job["id"]): job for job in _database(config_path).active_inventory()}
         job = inventory.get(args.job_id)
         if job is None:
             print(f"Active job not found: {args.job_id}", file=sys.stderr)
             return 2
+        liveness = verify_job_liveness(job, config.request_timeout_seconds)
+        if args.command == "verify":
+            print(json.dumps(liveness, indent=2, sort_keys=True))
+            return 3 if liveness["status"] == "closed" else 0
         shortlist = (
             json.loads(DEFAULT_OUTPUT.read_text(encoding="utf-8"))
             if DEFAULT_OUTPUT.exists()
@@ -560,7 +660,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         screen = next(
             (item for item in shortlist.get("jobs", []) if item["id"] == args.job_id), None
         )
-        print(json.dumps(screen or job, indent=2, sort_keys=True))
+        output = dict(screen or job)
+        output["liveness"] = liveness
+        print(json.dumps(output, indent=2, sort_keys=True))
         return 0
     except (ValueError, OSError, json.JSONDecodeError) as exc:
         print(f"Job inventory error: {exc}", file=sys.stderr)

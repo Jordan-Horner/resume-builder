@@ -81,7 +81,7 @@ Stay within roughly 350 words and one rendered page. Use this order and do not
 add sections unless the user asks:
 
 ```markdown
-## <Actual company or Undisclosed Client> — <Role>
+## <Actual company or Undisclosed Client> — <Role> · [Apply ↗](<canonical application URL>)
 
 **Match: <fixed match label>**
 
@@ -120,6 +120,11 @@ no question meets that bar.>
 - Title the screen with the actual employer or client. If a staffing
   intermediary does not disclose the client, title it `Undisclosed Client` and
   set `Company` to `Undisclosed`; never title the screen with the intermediary.
+- End the title with `· [Apply ↗](<canonical application URL>)`. Prefer the
+  verified direct-employer application URL when the posting exposes one;
+  otherwise use the verified source-posting URL. Keep the short `Apply ↗`
+  label instead of displaying the raw URL, and do not repeat the application
+  link in the facts table or final action.
 - Show age as an integer number of years in business for consistency; never
   show only `founded in <year>`. Calculate years from the supported founding
   year and the current year.

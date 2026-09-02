@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from enum import Enum
 from typing import Any
 
 from .work_modes import WorkArrangement, WorkMode, classify_work_arrangement
@@ -9,6 +10,15 @@ from .work_modes import WorkArrangement, WorkMode, classify_work_arrangement
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+class ProviderOutcome(str, Enum):
+    HEALTHY = "healthy"
+    HEALTHY_EMPTY = "healthy-empty"
+    PARTIAL = "partial"
+    CAPPED = "capped"
+    BLOCKED = "blocked"
+    FAILED = "failed"
 
 
 @dataclass(slots=True)
@@ -61,3 +71,56 @@ class ProviderResult:
     suspicious_empty: bool = False
     authoritative_complete: bool = False
     metrics: dict[str, int] = field(default_factory=dict)
+
+    @property
+    def outcome(self) -> ProviderOutcome:
+        error = (self.error or "").casefold()
+        blocked_markers = ("captcha", "challenge", "forbidden", "unauthorized", "status 403")
+        if any(marker in error for marker in blocked_markers):
+            return ProviderOutcome.BLOCKED
+        if self.success and any(
+            self.metrics.get(key, 0) > 0 for key in ("saturated_queries", "scan_limit_reached")
+        ):
+            return ProviderOutcome.CAPPED
+        if self.success and self.observations:
+            return ProviderOutcome.HEALTHY
+        if self.success and not self.suspicious_empty:
+            return ProviderOutcome.HEALTHY_EMPTY
+        if self.observations:
+            return ProviderOutcome.PARTIAL
+        return ProviderOutcome.FAILED
+
+    @property
+    def error_category(self) -> str | None:
+        if self.outcome == ProviderOutcome.BLOCKED:
+            return "blocked"
+        if self.suspicious_empty:
+            return "suspicious-empty"
+        error = (self.error or "").casefold()
+        if not error:
+            return None
+        if any(marker in error for marker in ("timeout", "timed out", "connection", "network")):
+            return "transport"
+        if any(marker in error for marker in ("status 4", "status 5", "http")):
+            return "http"
+        if any(marker in error for marker in ("parse", "json", "schema")):
+            return "parse"
+        return "unknown"
+
+    @property
+    def retryable(self) -> bool:
+        if self.outcome in {
+            ProviderOutcome.HEALTHY,
+            ProviderOutcome.HEALTHY_EMPTY,
+            ProviderOutcome.CAPPED,
+            ProviderOutcome.BLOCKED,
+        }:
+            return False
+        error = (self.error or "").casefold()
+        return (
+            self.suspicious_empty
+            or self.error_category == "transport"
+            or any(
+                marker in error for marker in ("status 429", "status 5", "temporarily unavailable")
+            )
+        )

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import re
 import time
+from collections import Counter
 from datetime import UTC, datetime
 from typing import Any
 
@@ -9,6 +11,14 @@ from job_puller.eligibility import remote_matches, title_matches
 from job_puller.models import JobObservation, ProviderResult
 from job_puller.normalize import html_to_text, normalized_key, parse_datetime
 from job_puller.work_modes import WorkMode, explicit_arrangement
+
+_ONTARIO_CALIFORNIA = re.compile(
+    r"^\s*Ontario\s*,\s*CA\s*,\s*(?:US|USA|United States)\s*$", re.IGNORECASE
+)
+_BASED_IN_ONTARIO = re.compile(
+    r"\b(?:based|located|residing)\s+in\s+(?:the\s+)?Ontario\b", re.IGNORECASE
+)
+_CANADIAN_CURRENCY = re.compile(r"(?<![A-Za-z])(?:CA\$|CAD\b)", re.IGNORECASE)
 
 
 class JobSpyProvider:
@@ -44,6 +54,7 @@ class JobSpyProvider:
             "accepted": 0,
             "saturated_queries": 0,
         }
+        rejected_titles: Counter[str] = Counter()
         query_number = 0
         for family in self.search.families:
             if not family.enabled:
@@ -90,8 +101,13 @@ class JobSpyProvider:
                         observation = self._normalize(row, family.name)
                         if observation is None:
                             metrics["invalid"] += 1
-                        elif not self._title_matches(observation.title, family.titles):
+                        elif not self._title_matches(
+                            observation.title,
+                            family.accepted_titles,
+                            family.excluded_titles,
+                        ):
                             metrics["title_rejected"] += 1
+                            rejected_titles[normalized_key(observation.title)] += 1
                         elif not self._recent_enough(observation, since):
                             metrics["freshness_rejected"] += 1
                         else:
@@ -114,6 +130,9 @@ class JobSpyProvider:
         metrics["accepted_before_dedupe"] = len(observations)
         metrics["accepted"] = len(deduped)
         metrics["duplicates"] = len(observations) - len(deduped)
+        metrics.update(
+            {f"rejected_title.{title}": count for title, count in rejected_titles.most_common(10)}
+        )
         success = not errors
         return ProviderResult(
             self.source_key,
@@ -144,8 +163,12 @@ class JobSpyProvider:
         return titles
 
     @staticmethod
-    def _title_matches(title: str, titles: list[str]) -> bool:
-        return title_matches(title, titles)
+    def _title_matches(
+        title: str,
+        titles: list[str],
+        excluded_titles: list[str] | None = None,
+    ) -> bool:
+        return title_matches(title, titles, excluded_titles)
 
     def _normalize(self, row: dict[str, Any], family: str) -> JobObservation | None:
         def value(name: str, default: Any = "") -> Any:
@@ -166,6 +189,10 @@ class JobSpyProvider:
         job_id = str(value("id")) or url.rstrip("/").split("/")[-1].split("?")[0]
         location_parts = [str(value(key)) for key in ("city", "state", "country") if value(key)]
         location = ", ".join(location_parts) or str(value("location"))
+        salary_currency = str(value("currency")) or None
+        location, salary_currency = self._correct_indeed_geography(
+            location, raw_description, salary_currency
+        )
         remote_value = value("is_remote", None)
         remote = bool(remote_value) if remote_value is not None else None
         work_arrangement = (
@@ -192,14 +219,36 @@ class JobSpyProvider:
             posted_at=parse_datetime(value("date_posted", None)),
             salary_min=self._number(value("min_amount", None)),
             salary_max=self._number(value("max_amount", None)),
-            salary_currency=str(value("currency")) or None,
+            salary_currency=salary_currency,
             salary_interval=str(value("interval")) or None,
             employment_type=str(value("job_type")) or None,
             remote=remote,
             work_arrangement=work_arrangement,
             raw_payload=raw_payload,
-            parser_version="jobspy-v1",
+            parser_version="jobspy-v2",
         )
+
+    @staticmethod
+    def _correct_indeed_geography(
+        location: str, description_html: str, salary_currency: str | None
+    ) -> tuple[str, str | None]:
+        """Repair a corroborated Indeed country/currency geocoding conflict.
+
+        Indeed can geocode Ontario, Canada as the city of Ontario, California
+        when a USA-scoped search returns a Canadian remote posting. Correct the
+        structured fields only when the posting independently says candidates
+        should be based in Ontario and publishes Canadian-dollar compensation.
+        The untouched provider row remains available in ``raw_payload``.
+        """
+        canadian_compensation = bool(_CANADIAN_CURRENCY.search(description_html))
+        if (
+            canadian_compensation
+            and _ONTARIO_CALIFORNIA.fullmatch(location)
+            and _BASED_IN_ONTARIO.search(description_html)
+        ):
+            location = "Ontario, Canada"
+            salary_currency = "CAD"
+        return location, salary_currency
 
     @staticmethod
     def _is_nan(value: Any) -> bool:

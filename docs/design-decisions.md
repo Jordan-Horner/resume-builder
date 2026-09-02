@@ -57,11 +57,15 @@ HTML is the continuous review surface; PDF pagination is a release concern.
 Separating them makes user approval explicit and prevents repeated browser
 rendering during ordinary content iteration.
 
-## Why no universal ATS score?
+## Why no universal ATS match score?
 
 Exact term retrieval and semantic qualification are different questions.
 Resume Builder reports discoverability evidence and a cited criterion review,
-but does not fabricate a pass probability or employer decision.
+but does not fabricate a pass probability or employer decision. The mint-time
+ATS readability score is deliberately narrower: it measures deterministic
+properties of the exact PDF—such as extraction, reading order, recognizable
+sections, and supported glyphs—and blocks release on a hard parseability failure.
+It says nothing about ranking, job fit, or whether a recruiter will respond.
 
 ## Why an ignored nested repository instead of a required Git submodule?
 
