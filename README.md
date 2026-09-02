@@ -239,13 +239,19 @@ used for that run.
 ## Detect submitted applications from Gmail
 
 The optional Gmail adapter uses Google's official read-only client to detect
-explicit application confirmations. It automatically creates or links an
-`applied` application only when company and role identity are both present.
-Ambiguous and unrelated messages do not change application history.
+explicit application confirmations and strongly contextual rejections. It
+automatically creates or links an `applied` application only when company and
+role identity are both present. A rejection updates only one confidently
+matched existing application; it never invents a new application. Ambiguous and
+unrelated messages do not change application history. Explicit recruiter
+outreach, interview invitations, assessments, and offers can advance a uniquely
+matched existing application without retaining the correspondence.
 
 ```bash
 python -m pip install -e ".[gmail]"
-resume-builder gmail connect --credentials /secure/path/google-client.json
+resume-builder gmail connect                              # show setup step 1
+resume-builder gmail connect --step 2                     # show another setup step
+resume-builder gmail connect --credentials /secure/path/google-client.json  # scripted setup
 resume-builder gmail scan                         # preview new labeled mail
 resume-builder gmail scan --apply                 # commit confident matches
 resume-builder gmail backfill                     # preview historical matches
@@ -253,9 +259,11 @@ resume-builder gmail backfill --apply             # reconstruct applications
 resume-builder gmail status
 ```
 
-Normal scans read only the Gmail label `Resume Builder`. Historical backfill
-uses a narrow application-confirmation query and does not require old messages
-to have that label. Gmail bodies are processed in memory and never written to
+Normal scans use a narrow Gmail server-side query for recent application
+confirmations and rejection signals; no labels or Gmail filters are required.
+Historical backfill uses the same application-activity query over a longer
+window and processes messages oldest first. Gmail bodies are processed in memory
+and never written to
 the engine, private workspace, runtime database, or logs. The OAuth token,
 mailbox cursor, message IDs, and dispositions live in an external runtime
 directory with owner-only file permissions. See

@@ -148,6 +148,7 @@ def _event(
     source_type: str | None = None,
     source_reference: str | None = None,
     confidence: float | None = None,
+    match_confidence: float | None = None,
     classifier_version: str | None = None,
     automation_policy: str | None = None,
 ) -> dict[str, Any]:
@@ -166,6 +167,7 @@ def _event(
         source_type or "",
         source_reference or "",
         str(confidence) if confidence is not None else "",
+        str(match_confidence) if match_confidence is not None else "",
         classifier_version or "",
         automation_policy or "",
     )
@@ -194,8 +196,11 @@ def _event(
     if confidence is not None or classifier_version or automation_policy:
         if confidence is None or not 0 <= confidence <= 1:
             raise ValueError("automated application event confidence must be between 0 and 1")
+        if match_confidence is not None and not 0 <= match_confidence <= 1:
+            raise ValueError("application match confidence must be between 0 and 1")
         event["automation"] = {
             "confidence": confidence,
+            "match_confidence": match_confidence,
             "classifier_version": _optional(classifier_version),
             "policy": _optional(automation_policy),
         }
@@ -255,6 +260,11 @@ def validate_record(record: dict[str, Any]) -> None:
             or not 0 <= automation["confidence"] <= 1
         ):
             raise ValueError("application event automation metadata is invalid")
+        if automation is not None and automation.get("match_confidence") is not None and (
+            not isinstance(automation["match_confidence"], int | float)
+            or not 0 <= automation["match_confidence"] <= 1
+        ):
+            raise ValueError("application event match confidence is invalid")
     answer_ids: set[str] = set()
     for answer in answers:
         if not isinstance(answer, dict) or answer.get("state") not in ANSWER_STATES:
@@ -300,6 +310,16 @@ def applied_job_ids(root: Path = DEFAULT_ROOT) -> set[str]:
         if isinstance(job_id, str) and job_id.strip():
             values.add(job_id)
     return values
+
+
+def application_job_dispositions(root: Path = DEFAULT_ROOT) -> dict[str, str]:
+    """Return each linked inventory job's current application status."""
+    dispositions: dict[str, str] = {}
+    for _, record in iter_records(root):
+        job_id = record["application"].get("job_id")
+        if isinstance(job_id, str) and job_id.strip():
+            dispositions[job_id] = str(_outcome(record)["current_status"])
+    return dispositions
 
 
 def validate_history(root: Path = DEFAULT_ROOT) -> dict[str, Any]:
@@ -387,6 +407,7 @@ def build_automated_record(
     workspace: Path,
     job_id: str | None = None,
     application_url: str | None = None,
+    requisition_id: str | None = None,
 ) -> dict[str, Any]:
     """Build an email-confirmed application without retaining message content."""
     args = argparse.Namespace(
@@ -403,6 +424,7 @@ def build_automated_record(
         note=None,
     )
     record = build_record(args, workspace)
+    record["application"]["requisition_id"] = _optional(requisition_id)
     application_id = record["application"]["id"]
     record["events"] = [
         _event(
@@ -456,6 +478,7 @@ def append_event(
     source_type: str | None = None,
     source_reference: str | None = None,
     confidence: float | None = None,
+    match_confidence: float | None = None,
     classifier_version: str | None = None,
     automation_policy: str | None = None,
 ) -> dict[str, Any]:
@@ -474,6 +497,7 @@ def append_event(
         source_type=source_type,
         source_reference=source_reference,
         confidence=confidence,
+        match_confidence=match_confidence,
         classifier_version=classifier_version,
         automation_policy=automation_policy,
     )
@@ -558,6 +582,11 @@ def _outcome(record: dict[str, Any]) -> dict[str, Any]:
         "pending": current not in TERMINAL_STATUSES,
         "current_status": current,
     }
+
+
+def current_application_status(record: dict[str, Any]) -> str:
+    """Return the effective current status from append-only application history."""
+    return str(_outcome(record)["current_status"])
 
 
 def _group_summary(records: list[dict[str, Any]], field: str) -> list[dict[str, Any]]:

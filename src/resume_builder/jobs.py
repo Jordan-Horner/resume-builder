@@ -22,7 +22,7 @@ from job_puller.database import InventoryDatabase
 from job_puller.liveness import verify_job_liveness
 
 from .applications import DEFAULT_ROOT as DEFAULT_APPLICATIONS_ROOT
-from .applications import applied_job_ids
+from .applications import application_job_dispositions
 from .atomic import atomic_write_json, atomic_write_text
 
 DEFAULT_CONFIG = Path("job-search/config/search.yml")
@@ -249,7 +249,7 @@ def _with_application_dispositions(
 ) -> dict[str, Any]:
     """Overlay durable application records without removing legacy preferences."""
     dispositions = dict(preferences.get("job_dispositions", {}))
-    dispositions.update({job_id: "applied" for job_id in applied_job_ids(applications_root)})
+    dispositions.update(application_job_dispositions(applications_root))
     return {**preferences, "job_dispositions": dispositions}
 
 

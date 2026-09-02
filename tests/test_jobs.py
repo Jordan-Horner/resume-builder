@@ -137,6 +137,12 @@ def test_application_history_overlays_legacy_dispositions(tmp_path: Path):
                         "status": "applied",
                         "effective_on": "2026-09-02",
                         "recorded_at": "2026-09-02T12:00:00+00:00",
+                    },
+                    {
+                        "id": "EVT-rejected",
+                        "status": "rejected",
+                        "effective_on": "2026-09-05",
+                        "recorded_at": "2026-09-05T12:00:00+00:00",
                     }
                 ],
                 "answers": [],
@@ -152,7 +158,7 @@ def test_application_history_overlays_legacy_dispositions(tmp_path: Path):
 
     assert merged["job_dispositions"] == {
         "job-legacy": "applied",
-        "job-new-history": "applied",
+        "job-new-history": "rejected",
     }
 
 
