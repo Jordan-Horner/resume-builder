@@ -13,6 +13,7 @@ from . import (
     directions,
     evaluations,
     feedback_memory,
+    gmail_automation,
     job_matching,
     jobs,
     migration,
@@ -69,6 +70,10 @@ COMMANDS: dict[str, Command] = {
     "application": (
         applications.main,
         "Record applications, outcomes, and submitted answers",
+    ),
+    "gmail": (
+        gmail_automation.main,
+        "Detect application confirmations without retaining email content",
     ),
     "review": (review_records.main, "Manage career-professional prose review"),
     "render": (rendering.main, "Render an evidence-grounded resume as ATS-safe HTML"),

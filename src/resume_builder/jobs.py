@@ -623,7 +623,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "shortlist":
             return _shortlist(config_path, args.preferences.expanduser(), args.limit)
         if args.command == "reposts":
-            candidates = _database(config_path).refresh_possible_reposts(
+            candidates = _database(config_path).possible_reposts(
                 window_days=args.window_days,
                 min_span_days=args.min_span_days,
                 aggregator_companies=set(args.aggregator),
@@ -632,6 +632,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 json.dumps(
                     {
                         "possible_reposts": candidates,
+                        "detector": {
+                            "window_days": args.window_days,
+                            "min_span_days": args.min_span_days,
+                            "aggregator_companies": sorted(set(args.aggregator)),
+                        },
                         "method": (
                             "Advisory same-employer and exact title-token identity; concurrent "
                             "postings and shared provider identities are excluded."

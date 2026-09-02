@@ -229,9 +229,38 @@ can additionally pin the submitted artifacts and detailed match record.
 
 Submitted application answers can be preserved with canonical fact citations
 and retrieved for similar future questions. Unknown and `needs-review` fact IDs
-are rejected. `jobs reposts` provides an advisory same-employer, exact-title
-signal while excluding concurrent postings, shared provider identities, and
-configured multi-employer aggregators.
+are rejected. Application commands always read and write the active private
+workspace; they do not accept an alternate output root. `jobs reposts` provides
+an advisory same-employer, exact-title signal while excluding concurrent
+postings, shared provider identities, and configured multi-employer aggregators.
+The repost calculation is read-only, and its output records the detector options
+used for that run.
+
+## Detect submitted applications from Gmail
+
+The optional Gmail adapter uses Google's official read-only client to detect
+explicit application confirmations. It automatically creates or links an
+`applied` application only when company and role identity are both present.
+Ambiguous and unrelated messages do not change application history.
+
+```bash
+python -m pip install -e ".[gmail]"
+resume-builder gmail connect --credentials /secure/path/google-client.json
+resume-builder gmail scan                         # preview new labeled mail
+resume-builder gmail scan --apply                 # commit confident matches
+resume-builder gmail backfill                     # preview historical matches
+resume-builder gmail backfill --apply             # reconstruct applications
+resume-builder gmail status
+```
+
+Normal scans read only the Gmail label `Resume Builder`. Historical backfill
+uses a narrow application-confirmation query and does not require old messages
+to have that label. Gmail bodies are processed in memory and never written to
+the engine, private workspace, runtime database, or logs. The OAuth token,
+mailbox cursor, message IDs, and dispositions live in an external runtime
+directory with owner-only file permissions. See
+[`docs/gmail-automation.md`](docs/gmail-automation.md) for setup, privacy, and
+scheduling guidance.
 
 If a repository has ever contained real career data, keep its complete Git history
 private. Removing personal files from the latest version does not remove them from

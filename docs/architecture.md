@@ -88,7 +88,13 @@ and CLI compatibility.
 Application history is a sibling workflow rooted in the private workspace. Its
 records pin targets and submitted resumes by hash, while canonical facts remain
 the only permitted evidence source for answer claims. Job prescreening reads
-only application-linked job IDs to suppress already-applied opportunities.
+only application-linked job IDs to suppress already-applied opportunities. The
+application CLI has no arbitrary storage-root override, and advisory repost
+detection derives results without replacing persisted inventory state.
+The optional Gmail boundary stores OAuth credentials and content-free sync state
+outside both repositories. It converts an explicit, uniquely identified
+application confirmation into an append-only application event; raw message
+content remains transient and ambiguous messages cannot mutate workspace state.
 Workspace state and remote-privacy inspection are similarly isolated from the
 mutating initialization and connection workflow.
 Project reporting uses typed artifact-status records and shared freshness

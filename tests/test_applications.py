@@ -193,6 +193,40 @@ def test_outcomes_are_append_only_and_idempotent(tmp_path: Path):
     assert stored["events"][1]["feedback_verbatim"] == "We selected other candidates."
 
 
+def test_automated_event_preserves_structured_provenance_without_message_content(tmp_path: Path):
+    root = tmp_path / "applications"
+    record = write_application(root, tmp_path)
+    application_id = record["application"]["id"]
+
+    result = append_event(
+        root,
+        application_id,
+        "applied",
+        "2026-09-02",
+        stage=None,
+        feedback=None,
+        note=None,
+        supersedes=None,
+        apply=True,
+        event_type="application_confirmed",
+        occurred_at="2026-09-02T14:30:00+00:00",
+        source_type="gmail-automation",
+        source_reference="opaque-reference",
+        confidence=0.97,
+        classifier_version="rules-v1",
+        automation_policy="confirmation-v1",
+    )
+
+    event = result["event"]
+    assert event["event_type"] == "application_confirmed"
+    assert event["occurred_at"] == "2026-09-02T14:30:00+00:00"
+    assert event["source"] == {
+        "type": "gmail-automation",
+        "reference": "opaque-reference",
+    }
+    assert event["automation"]["confidence"] == 0.97
+
+
 def test_outcome_correction_supersedes_an_earlier_event(tmp_path: Path):
     root = tmp_path / "applications"
     record = write_application(root, tmp_path)
@@ -457,12 +491,11 @@ def test_pending_interviews_do_not_inflate_concluded_rate(tmp_path: Path):
 
 def test_cli_requires_apply_before_writing(tmp_path: Path, capsys, monkeypatch):
     monkeypatch.chdir(tmp_path)
+    (tmp_path / ".resume-builder.json").write_text("{}\n", encoding="utf-8")
     root = tmp_path / "applications"
 
     status = main(
         [
-            "--root",
-            str(root),
             "record",
             "--company",
             "Example",
@@ -477,6 +510,18 @@ def test_cli_requires_apply_before_writing(tmp_path: Path, capsys, monkeypatch):
     assert status == 0
     assert output["applied"] is False
     assert not root.exists()
+
+
+def test_cli_refuses_application_storage_outside_private_workspace(
+    tmp_path: Path, capsys, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+
+    status = main(["list"])
+
+    captured = capsys.readouterr()
+    assert status == 2
+    assert "active private workspace" in captured.err
 
 
 def test_legacy_disposition_migration_requires_real_application_dates(tmp_path: Path):

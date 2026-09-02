@@ -219,11 +219,14 @@ def test_possible_reposts_require_distinct_dates_and_posting_identities(tmp_path
             ((start + timedelta(days=15)).isoformat(), earlier_job_id),
         )
 
-    candidates = db.refresh_possible_reposts()
+    candidates = db.possible_reposts()
 
     assert len(candidates) == 1
     assert candidates[0]["first_seen_gap_days"] == 30
     assert candidates[0]["confidence"] == 0.85
+    with db.connect() as conn:
+        stored = conn.execute("SELECT COUNT(*) FROM possible_reposts").fetchone()[0]
+    assert stored == 0
 
 
 def test_possible_reposts_exclude_concurrent_roles_and_aggregators(tmp_path):
@@ -238,7 +241,7 @@ def test_possible_reposts_exclude_concurrent_roles_and_aggregators(tmp_path):
     second.description_html = f"<p>{second.description_text}</p>"
     db.record_result(result(first, start))
     db.record_result(result(second, start))
-    assert db.refresh_possible_reposts() == []
+    assert db.possible_reposts() == []
 
     with db.connect() as conn:
         jobs = conn.execute("SELECT id FROM jobs ORDER BY id").fetchall()
@@ -246,7 +249,7 @@ def test_possible_reposts_exclude_concurrent_roles_and_aggregators(tmp_path):
             "UPDATE jobs SET first_seen_at=? WHERE id=?",
             ((start + timedelta(days=30)).isoformat(), jobs[-1][0]),
         )
-    assert db.refresh_possible_reposts(aggregator_companies={"Example, Inc."}) == []
+    assert db.possible_reposts(aggregator_companies={"Example, Inc."}) == []
 
 
 def test_possible_reposts_exclude_overlapping_active_postings(tmp_path):
@@ -260,7 +263,7 @@ def test_possible_reposts_exclude_overlapping_active_postings(tmp_path):
     db.record_result(result(first, start))
     db.record_result(result(second, start + timedelta(days=30)))
 
-    assert db.refresh_possible_reposts() == []
+    assert db.possible_reposts() == []
 
 
 def test_legacy_false_remote_is_persisted_as_unknown_not_onsite(tmp_path):

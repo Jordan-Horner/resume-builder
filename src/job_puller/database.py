@@ -1232,14 +1232,14 @@ class InventoryDatabase:
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def refresh_possible_reposts(
+    def possible_reposts(
         self,
         *,
         window_days: int = 90,
         min_span_days: int = 1,
         aggregator_companies: set[str] | None = None,
     ) -> list[dict[str, object]]:
-        """Derive conservative same-company, same-title repost relationships."""
+        """Return conservative repost candidates without mutating inventory state."""
         if window_days < 1 or min_span_days < 1 or min_span_days > window_days:
             raise ValueError("repost span must be positive and no greater than the window")
         aggregators = {normalized_key(value) for value in (aggregator_companies or set())}
@@ -1300,23 +1300,4 @@ class InventoryDatabase:
                             "confidence": 0.85,
                         }
                     )
-            conn.execute("DELETE FROM possible_reposts")
-            detected_at = _iso(datetime.now(UTC))
-            conn.executemany(
-                """INSERT INTO possible_reposts(
-                       earlier_job_id, later_job_id, reason, confidence,
-                       first_seen_gap_days, detected_at
-                   ) VALUES (?, ?, ?, ?, ?, ?)""",
-                (
-                    (
-                        item["earlier_job_id"],
-                        item["later_job_id"],
-                        item["reason"],
-                        item["confidence"],
-                        item["first_seen_gap_days"],
-                        detected_at,
-                    )
-                    for item in candidates
-                ),
-            )
         return candidates

@@ -143,6 +143,13 @@ def _event(
     feedback: str | None = None,
     note: str | None = None,
     supersedes: str | None = None,
+    event_type: str | None = None,
+    occurred_at: str | None = None,
+    source_type: str | None = None,
+    source_reference: str | None = None,
+    confidence: float | None = None,
+    classifier_version: str | None = None,
+    automation_policy: str | None = None,
 ) -> dict[str, Any]:
     if status not in STATUSES:
         raise ValueError(f"invalid application status: {status}")
@@ -154,8 +161,15 @@ def _event(
         feedback or "",
         note or "",
         supersedes or "",
+        event_type or "",
+        occurred_at or "",
+        source_type or "",
+        source_reference or "",
+        str(confidence) if confidence is not None else "",
+        classifier_version or "",
+        automation_policy or "",
     )
-    return {
+    event: dict[str, Any] = {
         "id": f"EVT-{_digest(*parts)}",
         "status": status,
         "effective_on": effective_on,
@@ -165,6 +179,27 @@ def _event(
         "note": _optional(note),
         "supersedes": _optional(supersedes),
     }
+    if event_type:
+        event["event_type"] = event_type.strip()
+    if occurred_at:
+        parsed = datetime.fromisoformat(occurred_at)
+        if parsed.tzinfo is None:
+            raise ValueError("application event occurred_at must include a timezone")
+        event["occurred_at"] = parsed.isoformat()
+    if source_type:
+        event["source"] = {
+            "type": source_type.strip(),
+            "reference": _optional(source_reference),
+        }
+    if confidence is not None or classifier_version or automation_policy:
+        if confidence is None or not 0 <= confidence <= 1:
+            raise ValueError("automated application event confidence must be between 0 and 1")
+        event["automation"] = {
+            "confidence": confidence,
+            "classifier_version": _optional(classifier_version),
+            "policy": _optional(automation_policy),
+        }
+    return event
 
 
 def validate_record(record: dict[str, Any]) -> None:
@@ -199,6 +234,27 @@ def validate_record(record: dict[str, Any]) -> None:
         supersedes = event.get("supersedes")
         if supersedes is not None and supersedes not in event_ids:
             raise ValueError("an event may supersede only an earlier event")
+        occurred_at = event.get("occurred_at")
+        if occurred_at is not None:
+            if not isinstance(occurred_at, str):
+                raise ValueError("application event occurred_at must be a string")
+            parsed = datetime.fromisoformat(occurred_at)
+            if parsed.tzinfo is None:
+                raise ValueError("application event occurred_at must include a timezone")
+        source = event.get("source")
+        if source is not None and (
+            not isinstance(source, dict)
+            or not isinstance(source.get("type"), str)
+            or not source["type"].strip()
+        ):
+            raise ValueError("application event source is invalid")
+        automation = event.get("automation")
+        if automation is not None and (
+            not isinstance(automation, dict)
+            or not isinstance(automation.get("confidence"), int | float)
+            or not 0 <= automation["confidence"] <= 1
+        ):
+            raise ValueError("application event automation metadata is invalid")
     answer_ids: set[str] = set()
     for answer in answers:
         if not isinstance(answer, dict) or answer.get("state") not in ANSWER_STATES:
@@ -318,6 +374,54 @@ def build_record(args: argparse.Namespace, workspace: Path) -> dict[str, Any]:
     return record
 
 
+def build_automated_record(
+    *,
+    company: str,
+    role: str,
+    applied_on: str,
+    occurred_at: str,
+    source_reference: str,
+    confidence: float,
+    classifier_version: str,
+    automation_policy: str,
+    workspace: Path,
+    job_id: str | None = None,
+    application_url: str | None = None,
+) -> dict[str, Any]:
+    """Build an email-confirmed application without retaining message content."""
+    args = argparse.Namespace(
+        company=company,
+        role=role,
+        on=applied_on,
+        job_id=job_id,
+        url=application_url,
+        role_family=None,
+        screen_category=None,
+        match_classification=None,
+        target=None,
+        resume=None,
+        note=None,
+    )
+    record = build_record(args, workspace)
+    application_id = record["application"]["id"]
+    record["events"] = [
+        _event(
+            application_id,
+            "applied",
+            applied_on,
+            event_type="application_confirmed",
+            occurred_at=occurred_at,
+            source_type="gmail-automation",
+            source_reference=source_reference,
+            confidence=confidence,
+            classifier_version=classifier_version,
+            automation_policy=automation_policy,
+        )
+    ]
+    validate_record(record)
+    return record
+
+
 def _write_or_preview(root: Path, record: dict[str, Any], *, apply: bool) -> dict[str, Any]:
     path = root / f"{record['application']['id']}.json"
     if apply:
@@ -347,6 +451,13 @@ def append_event(
     note: str | None,
     supersedes: str | None,
     apply: bool,
+    event_type: str | None = None,
+    occurred_at: str | None = None,
+    source_type: str | None = None,
+    source_reference: str | None = None,
+    confidence: float | None = None,
+    classifier_version: str | None = None,
+    automation_policy: str | None = None,
 ) -> dict[str, Any]:
     path = root / f"{application_id}.json"
     record = load_record(path)
@@ -358,6 +469,13 @@ def append_event(
         feedback=feedback,
         note=note,
         supersedes=supersedes,
+        event_type=event_type,
+        occurred_at=occurred_at,
+        source_type=source_type,
+        source_reference=source_reference,
+        confidence=confidence,
+        classifier_version=classifier_version,
+        automation_policy=automation_policy,
     )
     if supersedes and supersedes not in {item["id"] for item in record["events"]}:
         raise ValueError(f"superseded event not found: {supersedes}")
@@ -596,7 +714,6 @@ def migrate_dispositions(
 
 def parser() -> argparse.ArgumentParser:
     command_parser = argparse.ArgumentParser(prog="resume-builder application")
-    command_parser.add_argument("--root", type=Path, default=DEFAULT_ROOT)
     commands = command_parser.add_subparsers(dest="command", required=True)
 
     record = commands.add_parser("record", help="Preview or record one submitted application")
@@ -639,6 +756,7 @@ def parser() -> argparse.ArgumentParser:
     show.add_argument("application_id")
     commands.add_parser("report", help="Report outcomes without changing match rules")
     commands.add_parser("validate", help="Validate application records and fact citations")
+
     migrate = commands.add_parser(
         "migrate-dispositions", help="Preview legacy applied-disposition migration"
     )
@@ -651,7 +769,11 @@ def parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parser().parse_args(argv)
-    root = args.root.expanduser()
+    workspace = Path.cwd().resolve()
+    if not (workspace / ".resume-builder.json").is_file():
+        print("application commands require an active private workspace", file=sys.stderr)
+        return 2
+    root = workspace / DEFAULT_ROOT
     try:
         if args.command == "record":
             result = _write_or_preview(root, build_record(args, Path.cwd()), apply=args.apply)
