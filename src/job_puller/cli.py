@@ -182,8 +182,12 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 2
-    print(f"Updating inventory with {len(providers)} provider source(s)...")
-    summaries = service.scrape(selected)
+    print(f"Updating inventory with {len(providers)} provider source(s)...", flush=True)
+
+    def report_provider_start(index: int, total: int, source_key: str) -> None:
+        print(f"[{index}/{total}] Fetching {source_key}...", flush=True)
+
+    summaries = service.scrape(selected, on_provider_start=report_provider_start)
     failed = 0
     for summary in summaries:
         state = "EMPTY" if summary.suspicious_empty else "OK" if summary.success else "FAILED"

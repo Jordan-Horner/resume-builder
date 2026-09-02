@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -97,9 +98,18 @@ class InventoryService:
             return checkpoint - timedelta(hours=self.config.checkpoint_overlap_hours)
         return now - timedelta(days=self.config.initial_lookback_days)
 
-    def scrape(self, selected: set[str] | None = None) -> list[RunSummary]:
+    def scrape(
+        self,
+        selected: set[str] | None = None,
+        *,
+        on_provider_start: Callable[[int, int, str], None] | None = None,
+    ) -> list[RunSummary]:
         summaries = []
-        for provider in self.providers(selected):
+        providers = self.providers(selected)
+        total = len(providers)
+        for index, provider in enumerate(providers, start=1):
+            if on_provider_start is not None:
+                on_provider_start(index, total, provider.source_key)
             cutoff = self.cutoff(provider.source_key)
             result = provider.fetch(cutoff)
             if result.observations:

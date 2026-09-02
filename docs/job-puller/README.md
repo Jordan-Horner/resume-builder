@@ -72,7 +72,10 @@ the database, refreshes the selected providers, and writes a shortlist containin
 only active canonical jobs that did not exist before that refresh. Existing,
 updated, reopened, and cross-source duplicate jobs are not new. The command
 writes `job-search/latest-refresh.json`, `job-search/new-jobs.json`, and
-`job-search/new-jobs.md`. An interrupted refresh leaves an `in_progress`
+`job-search/new-jobs.md`. While the refresh runs, it immediately prints the
+total provider count and a flushed progress line before each provider source is
+queried, so slow commercial-board searches remain visibly active. An
+interrupted refresh leaves an `in_progress`
 manifest and the next run recovers canonical jobs created after that interrupted
 run began. A provider failure produces a failed or explicitly partial result
 instead of falling back to the prior shortlist.

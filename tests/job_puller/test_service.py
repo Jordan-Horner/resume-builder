@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 from job_puller.config import InventoryConfig
 from job_puller.database import InventoryDatabase
+from job_puller.models import ProviderResult
 from job_puller.providers.linkedin import LinkedInGuestProvider
 from job_puller.service import InventoryService
 
@@ -48,3 +49,39 @@ def test_service_can_select_one_provider_type(tmp_path):
     providers = InventoryService(configured, db).providers({"indeed"})
     assert len(providers) == 1
     assert providers[0].name == "indeed"
+
+
+def test_scrape_reports_each_provider_before_fetching(tmp_path, monkeypatch):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    service = InventoryService(config(), db)
+    events = []
+
+    class StubProvider:
+        name = "stub"
+        source_key = "stub:board"
+
+        def fetch(self, since):
+            events.append(("fetch", since))
+            now = datetime.now(UTC)
+            return ProviderResult(
+                source_key=self.source_key,
+                provider=self.name,
+                observations=[],
+                started_at=now,
+                completed_at=now,
+                success=True,
+                suspicious_empty=False,
+            )
+
+    monkeypatch.setattr(service, "providers", lambda _selected: [StubProvider()])
+
+    summaries = service.scrape(
+        on_provider_start=lambda index, total, source_key: events.append(
+            ("start", index, total, source_key)
+        )
+    )
+
+    assert events[0] == ("start", 1, 1, "stub:board")
+    assert events[1][0] == "fetch"
+    assert summaries[0].source_key == "stub:board"
