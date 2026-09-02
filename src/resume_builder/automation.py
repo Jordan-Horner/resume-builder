@@ -814,6 +814,16 @@ def run_forever(service: AutomationService, stop: threading.Event) -> int:
                 )
             ),
         }
+        schedule_summary = ", ".join(
+            f"{task}={due[task].astimezone(service.config.timezone).isoformat(timespec='minutes')}"
+            for task, enabled in (
+                ("jobs", service.config.jobs.enabled),
+                ("gmail", service.config.gmail.enabled),
+            )
+            if enabled
+        )
+        detail = f" Next runs: {schedule_summary}." if schedule_summary else ""
+        print(f"Automation service started.{detail}", flush=True)
         failures = {task: 0 for task in TASKS}
         next_delivery = now
         while not stop.is_set():
@@ -851,6 +861,7 @@ def run_forever(service: AutomationService, stop: threading.Event) -> int:
                 next_delivery = now + timedelta(minutes=DEFAULT_NOTIFICATION_RETRY_MINUTES)
             wait_seconds = 30 if ran else 60
             stop.wait(wait_seconds)
+        print("Automation service stopped.", flush=True)
     return 0
 
 

@@ -120,9 +120,10 @@ docker compose up -d
 docker compose logs -f automation
 ```
 
-The container log announces when each scanner starts and prints a content-free
-completion summary with statuses and counts. It never prints Gmail subjects,
-bodies, attachments, or message IDs.
+The container log immediately confirms that the scheduler started and shows the
+next job and Gmail scan times. It also announces when each scanner starts and
+prints a content-free completion summary with statuses and counts. It never
+prints Gmail subjects, bodies, attachments, or message IDs.
 
 The image runs as a non-root user, exposes no port, has a built-in health check,
 and mounts rather than copies private data:

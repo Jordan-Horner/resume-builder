@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -22,6 +23,7 @@ from resume_builder.automation import (
     load_config,
     next_job_run,
     render_default_config,
+    run_forever,
 )
 from resume_builder.automation import main as automation_main
 
@@ -310,6 +312,25 @@ def test_task_logs_privacy_safe_start_and_summary(tmp_path: Path, capsys) -> Non
     assert "Completed gmail automation scan: success" in output
     assert "examined=3" in output
     assert "must not be logged" not in output
+
+
+def test_service_logs_startup_schedule_before_waiting(tmp_path: Path, capsys) -> None:
+    config_path = tmp_path / "config.yml"
+    config_path.write_text(render_default_config("America/New_York"), encoding="utf-8")
+    service = AutomationService(
+        workspace=tmp_path,
+        config=load_config(config_path),
+        state=AutomationState(tmp_path / "runtime" / "automation.sqlite"),
+    )
+    stop = threading.Event()
+    stop.set()
+
+    assert run_forever(service, stop) == 0
+    output = capsys.readouterr().out
+    assert "Automation service started." in output
+    assert "Next runs: jobs=" in output
+    assert ", gmail=" in output
+    assert "Automation service stopped." in output
 
 
 def test_partial_job_coverage_is_visible_without_discarding_matches(tmp_path: Path) -> None:
