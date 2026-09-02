@@ -143,7 +143,7 @@ def test_application_history_overlays_legacy_dispositions(tmp_path: Path):
                         "status": "rejected",
                         "effective_on": "2026-09-05",
                         "recorded_at": "2026-09-05T12:00:00+00:00",
-                    }
+                    },
                 ],
                 "answers": [],
             }

@@ -260,9 +260,13 @@ def validate_record(record: dict[str, Any]) -> None:
             or not 0 <= automation["confidence"] <= 1
         ):
             raise ValueError("application event automation metadata is invalid")
-        if automation is not None and automation.get("match_confidence") is not None and (
-            not isinstance(automation["match_confidence"], int | float)
-            or not 0 <= automation["match_confidence"] <= 1
+        if (
+            automation is not None
+            and automation.get("match_confidence") is not None
+            and (
+                not isinstance(automation["match_confidence"], int | float)
+                or not 0 <= automation["match_confidence"] <= 1
+            )
         ):
             raise ValueError("application event match confidence is invalid")
     answer_ids: set[str] = set()

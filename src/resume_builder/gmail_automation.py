@@ -109,8 +109,12 @@ OFFER_PATTERNS = (
     re.compile(r"\boffer of employment\b", re.IGNORECASE),
 )
 ASSESSMENT_PATTERNS = (
-    re.compile(r"\binvit(?:e|ed|ing) you to (?:complete|take) (?:an? |the )?.*assessment\b", re.IGNORECASE),
-    re.compile(r"\b(?:complete|take) (?:our |the |an? )?(?:technical |coding )?assessment\b", re.IGNORECASE),
+    re.compile(
+        r"\binvit(?:e|ed|ing) you to (?:complete|take) (?:an? |the )?.*assessment\b", re.IGNORECASE
+    ),
+    re.compile(
+        r"\b(?:complete|take) (?:our |the |an? )?(?:technical |coding )?assessment\b", re.IGNORECASE
+    ),
     re.compile(r"\b(?:coding|technical) challenge\b", re.IGNORECASE),
     re.compile(r"\btake-home (?:assessment|assignment|exercise)\b", re.IGNORECASE),
 )
@@ -127,7 +131,9 @@ RECRUITER_CONTACT_PATTERNS = (
         r"(?:about|regarding) (?:your application|the|this|our)\b",
         re.IGNORECASE,
     ),
-    re.compile(r"\bschedule (?:a|an) (?:brief )?call to discuss (?:the|this|your)\b", re.IGNORECASE),
+    re.compile(
+        r"\bschedule (?:a|an) (?:brief )?call to discuss (?:the|this|your)\b", re.IGNORECASE
+    ),
 )
 CONDITIONAL_REJECTION = re.compile(
     r"\bif (?:you|your application) (?:are|is|were) not selected\b",
@@ -619,9 +625,7 @@ def _connect_step_payload(number: int) -> dict[str, object]:
     else:
         next_action = {
             "label": "Connect Gmail with the downloaded Desktop OAuth JSON",
-            "command": (
-                "resume-builder gmail connect --credentials /absolute/path/to/client.json"
-            ),
+            "command": ("resume-builder gmail connect --credentials /absolute/path/to/client.json"),
         }
     return {
         "valid": True,
@@ -901,8 +905,8 @@ def classify_lifecycle_event(message: GmailMessage) -> tuple[GmailLifecycleEvent
         return None, "invalid-identity-length"
     if not _valid_identity_pair(company, role):
         return None, "invalid-identity-value"
-    confidence = 0.92 + (0.03 if _authenticated(message) else 0) + (
-        0.02 if requisition_match else 0
+    confidence = (
+        0.92 + (0.03 if _authenticated(message) else 0) + (0.02 if requisition_match else 0)
     )
     return (
         GmailLifecycleEvent(
@@ -997,7 +1001,9 @@ def _match_application(
     matches = [
         record
         for record in (
-            records if records is not None else (item for _, item in iter_records(applications_root))
+            records
+            if records is not None
+            else (item for _, item in iter_records(applications_root))
         )
         if _identity(record["application"]["company"]) == _identity(confirmation.company)
         and _identity(record["application"]["role"]) == _identity(confirmation.role)
@@ -1048,17 +1054,13 @@ def _resolve_existing_application(
             return matches[0], 0.99, "company-role"
     if thread_application_id:
         matches = [
-            record
-            for record in records
-            if record["application"]["id"] == thread_application_id
+            record for record in records if record["application"]["id"] == thread_application_id
         ]
         if len(matches) == 1:
             return matches[0], 0.97, "thread"
     if sender_application_id:
         matches = [
-            record
-            for record in records
-            if record["application"]["id"] == sender_application_id
+            record for record in records if record["application"]["id"] == sender_application_id
         ]
         if len(matches) == 1:
             return matches[0], 0.96, "sender-domain"
@@ -1506,7 +1508,9 @@ def parser() -> argparse.ArgumentParser:
         help="Reconsider previously unresolved messages against current applications",
     )
 
-    backfill = commands.add_parser("backfill", help="Find historical application lifecycle messages")
+    backfill = commands.add_parser(
+        "backfill", help="Find historical application lifecycle messages"
+    )
     backfill.add_argument("--label", default="")
     backfill.add_argument("--query", default=DEFAULT_BACKFILL_QUERY)
     backfill.add_argument("--apply", action="store_true")

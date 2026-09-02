@@ -147,10 +147,7 @@ def test_classifier_extracts_common_body_identity_formats():
     role_at_company = parse_message(
         gmail_payload(
             subject="Example Corp - Thank You for Applying",
-            body=(
-                "Thank you for applying for the Cloud Support Engineer role "
-                "at Example Corp."
-            ),
+            body=("Thank you for applying for the Cloud Support Engineer role at Example Corp."),
             sender="Example Recruiting <recruiting@example.com>",
         )
     )
@@ -181,8 +178,7 @@ def test_classifier_rejects_nonsensical_or_malformed_identity_pairs():
     embedded_company = parse_message(
         gmail_payload(
             subject=(
-                "Thank you for applying to Example Corp for the Security Engineer "
-                "at Example Corp"
+                "Thank you for applying to Example Corp for the Security Engineer at Example Corp"
             )
         )
     )
@@ -209,8 +205,7 @@ def test_thanks_for_your_interest_requires_body_context():
         gmail_payload(
             subject="Thanks for your interest in Example Corp",
             body=(
-                "After careful consideration, we decided not to move forward "
-                "with your application."
+                "After careful consideration, we decided not to move forward with your application."
             ),
             sender="Example Recruiting <recruiting@example.com>",
         )
@@ -324,9 +319,7 @@ def test_ambiguous_messages_require_explicit_replay(tmp_path: Path):
     )
 
     assert state.processed("mailbox-opaque", "unresolved") is True
-    assert (
-        state.processed("mailbox-opaque", "unresolved", replay_ambiguous=True) is False
-    )
+    assert state.processed("mailbox-opaque", "unresolved", replay_ambiguous=True) is False
 
 
 def test_shared_recruiting_platform_domains_are_not_application_identity():
