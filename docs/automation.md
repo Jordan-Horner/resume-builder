@@ -133,6 +133,11 @@ message IDs, OAuth credentials, webhook URLs, job descriptions, or provider
 responses. The Compose configuration uses Docker's `json-file` driver with
 three 10 MB files, so rotation remains the container runtime's responsibility.
 
+Remote deployments should set `RESUME_BUILDER_IMAGE_TAG` to the exact Git commit
+being built. Reusing the default `local` tag can cause a container host to reuse
+an older image even after the build context changes. An immutable tag makes the
+requested source version and the running image agree.
+
 Restarting the container does not itself run either scanner. The service reads
 the last completion times from the external state database, logs the resulting
 schedule, and waits until a task is due. Replacing the container is therefore

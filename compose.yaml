@@ -2,7 +2,7 @@ services:
   automation:
     build:
       context: .
-    image: resume-builder-automation:local
+    image: resume-builder-automation:${RESUME_BUILDER_IMAGE_TAG:-local}
     restart: unless-stopped
     environment:
       RESUME_BUILDER_WORKSPACE: /workspace
