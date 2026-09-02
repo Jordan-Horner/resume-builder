@@ -5,7 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from resume_builder import synthesis
+from resume_builder import selection_guard, selection_review, synthesis
+from resume_builder.synthesis_models import summary_strategy_payload
 
 
 def add_fact(path: Path, fact_id: str, fact_type: str, extra: str = "") -> None:
@@ -409,6 +410,29 @@ def upgrade_to_v10(path: Path) -> None:
         confidence: 70
     selected_core_job_id: operational-owner
     core_job_decision: model-selected""",
+        1,
+    )
+    path.write_text(text, encoding="utf-8")
+
+
+def upgrade_to_v11(path: Path) -> None:
+    """Require a structured summary strategy without changing visible prose."""
+    upgrade_to_v10(path)
+    text = path.read_text(encoding="utf-8")
+    text = text.replace("version: 10", "version: 11", 1)
+    text = text.replace(
+        "summary_fact_ids: [FACT-001]",
+        """summary_fact_ids: [FACT-001]
+summary_strategy:
+  reader_conclusion: Intended hiring conclusion for the planned resume.
+  professional_frame: Evidence-supported professional frame.
+  fit_posture:
+    classification: direct
+    controlling_criterion_ids: []
+    bounded_criterion_ids: []
+  operating_scope_fact_ids: [FACT-001]
+  proof_anchor_story_id: operational-improvement
+  delegated_to_body: [secondary detail]""",
         1,
     )
     path.write_text(text, encoding="utf-8")
@@ -1182,6 +1206,7 @@ def test_v10_reports_core_job_scores_in_role_arc_payload(tmp_path: Path) -> None
     upgrade_to_v10(path)
     plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
 
+    assert plan.summary_strategy is None
     payload = synthesis.role_arc_payloads(plan)[0]
 
     assert payload["core_job"] == {
@@ -1200,6 +1225,152 @@ def test_v10_reports_core_job_scores_in_role_arc_payload(tmp_path: Path) -> None
             },
         ],
     }
+
+
+def test_v11_loads_and_reports_structured_summary_strategy(tmp_path: Path) -> None:
+    vault, path = project(tmp_path)
+    upgrade_to_v11(path)
+
+    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    assert plan.summary_strategy is not None
+    assert plan.summary_strategy.fit_posture.classification == "direct"
+    assert plan.summary_strategy.operating_scope_fact_ids == ("FACT-001",)
+    assert plan.summary_strategy.proof_anchor_story_id == "operational-improvement"
+    assert summary_strategy_payload(plan.summary_strategy) == {
+        "reader_conclusion": "Intended hiring conclusion for the planned resume.",
+        "professional_frame": "Evidence-supported professional frame.",
+        "fit_posture": {
+            "classification": "direct",
+            "controlling_criterion_ids": [],
+            "bounded_criterion_ids": [],
+        },
+        "operating_scope_fact_ids": ["FACT-001"],
+        "proof_anchor_story_id": "operational-improvement",
+        "delegated_to_body": ["secondary detail"],
+    }
+
+    payload = {
+        "section_order": [
+            "summary",
+            "experience",
+            "projects",
+            "education",
+            "certifications",
+            "skills",
+        ],
+        "summary": {"text": "Improves important operational work.", "evidence": ["FACT-001"]},
+        "summary_evidence": ["FACT-001"],
+        "competencies": [],
+        "experience": [
+            {
+                "evidence": ["ROLE-001"],
+                "bullets": [
+                    {
+                        "text": "Improved operations.",
+                        "evidence": ["FACT-001"],
+                        "story": "operational-improvement",
+                    },
+                    {
+                        "text": "Added technical depth.",
+                        "evidence": ["FACT-002"],
+                        "story": "supporting-detail",
+                    },
+                ],
+            }
+        ],
+        "projects": [],
+        "education": [],
+        "certifications": [],
+        "skills": [],
+    }
+    audited = synthesis.audit_synthesis(payload, plan)
+    assert audited["summary_strategy"] == summary_strategy_payload(plan.summary_strategy)
+    selected = selection_guard.build_selection(plan, audited)
+    assert selected["summary_strategy"] == summary_strategy_payload(plan.summary_strategy)
+    manifest = tmp_path / "build" / "resumes" / "operations" / "build-manifest.json"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text("{}", encoding="utf-8")
+    package_path = selection_review.build_selection_review_package(
+        tmp_path,
+        plan.resume,
+        plan,
+        selected,
+        manifest=manifest,
+    )
+    package = json.loads(package_path.read_text(encoding="utf-8"))
+    assert package["review_context"]["summary_strategy"] == summary_strategy_payload(
+        plan.summary_strategy
+    )
+
+
+def test_v11_accepts_direct_fit_with_bounded_gaps(tmp_path: Path) -> None:
+    vault, path = project(tmp_path)
+    upgrade_to_v11(path)
+    path.write_text(
+        path.read_text(encoding="utf-8")
+        .replace("classification: direct", "classification: direct-with-bounded-gaps", 1)
+        .replace("bounded_criterion_ids: []", "bounded_criterion_ids: [criterion-b]", 1),
+        encoding="utf-8",
+    )
+
+    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+
+    assert plan.summary_strategy is not None
+    assert plan.summary_strategy.fit_posture.bounded_criterion_ids == ("criterion-b",)
+
+
+@pytest.mark.parametrize(
+    ("replacement", "message"),
+    [
+        (
+            "operating_scope_fact_ids: [FACT-002]",
+            "operating scope must be included in summary_fact_ids",
+        ),
+        (
+            "proof_anchor_story_id: supporting-detail",
+            "proof anchor core facts must be included in summary_fact_ids",
+        ),
+        (
+            "classification: adjacent",
+            "fit posture disagrees with target_mode",
+        ),
+    ],
+)
+def test_v11_rejects_incoherent_summary_strategy(
+    tmp_path: Path,
+    replacement: str,
+    message: str,
+) -> None:
+    vault, path = project(tmp_path)
+    upgrade_to_v11(path)
+    original = {
+        "operating_scope_fact_ids: [FACT-002]": "operating_scope_fact_ids: [FACT-001]",
+        "proof_anchor_story_id: supporting-detail": (
+            "proof_anchor_story_id: operational-improvement"
+        ),
+        "classification: adjacent": "classification: direct",
+    }[replacement]
+    path.write_text(
+        path.read_text(encoding="utf-8").replace(original, replacement, 1),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=message):
+        synthesis.load_synthesis_plan(path, tmp_path, vault)
+
+
+def test_v11_requires_bounded_gap_for_direct_bounded_posture(tmp_path: Path) -> None:
+    vault, path = project(tmp_path)
+    upgrade_to_v11(path)
+    path.write_text(
+        path.read_text(encoding="utf-8").replace(
+            "classification: direct", "classification: direct-with-bounded-gaps", 1
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="requires bounded criteria"):
+        synthesis.load_synthesis_plan(path, tmp_path, vault)
 
 
 def test_v7_rejects_duplicate_content_template_sections(tmp_path: Path) -> None:

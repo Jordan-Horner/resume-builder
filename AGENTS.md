@@ -364,19 +364,21 @@ indexes. The scripts under
 - Follow `.agents/skills/build-resume/SKILL.md` when generating or changing a
   resume.
 - Before drafting a fresh baseline or substantial rewrite, create the build
-  skill's versioned synthesis plan under `resumes/plans/`. Use schema v10 and
+  skill's versioned synthesis plan under `resumes/plans/`. Use schema v11 and
   select a named content template plus a separate visual theme under its
   `resume_template` section. Keep section architecture independent from
   evidence selection and bullet allocation. Group facts into coherent career stories,
   assign each proposed bullet a distinct job, preserve supported progression,
   distinguish core stories from optional supporting stories, define the
   summary's job and evidence, and record intentional omissions. For new work,
-  use plan schema v10 to select the resume template, resolve the page budget,
+  use plan schema v11 to select the resume template, resolve the page budget,
   identify required role-anchor and distinct selling stories, and expose scored
   core-job interpretations; when the selected interpretation is within 10
   points of another, ask the user before drafting and record the answer;
-  declare `direct`, `adjacent`,
-  or `exploratory` targeting,
+  declare `direct`, `adjacent`, or `exploratory` targeting; record a structured
+  summary strategy containing the intended reader conclusion, professional
+  frame, fit posture and criterion boundaries, operating-scope facts, one
+  proof-anchor story, and details delegated to the body;
   the complete concept-fit map, reviewer risks, and the presentation strategy;
   give each story one claim focus and a minimum core evidence set, and treat the
   rest of its fact pool as optional support rather than sentence content. Give

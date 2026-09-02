@@ -13,6 +13,7 @@ from .atomic import atomic_write_json
 from .compilation import sha256_file
 from .layout import contained_path
 from .synthesis import SynthesisPlan
+from .synthesis_models import summary_strategy_payload
 
 
 def _digest(value: object) -> str:
@@ -102,6 +103,11 @@ def build_selection(
         "progression_role_ids": sorted(plan.progression),
         "stories": stories,
         "summary_fact_ids": sorted(plan.summary_fact_ids),
+        **(
+            {"summary_strategy": summary_strategy_payload(plan.summary_strategy)}
+            if plan.version >= 11
+            else {}
+        ),
         "role_arcs": role_arcs,
     }
     return selection

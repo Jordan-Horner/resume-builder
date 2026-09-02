@@ -43,6 +43,7 @@ FORBIDDEN_IMPORTS = {
     "synthesis_loader": {"synthesis", "synthesis_audit"},
     "synthesis_models": {"synthesis", "synthesis_audit", "synthesis_loader"},
     "synthesis_schema": {"synthesis", "synthesis_audit", "synthesis_loader"},
+    "synthesis_summary": {"synthesis", "synthesis_audit", "synthesis_loader"},
 }
 
 

@@ -13,6 +13,7 @@ from .compilation import sha256_file
 from .layout import contained_path
 from .selection_guard import selection_digest
 from .synthesis import SynthesisPlan
+from .synthesis_models import summary_strategy_payload
 from .validation import parse_frontmatter
 
 SELECTION_DECISIONS = {"approved", "strategy-revise", "needs-user-decision"}
@@ -517,6 +518,11 @@ def build_selection_review_package(
             "target_mode": plan.target_mode,
             "summary_job": plan.summary_job,
             "summary_fact_ids": list(plan.summary_fact_ids),
+            **(
+                {"summary_strategy": summary_strategy_payload(plan.summary_strategy)}
+                if plan.version >= 11
+                else {}
+            ),
             "progression_role_ids": list(plan.progression),
             "concept_fit": [
                 {
@@ -572,6 +578,12 @@ def build_selection_review_package(
                 "Inspect the selected core-job interpretation and every confidence-rated alternative before judging its role anchor.",
                 "Treat confidence values as comparative evidence estimates, not calibrated probabilities.",
                 "When the selected interpretation is within 10 points of an alternative, require a recorded user-confirmed decision before approval.",
+            ],
+            "summary_strategy_test": [
+                "Judge whether the reader conclusion and professional frame reflect the complete supported hiring case.",
+                "Treat bounded gaps as evidence boundaries, not reasons to weaken an otherwise direct frame; treat controlling gaps as real limits.",
+                "Require operating scope before the proof anchor so one project does not replace a broader demonstrated fit.",
+                "Keep delegated technologies and secondary requirements out of the summary strategy when experience or skills can carry them.",
             ],
             "adverse_or_sensitive_context_may_be_selected_only_when": [
                 "the target requires the disclosure",

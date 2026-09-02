@@ -9,6 +9,12 @@ from pathlib import Path
 STORY_ID = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 SECTIONS = {"experience", "projects"}
 TARGET_MODES = {"direct", "adjacent", "exploratory"}
+SUMMARY_FIT_POSTURES = {
+    "direct",
+    "direct-with-bounded-gaps",
+    "adjacent",
+    "exploratory",
+}
 FIT_STATUSES = {"demonstrated", "transferable", "unsupported"}
 RISK_STATUSES = {"resolved", "partial", "unresolved"}
 COMPETENCY_DECISIONS = {"include", "omit"}
@@ -139,6 +145,45 @@ class ReviewerRisk:
 
 
 @dataclass(frozen=True)
+class SummaryFitPosture:
+    """How criterion gaps affect the summary's supported hiring frame."""
+
+    classification: str
+    controlling_criterion_ids: tuple[str, ...]
+    bounded_criterion_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SummaryStrategy:
+    """Structured hiring argument used before summary prose is drafted."""
+
+    reader_conclusion: str
+    professional_frame: str
+    fit_posture: SummaryFitPosture
+    operating_scope_fact_ids: tuple[str, ...]
+    proof_anchor_story_id: str
+    delegated_to_body: tuple[str, ...]
+
+
+def summary_strategy_payload(strategy: SummaryStrategy | None) -> dict[str, object] | None:
+    """Return the stable inspectable form of one summary strategy."""
+    if strategy is None:
+        return None
+    return {
+        "reader_conclusion": strategy.reader_conclusion,
+        "professional_frame": strategy.professional_frame,
+        "fit_posture": {
+            "classification": strategy.fit_posture.classification,
+            "controlling_criterion_ids": list(strategy.fit_posture.controlling_criterion_ids),
+            "bounded_criterion_ids": list(strategy.fit_posture.bounded_criterion_ids),
+        },
+        "operating_scope_fact_ids": list(strategy.operating_scope_fact_ids),
+        "proof_anchor_story_id": strategy.proof_anchor_story_id,
+        "delegated_to_body": list(strategy.delegated_to_body),
+    }
+
+
+@dataclass(frozen=True)
 class PresentationStrategy:
     """Explicit section and compression choices for the resume draft."""
 
@@ -201,6 +246,7 @@ class SynthesisPlan:
     stories: tuple[SynthesisStory, ...]
     exclusions: tuple[tuple[str, str], ...]
     gaps: tuple[str, ...]
+    summary_strategy: SummaryStrategy | None = None
     target_mode: str | None = None
     concept_fit: tuple[ConceptFit, ...] = ()
     reviewer_risks: tuple[ReviewerRisk, ...] = ()

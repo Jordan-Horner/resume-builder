@@ -55,8 +55,13 @@ The loader accepts all published schema versions so existing Git history remains
   selection. These are comparative planning estimates, not calibrated
   probabilities. When the selected candidate is within 10 points of another
   candidate, the agent must show the choices and ask the user before drafting.
+- **Version 11:** makes summary positioning inspectable before prose drafting.
+  It records the intended reader conclusion and professional frame, the fit
+  posture and criterion boundaries, the facts that establish operating scope,
+  one representative proof-anchor story, and the details deliberately
+  delegated to later sections.
 
-Use version 10 for new plans and substantial rewrites. Do not rename the plan or
+Use version 11 for new plans and substantial rewrites. Do not rename the plan or
 resume with a version suffix; the schema field and Git history carry the version.
 
 ## Required plan
@@ -188,6 +193,25 @@ Version 10 also records:
     Otherwise show the candidates and scores to the user, ask which best
     describes the actual job, and record `user-confirmed` after the answer.
 
+Version 11 also records:
+
+28. **Summary strategy:** `summary_strategy` separates the summary's planning
+    decision from its prose. `reader_conclusion` states the hiring belief the
+    opening should create, and `professional_frame` states the supported role
+    family or operating identity through which the resume should be read.
+29. **Fit posture:** `fit_posture.classification` is `direct`,
+    `direct-with-bounded-gaps`, `adjacent`, or `exploratory` and must agree with
+    `target_mode`. For a preserved posting, stable criterion IDs identify any
+    `controlling_criterion_ids` and `bounded_criterion_ids`; they are planning
+    boundaries, not text to echo in the summary.
+30. **Scope and proof:** `operating_scope_fact_ids` is a non-empty subset of
+    `summary_fact_ids`. `proof_anchor_story_id` names one planned story whose
+    required evidence is also present in `summary_fact_ids`, so representative
+    proof substantiates rather than replaces the broader hiring frame.
+31. **Delegation:** `delegated_to_body` names supported details intentionally
+    left to experience or skills. It prevents the summary from becoming an
+    inventory while preserving those details elsewhere in the resume.
+
 Every experience story must belong to exactly one role arc and agree with that
 arc's role placement. Every progression role must appear in an arc, at least one
 arc must lead the resume's argument, and arcs marked `compressed` must agree with
@@ -222,7 +246,7 @@ Select evidence in this order:
 3. the strongest canonical evidence under the quality contract's hierarchy;
 4. distinct contribution within the page and information budget.
 
-Before applying that ordering inside `summary_job`, define the summary's reader
+Before applying that ordering inside `summary_strategy`, define the summary's reader
 decision. Record the one hiring-relevant conclusion the reader should reach,
 the likely misunderstanding or fragmented career story the summary must
 correct, the evidence-supported career through-line, and why that pattern is
@@ -233,13 +257,25 @@ the position. Select normally one representative proof anchor and at most one
 compact breadth or progression signal; do not plan several roles or independent
 accomplishments as a miniature career history.
 
-Apply the same ordering inside `summary_job` after defining that purpose. For a real posting, name the
+Apply the same ordering inside `summary_strategy` after defining that purpose. For a real posting, name the
 required role-defining criteria the summary must establish, the canonical facts
 that provide the strongest direct proof, and at most one differentiator or
 reviewer-risk answer that earns top-third space. Do not let chronology alone
 promote a recent supporting feature over stronger target evidence, and do not
 plan summary language as a compensating keyword list for `partial`,
 `undecidable`, or unsupported criteria.
+
+Record the semantic fit posture that should govern the introduction. Separate
+`controlling` gaps, which defeat a mandatory gate or the target's central
+operating identity, from `bounded` gaps that limit one area inside an otherwise
+direct match. This is a role-importance judgment, not a count of met criteria.
+When the posture remains direct, require `summary_strategy` to preserve the full
+supported operating scope and prevent one bounded gap from forcing adjacent or
+generic positioning. Also require scope before proof: one representative story
+may make the case credible, but it must not replace the broader demonstrated
+hiring case with a narrow project description. Keep bounded gaps in the risk
+map and evidence boundary; do not turn them into visible summary disclaimers or
+keyword compensation.
 
 Also plan the opening qualification signal. Prefer directly relevant experience
 and supported scope, using years only when duration materially strengthens the

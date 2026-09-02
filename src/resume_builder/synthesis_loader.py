@@ -43,6 +43,7 @@ from .synthesis_schema import (
     role_story_classes,
     string_list,
 )
+from .synthesis_summary import parse_summary_strategy
 
 
 def load_synthesis_plan(path: Path, project_root: Path, vault_root: Path) -> SynthesisPlan:
@@ -54,8 +55,8 @@ def load_synthesis_plan(path: Path, project_root: Path, vault_root: Path) -> Syn
         raise ValueError(f"invalid synthesis plan {source}: {exc}") from exc
     data = object_value(raw, "synthesis plan")
     version = data.get("version")
-    if not isinstance(version, int) or isinstance(version, bool) or version not in range(1, 11):
-        raise ValueError("synthesis plan must declare version 1, 2, 3, 4, 5, 6, 7, 8, 9, or 10")
+    if not isinstance(version, int) or isinstance(version, bool) or version not in range(1, 12):
+        raise ValueError("synthesis plan must declare version 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, or 11")
     fields = {
         "version",
         "resume",
@@ -76,6 +77,8 @@ def load_synthesis_plan(path: Path, project_root: Path, vault_root: Path) -> Syn
         fields.add("page_budget")
     if version >= 7:
         fields.add("resume_template")
+    if version >= 11:
+        fields.add("summary_strategy")
     exact_fields(data, fields, "synthesis plan")
 
     resume = contained_project_path(
@@ -341,6 +344,8 @@ def load_synthesis_plan(path: Path, project_root: Path, vault_root: Path) -> Syn
         )
 
     selected_facts.update(summary_fact_ids)
+    summary_strategy = parse_summary_strategy(version, data, facts, stories, summary_fact_ids)
+
     raw_exclusions = data["exclusions"]
     if not isinstance(raw_exclusions, list):
         raise ValueError("synthesis exclusions must be a list")
@@ -727,6 +732,7 @@ def load_synthesis_plan(path: Path, project_root: Path, vault_root: Path) -> Syn
         summary_job=summary_job,
         summary_fact_ids=tuple(summary_fact_ids),
         summary_body_fact_ids=tuple(summary_body_fact_ids),
+        summary_strategy=summary_strategy,
         progression=tuple(progression),
         stories=tuple(stories),
         exclusions=tuple(exclusions),

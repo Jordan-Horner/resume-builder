@@ -19,7 +19,7 @@ LANGUAGE_REVIEW_METHOD = "independent-cold-review"
 LANGUAGE_REVIEW_STATUSES = {"approved", "changes-required"}
 LANGUAGE_BLOCK_DECISIONS = {"approved", "revise"}
 LANGUAGE_REVIEW_STANDARD = {
-    "version": 3,
+    "version": 4,
     "context_test": (
         "Can a reviewer identify the actor, action, object, and why the claim matters "
         "using only the visible block and its supplied context?"
@@ -45,6 +45,13 @@ LANGUAGE_REVIEW_STANDARD = {
         "direct evidence supports the intended role family and the opening would cause a "
         "recruiter to misclassify the candidate. For adjacent or exploratory evidence, "
         "require an honest bridge or proof-led opening rather than an unsupported target title."
+    ),
+    "summary_completeness_rule": (
+        "Judge summary readability and completeness from the supplied visible context without "
+        "prescribing new evidence or a sentence count. Flag a supported result or differentiator "
+        "when it is already visible but buried inside a dense sentence, and reject filler added "
+        "only to reach a preferred length. Do not reject a clear two-sentence summary merely "
+        "because a third sentence could exist."
     ),
     "boundary": (
         "Apply these rules through contextual meaning, not exact-word matching, a "

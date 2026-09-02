@@ -129,7 +129,11 @@ Git tools do not. Never write candidate data into same-named engine folders.
    evidence judgments, not calibrated probabilities. If the selected interpretation
    is within 10 points of another candidate, show the choices and ask the user which
    best describes the actual job before drafting; record that answer as
-   `user-confirmed`. For every
+   `user-confirmed`. For schema v11, also record a structured
+   `summary_strategy`: the reader conclusion, professional frame, semantic fit
+   posture with controlling and bounded criterion IDs, operating-scope facts,
+   one proof-anchor story, and the supported details delegated to the body.
+   Treat these fields as planning constraints, not phrases to copy. For every
    story, define one `claim_focus`, the smallest required `core_fact_ids` set,
    and the larger `fact_ids` pool of optional supporting evidence. Then declare
    the structured claim's action, object, optional scope, optional outcome,
@@ -186,7 +190,7 @@ Git tools do not. Never write candidate data into same-named engine folders.
    preserve coverage, or create one bullet per leftover fact. Cite only the
    facts assigned to the visible action, object, scope, and outcome; the final
    evidence comment must equal that union. Let the selected
-   evidence and `summary_job` determine the
+   evidence, `summary_job`, and the version-11 `summary_strategy` determine the
    summary; do not reuse a generic title-plus-years introduction. Before
    ranking facts or drafting prose, define the summary's purpose as a reader
    decision: the one hiring-relevant conclusion the target reader should reach,
@@ -228,6 +232,18 @@ Git tools do not. Never write candidate data into same-named engine folders.
    recent but lower-value implementation detail when stronger evidence answers
    a more important requirement, and do not use polished wording or keyword
    density to disguise a `partial`, `undecidable`, or unsupported criterion.
+   Before drafting, determine the candidate's **fit posture** from the semantic
+   criterion review. Distinguish a controlling gap that undermines the role's
+   central operating identity from a bounded gap inside an otherwise direct
+   match. Do not let one bounded `partial` or unsupported criterion weaken the
+   professional identity, years-of-experience frame, or demonstrated operating
+   scope supported by the remaining role-defining criteria. This is not a
+   majority-vote rule: a missing mandatory gate can still control the posture.
+   When the posture remains direct, state the supported breadth of the work
+   before narrowing to representative proof; do not let one project or workflow
+   become a smaller substitute for the candidate's full hiring case. Keep the
+   bounded limitation honest in the match record and body evidence rather than
+   advertising it in the introduction or compensating for it with keywords.
    After ranking the evidence, synthesize it into a natural professional
    introduction rather than a compressed match report. Normally give the
    summary three jobs: establish one credible professional identity or
@@ -235,10 +251,18 @@ Git tools do not. Never write candidate data into same-named engine folders.
    most one breadth, progression, outcome, or reviewer-risk signal. Do not
    mirror the posting's requirement order, enumerate every matched technology,
    or restate the first experience bullet in condensed form. Let experience and
-   skills carry the remaining retrieval terms. Apply the quality contract's
+   skills carry the remaining retrieval terms. Treat two or three sentences as
+   an evidence-responsive information budget, not a shortest-possible-output
+   target. When qualification, relevant operating scope, and a supported
+   outcome or differentiator each contribute distinct hiring information, give
+   them enough space to remain readable; this will often require three
+   sentences, but sentence count is the result of the evidence rather than a
+   target. Do not bury a strong signal inside a dense proof sentence or add
+   filler to reach a preferred length. Express breadth as connected work rather
+   than a technology or responsibility inventory. Apply the quality contract's
    reader-conclusion, resume-framing, plain-direct-opening, role-family-positioning,
-   proof-concentration, requirement-echo, scope-precision, and summary-to-body
-   tests before review.
+   proof-concentration, requirement-echo, scope-precision, summary-completeness,
+   and summary-to-body tests before review.
    Require the summary to answer both “why this candidate fits this job” and
    “what evidence makes that fit credible” using claims demonstrated later in
    the resume. Treat Core

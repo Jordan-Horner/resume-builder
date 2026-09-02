@@ -828,7 +828,7 @@ def test_language_review_reuses_unchanged_approved_blocks(tmp_path: Path) -> Non
     assert "email" not in json.dumps(context).casefold()
     assert "PROFILE-001" not in json.dumps(context)
     assert cold["review_standard"] == language_review.LANGUAGE_REVIEW_STANDARD
-    assert cold["review_standard"]["version"] == 3
+    assert cold["review_standard"]["version"] == 4
     assert "actor, action, object" in cold["review_standard"]["context_test"]
     assert "unstated premise" in cold["review_standard"]["unstated_premise_rule"]
     assert "semantically generic object" in cold["review_standard"]["concrete_object_rule"]
@@ -840,6 +840,8 @@ def test_language_review_reuses_unchanged_approved_blocks(tmp_path: Path) -> Non
     assert "misclassify the candidate" in cold["review_standard"]["summary_positioning_rule"]
     assert "sufficient direct evidence" in cold["review_standard"]["summary_positioning_rule"]
     assert "proof-led opening" in cold["review_standard"]["summary_positioning_rule"]
+    assert "without prescribing new evidence or a sentence count" in cold["review_standard"]["summary_completeness_rule"]
+    assert "clear two-sentence summary" in cold["review_standard"]["summary_completeness_rule"]
     assert "exact-word matching" in cold["review_standard"]["boundary"]
     assert "banned-term list" in cold["review_standard"]["boundary"]
 

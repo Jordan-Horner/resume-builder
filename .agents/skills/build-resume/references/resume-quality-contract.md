@@ -266,6 +266,12 @@ the target criteria inform it but do not replace it. Use the selected facts to
 make the position credible. Never treat the facts, technologies, or requirement
 labels themselves as the position.
 
+For version-11 synthesis plans, encode this decision in `summary_strategy`.
+Use its professional frame, fit posture, operating-scope facts, proof anchor,
+and body-delegated details as constraints on the draft. They define what the
+summary must accomplish, not a template for its sentences; visible prose must
+still read as a natural professional introduction.
+
 Use the private through-line to select and frame the evidence, but do not force
 the visible prose to state an abstract value proposition. Write the finished
 summary in plain, direct resume language. A concise role identity followed by
@@ -294,6 +300,30 @@ writing the summary:
    counter-evidence that materially reduces a reviewer risk.
 4. Leave `partial`, `undecidable`, and unsupported criteria accurately bounded;
    keyword repetition cannot turn them into demonstrated fit.
+
+Then establish the candidate's **fit posture**. A criterion gap is
+`controlling` when it defeats a mandatory gate or materially undermines the
+central operating identity required for the role. It is `bounded` when the
+candidate still directly demonstrates the role-defining work and the gap limits
+only one capability, tool, environment, or depth area. Do not calculate this by
+counting criteria: one mandatory central requirement may control, while one
+specialized partial requirement may not.
+
+For a direct fit with a bounded gap, preserve the strongest supported hiring
+frame. Do not dilute the professional identity, retreat to a generic umbrella
+label, or reduce the summary to one narrow project merely because the match is
+not perfect. The introduction need not announce the limitation. Keep it honest
+by avoiding the unsupported claim and letting the match record and experience
+section show the exact boundary. Conversely, do not use broad coverage to hide
+a controlling gap or claim a role identity whose central work is unsupported.
+
+Apply a **scope-before-proof test**: after the qualification, does the summary
+state the supported operating scope that makes the candidate a fit before it
+zooms into one accomplishment? Representative proof should substantiate the
+hiring case, not replace it with a smaller technical story. When several
+role-defining responsibilities are directly demonstrated, synthesize their
+common operating pattern rather than enumerating them or selecting one recent
+workflow as though it were the whole qualification.
 
 ### Use a qualification-first opening
 
@@ -365,12 +395,28 @@ rendered lines, with these distinct jobs:
 3. optionally add one broader pattern, progression signal, differentiator, or
    reviewer-risk answer that changes the hiring read.
 
-This is a flexible information budget, not a fixed template. Omit the third job
-when the first two make the case. Do not mirror the posting's requirement order,
-join criterion labels into a sentence, or enumerate every matched technology.
-Exact retrieval belongs across the complete resume; the summary should carry
-only the few terms needed to make its central argument understandable and
-discoverable.
+This is a flexible information budget, not a fixed template. Concision means
+that every sentence earns its place; it does not mean choosing the shortest
+grammatically complete version. When qualification, relevant operating scope,
+and a specific supported outcome or differentiator each contribute distinct
+hiring information, give them enough space to remain readable. This will often
+require three sentences, but sentence count must follow the evidence rather
+than experience level or a preferred formula. Give a strong outcome its own
+sentence when folding it into the proof sentence would make the prose dense,
+list-like, or easy to miss. Use two sentences when there is no distinct third
+signal or when the same hiring case is clearer without it; do not invent or pad
+a third sentence. Quantify an outcome when the number materially strengthens
+the claim, not merely because a metric is available.
+
+Apply a **summary-completeness test** after drafting. Remove each sentence in
+turn and ask whether the cold reader would lose a distinct reason to classify,
+believe, or advance the candidate. If supported high-value evidence is absent
+and the summary feels thin rather than selective, restore the missing job in a
+separate natural sentence. If removing a sentence changes nothing, cut or
+replace it. Do not mirror the posting's requirement order, join criterion
+labels into a sentence, or enumerate every matched technology. Exact retrieval
+belongs across the complete resume; the summary should carry only the few terms
+needed to make its central argument understandable and discoverable.
 
 Reject any summary sentence whose main function is to inventory technologies,
 capabilities, responsibilities, or matched requirements, even when every item
@@ -378,8 +424,12 @@ is supported. A comma-separated list is a strong warning sign, but judge the
 sentence by its function rather than punctuation or prohibited phrases. Breadth
 belongs in the experience evidence or Technical Skills section unless one
 compact scope signal materially changes the summary's central hiring argument.
+Express breadth as a coherent operating domain, recurring problem, or connected
+scope of work. Reject list-shaped breadth statements that enumerate tools,
+capabilities, or responsibilities without explaining the connected work they
+enabled. Apply this as a functional test, not a phrase blacklist.
 
-Before approving a summary, apply seven additional tests:
+Before approving a summary, apply the following additional tests:
 
 - **Reader-conclusion test:** After reading only the summary, can the reviewer
   state in one natural sentence what kind of professional this is, why that
@@ -401,6 +451,14 @@ Before approving a summary, apply seven additional tests:
   family using demonstrated work, or does it foreground an adjacent title,
   legacy function, or generic umbrella label that would misclassify the
   candidate? Correct the frame without claiming unsupported target experience.
+- **Fit-posture test:** Is the summary calibrated to the actual semantic match,
+  or has one bounded gap made an otherwise direct candidate sound adjacent or
+  generic? Preserve the direct supported frame unless the gap is controlling;
+  never infer posture from a raw count of matched requirements.
+- **Scope-before-proof test:** Does the introduction establish the supported
+  operating breadth before the proof anchor, or has one project displaced the
+  larger hiring case? Keep one proof anchor, but make it prove the frame rather
+  than define a needlessly narrow frame.
 - **Proof-concentration test:** Does one representative anchor make the position
   believable, with at most one compact breadth or progression signal? If the
   summary recounts multiple roles or independent accomplishments, return the
@@ -418,6 +476,11 @@ Before approving a summary, apply seven additional tests:
   Keep the framing; move architecture inventories, implementation details, and
   secondary keywords to experience or skills unless they are themselves the
   differentiating proof.
+- **Summary-completeness test:** Does each sentence contribute a different
+  hiring decision signal, and has aggressive compression hidden a supported
+  result or differentiator that would materially strengthen the introduction?
+  Give distinct information enough space to remain readable, which may require
+  a third sentence; never add filler merely to reach a length target.
 
 Calibrate specificity to the section, evidence, and intended audience. Choose
 the clearest supported wording that preserves decision-relevant meaning. Keep
@@ -506,13 +569,18 @@ list as a writing system:
   what measurable impact.
 - [Yale Office of Career Strategy: Resume Sections—Summary](https://cdn.ocs.yale.edu/wp-content/uploads/sites/77/2022/07/CV_Resume_Conversion-GSAS-2022.pdf)
   describes the summary as brief, specific, tailored, evidence-backed, and
-  occupying valuable resume space.
+  occupying valuable resume space; it also recommends quantification where
+  appropriate and ending with fit, a result, or an accomplishment.
 - [Columbia Career Education: Creating a Summary/Profile Statement](https://www.careereducation.columbia.edu/sites/default/files/cce_cpg_16-17.pdf)
   recommends a concise two-to-five-phrase snapshot that prioritizes the
   qualifications most important to the employer.
 - [Harvard Mignone Center: Creating a Strong Resume](https://careerservices.fas.harvard.edu/resources/create-a-strong-resume/)
   emphasizes specific, direct, fact-based language designed for fast human and
   system scanning.
+- [Indeed Career Guide: Resume Summary Examples](https://www.indeed.com/career-advice/resumes-cover-letters/resume-summary-examples)
+  describes a two-to-three-sentence summary that establishes professional
+  identity, stays relevant to the role, and quantifies experience or
+  accomplishments when useful.
 
 These are editorial heuristics, not permission to fabricate a result, number,
 causal link, authorship level, or universal bullet count. Canonical evidence and

@@ -453,6 +453,8 @@ def test_build_resume_references_define_evidence_and_regression_contracts() -> N
     assert "Version 6" in synthesis
     assert "Version 8" in synthesis
     assert "Version 9" in synthesis
+    assert "Version 10" in synthesis
+    assert "Version 11" in synthesis
     assert "Supporting stories may be omitted" in normalized_synthesis
     assert "summary_fact_ids" in synthesis
     assert "complete evidence set" in normalized_synthesis
@@ -476,9 +478,17 @@ def test_build_resume_references_define_evidence_and_regression_contracts() -> N
     assert "not minimum or maximum bullet counts" in normalized_synthesis
     assert "Follow subtraction with redistribution" in synthesis
     assert "not a visible summary of every detail inside the fact" in normalized_synthesis
-    assert "Apply the same ordering inside `summary_job`" in synthesis
+    assert "Apply the same ordering inside `summary_strategy`" in synthesis
+    assert "reader_conclusion" in synthesis
+    assert "professional_frame" in synthesis
+    assert "operating_scope_fact_ids" in synthesis
+    assert "proof_anchor_story_id" in synthesis
+    assert "delegated_to_body" in synthesis
     assert "highest-value required criteria" in normalized_synthesis
     assert "partial`, `undecidable`, or unsupported criteria" in normalized_synthesis
+    assert "controlling` gaps" in normalized_synthesis
+    assert "bounded` gaps" in normalized_synthesis
+    assert "scope before proof" in normalized_synthesis
     assert "Run a subtraction test" in synthesis
     assert "honest lead is only `used`" in normalized_synthesis
     assert "never authorize stronger authorship or authority" in normalized_synthesis
@@ -658,6 +668,10 @@ def test_resume_quality_contract_teaches_principles_not_copywriting() -> None:
     assert "Recency is a tiebreaker, not the ranking rule" in normalized_quality
     assert "why this candidate fits this specific job" in normalized_quality
     assert "keyword repetition cannot turn them into demonstrated fit" in normalized_quality
+    assert "fit posture" in normalized_quality
+    assert "controlling" in normalized_quality
+    assert "bounded" in normalized_quality
+    assert "scope-before-proof test" in normalized_quality
     assert "qualification-first opening" in normalized_quality
     assert "Directly relevant experience outranks education" in normalized_quality
     assert "education or certifications" in normalized_quality
@@ -695,9 +709,23 @@ def test_resume_quality_contract_teaches_principles_not_copywriting() -> None:
     assert "three or more parallel items" in normalized_quality
     assert "main function is to inventory" in normalized_quality
     assert "judge the sentence by its function" in normalized_quality
+    assert "summary-completeness test" in normalized_quality
+    assert "shortest grammatically complete version" in normalized_quality
+    assert "sentence count must follow the evidence" in normalized_quality
+    assert "strong outcome its own sentence" in normalized_quality
+    assert "list-shaped breadth statements" in normalized_quality
+    assert "not a phrase blacklist" in normalized_quality
+    assert "Quantify an outcome when the number materially strengthens" in normalized_quality
     assert "Would a capable manager plausibly use this language" in normalized_quality
     assert "Do not enforce a banned-word list" in normalized_quality
     assert "direct relationships over constructed modifiers" in normalized_quality
+
+    critique = (CRITIQUE_SKILL / "references" / "critique-contract.md").read_text(encoding="utf-8")
+    normalized_critique = " ".join(critique.split()).casefold()
+    assert "fit posture" in normalized_critique
+    assert "controlling gap" in normalized_critique
+    assert "bounded gap" in normalized_critique
+    assert "scope before proof" in normalized_critique
     assert "framework-enabled" in quality
     assert "Read opening verbs across each role" in normalized_quality
     assert "Do not rotate synonyms merely for variety" in normalized_quality

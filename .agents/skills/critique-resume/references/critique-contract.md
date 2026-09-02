@@ -38,6 +38,24 @@ This is a scan heuristic, not a literal timing measurement, keyword quota, or
 compiler gate. A technically valid opening can still fail it by being generic,
 overloaded, or focused on the wrong evidence.
 
+For a targeted resume, also test the summary's **fit posture** and information
+scale. Distinguish a controlling gap that defeats a mandatory gate or the
+role's central operating identity from a bounded gap inside an otherwise direct
+match. Do not let one bounded partial requirement make the candidate sound
+adjacent, generic, or less experienced when the visible evidence supports the
+remaining role-defining work. This is not permission to hide a controlling gap
+or count requirements mechanically. Then apply scope before proof: the summary
+should establish the supported operating breadth before one representative
+accomplishment substantiates it. Flag an opening that reduces a broad direct
+hiring case to one project or workflow, even when that project is relevant and
+well written.
+
+Judge these qualities from the visible resume and target evidence. The cold
+career reviewer must not receive the builder's `summary_strategy`; that plan is
+an intent record, not evidence that the prose achieved its goal. The builder
+may compare the independent finding with the strategy only after the review is
+complete.
+
 ### Reviewer risk map
 
 Record no more than three plausible objections that could materially change the

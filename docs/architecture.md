@@ -59,6 +59,11 @@ resolution, review schema enforcement, and synthesis models from the workflows
 that write artifacts. Feedback acceptance pins the user-approved preview, while
 compilation depends only on feedback resolution; neither relationship points
 back toward its caller. The package import graph is therefore acyclic.
+Version-11 synthesis plans also represent summary positioning as structured
+strategy: hiring frame, semantic fit posture, operating-scope evidence, one
+proof anchor, and body-delegated detail. The selection reviewer receives this
+non-prose strategy, while the independent language and career reviews continue
+to judge visible wording without builder rationale.
 
 `review_records.py` historically owned package construction, decision
 finalization, wording-only repair, record loading, freshness, and approval

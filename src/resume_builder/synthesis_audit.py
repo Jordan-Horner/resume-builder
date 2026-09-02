@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .role_balance import role_balance_diagnostic
-from .synthesis_models import SynthesisPlan, SynthesisStory
+from .synthesis_models import SynthesisPlan, SynthesisStory, summary_strategy_payload
 
 
 def _sha256(path: Path) -> str:
@@ -310,6 +310,11 @@ def audit_synthesis(payload: dict[str, Any], plan: SynthesisPlan) -> dict[str, o
         "summary_job": plan.summary_job,
         "summary_fact_ids": list(plan.summary_fact_ids),
         "summary_body_fact_ids": list(plan.summary_body_fact_ids),
+        **(
+            {"summary_strategy": summary_strategy_payload(plan.summary_strategy)}
+            if plan.version >= 11
+            else {}
+        ),
         "progression_role_ids": list(plan.progression),
         "exclusions": len(plan.exclusions),
         "gaps": list(plan.gaps),
