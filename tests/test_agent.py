@@ -34,6 +34,7 @@ def test_default_config_enforces_private_bounded_openrouter_routing(tmp_path: Pa
 
     assert config.provider == "openrouter"
     assert config.api_key_env == "OPENROUTER_API_KEY"
+    assert config.models.fast == "deepseek/deepseek-v4-flash-0731"
     assert config.routing.zero_data_retention is True
     assert config.routing.data_collection == "deny"
     assert config.routing.require_parameters is True
