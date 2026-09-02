@@ -10,7 +10,13 @@ services:
       RESUME_BUILDER_GMAIL_STATE: /state/gmail-state.sqlite
       RESUME_BUILDER_GMAIL_TOKEN: /state/gmail-token.json
       RESUME_BUILDER_DISCORD_WEBHOOK: ${RESUME_BUILDER_DISCORD_WEBHOOK:-}
+      RESUME_BUILDER_LOG_LEVEL: ${RESUME_BUILDER_LOG_LEVEL:-INFO}
       TZ: ${RESUME_BUILDER_TIMEZONE:-America/New_York}
+    logging:
+      driver: json-file
+      options:
+        max-file: "3"
+        max-size: 10m
     volumes:
       - ${RESUME_BUILDER_WORKSPACE_PATH:?Set RESUME_BUILDER_WORKSPACE_PATH}:/workspace
       - ${RESUME_BUILDER_RUNTIME_PATH:?Set RESUME_BUILDER_RUNTIME_PATH}:/state

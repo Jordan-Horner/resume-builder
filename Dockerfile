@@ -4,7 +4,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     RESUME_BUILDER_WORKSPACE=/workspace \
     RESUME_BUILDER_AUTOMATION_STATE=/state/automation-state.sqlite \
-    RESUME_BUILDER_GMAIL_STATE=/state/gmail-state.sqlite
+    RESUME_BUILDER_GMAIL_STATE=/state/gmail-state.sqlite \
+    RESUME_BUILDER_LOG_LEVEL=INFO
 
 WORKDIR /app
 

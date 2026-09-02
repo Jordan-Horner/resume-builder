@@ -3,20 +3,27 @@
 from __future__ import annotations
 
 import json
+import sys
 import threading
+from collections.abc import Callable, Iterator
 from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
 
+from resume_builder import jobs as jobs_module
 from resume_builder.automation import (
+    LOGGER,
     AutomationService,
     AutomationState,
     JobSchedule,
     Notification,
     NotificationConfig,
+    TaskExecutionError,
+    _configure_logging,
     _in_quiet_hours,
+    _run_jobs,
     configure,
     gmail_notification,
     job_notification,
@@ -49,6 +56,19 @@ def notification_config(*, privacy: str = "summary") -> NotificationConfig:
         quiet_start=time(21),
         quiet_end=time(7),
     )
+
+
+@pytest.fixture
+def configured_logs() -> Iterator[Callable[[], None]]:
+    yield _configure_logging
+    for handler in LOGGER.handlers[:]:
+        LOGGER.removeHandler(handler)
+        handler.close()
+    LOGGER.propagate = True
+
+
+def log_events(output: str) -> list[dict[str, object]]:
+    return [json.loads(line) for line in output.splitlines() if line.startswith("{")]
 
 
 def test_default_config_uses_daily_jobs_and_low_frequency_gmail(tmp_path: Path) -> None:
@@ -236,7 +256,10 @@ def test_quiet_hours_delay_routine_alerts_but_not_interviews(tmp_path: Path, cap
     assert "Interview" in capsys.readouterr().out
 
 
-def test_run_once_runs_gmail_even_when_jobs_fail(tmp_path: Path, capsys) -> None:
+def test_run_once_runs_gmail_even_when_jobs_fail(
+    tmp_path: Path, capsys, configured_logs: Callable[[], None]
+) -> None:
+    configured_logs()
     config_path = tmp_path / "config.yml"
     config_path.write_text(render_default_config("America/New_York"), encoding="utf-8")
     called: list[str] = []
@@ -259,7 +282,9 @@ def test_run_once_runs_gmail_even_when_jobs_fail(tmp_path: Path, capsys) -> None
 
     assert service.run_once(("jobs", "gmail")) is False
     assert called == ["jobs", "gmail"]
-    assert "RuntimeError" in capsys.readouterr().err
+    error_events = log_events(capsys.readouterr().err)
+    assert error_events[0]["event"] == "scan_failed"
+    assert error_events[0]["error_category"] == "RuntimeError"
     assert service.state.last_run("jobs")["error_category"] == "RuntimeError"
 
 
@@ -292,7 +317,10 @@ def test_task_history_excludes_job_match_details(tmp_path: Path) -> None:
     assert "matches" not in history["summary"]
 
 
-def test_task_logs_privacy_safe_start_and_summary(tmp_path: Path, capsys) -> None:
+def test_task_logs_privacy_safe_start_and_summary(
+    tmp_path: Path, capsys, configured_logs: Callable[[], None]
+) -> None:
+    configured_logs()
     config_path = tmp_path / "config.yml"
     config_path.write_text(render_default_config("America/New_York"), encoding="utf-8")
     service = AutomationService(
@@ -307,14 +335,20 @@ def test_task_logs_privacy_safe_start_and_summary(tmp_path: Path, capsys) -> Non
     )
 
     assert service.run_task("gmail") is True
-    output = capsys.readouterr().out
-    assert "Starting gmail automation scan." in output
-    assert "Completed gmail automation scan: success" in output
-    assert "examined=3" in output
-    assert "must not be logged" not in output
+    events = log_events(capsys.readouterr().out)
+    assert [event["event"] for event in events] == ["scan_started", "scan_completed"]
+    assert events[0]["task"] == "gmail"
+    assert events[0]["trigger"] == "manual"
+    assert isinstance(events[0]["run_id"], str)
+    assert events[1]["status"] == "success"
+    assert events[1]["examined"] == 3
+    assert "must not be logged" not in json.dumps(events)
 
 
-def test_service_logs_startup_schedule_before_waiting(tmp_path: Path, capsys) -> None:
+def test_service_logs_startup_schedule_before_waiting(
+    tmp_path: Path, capsys, configured_logs: Callable[[], None]
+) -> None:
+    configured_logs()
     config_path = tmp_path / "config.yml"
     config_path.write_text(render_default_config("America/New_York"), encoding="utf-8")
     service = AutomationService(
@@ -326,11 +360,115 @@ def test_service_logs_startup_schedule_before_waiting(tmp_path: Path, capsys) ->
     stop.set()
 
     assert run_forever(service, stop) == 0
-    output = capsys.readouterr().out
-    assert "Automation service started." in output
-    assert "Next runs: jobs=" in output
-    assert ", gmail=" in output
-    assert "Automation service stopped." in output
+    events = log_events(capsys.readouterr().out)
+    assert [event["event"] for event in events] == ["service_started", "service_stopped"]
+    assert events[0]["state"] == "ready"
+    assert events[0]["jobs_previous"] == "never"
+    assert isinstance(events[0]["jobs_next"], str)
+    assert isinstance(events[0]["gmail_next"], str)
+    assert events[0]["log_version"] == 1
+
+
+def test_failure_log_omits_exception_message(
+    tmp_path: Path, capsys, configured_logs: Callable[[], None]
+) -> None:
+    configured_logs()
+    config_path = tmp_path / "config.yml"
+    config_path.write_text(render_default_config("America/New_York"), encoding="utf-8")
+
+    def fail() -> dict[str, object]:
+        raise RuntimeError("private provider response must not be logged")
+
+    service = AutomationService(
+        workspace=tmp_path,
+        config=load_config(config_path),
+        state=AutomationState(tmp_path / "runtime" / "automation.sqlite"),
+        job_runner=fail,
+    )
+
+    assert service.run_task("jobs") is False
+    captured = capsys.readouterr()
+    events = log_events(captured.err)
+    assert events[0]["event"] == "scan_failed"
+    assert events[0]["stage"] == "task"
+    assert events[0]["error_category"] == "RuntimeError"
+    assert "private provider response" not in captured.err
+    assert "test_automation.py" in str(events[0]["stack"])
+
+
+def test_job_cli_output_is_suppressed_and_failure_stage_is_safe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    config_path = tmp_path / "config.yml"
+    config_path.write_text(render_default_config("America/New_York"), encoding="utf-8")
+    manifest = tmp_path / "latest-refresh.json"
+    manifest.write_text('{"status":"failed"}', encoding="utf-8")
+    monkeypatch.setattr(jobs_module, "DEFAULT_LATEST_REFRESH", manifest)
+    monkeypatch.setattr(jobs_module, "DEFAULT_NEW_OUTPUT", tmp_path / "new-jobs.json")
+
+    def noisy_failure(_argv: list[str]) -> int:
+        print("private provider response")
+        print("private provider error", file=sys.stderr)
+        return 2
+
+    monkeypatch.setattr(jobs_module, "main", noisy_failure)
+
+    with pytest.raises(TaskExecutionError) as captured_error:
+        _run_jobs(load_config(config_path))
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
+    assert captured_error.value.stage == "collect"
+    assert captured_error.value.error_category == "RuntimeError"
+
+
+def test_unfinalized_job_manifest_is_a_publish_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_path = tmp_path / "config.yml"
+    config_path.write_text(render_default_config("America/New_York"), encoding="utf-8")
+    manifest = tmp_path / "latest-refresh.json"
+    manifest.write_text('{"status":"processing"}', encoding="utf-8")
+    prior_output = tmp_path / "new-jobs.json"
+    prior_output.write_text('{"jobs":[]}', encoding="utf-8")
+    monkeypatch.setattr(jobs_module, "DEFAULT_LATEST_REFRESH", manifest)
+    monkeypatch.setattr(jobs_module, "DEFAULT_NEW_OUTPUT", prior_output)
+    monkeypatch.setattr(jobs_module, "main", lambda _argv: 2)
+
+    with pytest.raises(TaskExecutionError) as captured_error:
+        _run_jobs(load_config(config_path))
+
+    assert captured_error.value.stage == "publish"
+
+
+def test_restart_with_persistent_state_does_not_rescan(
+    tmp_path: Path, configured_logs: Callable[[], None]
+) -> None:
+    configured_logs()
+    config_path = tmp_path / "config.yml"
+    config_path.write_text(render_default_config("America/New_York"), encoding="utf-8")
+    state = AutomationState(tmp_path / "runtime" / "automation.sqlite")
+    state.record_run("jobs", datetime.now(UTC), "success", {})
+    state.record_run("gmail", datetime.now(UTC), "success", {})
+    calls: list[str] = []
+
+    class OneLoopEvent(threading.Event):
+        def wait(self, timeout: float | None = None) -> bool:
+            self.set()
+            return True
+
+    for _ in range(2):
+        service = AutomationService(
+            workspace=tmp_path,
+            config=load_config(config_path),
+            state=state,
+            job_runner=lambda: calls.append("jobs") or {},
+            gmail_runner=lambda: calls.append("gmail") or {},
+        )
+        assert run_forever(service, OneLoopEvent()) == 0
+
+    assert calls == []
 
 
 def test_partial_job_coverage_is_visible_without_discarding_matches(tmp_path: Path) -> None:

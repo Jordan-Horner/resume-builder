@@ -120,10 +120,23 @@ docker compose up -d
 docker compose logs -f automation
 ```
 
-The container log immediately confirms that the scheduler started and shows the
-next job and Gmail scan times. It also announces when each scanner starts and
-prints a content-free completion summary with statuses and counts. It never
-prints Gmail subjects, bodies, attachments, or message IDs.
+The container writes versioned, one-line JSON events directly to standard output
+and standard error. It immediately confirms that the scheduler started, shows
+the previous and next job and Gmail scan times, and emits a quiet heartbeat every
+six hours. Scanner events include a short run ID, trigger, attempt, safe stage,
+duration, status, and content-free counts. Set `RESUME_BUILDER_LOG_LEVEL` to
+`DEBUG`, `INFO`, `WARNING`, or `ERROR`; the default is `INFO`.
+
+Failures contain only an exception class and sanitized local frame locations,
+not exception messages. Logs never include Gmail subjects, bodies, attachments,
+message IDs, OAuth credentials, webhook URLs, job descriptions, or provider
+responses. The Compose configuration uses Docker's `json-file` driver with
+three 10 MB files, so rotation remains the container runtime's responsibility.
+
+Restarting the container does not itself run either scanner. The service reads
+the last completion times from the external state database, logs the resulting
+schedule, and waits until a task is due. Replacing the container is therefore
+safe as long as the same `/state` mount is retained.
 
 The image runs as a non-root user, exposes no port, has a built-in health check,
 and mounts rather than copies private data:

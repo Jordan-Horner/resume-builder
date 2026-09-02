@@ -6,18 +6,22 @@ import argparse
 import fcntl
 import hashlib
 import json
+import logging
 import os
 import signal
 import sqlite3
 import sys
 import tempfile
 import threading
+import traceback
+import uuid
 from collections.abc import Callable, Iterator, Sequence
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -31,8 +35,11 @@ DEFAULT_CONFIG = Path("automation/config.yml")
 DEFAULT_JOB_TIMES = ("08:00",)
 DEFAULT_GMAIL_INTERVAL_HOURS = 4
 DEFAULT_NOTIFICATION_RETRY_MINUTES = 5
+DEFAULT_HEARTBEAT_HOURS = 6
 INTERESTING_CATEGORIES = {"SCREEN NEXT", "POSSIBLE FIT", "INTERESTING STRETCH"}
 TASKS = ("jobs", "gmail")
+LOG_FORMAT_VERSION = 1
+LOGGER = logging.getLogger("resume_builder.automation")
 LOG_SUMMARY_FIELDS = {
     "jobs": ("refresh_status", "new_jobs", "interesting_jobs"),
     "gmail": (
@@ -90,6 +97,86 @@ class Notification:
     title: str
     body: str
     priority: str = "normal"
+
+
+class TaskExecutionError(RuntimeError):
+    """Carry a content-free stage and category across one task boundary."""
+
+    def __init__(self, stage: str, cause: BaseException):
+        super().__init__(stage)
+        self.stage = stage
+        self.error_category = _safe_error(cause)
+
+
+class _MaxLevelFilter(logging.Filter):
+    def __init__(self, maximum: int):
+        super().__init__()
+        self.maximum = maximum
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.levelno <= self.maximum
+
+
+class _DockerLogFormatter(logging.Formatter):
+    """Render one stable JSON object per container-log line."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        payload: dict[str, object] = {
+            "timestamp": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
+            "level": record.levelname,
+            "event": record.getMessage(),
+            "log_version": LOG_FORMAT_VERSION,
+        }
+        fields = getattr(record, "event_fields", None)
+        if isinstance(fields, dict):
+            payload.update(fields)
+        return json.dumps(payload, separators=(",", ":"), sort_keys=False)
+
+
+def _configure_logging() -> None:
+    level_name = os.environ.get("RESUME_BUILDER_LOG_LEVEL", "INFO").upper()
+    configured_level = getattr(logging, level_name, None)
+    invalid_level = not isinstance(configured_level, int) or level_name not in {
+        "DEBUG",
+        "INFO",
+        "WARNING",
+        "ERROR",
+    }
+    level = logging.INFO if invalid_level else cast(int, configured_level)
+    for handler in LOGGER.handlers[:]:
+        LOGGER.removeHandler(handler)
+        handler.close()
+    LOGGER.propagate = False
+    LOGGER.setLevel(level)
+    formatter = _DockerLogFormatter()
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    stdout_handler.setLevel(level)
+    stdout_handler.addFilter(_MaxLevelFilter(logging.INFO))
+    stdout_handler.setFormatter(formatter)
+    stderr_handler = logging.StreamHandler(sys.stderr)
+    stderr_handler.setLevel(max(level, logging.WARNING))
+    stderr_handler.setFormatter(formatter)
+    LOGGER.addHandler(stdout_handler)
+    LOGGER.addHandler(stderr_handler)
+    if invalid_level:
+        raise ValueError("RESUME_BUILDER_LOG_LEVEL must be DEBUG, INFO, WARNING, or ERROR")
+
+
+def _log(level: int, event: str, **fields: object) -> None:
+    LOGGER.log(level, event, extra={"event_fields": fields})
+
+
+def _safe_stack(exc: BaseException) -> str:
+    root = exc.__cause__ or exc
+    frames = traceback.extract_tb(root.__traceback__)
+    return ">".join(f"{Path(frame.filename).name}:{frame.lineno}:{frame.name}" for frame in frames)
+
+
+def _package_version() -> str:
+    try:
+        return version("resume-builder")
+    except PackageNotFoundError:
+        return "unknown"
 
 
 def default_state_path() -> Path:
@@ -624,16 +711,31 @@ def _ensure_external(path: Path, workspace: Path) -> Path:
 
 
 def _run_jobs(config: AutomationConfig) -> dict[str, object]:
-    exit_code = jobs.main(["new", "--limit", str(config.jobs.limit)])
+    try:
+        with Path(os.devnull).open("w", encoding="utf-8") as null_stream:
+            with redirect_stdout(null_stream), redirect_stderr(null_stream):
+                exit_code = jobs.main(["new", "--limit", str(config.jobs.limit)])
+    except Exception as exc:
+        raise TaskExecutionError("collect", exc) from exc
     manifest: dict[str, Any] = {}
-    if jobs.DEFAULT_LATEST_REFRESH.is_file():
-        manifest = json.loads(jobs.DEFAULT_LATEST_REFRESH.read_text(encoding="utf-8"))
-    matches = _interesting_jobs(jobs.DEFAULT_NEW_OUTPUT)
-    if exit_code != 0 and manifest.get("status") == "failed":
-        raise RuntimeError("job discovery failed")
+    try:
+        if jobs.DEFAULT_LATEST_REFRESH.is_file():
+            manifest = json.loads(jobs.DEFAULT_LATEST_REFRESH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise TaskExecutionError("publish", exc) from exc
+    refresh_status = manifest.get("status")
+    if refresh_status not in {"complete", "partial"}:
+        stage = "publish" if refresh_status == "processing" else "collect"
+        raise TaskExecutionError(stage, RuntimeError("job discovery did not finalize"))
+    if not jobs.DEFAULT_NEW_OUTPUT.is_file():
+        raise TaskExecutionError("publish", FileNotFoundError("new-job output was not published"))
+    try:
+        matches = _interesting_jobs(jobs.DEFAULT_NEW_OUTPUT)
+    except (OSError, json.JSONDecodeError, TypeError) as exc:
+        raise TaskExecutionError("match", exc) from exc
     return {
         "exit_code": exit_code,
-        "refresh_status": manifest.get("status", "unknown"),
+        "refresh_status": refresh_status,
         "new_jobs": len(manifest.get("new_to_database_job_ids", [])),
         "interesting_jobs": len(matches),
         "matches": matches,
@@ -652,16 +754,22 @@ def _run_gmail(workspace: Path) -> dict[str, object]:
         )
     ).expanduser()
     token_path = _ensure_external(token_path, workspace)
-    gateway = gmail_automation.google_gateway(token_path)
-    return gmail_automation.scan(
-        gateway=gateway,
-        state=gmail_automation.GmailRuntimeState(state_path),
-        workspace=workspace,
-        label=gmail_automation.DEFAULT_LABEL,
-        query=gmail_automation.DEFAULT_SCAN_QUERY,
-        backfill=False,
-        apply=True,
-    )
+    try:
+        gateway = gmail_automation.google_gateway(token_path)
+    except Exception as exc:
+        raise TaskExecutionError("authenticate", exc) from exc
+    try:
+        return gmail_automation.scan(
+            gateway=gateway,
+            state=gmail_automation.GmailRuntimeState(state_path),
+            workspace=workspace,
+            label=gmail_automation.DEFAULT_LABEL,
+            query=gmail_automation.DEFAULT_SCAN_QUERY,
+            backfill=False,
+            apply=True,
+        )
+    except Exception as exc:
+        raise TaskExecutionError("reconcile", exc) from exc
 
 
 TaskRunner = Callable[[], dict[str, object]]
@@ -685,9 +793,17 @@ class AutomationService:
             "gmail": gmail_runner or (lambda: _run_gmail(workspace)),
         }
 
-    def run_task(self, task: str) -> bool:
+    def run_task(self, task: str, *, trigger: str = "manual", attempt: int = 1) -> bool:
         started = datetime.now(UTC)
-        print(f"Starting {task} automation scan.", flush=True)
+        run_id = uuid.uuid4().hex[:12]
+        _log(
+            logging.INFO,
+            "scan_started",
+            task=task,
+            run_id=run_id,
+            trigger=trigger,
+            attempt=attempt,
+        )
         try:
             result = self.runners[task]()
             public_summary = {key: value for key, value in result.items() if key != "matches"}
@@ -706,18 +822,43 @@ class AutomationService:
             )
             if notification is not None:
                 self.state.enqueue(notification)
-            summary = ", ".join(
-                f"{key}={public_summary[key]}"
+            summary_fields = {
+                key: public_summary[key]
                 for key in LOG_SUMMARY_FIELDS[task]
                 if isinstance(public_summary.get(key), int | float | bool | str)
+            }
+            _log(
+                logging.INFO,
+                "scan_completed",
+                task=task,
+                run_id=run_id,
+                trigger=trigger,
+                attempt=attempt,
+                status=run_status,
+                stage="complete",
+                duration_seconds=round((datetime.now(UTC) - started).total_seconds(), 3),
+                **summary_fields,
             )
-            detail = f" ({summary})" if summary else ""
-            print(f"Completed {task} automation scan: {run_status}{detail}.", flush=True)
             return True
         except Exception as exc:
-            category = _safe_error(exc)
+            category = (
+                exc.error_category if isinstance(exc, TaskExecutionError) else _safe_error(exc)
+            )
+            stage = exc.stage if isinstance(exc, TaskExecutionError) else "task"
             self.state.record_run(task, started, "failed", {}, category)
-            print(f"{task} automation failed ({category})", file=sys.stderr, flush=True)
+            _log(
+                logging.ERROR,
+                "scan_failed",
+                task=task,
+                run_id=run_id,
+                trigger=trigger,
+                attempt=attempt,
+                status="failed",
+                stage=stage,
+                error_category=category,
+                duration_seconds=round((datetime.now(UTC) - started).total_seconds(), 3),
+                stack=_safe_stack(exc),
+            )
             return False
 
     def deliver_pending(self, now: datetime | None = None) -> bool:
@@ -731,15 +872,28 @@ class AutomationService:
             try:
                 deliver(notification, self.config.notifications)
                 self.state.delivery_succeeded(notification.key)
+                _log(
+                    logging.INFO,
+                    "notification_delivered",
+                    stage="notify",
+                    sink=self.config.notifications.sink,
+                    priority=notification.priority,
+                )
             except Exception as exc:
                 successful = False
                 category = _safe_error(exc)
                 self.state.delivery_failed(notification.key, category)
-                print(f"notification delivery failed ({category})", file=sys.stderr, flush=True)
+                _log(
+                    logging.ERROR,
+                    "notification_failed",
+                    stage="notify",
+                    error_category=category,
+                    stack=_safe_stack(exc),
+                )
         return successful
 
     def run_once(self, tasks: Sequence[str]) -> bool:
-        task_results = [self.run_task(task) for task in tasks]
+        task_results = [self.run_task(task, trigger="manual") for task in tasks]
         notifications_delivered = self.deliver_pending()
         return all(task_results) and notifications_delivered
 
@@ -790,6 +944,27 @@ def _gmail_due(now: datetime, config: AutomationConfig, state: AutomationState) 
     return config.gmail.run_on_start if last is None else now >= last + config.gmail.every
 
 
+def _local_timestamp(value: datetime, timezone: ZoneInfo) -> str:
+    return value.astimezone(timezone).isoformat(timespec="minutes")
+
+
+def _schedule_log_fields(service: AutomationService, due: dict[str, datetime]) -> dict[str, object]:
+    fields: dict[str, object] = {"timezone": str(service.config.timezone)}
+    for task, enabled in (
+        ("jobs", service.config.jobs.enabled),
+        ("gmail", service.config.gmail.enabled),
+    ):
+        fields[f"{task}_enabled"] = enabled
+        if not enabled:
+            continue
+        previous = _last_finished(service.state, task)
+        fields[f"{task}_previous"] = (
+            _local_timestamp(previous, service.config.timezone) if previous else "never"
+        )
+        fields[f"{task}_next"] = _local_timestamp(due[task], service.config.timezone)
+    return fields
+
+
 def run_forever(service: AutomationService, stop: threading.Event) -> int:
     """Run due tasks and retry pending alerts until asked to stop."""
     with service.state.locked():
@@ -814,18 +989,21 @@ def run_forever(service: AutomationService, stop: threading.Event) -> int:
                 )
             ),
         }
-        schedule_summary = ", ".join(
-            f"{task}={due[task].astimezone(service.config.timezone).isoformat(timespec='minutes')}"
-            for task, enabled in (
-                ("jobs", service.config.jobs.enabled),
-                ("gmail", service.config.gmail.enabled),
-            )
-            if enabled
+        _log(
+            logging.INFO,
+            "service_started",
+            version=_package_version(),
+            state=(
+                "ready"
+                if (service.config.jobs.enabled and due["jobs"] <= now)
+                or (service.config.gmail.enabled and due["gmail"] <= now)
+                else "waiting"
+            ),
+            **_schedule_log_fields(service, due),
         )
-        detail = f" Next runs: {schedule_summary}." if schedule_summary else ""
-        print(f"Automation service started.{detail}", flush=True)
         failures = {task: 0 for task in TASKS}
         next_delivery = now
+        next_heartbeat = now + timedelta(hours=DEFAULT_HEARTBEAT_HOURS)
         while not stop.is_set():
             now = datetime.now(UTC)
             ran = False
@@ -835,7 +1013,9 @@ def run_forever(service: AutomationService, stop: threading.Event) -> int:
             ):
                 if not enabled or now < due[task]:
                     continue
-                succeeded = service.run_task(task)
+                attempt = failures[task] + 1
+                trigger = "retry" if failures[task] else "scheduled"
+                succeeded = service.run_task(task, trigger=trigger, attempt=attempt)
                 ran = True
                 if succeeded:
                     failures[task] = 0
@@ -844,24 +1024,39 @@ def run_forever(service: AutomationService, stop: threading.Event) -> int:
                         if task == "jobs"
                         else now + service.config.gmail.every
                     )
-                    continue
-                failures[task] += 1
-                if failures[task] <= 2:
-                    due[task] = now + timedelta(minutes=DEFAULT_NOTIFICATION_RETRY_MINUTES)
                 else:
-                    service.state.enqueue(failure_notification(task, now))
-                    failures[task] = 0
-                    due[task] = (
-                        next_job_run(now, service.config.jobs, service.config.timezone)
-                        if task == "jobs"
-                        else now + service.config.gmail.every
-                    )
+                    failures[task] += 1
+                    if failures[task] <= 2:
+                        due[task] = now + timedelta(minutes=DEFAULT_NOTIFICATION_RETRY_MINUTES)
+                    else:
+                        service.state.enqueue(failure_notification(task, now))
+                        failures[task] = 0
+                        due[task] = (
+                            next_job_run(now, service.config.jobs, service.config.timezone)
+                            if task == "jobs"
+                            else now + service.config.gmail.every
+                        )
+                _log(
+                    logging.INFO,
+                    "scan_scheduled",
+                    task=task,
+                    next_run=_local_timestamp(due[task], service.config.timezone),
+                    reason="retry" if failures[task] else "schedule",
+                )
             if now >= next_delivery:
                 service.deliver_pending(now)
                 next_delivery = now + timedelta(minutes=DEFAULT_NOTIFICATION_RETRY_MINUTES)
+            if now >= next_heartbeat:
+                _log(
+                    logging.INFO,
+                    "service_heartbeat",
+                    state="waiting",
+                    **_schedule_log_fields(service, due),
+                )
+                next_heartbeat = now + timedelta(hours=DEFAULT_HEARTBEAT_HOURS)
             wait_seconds = 30 if ran else 60
             stop.wait(wait_seconds)
-        print("Automation service stopped.", flush=True)
+        _log(logging.INFO, "service_stopped", state="stopped")
     return 0
 
 
@@ -924,12 +1119,33 @@ def _doctor(
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    structured_logs = args.command in {"once", "run"}
+    if structured_logs:
+        try:
+            _configure_logging()
+        except ValueError as exc:
+            _log(
+                logging.ERROR,
+                "service_start_failed",
+                stage="logging",
+                error_category=_safe_error(exc),
+                stack=_safe_stack(exc),
+            )
+            return 2
     workspace = Path.cwd().resolve()
     if (
         not (workspace / ".resume-builder.json").is_file()
         and not (workspace / "vault" / "vault.json").is_file()
     ):
-        print("automation commands require an active private workspace", file=sys.stderr)
+        if structured_logs:
+            _log(
+                logging.ERROR,
+                "service_start_failed",
+                stage="workspace",
+                error_category="WorkspaceNotConfigured",
+            )
+        else:
+            print("automation commands require an active private workspace", file=sys.stderr)
         return 2
     config_path = args.config.expanduser()
     if args.command == "init":
@@ -997,7 +1213,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         signal.signal(signal.SIGINT, stop_service)
         return run_forever(service, stop)
     except (OSError, ValueError, sqlite3.Error, json.JSONDecodeError) as exc:
-        print(str(exc), file=sys.stderr)
+        if structured_logs:
+            _log(
+                logging.ERROR,
+                "service_start_failed",
+                stage="startup",
+                error_category=_safe_error(exc),
+                stack=_safe_stack(exc),
+            )
+        else:
+            print(str(exc), file=sys.stderr)
         return 2
 
 
