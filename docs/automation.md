@@ -120,12 +120,17 @@ docker compose up -d
 docker compose logs -f automation
 ```
 
-The container writes versioned, one-line JSON events directly to standard output
-and standard error. It immediately confirms that the scheduler started, shows
+The container writes concise, human-readable events directly to standard output
+and standard error. It immediately confirms that the scheduler started, groups
 the previous and next job and Gmail scan times, and emits a quiet heartbeat every
 six hours. Scanner events include a short run ID, trigger, attempt, safe stage,
-duration, status, and content-free counts. Set `RESUME_BUILDER_LOG_LEVEL` to
+duration, status, and content-free counts. Docker supplies the outer timestamp,
+so the readable line does not repeat it. Set `RESUME_BUILDER_LOG_LEVEL` to
 `DEBUG`, `INFO`, `WARNING`, or `ERROR`; the default is `INFO`.
+
+Set `RESUME_BUILDER_LOG_FORMAT=json` when forwarding logs to a structured log
+collector. JSON events remain versioned and include their own UTC timestamp.
+The default `text` format is intended for Docker and TrueNAS log screens.
 
 Failures contain only an exception class and sanitized local frame locations,
 not exception messages. Logs never include Gmail subjects, bodies, attachments,

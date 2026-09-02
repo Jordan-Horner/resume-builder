@@ -59,7 +59,8 @@ def notification_config(*, privacy: str = "summary") -> NotificationConfig:
 
 
 @pytest.fixture
-def configured_logs() -> Iterator[Callable[[], None]]:
+def configured_logs(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[[], None]]:
+    monkeypatch.setenv("RESUME_BUILDER_LOG_FORMAT", "json")
     yield _configure_logging
     for handler in LOGGER.handlers[:]:
         LOGGER.removeHandler(handler)
@@ -69,6 +70,41 @@ def configured_logs() -> Iterator[Callable[[], None]]:
 
 def log_events(output: str) -> list[dict[str, object]]:
     return [json.loads(line) for line in output.splitlines() if line.startswith("{")]
+
+
+def test_readable_logs_group_schedule_without_duplicate_timestamp(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("RESUME_BUILDER_LOG_FORMAT", "text")
+    _configure_logging()
+
+    LOGGER.info(
+        "service_started",
+        extra={
+            "event_fields": {
+                "version": "0.12.0",
+                "state": "waiting",
+                "timezone": "America/New_York",
+                "jobs_enabled": True,
+                "jobs_previous": "2026-09-02T17:08-04:00",
+                "jobs_next": "2026-09-03T08:00-04:00",
+                "gmail_enabled": False,
+            }
+        },
+    )
+
+    output = capsys.readouterr().out.strip()
+    assert output.startswith("INFO    Service started (waiting)")
+    assert "jobs=on (last Sep 2, 2026 5:08 PM -0400; next Sep 3, 2026 8:00 AM -0400)" in output
+    assert "gmail=off" in output
+    assert '"timestamp"' not in output
+
+
+def test_unknown_log_format_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("RESUME_BUILDER_LOG_FORMAT", "xml")
+
+    with pytest.raises(ValueError, match="must be text or json"):
+        _configure_logging()
 
 
 def test_default_config_uses_daily_jobs_and_low_frequency_gmail(tmp_path: Path) -> None:

@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -133,6 +133,70 @@ class _DockerLogFormatter(logging.Formatter):
         return json.dumps(payload, separators=(",", ":"), sort_keys=False)
 
 
+class _ReadableLogFormatter(logging.Formatter):
+    """Render compact operational events for an interactive container log."""
+
+    EVENT_LABELS: ClassVar[dict[str, str]] = {
+        "notification_delivered": "Notification delivered",
+        "notification_failed": "Notification failed",
+        "scan_completed": "Scan completed",
+        "scan_failed": "Scan failed",
+        "scan_scheduled": "Next scan scheduled",
+        "scan_started": "Scan started",
+        "service_heartbeat": "Service healthy",
+        "service_start_failed": "Service failed to start",
+        "service_started": "Service started",
+        "service_stopped": "Service stopped",
+    }
+
+    @staticmethod
+    def _value(value: object) -> str:
+        if isinstance(value, bool):
+            return "yes" if value else "no"
+        if isinstance(value, str) and "T" in value:
+            try:
+                parsed = datetime.fromisoformat(value)
+            except ValueError:
+                pass
+            else:
+                return parsed.strftime("%b %d, %Y %I:%M %p %z").replace(" 0", " ")
+        return str(value)
+
+    @classmethod
+    def _schedule(cls, fields: dict[str, object], task: str) -> str:
+        if not fields.get(f"{task}_enabled", False):
+            return f"{task}=off"
+        previous = cls._value(fields.get(f"{task}_previous", "never"))
+        upcoming = cls._value(fields.get(f"{task}_next", "unknown"))
+        return f"{task}=on (last {previous}; next {upcoming})"
+
+    def format(self, record: logging.LogRecord) -> str:
+        event = record.getMessage()
+        label = self.EVENT_LABELS.get(event, event.replace("_", " ").capitalize())
+        fields = getattr(record, "event_fields", None)
+        if not isinstance(fields, dict):
+            fields = {}
+        visible = dict(fields)
+        details: list[str] = []
+        if event in {"service_started", "service_heartbeat"}:
+            state = visible.pop("state", None)
+            if state:
+                label = f"{label} ({state})"
+            details.extend(
+                [
+                    self._schedule(visible, "jobs"),
+                    self._schedule(visible, "gmail"),
+                ]
+            )
+            for task in TASKS:
+                for suffix in ("enabled", "previous", "next"):
+                    visible.pop(f"{task}_{suffix}", None)
+        for key, value in visible.items():
+            details.append(f"{key}={self._value(value)}")
+        prefix = f"{record.levelname:<7} {label}"
+        return f"{prefix} | {' | '.join(details)}" if details else prefix
+
+
 def _configure_logging() -> None:
     level_name = os.environ.get("RESUME_BUILDER_LOG_LEVEL", "INFO").upper()
     configured_level = getattr(logging, level_name, None)
@@ -143,12 +207,16 @@ def _configure_logging() -> None:
         "ERROR",
     }
     level = logging.INFO if invalid_level else cast(int, configured_level)
+    format_name = os.environ.get("RESUME_BUILDER_LOG_FORMAT", "text").lower()
+    invalid_format = format_name not in {"text", "json"}
     for handler in LOGGER.handlers[:]:
         LOGGER.removeHandler(handler)
         handler.close()
     LOGGER.propagate = False
     LOGGER.setLevel(level)
-    formatter = _DockerLogFormatter()
+    formatter: logging.Formatter = (
+        _DockerLogFormatter() if format_name == "json" else _ReadableLogFormatter()
+    )
     stdout_handler = logging.StreamHandler(sys.stdout)
     stdout_handler.setLevel(level)
     stdout_handler.addFilter(_MaxLevelFilter(logging.INFO))
@@ -160,6 +228,8 @@ def _configure_logging() -> None:
     LOGGER.addHandler(stderr_handler)
     if invalid_level:
         raise ValueError("RESUME_BUILDER_LOG_LEVEL must be DEBUG, INFO, WARNING, or ERROR")
+    if invalid_format:
+        raise ValueError("RESUME_BUILDER_LOG_FORMAT must be text or json")
 
 
 def _log(level: int, event: str, **fields: object) -> None:
