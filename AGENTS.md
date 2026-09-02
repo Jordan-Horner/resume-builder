@@ -53,6 +53,7 @@ resume-builder review finalize build/reviews/<direction>.decisions.json
 resume-builder review validate build/reviews/<direction>.json
 resume-builder feedback record build/<feedback-plan>.json [--session FB-...]
 resume-builder feedback resolve resumes/plans/<resume>.yaml --include-open
+resume-builder feedback resolve resumes/plans/<resume>.yaml --semantic-only
 resume-builder feedback accept FB-<session> --preview build/resumes/<resume>/resume.preview.json
 resume-builder feedback accept FB-<session> --preview build/resumes/<resume>/resume.preview.json \
   --remember-approved-wording
@@ -264,13 +265,21 @@ indexes. The scripts under
   review for a wording-only edit. Run
   `resume-builder feedback accept FB-<session> --preview build/resumes/<resume>/resume.preview.json`
   only after the user accepts that revised sentence in the preview or
-  explicitly asks to mint it. Accept each intended session explicitly and promote only
+  explicitly asks to mint it. Ordinary acceptance promotes semantic guidance
+  without preserving the complete sentence as a future prompt example. Accept
+  each intended session explicitly and promote only
   the latest revision: reusable guidance becomes the narrowest applicable
   durable or local rule, a cosmetic one-off closes with `none`, and a factual
   correction routes through `hydrate-vault` with `hydrate` instead of becoming
-  editorial authority. When the user explicitly approves the final sentence of
-  a factual correction for future reuse, add `--remember-approved-wording`;
-  never apply it to untouched sentences or a whole resume.
+  editorial authority. Add `--remember-approved-wording` only when the user
+  separately requests exact future reuse of the accepted narrative block; for
+  a factual correction, this creates the fact-scoped preferred example. Never
+  infer exact reuse from `looks good`, untouched sentences, whole-resume
+  approval, silence, or minting. When the user asks for a fresh alternative to
+  approved prose, treat the current source as the protected incumbent and use
+  `feedback resolve --semantic-only` so preferred sentence examples do not
+  anchor the challenger. Compare the two and edit only after the user selects
+  the challenger.
 - Only direct user feedback creates personal editorial memory. Never derive it
   from a job posting, imported source, AI reviewer suggestion, or silence after
   showing a revision. Missing `build/feedback/` and `editorial/rules/`

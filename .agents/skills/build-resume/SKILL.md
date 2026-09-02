@@ -395,13 +395,23 @@ Git tools do not. Never write candidate data into same-named engine folders.
     Answer any simultaneous process question in commentary before previewing,
     not beside the exclusive preview handoff. Stay in the preview → edit → preview loop until the user says
     `Mint`. When the user explicitly approves one sentence they manually
-    refined, accept only that feedback session against the current preview. For
-    a factual-correction session, pass `--remember-approved-wording` so the
-    final sentence becomes a fact-scoped preferred example. Never infer
-    sentence approval from untouched prose, whole-resume approval, or minting.
+    refined, accept only that feedback session against the current preview.
+    Ordinary acceptance promotes the semantic preference but does not preserve
+    the complete sentence as a future prompt example. Pass
+    `--remember-approved-wording` only when the user separately asks to reuse
+    that exact wording in future work; for a factual-correction session, this
+    creates the fact-scoped preferred example. Never infer exact-wording reuse
+    from `looks good`, untouched prose, whole-resume approval, silence, or
+    minting.
     A preview with `changes-required` language is an editable revision state,
     not a release-ready preview: surface its flagged blocks, revise them, and
     repeat the changed-block language check before offering mint.
+    When the user asks to regenerate an approved narrative block, treat the
+    existing source as the protected incumbent and resolve accepted guidance
+    with `--semantic-only` for a clean challenger. Draft from the semantic
+    constraints, target, synthesis strategy, and canonical evidence without
+    preferred sentence examples; compare the challenger with the incumbent and
+    change the resume only after the user selects it.
     When the user adds content during preview, use canonical vault evidence
     immediately when it exists. For a new or changed factual claim, do not place
     the claim into the resume first. Show the current canonical fact and handle

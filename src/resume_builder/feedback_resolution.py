@@ -102,14 +102,13 @@ def _effective_payload(
     strength: object,
     revision: dict[str, Any],
 ) -> dict[str, object]:
-    """Return the storage-independent guidance that can affect resume prose."""
+    """Return semantic compliance guidance independent of drafting examples."""
     return {
         "identity": identity,
         "strength": strength,
         "instruction": revision["instruction"],
         "must_preserve": revision["must_preserve"],
         "must_avoid": revision["must_avoid"],
-        "preferred_examples": revision["preferred_examples"],
     }
 
 
@@ -340,7 +339,13 @@ def _validate_rule(data: dict[str, Any], path: Path, project_root: Path) -> None
         raise ValueError(f"{path}: feedback rule has an invalid strength")
 
 
-def _rule_record(path: Path, data: dict[str, Any], project_root: Path) -> dict[str, object]:
+def _rule_record(
+    path: Path,
+    data: dict[str, Any],
+    project_root: Path,
+    *,
+    semantic_only: bool = False,
+) -> dict[str, object]:
     current = data["revisions"][int(data["current_revision"]) - 1]
     return {
         "id": data["id"],
@@ -351,7 +356,7 @@ def _rule_record(path: Path, data: dict[str, Any], project_root: Path) -> dict[s
         "instruction": current["instruction"],
         "must_preserve": current["must_preserve"],
         "must_avoid": current["must_avoid"],
-        "preferred_examples": current["preferred_examples"],
+        "preferred_examples": [] if semantic_only else current["preferred_examples"],
         "effective_digest": _effective_digest(data["identity"], data["strength"], current),
         "path": path.relative_to(project_root).as_posix(),
         "sha256": _file_digest(path),
@@ -435,6 +440,7 @@ def resolve_for_plan(
     project_root: Path,
     *,
     include_open: bool = False,
+    semantic_only: bool = False,
 ) -> list[dict[str, object]]:
     """Resolve current accepted rules and optionally unfinished session guidance."""
     root = project_root.expanduser().resolve()
@@ -465,7 +471,7 @@ def resolve_for_plan(
                     "instruction": current["instruction"],
                     "must_preserve": current["must_preserve"],
                     "must_avoid": current["must_avoid"],
-                    "preferred_examples": current["preferred_examples"],
+                    "preferred_examples": [] if semantic_only else current["preferred_examples"],
                     "effective_digest": _effective_digest(
                         session["identity"], session["strength"], current
                     ),
@@ -481,7 +487,12 @@ def resolve_for_plan(
             and rule["id"] not in suppressed_rule_ids
             and _applies(rule["identity"]["scope"], context)
         ):
-            resolved.append({"source": "accepted-rule", **_rule_record(path, rule, root)})
+            resolved.append(
+                {
+                    "source": "accepted-rule",
+                    **_rule_record(path, rule, root, semantic_only=semantic_only),
+                }
+            )
     resolved.extend(open_records)
     return sorted(resolved, key=lambda item: (str(item["effective_digest"]), str(item["id"])))
 

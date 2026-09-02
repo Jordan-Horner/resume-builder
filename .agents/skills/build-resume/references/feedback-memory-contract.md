@@ -44,7 +44,8 @@ not merely rotate synonyms.
    the newest revision replaces earlier interpretations even when the agent
    corrects its kind or scope.
 2. Build and preview with the latest applicable open revisions plus accepted
-   rules.
+   rules. Open revisions may carry the exact selected wording so the active
+   edit remains stable.
 3. Promote only after the user accepts the revised sentence in the published
    preview or explicitly asks to mint it. Accept the exact session revision
    pinned to the preview. Promotion does not stale that preview when the
@@ -58,11 +59,14 @@ resume-builder feedback resolve resumes/plans/<resume>.yaml --include-open
 resume-builder feedback accept FB-... --preview build/resumes/<resume>/resume.preview.json
 ```
 
-For a factual correction whose final sentence the user explicitly approves for
-future reuse, add `--remember-approved-wording`. This creates a separate,
-fact-scoped presentation rule whose sole preferred example is the approved
-current sentence. Do not use the flag for untouched prose, whole-resume
-approval, or minting alone.
+Ordinary acceptance promotes semantic guidance and removes sentence examples
+from the durable rule. Add `--remember-approved-wording` only when the user
+explicitly asks to reuse the exact accepted narrative block in future work.
+For a factual correction, this creates a separate fact-scoped presentation rule
+whose sole preferred example is the approved current sentence. For other
+reusable feedback, it preserves the exact accepted block in that rule. Do not
+infer exact-wording authorization from `looks good`, whole-resume approval,
+silence, or minting alone.
 
 After recording, give the command's one-line receipt to the user without asking
 another approval question. It lets the user catch a misunderstood instruction.
@@ -191,11 +195,21 @@ resume path and block pin, plus these fields:
   and any rule IDs explicitly superseded.
 
 The instruction records the user's intended boundary, not the AI's proposed
-replacement sentence. Examples remain optional unless the user explicitly
-approves exact language. In that case, preserve only that sentence and reuse it
-by default when the same fact-scoped accomplishment is selected. Adapt it only
-when the target or page constraint requires a different emphasis; do not save
-the adaptation unless the user explicitly approves it too.
+replacement sentence. Examples in an open session stabilize the active
+revision, but ordinary acceptance strips them before creating durable guidance.
+Preserve exact wording only when the user separately and explicitly requests
+future reuse. In that case, preserve only the accepted narrative block and
+reuse it within its approved scope. Adapt it only when the target or page
+constraint requires a different emphasis; do not save the adaptation unless the
+user explicitly approves it too.
+
+Treat an approved sentence without exact-reuse authorization as the protected
+incumbent in the resume source, not as a prompt example. Future regeneration
+must not silently replace that incumbent. When the user asks for a fresh
+challenger, run `resume-builder feedback resolve <plan> --semantic-only` and
+draft from the resulting constraints, synthesis strategy, target, and canonical
+evidence without using preferred sentence examples. Compare the challenger
+with the incumbent and update the resume only after the user selects it.
 
 ## Editing and review
 
@@ -205,6 +219,12 @@ The open session's latest revision guides the current rewrite; accepted rules
 guide applicable future builds. A changed applicable digest makes prior build,
 review, preview, and mint artifacts stale; promotion of the exact reviewed
 revision does not.
+
+Preferred examples are drafting aids rather than semantic compliance authority,
+so they are excluded from the effective-guidance digest. The resume source and
+review pins protect the selected incumbent. Instructions, preservation
+requirements, and avoidance constraints remain part of the digest and stale a
+build when their meaning changes.
 
 When the user rejects the new wording, record a new revision with the same
 `subject_key` before editing again. Do not promote the failed interpretation.

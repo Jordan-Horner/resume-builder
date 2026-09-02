@@ -222,6 +222,7 @@ def test_latest_session_revision_is_the_only_revision_promoted_and_resolved(
     assert rule["revisions"][0]["instruction"] == (
         "Describe the events as customer issues, not confirmed defects."
     )
+    assert rule["revisions"][0]["preferred_examples"] == []
 
     resolved = feedback_memory.resolve_feedback(synthesis_plan, tmp_path, vault)
     assert resolved["count"] == 1
@@ -268,6 +269,72 @@ def test_open_feedback_is_visible_during_revision_but_not_future_memory(
     )
     assert current["count"] == 1
     assert current["rules"][0]["source"] == "open-session"
+    assert current["rules"][0]["preferred_examples"] == ["customer issues"]
+
+
+def test_semantic_promotion_preserves_effective_guidance_fingerprint(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    vault, resume, synthesis_plan = project(tmp_path)
+    plan_path = feedback_plan(tmp_path, resume, instruction="Keep the meaning stable.")
+    recorded = feedback_memory.record_feedback(plan_path, tmp_path)
+    before = feedback_memory.resolve_feedback(
+        synthesis_plan,
+        tmp_path,
+        vault,
+        include_open=True,
+    )
+    before_digest = before["rules"][0]["effective_digest"]
+
+    accept_for_unit_test(tmp_path, str(recorded["session_id"]), monkeypatch)
+    after = feedback_memory.resolve_feedback(synthesis_plan, tmp_path, vault)
+
+    assert after["rules"][0]["effective_digest"] == before_digest
+    assert after["rules"][0]["preferred_examples"] == []
+
+
+def test_exact_wording_requires_explicit_acceptance_opt_in(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    vault, resume, synthesis_plan = project(tmp_path)
+    plan_path = feedback_plan(
+        tmp_path,
+        resume,
+        instruction="Prefer the selected customer-issue wording.",
+    )
+    recorded = feedback_memory.record_feedback(plan_path, tmp_path)
+
+    accepted = accept_for_unit_test(
+        tmp_path,
+        str(recorded["session_id"]),
+        monkeypatch,
+        remember_approved_wording=True,
+    )
+
+    result = accepted["accepted"][0]
+    sentence = "Traced customer-impacting defects across service boundaries."
+    assert result["route"] == "memory+wording"
+    assert result["preferred_sentence"] == sentence
+    rule = json.loads(
+        (tmp_path / "editorial" / "rules" / f"{result['rule']}.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert rule["revisions"][0]["preferred_examples"] == [sentence]
+
+    normal = feedback_memory.resolve_feedback(synthesis_plan, tmp_path, vault)
+    assert normal["mode"] == "normal"
+    assert normal["rules"][0]["preferred_examples"] == [sentence]
+    challenger = feedback_memory.resolve_feedback(
+        synthesis_plan,
+        tmp_path,
+        vault,
+        semantic_only=True,
+    )
+    assert challenger["mode"] == "semantic-only"
+    assert challenger["rules"][0]["preferred_examples"] == []
 
 
 def test_explicit_session_revision_can_correct_the_feedback_classification(

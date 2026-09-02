@@ -82,16 +82,23 @@ def resolve_feedback(
     vault_root: Path,
     *,
     include_open: bool = False,
+    semantic_only: bool = False,
 ) -> dict[str, object]:
     root = project_root.expanduser().resolve()
     plan = load_synthesis_plan(plan_path, root, vault_root.expanduser().resolve())
-    rules = resolve_for_plan(plan, root, include_open=include_open)
+    rules = resolve_for_plan(
+        plan,
+        root,
+        include_open=include_open,
+        semantic_only=semantic_only,
+    )
     return {
         "valid": True,
         "plan": plan.source.relative_to(root).as_posix(),
         "resume": plan.resume.relative_to(root).as_posix(),
         "rules": rules,
         "count": len(rules),
+        "mode": "semantic-only" if semantic_only else "normal",
     }
 
 
@@ -139,11 +146,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     accept_parser.add_argument("session_id", nargs="?")
     accept_parser.add_argument("--resume", type=Path)
     accept_parser.add_argument("--preview", type=Path)
-    accept_parser.add_argument("--remember-approved-wording", action="store_true")
+    accept_parser.add_argument(
+        "--remember-approved-wording",
+        action="store_true",
+        help="Explicitly preserve the exact accepted narrative block for future reuse",
+    )
     resolve_parser = subparsers.add_parser("resolve", help="Resolve guidance for one plan")
     resolve_parser.add_argument("plan", type=Path)
     resolve_parser.add_argument("--vault-root", type=Path, default=Path("vault"))
     resolve_parser.add_argument("--include-open", action="store_true")
+    resolve_parser.add_argument(
+        "--semantic-only",
+        action="store_true",
+        help="Return constraints without preferred sentence examples for challenger drafting",
+    )
     retire_parser = subparsers.add_parser("retire", help="Retire one accepted feedback rule")
     retire_parser.add_argument("rule_id")
     retire_parser.add_argument("--reason", required=True)
@@ -182,6 +198,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 root,
                 vault_root,
                 include_open=args.include_open,
+                semantic_only=args.semantic_only,
             )
         elif args.action == "retire":
             result = retire_feedback_rule(args.rule_id, args.reason, root)

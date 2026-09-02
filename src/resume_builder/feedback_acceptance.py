@@ -140,6 +140,26 @@ def _approved_wording_rule(
     return rule_path, rule, sentence
 
 
+def _accepted_sentence(
+    root: Path,
+    current: dict[str, Any],
+    accepted_result: dict[str, str],
+) -> str:
+    """Return the exact narrative block pinned by the accepted preview."""
+    source = _object(current.get("source"), "feedback revision source")
+    resume_path = _project_file(root, source.get("resume"), "feedback source resume", "resumes")
+    from .compilation import sha256_file
+    from .feedback_recording import _block_inventory
+
+    if sha256_file(resume_path) != accepted_result["resume_sha256"]:
+        raise ValueError("approved wording resume changed after preview publication")
+    block_id = _nonempty(source.get("block_id"), "feedback source block_id")
+    block = _block_inventory(resume_path).get(block_id)
+    if block is None:
+        raise ValueError("approved wording block no longer exists in the accepted resume")
+    return _nonempty(block.get("text"), "approved wording sentence")
+
+
 def _acceptance_result(
     root: Path,
     session: dict[str, Any],
@@ -290,13 +310,16 @@ def accept_feedback(
         promotion = session["promotion"]
         current = session["revisions"][session["current_revision"] - 1]
         wording_update: tuple[Path, dict[str, Any], str] | None = None
+        accepted_sentence: str | None = None
         if remember_approved_wording:
-            if promotion != "hydrate":
+            if promotion == "none":
                 raise ValueError(
-                    "--remember-approved-wording is only needed for factual corrections; "
-                    "other reusable feedback should use its existing preferred_examples"
+                    "--remember-approved-wording requires reusable or factual feedback"
                 )
-            wording_update = _approved_wording_rule(root, session, current, accepted_result)
+            if promotion == "hydrate":
+                wording_update = _approved_wording_rule(root, session, current, accepted_result)
+            else:
+                accepted_sentence = _accepted_sentence(root, current, accepted_result)
         if promotion == "hydrate":
             session["status"] = "needs-hydration"
             session["accepted_at"] = _now()
@@ -363,7 +386,7 @@ def accept_feedback(
                 "instruction": current["instruction"],
                 "must_preserve": current["must_preserve"],
                 "must_avoid": current["must_avoid"],
-                "preferred_examples": current["preferred_examples"],
+                "preferred_examples": [accepted_sentence] if accepted_sentence else [],
             }
         )
         rule.update(
@@ -415,9 +438,10 @@ def accept_feedback(
         accepted.append(
             {
                 "session_id": session["id"],
-                "route": "memory",
+                "route": "memory+wording" if accepted_sentence else "memory",
                 "rule": rule["id"],
                 "revision": rule["current_revision"],
+                "preferred_sentence": accepted_sentence,
                 "receipt": f"Saved for future resumes: {current['instruction']}",
             }
         )
