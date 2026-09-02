@@ -43,7 +43,6 @@ class OpenRouterAdapter(ModelAdapter):
             provider_options["only"] = list(self.config.routing.providers)
         settings = OpenRouterModelSettings(
             max_tokens=self.config.limits.max_output_tokens,
-            parallel_tool_calls=False,
             openrouter_provider=cast(Any, provider_options),
         )
         model = OpenRouterModel(

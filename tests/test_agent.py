@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import sys
+import types
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -12,6 +15,7 @@ from resume_builder import agent_tools, jobs
 from resume_builder.agent import AgentService, ConsoleAdapter, main
 from resume_builder.agent_config import load_agent_config, render_default_agent_config
 from resume_builder.agent_contracts import InboundMessage, ModelReply, ModelRequest
+from resume_builder.agent_openrouter import OpenRouterAdapter
 
 
 class FakeModelAdapter:
@@ -34,7 +38,7 @@ def test_default_config_enforces_private_bounded_openrouter_routing(tmp_path: Pa
 
     assert config.provider == "openrouter"
     assert config.api_key_env == "OPENROUTER_API_KEY"
-    assert config.models.fast == "deepseek/deepseek-v4-flash-0731"
+    assert config.models.fast == "deepseek/deepseek-v4-flash"
     assert config.routing.zero_data_retention is True
     assert config.routing.data_collection == "deny"
     assert config.routing.require_parameters is True
@@ -68,6 +72,54 @@ def test_service_uses_model_and_channel_adapters(tmp_path: Path) -> None:
         "list_new_job_matches",
     }
     assert all(not tool.mutates for tool in model.request.tools)
+
+
+def test_openrouter_adapter_does_not_require_parallel_tool_call_support(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured_settings: dict[str, object] = {}
+
+    class FakeAgent:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        def run_sync(self, *args: object, **kwargs: object) -> object:
+            usage = types.SimpleNamespace(
+                cost=Decimal("0.01"),
+                requests=1,
+                tool_calls=0,
+                input_tokens=10,
+                output_tokens=1,
+            )
+            return types.SimpleNamespace(output="READY", usage=usage)
+
+    def fake_settings(**kwargs: object) -> dict[str, object]:
+        captured_settings.update(kwargs)
+        return kwargs
+
+    pydantic_ai = types.ModuleType("pydantic_ai")
+    pydantic_ai.Agent = FakeAgent
+    pydantic_ai.Tool = object
+    models = types.ModuleType("pydantic_ai.models.openrouter")
+    models.OpenRouterModel = lambda *args, **kwargs: object()
+    models.OpenRouterModelSettings = fake_settings
+    providers = types.ModuleType("pydantic_ai.providers.openrouter")
+    providers.OpenRouterProvider = lambda *args, **kwargs: object()
+    usage = types.ModuleType("pydantic_ai.usage")
+    usage.UsageLimits = lambda **kwargs: kwargs
+    monkeypatch.setitem(sys.modules, "pydantic_ai", pydantic_ai)
+    monkeypatch.setitem(sys.modules, "pydantic_ai.models.openrouter", models)
+    monkeypatch.setitem(sys.modules, "pydantic_ai.providers.openrouter", providers)
+    monkeypatch.setitem(sys.modules, "pydantic_ai.usage", usage)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "secret-value")
+    config = load_agent_config(config_path(tmp_path))
+
+    reply = OpenRouterAdapter(config).run(
+        ModelRequest("Reply READY", "Do not use tools.", config.models.fast)
+    )
+
+    assert reply.text == "READY"
+    assert "parallel_tool_calls" not in captured_settings
 
 
 def test_new_job_tool_exposes_only_sanitized_review_eligible_fields(

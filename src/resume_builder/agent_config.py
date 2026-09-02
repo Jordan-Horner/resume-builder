@@ -174,7 +174,7 @@ provider: openrouter
 api_key_env: OPENROUTER_API_KEY
 
 models:
-  fast: deepseek/deepseek-v4-flash-0731
+  fast: deepseek/deepseek-v4-flash
   reasoning: z-ai/glm-5.2
   writing: z-ai/glm-5.2
 
