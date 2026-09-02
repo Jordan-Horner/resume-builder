@@ -160,9 +160,10 @@ local Git cannot recover files after device loss.
 ## Build and screen a job inventory
 
 Resume Builder includes a local inventory backend for LinkedIn, Indeed, and
-direct employer ATS boards. Collection is manual: there is no server, scheduler,
-or authenticated LinkedIn automation. Mutable inventory and personal search
-preferences stay under the private workspace.
+direct employer ATS boards. Collection can run manually or through the native
+low-noise automation service; there is no authenticated LinkedIn automation.
+Mutable inventory, schedules, and personal search preferences stay under the
+private workspace.
 
 ```bash
 resume-builder jobs update
@@ -269,6 +270,25 @@ mailbox cursor, message IDs, and dispositions live in an external runtime
 directory with owner-only file permissions. See
 [`docs/gmail-automation.md`](docs/gmail-automation.md) for setup, privacy, and
 scheduling guidance.
+
+## Schedule job and Gmail scans
+
+The native automation service can run job discovery once or twice daily and
+Gmail reconciliation every few hours, then notify only when a meaningful change
+is found. Console output is the default; Discord uses an environment-provided
+webhook and a durable deduplication outbox. Docker Compose is supported without
+putting the workspace, OAuth token, runtime databases, or webhook secret in the
+image.
+
+```bash
+resume-builder automation init --timezone America/New_York
+resume-builder automation doctor
+resume-builder automation once --task jobs
+resume-builder automation run
+```
+
+See [`docs/automation.md`](docs/automation.md) for schedules, notifications,
+privacy boundaries, and Docker deployment.
 
 If a repository has ever contained real career data, keep its complete Git history
 private. Removing personal files from the latest version does not remove them from

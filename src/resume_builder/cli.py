@@ -9,6 +9,7 @@ from collections.abc import Callable, Sequence
 
 from . import (
     applications,
+    automation,
     compilation,
     directions,
     evaluations,
@@ -70,6 +71,10 @@ COMMANDS: dict[str, Command] = {
     "application": (
         applications.main,
         "Record applications, outcomes, and submitted answers",
+    ),
+    "automation": (
+        automation.main,
+        "Schedule job discovery, Gmail updates, and notifications",
     ),
     "gmail": (
         gmail_automation.main,

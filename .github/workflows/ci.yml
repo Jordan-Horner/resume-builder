@@ -19,6 +19,20 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build automation image
+        run: docker build --tag resume-builder-automation:ci .
+      - name: Smoke test image
+        run: docker run --rm resume-builder-automation:ci --help
+      - name: Validate Compose configuration
+        env:
+          RESUME_BUILDER_WORKSPACE_PATH: /tmp/resume-builder-workspace
+          RESUME_BUILDER_RUNTIME_PATH: /tmp/resume-builder-runtime
+        run: docker compose config --quiet
+
   test:
     runs-on: ubuntu-latest
     strategy:

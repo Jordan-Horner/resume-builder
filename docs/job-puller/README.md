@@ -7,8 +7,8 @@ candidate-aware orchestration layer for cheap prescreening and deeper screening.
 
 ## Boundaries
 
-- Local manual execution only.
-- No separate repository, telemetry, hosted service, or background scheduler.
+- Local execution through either the CLI or Resume Builder's native automation service.
+- No separate repository, telemetry, hosted service, or inbound web server.
 - LinkedIn uses a direct logged-out guest adapter; Indeed is isolated behind `python-jobspy`.
 - Greenhouse, Lever, Ashby, SmartRecruiters, and Workday use direct public board adapters.
 - Mutable inventory and personal configuration live under the private Resume

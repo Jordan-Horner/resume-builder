@@ -359,6 +359,18 @@ def test_new_jobs_shortlists_only_canonical_database_delta(tmp_path: Path, monke
     assert captured["shortlist_kwargs"]["included_job_ids"] == {"new"}
 
 
+def test_new_jobs_rejects_an_overlapping_refresh(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(jobs_module, "DEFAULT_LATEST_REFRESH", tmp_path / "latest-refresh.json")
+
+    def locked(*_args):
+        raise BlockingIOError
+
+    monkeypatch.setattr(jobs_module.fcntl, "flock", locked)
+
+    with pytest.raises(ValueError, match="another job discovery scan"):
+        _new_jobs(Path("search.yml"), Path("preferences.yml"), 25, None)
+
+
 def test_new_jobs_marks_failed_refresh_without_reusing_old_delta(tmp_path: Path, monkeypatch):
     inventory = FakeInventory()
     manifest_path = tmp_path / "latest-refresh.json"

@@ -58,7 +58,7 @@ def write_workspace_files(root: Path, configuration: dict[str, object]) -> None:
     atomic_write_json(root / ".resume-builder.json", configuration)
     atomic_write_text(
         root / ".gitignore",
-        "/build/\n*.db\n*.docx\n*.pdf\n*.sqlite\n*.sqlite3\n.DS_Store\n",
+        "/build/\n/job-search/*.lock\n*.db\n*.docx\n*.pdf\n*.sqlite\n*.sqlite3\n.DS_Store\n",
     )
     atomic_write_text(
         root / "README.md",
@@ -86,6 +86,7 @@ def write_workspace_files(root: Path, configuration: dict[str, object]) -> None:
         "editorial",
         "exports",
         "applications",
+        "automation",
     ):
         readme = workspace_resources / directory / "README.md"
         atomic_write_text(root / directory / "README.md", readme.read_text(encoding="utf-8"))

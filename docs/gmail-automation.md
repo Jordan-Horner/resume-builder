@@ -125,19 +125,21 @@ supersession workflow rather than silent reclassification.
 
 ## Schedule regular scans
 
-After one interactive `gmail connect`, a server timer can run the apply command
-from the configured private workspace. For example, a cron entry that checks
-every 15 minutes is:
+After one interactive `gmail connect`, use the first-class automation service.
+Gmail is deliberately lower priority than job discovery and defaults to every
+four hours:
 
-```cron
-*/15 * * * * cd /absolute/path/to/private-workspace && /absolute/path/to/resume-builder gmail scan --apply
+```bash
+resume-builder automation init --timezone America/New_York
+resume-builder automation doctor
+resume-builder automation run
 ```
 
-Use absolute paths and run the timer as the same operating-system account that
-owns the external token and runtime database. The command is idempotent, returns
-nonzero when Gmail or local validation fails, and never sends email. Sending
-digests or alerts should be a separate outbound policy so read-only mailbox
-access remains isolated from notification credentials.
+The scheduler uses the same idempotent apply command and external lock, retries
+bounded failures, and keeps outbound notifications isolated from read-only
+mailbox credentials. Docker Compose deployment is documented in
+[`automation.md`](automation.md). A system cron timer remains possible for
+advanced installations, but it is no longer the primary onboarding path.
 
 ## Automatic policy
 

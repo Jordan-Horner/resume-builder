@@ -8,6 +8,12 @@ changes.
 
 ### Added
 
+- Native low-noise automation for daily job discovery and periodic read-only
+  Gmail reconciliation, with durable health state and deduplicated alerts
+- Non-root Docker and Compose deployment with external private-workspace,
+  OAuth-token, runtime-state, and notification-secret boundaries
+- Console and Discord notification sinks with quiet hours, privacy modes, and
+  high-priority application-lifecycle alerts
 - A prose-preflight advisory for possible third-person candidate narration, with
   an explicit implied-first-person requirement in the reviewer standards
 - Apache License 2.0 for public use, modification, and distribution

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import fcntl
 import hashlib
 import io
 import json
@@ -491,6 +492,33 @@ def _recover_pending_new_job_ids(database: InventoryDatabase) -> set[str]:
 
 
 def _new_jobs(
+    config_path: Path,
+    preferences_path: Path,
+    limit: int,
+    providers: list[str] | None,
+    *,
+    retry_failed: bool = False,
+) -> int:
+    lock_path = DEFAULT_LATEST_REFRESH.with_suffix(".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+", encoding="utf-8") as stream:
+        try:
+            fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise ValueError("another job discovery scan is already running") from exc
+        try:
+            return _new_jobs_unlocked(
+                config_path,
+                preferences_path,
+                limit,
+                providers,
+                retry_failed=retry_failed,
+            )
+        finally:
+            fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+
+
+def _new_jobs_unlocked(
     config_path: Path,
     preferences_path: Path,
     limit: int,
