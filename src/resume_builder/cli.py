@@ -8,6 +8,7 @@ import sys
 from collections.abc import Callable, Sequence
 
 from . import (
+    agent,
     applications,
     automation,
     compilation,
@@ -34,6 +35,7 @@ from . import (
 
 Command = tuple[Callable[[Sequence[str] | None], int], str]
 COMMANDS: dict[str, Command] = {
+    "agent": (agent.main, "Talk to the private career agent through an adapter"),
     "init": (
         workspace.main,
         "Create a private Git workspace with an optional private GitHub backup",

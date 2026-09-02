@@ -15,7 +15,7 @@ RUN groupadd --gid 1000 resume-builder \
 
 COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
-RUN python -m pip install --no-cache-dir ".[gmail]"
+RUN python -m pip install --no-cache-dir ".[agent,gmail]"
 
 RUN mkdir -p /workspace /state \
     && chown -R resume-builder:resume-builder /workspace /state

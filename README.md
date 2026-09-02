@@ -260,6 +260,21 @@ resume-builder gmail backfill --apply             # reconstruct applications
 resume-builder gmail status
 ```
 
+## Run the private career-agent foundation
+
+The optional agent uses PydanticAI with OpenRouter behind provider- and
+communication-channel adapters. Its first toolset is read-only.
+
+```bash
+python -m pip install -e ".[agent]"
+resume-builder agent init
+resume-builder agent doctor
+resume-builder agent ask "What new jobs are ready to review?"
+```
+
+The generated configuration contains no API key. See
+[the agent architecture and implementation cycles](docs/agent.md).
+
 Normal scans use a narrow Gmail server-side query for recent application
 confirmations and rejection signals; no labels or Gmail filters are required.
 Historical backfill uses the same application-activity query over a longer

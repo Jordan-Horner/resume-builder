@@ -102,6 +102,12 @@ application confirmation into an append-only application event; raw message
 content remains transient and ambiguous messages cannot mutate workspace state.
 Workspace state and remote-privacy inspection are similarly isolated from the
 mutating initialization and connection workflow.
+The optional career agent follows the same dependency direction. Provider,
+communication-channel, and application-tool contracts are independent. The
+PydanticAI/OpenRouter adapter receives only normalized turns and explicitly
+registered tools, while SQLite and the private workspace remain authoritative.
+The initial agent toolset is read-only and content-limited; model conversation
+cannot establish career facts, application state, or approvals.
 Project reporting uses typed artifact-status records and shared freshness
 helpers while preserving its stable JSON-facing report contract.
 The same compiled-build freshness check is shared by language review, career

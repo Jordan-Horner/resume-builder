@@ -8,6 +8,9 @@ changes.
 
 ### Added
 
+- An adapter-first private career-agent foundation using PydanticAI and
+  OpenRouter, with separate model, communication-channel, and tool contracts,
+  conservative privacy routing, bounded usage, and an initial read-only CLI
 - Native low-noise automation for daily job discovery and periodic read-only
   Gmail reconciliation, with durable health state and deduplicated alerts
 - Non-root Docker and Compose deployment with external private-workspace,
