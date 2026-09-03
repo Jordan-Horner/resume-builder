@@ -1,18 +1,10 @@
 schema_version: 1
-accepted_work_modes: [remote]
-desired_title_terms:
-  - site reliability engineer
-  - production support engineer
-  - technical operations
-  - cloud engineer
-  - backend engineer
-interest_terms:
-  - incident response
-  - reliability
-  - production operations
-  - Python
-  - APIs
-  - cloud
+accepted_work_modes: []
+# Fresh installs are deliberately neutral. Add explicit preferences only after
+# reviewing discovery results; resume-derived concepts belong in a generated
+# discovery draft, not in this durable preference file.
+desired_title_terms: []
+interest_terms: []
 # Hard filters affect only the personal review queue. Matching inventory records
 # remain available if these preferences change later.
 excluded_title_terms: []
@@ -20,10 +12,7 @@ excluded_title_terms: []
 # must also contain an accepted senior role term to enter the review queue.
 senior_title_terms: []
 accepted_senior_role_terms: []
-unwanted_title_terms:
-  - computer repair
-  - desktop technician
-  - field service technician
+unwanted_title_terms: []
 excluded_companies: []
 # Suppress only an exact opening while retaining future roles from the company.
 # Values: applied or not_interested.
@@ -35,3 +24,20 @@ minimum_salary: null
 resume_globs:
   - resumes/baselines/*.md
   - resumes/tailored/*.md
+
+# Optional semantic-screening evidence. Keep fields null or empty when they are
+# unknown: the screener will report uncertainty instead of inventing an answer.
+# These are per-workspace facts, never product-wide defaults.
+screening_profile: {}
+# Optional screening facts can be added when known:
+# screening_profile:
+#   requires_sponsorship: null
+#   held_clearances: null
+#   willing_to_obtain_clearance: null
+#   licenses: null
+#   remote_location_terms: null
+#   work_mode_strength: preferred
+#   location_strength: preferred
+#   minimum_salary_strength: preferred
+#   supported_capabilities: []
+#   transferable_capabilities: []

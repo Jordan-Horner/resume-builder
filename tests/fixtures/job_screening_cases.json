@@ -1,0 +1,122 @@
+[
+  {
+    "name": "texas-onsite-profile-accepts-texas-onsite",
+    "job": {
+      "id": "fictional-texas-1",
+      "title": "Reliability Engineer",
+      "company": "Fictional Systems",
+      "location": "Austin, Texas",
+      "work_modes": ["onsite"],
+      "description_text": "Maintain reliable production services from the Austin office.",
+      "description_quality": "complete",
+      "url": "https://example.invalid/jobs/texas-1"
+    },
+    "preferences": {
+      "accepted_work_modes": ["onsite"],
+      "accepted_location_terms": ["Texas"],
+      "include_unknown_locations": false,
+      "screening_profile": {}
+    },
+    "eligibility": "eligible"
+  },
+  {
+    "name": "remote-only-profile-rejects-explicit-onsite-role",
+    "job": {
+      "id": "fictional-texas-2",
+      "title": "Reliability Engineer",
+      "company": "Fictional Systems",
+      "location": "Austin, Texas",
+      "work_modes": ["onsite"],
+      "description_text": "Maintain reliable production services from the Austin office.",
+      "description_quality": "complete",
+      "url": "https://example.invalid/jobs/texas-2"
+    },
+    "preferences": {
+      "accepted_work_modes": ["remote"],
+      "accepted_location_terms": [],
+      "include_unknown_locations": true,
+      "screening_profile": {}
+    },
+    "eligibility": "ineligible"
+  },
+  {
+    "name": "sponsorship-conflict-requires-two-explicit-sides",
+    "job": {
+      "id": "fictional-sponsorship-1",
+      "title": "Platform Engineer",
+      "company": "Fictional Cloud",
+      "location": "United States",
+      "work_modes": ["remote"],
+      "description_text": "Applicants must be able to work without current or future sponsorship.",
+      "description_quality": "complete",
+      "url": "https://example.invalid/jobs/sponsorship-1"
+    },
+    "preferences": {
+      "accepted_work_modes": [],
+      "accepted_location_terms": [],
+      "include_unknown_locations": true,
+      "screening_profile": {"requires_sponsorship": true}
+    },
+    "eligibility": "ineligible"
+  },
+  {
+    "name": "silent-sponsorship-policy-remains-unknown",
+    "job": {
+      "id": "fictional-sponsorship-2",
+      "title": "Platform Engineer",
+      "company": "Fictional Cloud",
+      "location": "United States",
+      "work_modes": ["remote"],
+      "description_text": "Build and operate cloud services.",
+      "description_quality": "complete",
+      "url": "https://example.invalid/jobs/sponsorship-2"
+    },
+    "preferences": {
+      "accepted_work_modes": [],
+      "accepted_location_terms": [],
+      "include_unknown_locations": true,
+      "screening_profile": {"requires_sponsorship": true}
+    },
+    "eligibility": "unknown"
+  },
+  {
+    "name": "active-clearance-with-unknown-holdings-remains-unknown",
+    "job": {
+      "id": "fictional-clearance-1",
+      "title": "Systems Engineer",
+      "company": "Fictional Aerospace",
+      "location": "Fort Worth, Texas",
+      "work_modes": ["onsite"],
+      "description_text": "An active Secret security clearance is required.",
+      "description_quality": "complete",
+      "url": "https://example.invalid/jobs/clearance-1"
+    },
+    "preferences": {
+      "accepted_work_modes": [],
+      "accepted_location_terms": [],
+      "include_unknown_locations": true,
+      "screening_profile": {"held_clearances": null}
+    },
+    "eligibility": "unknown"
+  },
+  {
+    "name": "higher-held-clearance-satisfies-lower-requirement",
+    "job": {
+      "id": "fictional-clearance-2",
+      "title": "Systems Engineer",
+      "company": "Fictional Aerospace",
+      "location": "Fort Worth, Texas",
+      "work_modes": ["onsite"],
+      "description_text": "An active Secret security clearance is required.",
+      "description_quality": "complete",
+      "url": "https://example.invalid/jobs/clearance-2"
+    },
+    "preferences": {
+      "accepted_work_modes": [],
+      "accepted_location_terms": [],
+      "include_unknown_locations": true,
+      "screening_profile": {"held_clearances": ["TS/SCI"]}
+    },
+    "eligibility": "eligible"
+  }
+]

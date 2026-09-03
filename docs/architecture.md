@@ -108,6 +108,12 @@ PydanticAI/OpenRouter adapter receives only normalized turns and explicitly
 registered tools, while SQLite and the private workspace remain authoritative.
 The initial agent toolset is read-only and content-limited; model conversation
 cannot establish career facts, application state, or approvals.
+Structured job screening follows an additional split: local deterministic
+constraints own eligibility, while a provider-neutral structured model request
+owns only career-fit judgment. A model cannot override a confirmed eligibility
+conflict. Screening packets and results are hash-pinned, provider calls require
+an explicit private-data confirmation, and generated cache records remain
+outside Git and outside authoritative inventory state.
 Project reporting uses typed artifact-status records and shared freshness
 helpers while preserving its stable JSON-facing report contract.
 The same compiled-build freshness check is shared by language review, career

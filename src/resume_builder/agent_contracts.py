@@ -6,6 +6,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from pydantic import BaseModel
+
 
 @dataclass(frozen=True)
 class AgentTool:
@@ -41,10 +43,34 @@ class ModelReply:
     cost_usd: str | None = None
 
 
+@dataclass(frozen=True)
+class StructuredModelRequest:
+    """One validated model task independent of a specific inference provider."""
+
+    prompt: str
+    instructions: str
+    model: str
+    output_type: type[BaseModel]
+
+
+@dataclass(frozen=True)
+class StructuredModelReply:
+    """Validated structured output and content-free usage metadata."""
+
+    output: BaseModel
+    model: str
+    requests: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cost_usd: str | None = None
+
+
 class ModelAdapter(Protocol):
     """Run model turns without exposing provider types to application code."""
 
     def run(self, request: ModelRequest) -> ModelReply: ...
+
+    def run_structured(self, request: StructuredModelRequest) -> StructuredModelReply: ...
 
 
 @dataclass(frozen=True)
