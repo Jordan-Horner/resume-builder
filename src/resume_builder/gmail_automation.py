@@ -15,6 +15,7 @@ from collections.abc import Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from decimal import Decimal, InvalidOperation
 from email.utils import parseaddr
 from pathlib import Path
 from typing import Any, Protocol
@@ -24,6 +25,7 @@ from bs4 import BeautifulSoup
 from job_puller.config import load_config, resolve_database_path
 from job_puller.database import InventoryDatabase
 
+from .agent_contracts import ModelProviderError
 from .applications import (
     DEFAULT_ROOT as DEFAULT_APPLICATIONS_ROOT,
 )
@@ -34,12 +36,16 @@ from .applications import (
     current_application_status,
     iter_records,
 )
+from .gmail_semantic import SemanticEmailClassifier, SemanticLifecycleOutcome
 from .jobs import DEFAULT_CONFIG
 
 GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
 CLASSIFIER_VERSION = "application-lifecycle-rules-v4"
 AUTOMATION_POLICY = "high-confidence-application-lifecycle-v2"
 AUTO_APPLY_THRESHOLD = 0.92
+SEMANTIC_CLASSIFIER_VERSION = f"{CLASSIFIER_VERSION}+semantic-v1"
+SEMANTIC_FALLBACK_REASONS = frozenset({"missing-confirmation-phrase"})
+SEMANTIC_APPLICATION_WINDOW_DAYS = 365
 DEFAULT_LABEL = ""
 GOOGLE_PROJECT_URL = "https://console.cloud.google.com/projectcreate"
 GMAIL_API_URL = "https://console.cloud.google.com/apis/library/gmail.googleapis.com"
@@ -62,8 +68,12 @@ FOLLOW_UP_QUERY_TERMS = (
     '"phone screen" "recruiter screen" "technical assessment" "take-home assessment" '
     '"coding challenge" "pleased to offer you" "offer letter" "offer of employment"'
 )
+SEMANTIC_CANDIDATE_QUERY_TERMS = (
+    '"application update" "update on your application" "application status"'
+)
 APPLICATION_ACTIVITY_QUERY = (
-    f"{CONFIRMATION_QUERY[:-1]} {REJECTION_QUERY_TERMS} {FOLLOW_UP_QUERY_TERMS}}}"
+    f"{CONFIRMATION_QUERY[:-1]} {REJECTION_QUERY_TERMS} {FOLLOW_UP_QUERY_TERMS} "
+    f"{SEMANTIC_CANDIDATE_QUERY_TERMS}}}"
 )
 DEFAULT_SCAN_QUERY = f"{APPLICATION_ACTIVITY_QUERY} newer_than:30d"
 DEFAULT_BACKFILL_QUERY = f"{APPLICATION_ACTIVITY_QUERY} newer_than:5y"
@@ -222,6 +232,14 @@ class GmailLifecycleEvent:
 
 
 @dataclass(frozen=True)
+class SemanticCorrelation:
+    allowed: bool
+    strength: str
+    reason: str
+    application_id: str | None = None
+
+
+@dataclass(frozen=True)
 class GmailSetupStep:
     title: str
     instruction: str
@@ -372,7 +390,12 @@ class GmailRuntimeState:
             )
 
     def processed(
-        self, account_id: str, message_id: str, *, replay_ambiguous: bool = False
+        self,
+        account_id: str,
+        message_id: str,
+        *,
+        replay_ambiguous: bool = False,
+        classifier_version: str = CLASSIFIER_VERSION,
     ) -> bool:
         if not self.path.is_file():
             return False
@@ -383,6 +406,8 @@ class GmailRuntimeState:
                 (account_id, message_id),
             ).fetchone()
         if row is None:
+            return False
+        if str(row[0]) in {"provider_error", "budget_exhausted"}:
             return False
         if replay_ambiguous and str(row[0]) == "ambiguous":
             return False
@@ -398,7 +423,7 @@ class GmailRuntimeState:
                 "offer",
                 "duplicate",
             }
-            or str(row[1]) == CLASSIFIER_VERSION
+            or str(row[1]) == classifier_version
         )
 
     def application_for_thread(self, account_id: str, thread_id: str) -> str | None:
@@ -436,6 +461,7 @@ class GmailRuntimeState:
         disposition: str,
         application_id: str | None,
         event_id: str | None,
+        classifier_version: str = CLASSIFIER_VERSION,
     ) -> None:
         self.initialize()
         with sqlite3.connect(self.path) as conn:
@@ -466,7 +492,7 @@ class GmailRuntimeState:
                     application_id,
                     event_id,
                     _sender_domain_hash(message.sender),
-                    CLASSIFIER_VERSION,
+                    classifier_version,
                     datetime.now(UTC).isoformat(),
                 ),
             )
@@ -921,6 +947,52 @@ def classify_lifecycle_event(message: GmailMessage) -> tuple[GmailLifecycleEvent
     )
 
 
+def _semantic_identity(value: str | None, text: str) -> str | None:
+    if not value:
+        return None
+    cleaned = _clean_identity(value)
+    normalized = _identity(cleaned)
+    return cleaned if normalized and normalized in _identity(text) else None
+
+
+def _classify_semantic_lifecycle(
+    message: GmailMessage,
+    classifier: SemanticEmailClassifier,
+) -> tuple[GmailLifecycleEvent | None, SemanticLifecycleOutcome]:
+    """Map validated semantic output into the existing lifecycle contract."""
+    outcome = classifier.classify(subject=message.subject, body=message.body)
+    decision = outcome.decision
+    if decision is None:
+        return None, outcome
+    company, role = _extract_identity(message.subject, message.body)
+    text = f"{message.subject}\n{message.body}"
+    semantic_company = _semantic_identity(decision.company, text)
+    semantic_role = _semantic_identity(decision.role, text)
+    if semantic_company and semantic_role and _valid_identity_pair(semantic_company, semantic_role):
+        company, role = semantic_company, semantic_role
+    else:
+        company = company or semantic_company
+        role = role or semantic_role
+    requisition_match = REQUISITION.search(text)
+    requisition_id = requisition_match.group(1) if requisition_match else None
+    if requisition_id is None:
+        requisition_id = _semantic_identity(decision.requisition_id, text)
+    confidence = 0.92 + (0.03 if _authenticated(message) else 0)
+    if company and role and _valid_identity_pair(company, role):
+        confidence += 0.02
+    return (
+        GmailLifecycleEvent(
+            event_type=decision.event_type,
+            company=company,
+            role=role,
+            requisition_id=requisition_id,
+            received_at=message.received_at,
+            confidence=round(min(confidence, 0.99), 2),
+        ),
+        outcome,
+    )
+
+
 def _classify_confirmation(
     message: GmailMessage,
 ) -> tuple[ApplicationConfirmation | None, str]:
@@ -1026,6 +1098,88 @@ def _already_confirmed(record: dict[str, Any], applied_on: str) -> bool:
     )
 
 
+def _role_core(value: str) -> str:
+    seniority = {"associate", "junior", "jr", "lead", "principal", "senior", "sr", "staff"}
+    return " ".join(token for token in TOKEN.findall(value.casefold()) if token not in seniority)
+
+
+def _semantic_correlation(
+    message: GmailMessage,
+    records: list[dict[str, Any]],
+    *,
+    thread_application_id: str | None,
+    sender_application_id: str | None,
+) -> SemanticCorrelation:
+    """Require local evidence of a tracked job before transmitting message text."""
+    eligible: list[dict[str, Any]] = []
+    terminal_seen = False
+    expired_seen = False
+    for record in records:
+        if current_application_status(record) in {"hired", "withdrawn", "rejected"}:
+            terminal_seen = True
+            continue
+        applied_on = date.fromisoformat(str(record["application"]["applied_on"]))
+        age = (message.received_at.date() - applied_on).days
+        if 0 <= age <= SEMANTIC_APPLICATION_WINDOW_DAYS:
+            eligible.append(record)
+        elif age > SEMANTIC_APPLICATION_WINDOW_DAYS:
+            expired_seen = True
+    by_id = {str(record["application"]["id"]): record for record in eligible}
+    if thread_application_id in by_id:
+        return SemanticCorrelation(True, "strong", "known-thread", thread_application_id)
+
+    text = _identity(f"{message.subject}\n{message.body}")
+    requisition_match = REQUISITION.search(f"{message.subject}\n{message.body}")
+    if requisition_match:
+        requisition = _identity(requisition_match.group(1))
+        matches = [
+            record
+            for record in eligible
+            if _identity(str(record["application"].get("requisition_id", ""))) == requisition
+        ]
+        if len(matches) == 1:
+            application_id = str(matches[0]["application"]["id"])
+            return SemanticCorrelation(True, "strong", "exact-requisition", application_id)
+        if len(matches) > 1:
+            return SemanticCorrelation(False, "insufficient", "multiple-possible-applications")
+
+    exact: list[dict[str, Any]] = []
+    compatible: list[dict[str, Any]] = []
+    company_only = False
+    for record in eligible:
+        application = record["application"]
+        company = _identity(str(application["company"]))
+        role = _identity(str(application["role"]))
+        if not company or company not in text:
+            continue
+        company_only = True
+        if role and role in text:
+            exact.append(record)
+            continue
+        core_role = _role_core(str(application["role"]))
+        if len(core_role.split()) >= 2 and core_role in text:
+            compatible.append(record)
+    if len(exact) == 1:
+        application_id = str(exact[0]["application"]["id"])
+        return SemanticCorrelation(True, "strong", "company-role", application_id)
+    if len(exact) > 1:
+        return SemanticCorrelation(False, "insufficient", "multiple-possible-applications")
+    if len(compatible) == 1:
+        application_id = str(compatible[0]["application"]["id"])
+        return SemanticCorrelation(True, "supported", "company-compatible-role", application_id)
+    if len(compatible) > 1:
+        return SemanticCorrelation(False, "insufficient", "multiple-possible-applications")
+    if sender_application_id in by_id:
+        return SemanticCorrelation(True, "strong", "known-company-domain", sender_application_id)
+    if company_only:
+        return SemanticCorrelation(False, "insufficient", "company-only")
+    if terminal_seen and not eligible:
+        return SemanticCorrelation(False, "insufficient", "terminal-application-only")
+    if expired_seen and not eligible:
+        return SemanticCorrelation(False, "insufficient", "application-window-expired")
+    return SemanticCorrelation(False, "insufficient", "no-tracked-application-correlation")
+
+
 def _resolve_existing_application(
     event: GmailLifecycleEvent,
     records: list[dict[str, Any]],
@@ -1114,6 +1268,8 @@ def process_messages(
     message_ids: Iterable[str],
     apply: bool,
     replay_ambiguous: bool = False,
+    semantic_classifier: SemanticEmailClassifier | None = None,
+    max_semantic_messages: int = 10,
 ) -> dict[str, object]:
     account_id = gateway.account_id()
     applications_root = workspace / DEFAULT_APPLICATIONS_ROOT
@@ -1147,26 +1303,135 @@ def process_messages(
         "ambiguous_reasons": {},
         "duplicates": 0,
         "ignored_reasons": {},
+        "semantic_attempted": 0,
+        "semantic_candidates": 0,
+        "semantic_blocked": 0,
+        "semantic_gate_reasons": {},
+        "semantic_gate_strengths": {},
+        "semantic_classified": 0,
+        "semantic_ambiguous": 0,
+        "semantic_failures": 0,
+        "semantic_skipped_budget": 0,
+        "semantic_requests": 0,
+        "semantic_input_tokens": 0,
+        "semantic_output_tokens": 0,
+        "semantic_cost_usd": "0",
         "changes": [],
     }
+    semantic_cost = Decimal("0")
+    active_classifier_version = (
+        f"{SEMANTIC_CLASSIFIER_VERSION}:{semantic_classifier.configuration_key}"
+        if semantic_classifier is not None
+        else CLASSIFIER_VERSION
+    )
     messages = [
         parse_message(gateway.get_message(message_id))
         for message_id in dict.fromkeys(message_ids)
-        if not state.processed(account_id, message_id, replay_ambiguous=replay_ambiguous)
+        if not state.processed(
+            account_id,
+            message_id,
+            replay_ambiguous=replay_ambiguous,
+            classifier_version=active_classifier_version,
+        )
     ]
     for message in sorted(messages, key=lambda item: (item.received_at, item.id)):
         summary["examined"] += 1
         lifecycle_event, reason = classify_lifecycle_event(message)
+        semantic_reason: str | None = None
+        if (
+            lifecycle_event is None
+            and semantic_classifier is not None
+            and reason in SEMANTIC_FALLBACK_REASONS
+        ):
+            thread_application_id = (
+                thread_associations[message.thread_id]
+                if message.thread_id in thread_associations
+                else state.application_for_thread(account_id, message.thread_id)
+            )
+            domain_hash = _sender_domain_hash(message.sender)
+            sender_application_id = (
+                sender_associations[domain_hash]
+                if domain_hash in sender_associations
+                else state.application_for_sender(account_id, message.sender)
+            )
+            correlation = _semantic_correlation(
+                message,
+                records,
+                thread_application_id=thread_application_id,
+                sender_application_id=sender_application_id,
+            )
+            summary["semantic_gate_reasons"][correlation.reason] = (
+                summary["semantic_gate_reasons"].get(correlation.reason, 0) + 1
+            )
+            summary["semantic_gate_strengths"][correlation.strength] = (
+                summary["semantic_gate_strengths"].get(correlation.strength, 0) + 1
+            )
+            if not correlation.allowed:
+                summary["semantic_blocked"] += 1
+                reason = f"semantic-gate:{correlation.reason}"
+            elif summary["semantic_attempted"] >= max_semantic_messages:
+                summary["semantic_candidates"] += 1
+                summary["semantic_skipped_budget"] += 1
+                reason = "semantic-budget-exhausted"
+            else:
+                summary["semantic_candidates"] += 1
+                summary["semantic_attempted"] += 1
+                try:
+                    lifecycle_event, semantic_outcome = _classify_semantic_lifecycle(
+                        message, semantic_classifier
+                    )
+                    semantic_reason = semantic_outcome.reason
+                    summary["semantic_requests"] += semantic_outcome.requests
+                    summary["semantic_input_tokens"] += semantic_outcome.input_tokens
+                    summary["semantic_output_tokens"] += semantic_outcome.output_tokens
+                    try:
+                        semantic_cost += Decimal(semantic_outcome.cost_usd or "0")
+                    except InvalidOperation:
+                        pass
+                    summary["semantic_cost_usd"] = str(semantic_cost)
+                    if lifecycle_event is not None:
+                        summary["semantic_classified"] += 1
+                except ModelProviderError:
+                    semantic_reason = "semantic-provider-error"
+                    summary["semantic_failures"] += 1
         if lifecycle_event is None:
+            if semantic_reason is not None and semantic_reason != "semantic-unrelated":
+                summary["ambiguous"] += 1
+                summary["semantic_ambiguous"] += 1
+                summary["ambiguous_reasons"][semantic_reason] = (
+                    summary["ambiguous_reasons"].get(semantic_reason, 0) + 1
+                )
+                if apply:
+                    state.record(
+                        account_id=account_id,
+                        message=message,
+                        disposition=(
+                            "provider_error"
+                            if semantic_reason == "semantic-provider-error"
+                            else "ambiguous"
+                        ),
+                        application_id=None,
+                        event_id=None,
+                        classifier_version=active_classifier_version,
+                    )
+                continue
             summary["ignored"] += 1
-            summary["ignored_reasons"][reason] = summary["ignored_reasons"].get(reason, 0) + 1
+            final_reason = semantic_reason or reason
+            summary["ignored_reasons"][final_reason] = (
+                summary["ignored_reasons"].get(final_reason, 0) + 1
+            )
             if apply:
                 state.record(
                     account_id=account_id,
                     message=message,
-                    disposition="ignored",
+                    disposition=(
+                        "budget_exhausted"
+                        if final_reason == "semantic-budget-exhausted"
+                        else "ignored"
+                    ),
                     application_id=None,
                     event_id=None,
+                    classifier_version=active_classifier_version,
                 )
             continue
         if lifecycle_event.confidence < AUTO_APPLY_THRESHOLD:
@@ -1181,6 +1446,7 @@ def process_messages(
                     disposition="ambiguous",
                     application_id=None,
                     event_id=None,
+                    classifier_version=active_classifier_version,
                 )
             continue
         reference = _source_reference(account_id, message.id)
@@ -1215,6 +1481,7 @@ def process_messages(
                         disposition="ambiguous",
                         application_id=None,
                         event_id=None,
+                        classifier_version=active_classifier_version,
                     )
                 continue
             application_id = str(existing["application"]["id"])
@@ -1229,6 +1496,7 @@ def process_messages(
                         disposition="duplicate",
                         application_id=application_id,
                         event_id=None,
+                        classifier_version=active_classifier_version,
                     )
                 continue
             status, stage = transition
@@ -1255,7 +1523,7 @@ def process_messages(
                     source_reference=reference,
                     confidence=lifecycle_event.confidence,
                     match_confidence=match_confidence,
-                    classifier_version=CLASSIFIER_VERSION,
+                    classifier_version=active_classifier_version,
                     automation_policy=AUTOMATION_POLICY,
                 )
                 event_id = str(result["event"]["id"])
@@ -1299,6 +1567,7 @@ def process_messages(
                     disposition=action,
                     application_id=application_id,
                     event_id=event_id,
+                    classifier_version=active_classifier_version,
                 )
             continue
 
@@ -1324,6 +1593,7 @@ def process_messages(
                         disposition="duplicate",
                         application_id=application_id,
                         event_id=None,
+                        classifier_version=active_classifier_version,
                     )
                 continue
             result = append_event(
@@ -1341,7 +1611,7 @@ def process_messages(
                 source_type="gmail-automation",
                 source_reference=reference,
                 confidence=confirmation.confidence,
-                classifier_version=CLASSIFIER_VERSION,
+                classifier_version=active_classifier_version,
                 automation_policy=AUTOMATION_POLICY,
             )
             event_id = str(result["event"]["id"])
@@ -1358,7 +1628,7 @@ def process_messages(
                 occurred_at=confirmation.received_at.isoformat(),
                 source_reference=reference,
                 confidence=confirmation.confidence,
-                classifier_version=CLASSIFIER_VERSION,
+                classifier_version=active_classifier_version,
                 automation_policy=AUTOMATION_POLICY,
                 workspace=workspace,
                 job_id=job_id,
@@ -1381,6 +1651,7 @@ def process_messages(
                         disposition="ambiguous",
                         application_id=None,
                         event_id=None,
+                        classifier_version=active_classifier_version,
                     )
                 continue
             application_id = str(record["application"]["id"])
@@ -1406,6 +1677,7 @@ def process_messages(
                 disposition=action,
                 application_id=application_id,
                 event_id=event_id,
+                classifier_version=active_classifier_version,
             )
     return summary
 
@@ -1420,6 +1692,8 @@ def _scan_unlocked(
     backfill: bool,
     apply: bool,
     replay_ambiguous: bool = False,
+    semantic_classifier: SemanticEmailClassifier | None = None,
+    max_semantic_messages: int = 10,
 ) -> dict[str, object]:
     account_id = gateway.account_id()
     label_id = gateway.label_id(label) if label else None
@@ -1447,6 +1721,8 @@ def _scan_unlocked(
         message_ids=message_ids,
         apply=apply,
         replay_ambiguous=replay_ambiguous,
+        semantic_classifier=semantic_classifier,
+        max_semantic_messages=max_semantic_messages,
     )
     if apply and use_history:
         state.set_history_id(account_id, next_history)
@@ -1470,6 +1746,8 @@ def scan(
     backfill: bool,
     apply: bool,
     replay_ambiguous: bool = False,
+    semantic_classifier: SemanticEmailClassifier | None = None,
+    max_semantic_messages: int = 10,
 ) -> dict[str, object]:
     with state.locked():
         return _scan_unlocked(
@@ -1481,6 +1759,8 @@ def scan(
             backfill=backfill,
             apply=apply,
             replay_ambiguous=replay_ambiguous,
+            semantic_classifier=semantic_classifier,
+            max_semantic_messages=max_semantic_messages,
         )
 
 
@@ -1507,6 +1787,32 @@ def parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Reconsider previously unresolved messages against current applications",
     )
+    scan_parser.add_argument(
+        "--semantic-fallback",
+        action="store_true",
+        help="Use the configured model only for deterministic-rule misses",
+    )
+    scan_parser.add_argument(
+        "--confirm-send-private-data",
+        action="store_true",
+        help="Explicitly allow minimized message text to be sent to the model provider",
+    )
+    scan_parser.add_argument("--agent-config", type=Path, default=Path("agent/config.yml"))
+    scan_parser.add_argument("--semantic-model", choices=("fast", "reasoning"), default="fast")
+    scan_parser.add_argument(
+        "--semantic-event",
+        action="append",
+        choices=(
+            "rejected",
+            "recruiter_contact",
+            "interview_invited",
+            "assessment_invited",
+            "offer_received",
+        ),
+        default=None,
+        help="Allowed semantic event; repeat to enable more (default: rejected)",
+    )
+    scan_parser.add_argument("--max-semantic-messages", type=int, default=10)
 
     backfill = commands.add_parser(
         "backfill", help="Find historical application lifecycle messages"
@@ -1519,6 +1825,23 @@ def parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Reconsider previously unresolved messages against current applications",
     )
+    backfill.add_argument("--semantic-fallback", action="store_true")
+    backfill.add_argument("--confirm-send-private-data", action="store_true")
+    backfill.add_argument("--agent-config", type=Path, default=Path("agent/config.yml"))
+    backfill.add_argument("--semantic-model", choices=("fast", "reasoning"), default="fast")
+    backfill.add_argument(
+        "--semantic-event",
+        action="append",
+        choices=(
+            "rejected",
+            "recruiter_contact",
+            "interview_invited",
+            "assessment_invited",
+            "offer_received",
+        ),
+        default=None,
+    )
+    backfill.add_argument("--max-semantic-messages", type=int, default=10)
 
     commands.add_parser("status", help="Show content-free Gmail runtime state")
     disconnect = commands.add_parser("disconnect", help="Delete local Gmail credentials and state")
@@ -1569,6 +1892,32 @@ def main(argv: Sequence[str] | None = None) -> int:
                 state_path.with_suffix(state_path.suffix + "-shm").unlink(missing_ok=True)
             print(json.dumps(result, indent=2))
             return 0
+        semantic_classifier: SemanticEmailClassifier | None = None
+        if args.semantic_fallback:
+            if not args.confirm_send_private_data:
+                raise ValueError(
+                    "semantic Gmail fallback requires --confirm-send-private-data because "
+                    "minimized message text leaves this device"
+                )
+            if not 1 <= args.max_semantic_messages <= 25:
+                raise ValueError("--max-semantic-messages must be from 1 to 25")
+            from .agent_config import load_agent_config
+            from .agent_openrouter import OpenRouterAdapter
+
+            config_path = args.agent_config
+            if not config_path.is_absolute():
+                config_path = workspace / config_path
+            agent_config = load_agent_config(config_path)
+            if not agent_config.routing.zero_data_retention:
+                raise ValueError("semantic Gmail fallback requires zero_data_retention: true")
+            if agent_config.routing.data_collection != "deny":
+                raise ValueError("semantic Gmail fallback requires data_collection: deny")
+            model = getattr(agent_config.models, args.semantic_model)
+            semantic_classifier = SemanticEmailClassifier(
+                OpenRouterAdapter(agent_config),
+                model,
+                frozenset(args.semantic_event or ("rejected",)),
+            )
         gateway = google_gateway(token_path)
         result = scan(
             gateway=gateway,
@@ -1579,6 +1928,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             backfill=args.command == "backfill",
             apply=args.apply,
             replay_ambiguous=args.replay_ambiguous,
+            semantic_classifier=semantic_classifier,
+            max_semantic_messages=args.max_semantic_messages,
         )
         print(json.dumps(result, indent=2))
         return 0

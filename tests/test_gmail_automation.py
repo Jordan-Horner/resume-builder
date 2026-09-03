@@ -12,6 +12,13 @@ from typing import Any
 
 import pytest
 
+from resume_builder.agent_contracts import (
+    ModelProviderError,
+    ModelReply,
+    ModelRequest,
+    StructuredModelReply,
+    StructuredModelRequest,
+)
 from resume_builder.applications import load_record
 from resume_builder.gmail_automation import (
     DEFAULT_SCAN_QUERY,
@@ -34,6 +41,7 @@ from resume_builder.gmail_automation import (
     process_messages,
     scan,
 )
+from resume_builder.gmail_semantic import SemanticEmailClassifier, SemanticLifecycleDecision
 
 
 def encoded(value: str) -> str:
@@ -99,6 +107,57 @@ class FakeGateway:
 
     def current_history_id(self) -> str:
         return "300"
+
+
+class FakeSemanticAdapter:
+    def __init__(self, decision: SemanticLifecycleDecision):
+        self.decision = decision
+        self.requests: list[StructuredModelRequest] = []
+
+    def run(self, request: ModelRequest) -> ModelReply:
+        raise AssertionError("unstructured model calls are not allowed")
+
+    def run_structured(self, request: StructuredModelRequest) -> StructuredModelReply:
+        self.requests.append(request)
+        return StructuredModelReply(
+            output=self.decision,
+            model=request.model,
+            requests=1,
+            input_tokens=120,
+            output_tokens=30,
+            cost_usd="0.0002",
+        )
+
+
+class FailingSemanticAdapter:
+    def run(self, request: ModelRequest) -> ModelReply:
+        raise AssertionError("unstructured model calls are not allowed")
+
+    def run_structured(self, request: StructuredModelRequest) -> StructuredModelReply:
+        raise ModelProviderError("provider unavailable")
+
+
+def manual_application(workspace: Path, company: str, role: str):
+    from resume_builder.applications import _write_or_preview, build_record
+
+    record = build_record(
+        argparse.Namespace(
+            company=company,
+            role=role,
+            on="2026-08-20",
+            job_id=None,
+            url=None,
+            role_family=None,
+            screen_category=None,
+            match_classification=None,
+            target=None,
+            resume=None,
+            note=None,
+        ),
+        workspace,
+    )
+    _write_or_preview(workspace / "applications", record, apply=True)
+    return record
 
 
 def test_parse_and_classify_application_confirmation_without_retaining_html():
@@ -266,6 +325,269 @@ def test_move_forward_requires_negative_context():
     assert _classify_confirmation(positive)[1] == "confirmed"
     assert _classify_confirmation(unable) == (None, "rejection-signal")
     assert _classify_confirmation(not_moving) == (None, "rejection-signal")
+
+
+def test_semantic_fallback_minimizes_message_and_requires_exact_evidence():
+    evidence = "we have chosen to continue discussions with other applicants"
+    adapter = FakeSemanticAdapter(
+        SemanticLifecycleDecision(
+            event_type="rejected",
+            explicit_decision=True,
+            conditional=False,
+            company="Example Corp",
+            role="Support Engineer",
+            evidence=evidence,
+        )
+    )
+    classifier = SemanticEmailClassifier(adapter, "example/fast-model")
+
+    outcome = classifier.classify(
+        subject="Application update from Example Corp",
+        body=(
+            "Hello Candidate,\n\nAfter reviewing your application, we have chosen to "
+            "continue discussions with other applicants for the Support Engineer role.\n"
+            "Questions: applicant@example.test https://example.test/status\n\nBest,\n"
+            "Recruiting Team"
+        ),
+    )
+
+    assert outcome.decision is not None
+    assert outcome.reason == "semantic-rejected"
+    assert outcome.requests == 1
+    prompt = adapter.requests[0].prompt
+    assert "Hello Candidate" not in prompt
+    assert "applicant@example.test" not in prompt
+    assert "https://example.test" not in prompt
+    assert "Recruiting Team" not in prompt
+
+    hallucinated = FakeSemanticAdapter(
+        SemanticLifecycleDecision(
+            event_type="rejected",
+            explicit_decision=True,
+            conditional=False,
+            evidence="we regret to inform you that you were not selected",
+        )
+    )
+    rejected = SemanticEmailClassifier(hallucinated, "example/fast-model").classify(
+        subject="Application update",
+        body="We will send another update next week.",
+    )
+    assert rejected.decision is None
+    assert rejected.reason == "semantic-evidence-not-found"
+
+    conditional = FakeSemanticAdapter(
+        SemanticLifecycleDecision(
+            event_type="rejected",
+            explicit_decision=True,
+            conditional=True,
+            evidence="If another applicant is selected, we will contact you.",
+        )
+    )
+    conditional_result = SemanticEmailClassifier(conditional, "example/fast-model").classify(
+        subject="Application update",
+        body="If another applicant is selected, we will contact you.",
+    )
+    assert conditional_result.decision is None
+    assert conditional_result.reason == "semantic-not-explicit"
+
+
+def test_semantic_fallback_updates_only_a_uniquely_matched_existing_application(tmp_path: Path):
+    from resume_builder.applications import _write_or_preview, build_record
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / ".resume-builder.json").write_text("{}\n", encoding="utf-8")
+    root = workspace / "applications"
+    record = build_record(
+        argparse.Namespace(
+            company="Example Corp",
+            role="Support Engineer",
+            on="2026-08-20",
+            job_id=None,
+            url=None,
+            role_family=None,
+            screen_category=None,
+            match_classification=None,
+            target=None,
+            resume=None,
+            note=None,
+        ),
+        workspace,
+    )
+    _write_or_preview(root, record, apply=True)
+    body = (
+        "Thank you for your interest in the Support Engineer role at Example Corp. After "
+        "reviewing your application, we have chosen to continue discussions with other applicants."
+    )
+    message = gmail_payload(
+        message_id="semantic-update",
+        subject="Application update from Example Corp",
+        body=body,
+        sender="Example Recruiting <recruiting@example.com>",
+    )
+    assert classify_lifecycle_event(parse_message(message))[0] is None
+    adapter = FakeSemanticAdapter(
+        SemanticLifecycleDecision(
+            event_type="rejected",
+            explicit_decision=True,
+            conditional=False,
+            company="Example Corp",
+            role="Support Engineer",
+            evidence="we have chosen to continue discussions with other applicants",
+        )
+    )
+    state = GmailRuntimeState(tmp_path / "runtime" / "gmail.sqlite")
+    state.record(
+        account_id="mailbox-opaque",
+        message=parse_message(message),
+        disposition="ignored",
+        application_id=None,
+        event_id=None,
+    )
+
+    result = process_messages(
+        gateway=FakeGateway({"semantic-update": message}),
+        state=state,
+        workspace=workspace,
+        message_ids=["semantic-update"],
+        apply=True,
+        semantic_classifier=SemanticEmailClassifier(adapter, "example/fast-model"),
+        max_semantic_messages=1,
+    )
+
+    assert result["rejected"] == 1
+    assert result["semantic_attempted"] == 1
+    assert result["semantic_classified"] == 1
+    assert result["semantic_cost_usd"] == "0.0002"
+    stored = load_record(root / f"{record['application']['id']}.json")
+    assert stored["events"][-1]["status"] == "rejected"
+    assert body not in json.dumps(stored)
+
+
+def test_semantic_provider_failure_stays_ambiguous_and_content_free(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / ".resume-builder.json").write_text("{}\n", encoding="utf-8")
+    manual_application(workspace, "Example Corp", "Support Engineer")
+    body = "There is an update concerning your Support Engineer application at Example Corp."
+    message = gmail_payload(
+        message_id="provider-failure",
+        subject="Application update",
+        body=body,
+    )
+    state = GmailRuntimeState(tmp_path / "runtime" / "gmail.sqlite")
+
+    result = process_messages(
+        gateway=FakeGateway({"provider-failure": message}),
+        state=state,
+        workspace=workspace,
+        message_ids=["provider-failure"],
+        apply=True,
+        semantic_classifier=SemanticEmailClassifier(FailingSemanticAdapter(), "example/fast-model"),
+        max_semantic_messages=1,
+    )
+
+    assert result["semantic_failures"] == 1
+    assert result["ambiguous"] == 1
+    assert result["changes"] == []
+    assert state.status()["dispositions"] == {"provider_error": 1}
+    assert body not in state.path.read_bytes().decode("utf-8", errors="ignore")
+
+
+def test_semantic_gate_blocks_visa_application_but_allows_matching_job(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / ".resume-builder.json").write_text("{}\n", encoding="utf-8")
+    manual_application(workspace, "Visa Systems", "Senior Cloud Engineer")
+    immigration = gmail_payload(
+        message_id="immigration",
+        subject="Visa application status",
+        body="Your immigration application is being reviewed by the consular office.",
+    )
+    job = gmail_payload(
+        message_id="job",
+        subject="Application update from Visa Systems",
+        body="This update concerns your Cloud Engineer application at Visa Systems.",
+    )
+    adapter = FakeSemanticAdapter(
+        SemanticLifecycleDecision(
+            event_type="unrelated",
+            explicit_decision=False,
+            conditional=False,
+        )
+    )
+
+    result = process_messages(
+        gateway=FakeGateway({"immigration": immigration, "job": job}),
+        state=GmailRuntimeState(tmp_path / "runtime" / "gmail.sqlite"),
+        workspace=workspace,
+        message_ids=["immigration", "job"],
+        apply=False,
+        semantic_classifier=SemanticEmailClassifier(adapter, "example/fast-model"),
+        max_semantic_messages=5,
+    )
+
+    assert result["semantic_blocked"] == 1
+    assert result["semantic_attempted"] == 1
+    assert result["semantic_gate_reasons"] == {
+        "company-compatible-role": 1,
+        "no-tracked-application-correlation": 1,
+    }
+    assert len(adapter.requests) == 1
+    assert "immigration" not in adapter.requests[0].prompt.casefold()
+
+
+def test_semantic_budget_exhaustion_is_retryable_and_configuration_is_versioned(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / ".resume-builder.json").write_text("{}\n", encoding="utf-8")
+    manual_application(workspace, "Example Corp", "Support Engineer")
+    messages = {
+        key: gmail_payload(
+            message_id=key,
+            subject="Application update from Example Corp",
+            body="This concerns the Support Engineer application at Example Corp.",
+        )
+        for key in ("message-a", "message-b")
+    }
+    decision = SemanticLifecycleDecision(
+        event_type="unrelated", explicit_decision=False, conditional=False
+    )
+    first_classifier = SemanticEmailClassifier(
+        FakeSemanticAdapter(decision), "example/fast-model", frozenset({"rejected"})
+    )
+    expanded_classifier = SemanticEmailClassifier(
+        FakeSemanticAdapter(decision),
+        "example/fast-model",
+        frozenset({"rejected", "interview_invited"}),
+    )
+    assert first_classifier.configuration_key != expanded_classifier.configuration_key
+    state = GmailRuntimeState(tmp_path / "runtime" / "gmail.sqlite")
+
+    first = process_messages(
+        gateway=FakeGateway(messages),
+        state=state,
+        workspace=workspace,
+        message_ids=messages,
+        apply=True,
+        semantic_classifier=first_classifier,
+        max_semantic_messages=1,
+    )
+    second = process_messages(
+        gateway=FakeGateway(messages),
+        state=state,
+        workspace=workspace,
+        message_ids=messages,
+        apply=True,
+        semantic_classifier=first_classifier,
+        max_semantic_messages=1,
+    )
+
+    assert first["semantic_attempted"] == 1
+    assert first["semantic_skipped_budget"] == 1
+    assert second["examined"] == 1
+    assert second["semantic_attempted"] == 1
+    assert state.status()["dispositions"] == {"ignored": 2}
 
 
 def test_quoted_rejection_text_does_not_override_current_message():

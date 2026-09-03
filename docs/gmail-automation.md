@@ -157,6 +157,33 @@ the identified company. Hired and withdrawn applications are not changed.
 Ambiguous events remain content-free runtime dispositions for later classifier
 improvements.
 
+### Experimental semantic fallback
+
+Deterministic rules remain the default. A manual scan can send only unresolved,
+application-related messages through the configured provider-neutral agent adapter:
+
+```bash
+resume-builder gmail scan --semantic-fallback --confirm-send-private-data
+```
+
+This is intentionally explicit and is not enabled by the scheduler. Before transmission,
+local code must correlate the message to one nonterminal application from the previous 365
+days using its thread, requisition, known company domain, or company plus role. Company-only
+matches and shared recruiting domains are insufficient. This keeps visa, loan, rental,
+education, and other non-job applications on the device. Before transmission,
+the scanner removes common greetings and signatures, replaces email addresses and links,
+and caps the body length. The model must return schema-valid output and an exact evidence
+quote present in the minimized message. Conditional or unsupported decisions remain
+ambiguous. A semantic result still cannot create an application and cannot update a status
+unless the existing deterministic matcher resolves exactly one application.
+
+The agent configuration must require zero-data-retention routing and deny provider data
+collection. Limit an experiment with `--max-semantic-messages N`; the default is 10 and the
+hard maximum is 25. Rejections are the only enabled semantic event by default; repeat
+`--semantic-event EVENT` to trial interviews, assessments, offers, or recruiter contact.
+Provider failures are recorded content-free and remain retryable on a later bounded scan.
+Raw message content and model evidence are never retained.
+
 The job inventory reflects the application's current status, so a linked job
 changes from `applied` to `rejected` when the rejection event becomes current.
 

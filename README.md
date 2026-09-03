@@ -254,8 +254,9 @@ python -m pip install -e ".[gmail]"
 resume-builder gmail connect                              # show setup step 1
 resume-builder gmail connect --step 2                     # show another setup step
 resume-builder gmail connect --credentials /secure/path/google-client.json  # scripted setup
-resume-builder gmail scan                         # preview new labeled mail
-resume-builder gmail scan --apply                 # commit confident matches
+resume-builder gmail scan                         # preview recent lifecycle mail
+resume-builder gmail scan --apply                 # commit confident rule matches
+resume-builder gmail scan --semantic-fallback --confirm-send-private-data  # opt-in experiment
 resume-builder gmail backfill                     # preview historical matches
 resume-builder gmail backfill --apply             # reconstruct applications
 resume-builder gmail status
