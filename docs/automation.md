@@ -160,6 +160,11 @@ being built. Reusing the default `local` tag can cause a container host to reuse
 an older image even after the build context changes. An immutable tag makes the
 requested source version and the running image agree.
 
+Set `JOB_PULLER_LINKEDIN_RESULTS_WANTED` when a container host needs to tune the
+LinkedIn qualified-result target without rewriting the mounted private search
+configuration. The configured `max_cards_scanned` remains the hard safety
+ceiling and must be at least as large as the override.
+
 Restarting the container does not itself run either scanner. The service reads
 the last completion times from the external state database, logs the resulting
 schedule, and waits until a task is due. Replacing the container is therefore

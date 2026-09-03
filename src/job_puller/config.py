@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Literal
 
@@ -232,6 +233,21 @@ def load_config(path: Path) -> InventoryConfig:
         raise ValueError(f"invalid YAML in {path}: {exc}") from exc
     if not isinstance(data, dict):
         raise ValueError(f"configuration root must be a mapping: {path}")
+    linkedin_results_wanted = os.getenv("JOB_PULLER_LINKEDIN_RESULTS_WANTED", "").strip()
+    if linkedin_results_wanted:
+        try:
+            result_target = int(linkedin_results_wanted)
+        except ValueError as exc:
+            raise ValueError(
+                "JOB_PULLER_LINKEDIN_RESULTS_WANTED must be an integer"
+            ) from exc
+        providers = data.setdefault("providers", {})
+        if not isinstance(providers, dict):
+            raise ValueError(f"providers must be a mapping: {path}")
+        linkedin = providers.setdefault("linkedin", {})
+        if not isinstance(linkedin, dict):
+            raise ValueError(f"providers.linkedin must be a mapping: {path}")
+        linkedin["results_wanted"] = result_target
     try:
         config = InventoryConfig.model_validate(data)
     except ValidationError as exc:

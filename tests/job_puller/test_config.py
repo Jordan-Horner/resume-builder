@@ -63,6 +63,36 @@ def test_environment_can_select_default_config(monkeypatch):
     assert _default_config_path() == "/tmp/example-search.yml"
 
 
+def test_environment_can_override_linkedin_result_target(tmp_path, monkeypatch):
+    path = tmp_path / "search.yml"
+    path.write_text(
+        """schema_version: 1
+search:
+  families: [{name: reliability, titles: [SRE]}]
+providers:
+  linkedin: {results_wanted: 25, max_cards_scanned: 150}
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("JOB_PULLER_LINKEDIN_RESULTS_WANTED", "50")
+
+    config = load_config(path)
+
+    assert config.providers.linkedin.results_wanted == 50
+
+
+def test_linkedin_result_target_environment_override_is_validated(tmp_path, monkeypatch):
+    path = tmp_path / "search.yml"
+    path.write_text(
+        "schema_version: 1\nsearch:\n  families: [{name: x, titles: [x]}]\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("JOB_PULLER_LINKEDIN_RESULTS_WANTED", "many")
+
+    with pytest.raises(ValueError, match="must be an integer"):
+        load_config(path)
+
+
 def test_family_title_validation_surfaces_unsafe_quotes(tmp_path):
     path = tmp_path / "search.yml"
     path.write_text(

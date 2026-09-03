@@ -149,6 +149,8 @@ Commercial providers use a default result target and may override it for specifi
 `family_results_wanted`. For LinkedIn, the target counts title- and freshness-qualified cards rather than raw
 search results; `max_cards_scanned` bounds the work when search quality is poor. Queries that exhaust that scan
 limit are reported as capped so coverage pressure remains visible.
+Container deployments may override the default LinkedIn target without modifying the private workspace by setting
+`JOB_PULLER_LINKEDIN_RESULTS_WANTED`. Normal validation still applies, including the `max_cards_scanned` ceiling.
 
 Inspect inventory counts:
 
