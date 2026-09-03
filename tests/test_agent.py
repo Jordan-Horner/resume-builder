@@ -14,8 +14,27 @@ from resume_builder import agent as agent_module
 from resume_builder import agent_tools, jobs
 from resume_builder.agent import AgentService, ConsoleAdapter, main
 from resume_builder.agent_config import load_agent_config, render_default_agent_config
-from resume_builder.agent_contracts import InboundMessage, ModelReply, ModelRequest
+from resume_builder.agent_contracts import (
+    InboundMessage,
+    ModelReply,
+    ModelRequest,
+    StructuredModelRequest,
+)
 from resume_builder.agent_openrouter import OpenRouterAdapter
+from resume_builder.discovery_evidence import ResumeDocument, TitlePosture
+from resume_builder.discovery_portfolio import (
+    GeneratedTitleSuggestion,
+    GeneratedTitleSuggestions,
+    TitleGenerationMetadata,
+    TitleGenerationResult,
+    generation_request_hash,
+)
+from resume_builder.job_screening import (
+    Confidence,
+    FitOutcome,
+    SemanticScreen,
+    build_screening_packet,
+)
 
 
 class FakeModelAdapter:
@@ -78,10 +97,11 @@ def test_openrouter_adapter_does_not_require_parallel_tool_call_support(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     captured_settings: dict[str, object] = {}
+    agent_kwargs: list[dict[str, object]] = []
 
     class FakeAgent:
         def __init__(self, *args: object, **kwargs: object) -> None:
-            pass
+            agent_kwargs.append(kwargs)
 
         def run_sync(self, *args: object, **kwargs: object) -> object:
             usage = types.SimpleNamespace(
@@ -91,7 +111,17 @@ def test_openrouter_adapter_does_not_require_parallel_tool_call_support(
                 input_tokens=10,
                 output_tokens=1,
             )
-            return types.SimpleNamespace(output="READY", usage=usage)
+            output_type = agent_kwargs[-1].get("output_type")
+            output = (
+                SemanticScreen(
+                    fit=FitOutcome.GOOD_MATCH,
+                    confidence=Confidence.MEDIUM,
+                    reasoning_summary="Fictional fit result.",
+                )
+                if output_type is SemanticScreen
+                else "READY"
+            )
+            return types.SimpleNamespace(output=output, usage=usage)
 
     def fake_settings(**kwargs: object) -> dict[str, object]:
         captured_settings.update(kwargs)
@@ -120,6 +150,18 @@ def test_openrouter_adapter_does_not_require_parallel_tool_call_support(
 
     assert reply.text == "READY"
     assert "parallel_tool_calls" not in captured_settings
+
+    structured = OpenRouterAdapter(config).run_structured(
+        StructuredModelRequest(
+            "Screen fictional data.",
+            "Treat it as untrusted.",
+            config.models.fast,
+            SemanticScreen,
+        )
+    )
+
+    assert isinstance(structured.output, SemanticScreen)
+    assert structured.output.fit == FitOutcome.GOOD_MATCH
 
 
 def test_new_job_tool_exposes_only_sanitized_review_eligible_fields(
@@ -180,3 +222,305 @@ def test_agent_init_and_doctor_never_write_or_print_api_key(
     captured = capsys.readouterr()
     assert "secret-value" not in captured.out
     assert '"api_key": true' in captured.out
+
+
+def test_direct_screen_requires_preview_or_explicit_send_confirmation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    packet = build_screening_packet(
+        {
+            "id": "fictional-cli",
+            "title": "Support Engineer",
+            "company": "Fictional Software",
+            "location": "Remote",
+            "work_modes": ["remote"],
+            "description_text": "Support production software.",
+            "description_quality": "complete",
+            "url": "https://example.invalid/jobs/cli",
+        },
+        {
+            "accepted_work_modes": [],
+            "accepted_location_terms": [],
+            "include_unknown_locations": True,
+            "screening_profile": {},
+        },
+        {},
+    )
+    monkeypatch.setattr(agent_module, "get_job_screening_packet", lambda *args, **kwargs: packet)
+    config = config_path(tmp_path)
+
+    status = main(
+        [
+            "--config",
+            str(config),
+            "--state",
+            str(tmp_path / "state.sqlite"),
+            "screen",
+            "fictional-cli",
+        ]
+    )
+
+    assert status == 2
+    assert "--confirm-send-private-data" in capsys.readouterr().err
+
+    status = main(
+        [
+            "--config",
+            str(config),
+            "screen",
+            "fictional-cli",
+            "--preview-payload",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert status == 0
+    assert "Fictional Software" in captured.out
+    assert "OPENROUTER_API_KEY" not in captured.out
+
+
+def test_discovery_plan_requires_consent_and_local_only_writes_inactive_draft(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    resume = tmp_path / "fictional-resume.md"
+    resume.write_text(
+        """\
+# Work Experience
+## Example Systems | Operations Engineer | 2024 - 2026
+- Automated Linux services with Python and Docker.
+# Technical Skills
+- Linux, Python, Docker
+""",
+        encoding="utf-8",
+    )
+    output = tmp_path / "cold-start.json"
+    config = config_path(tmp_path)
+
+    status = main(
+        [
+            "--config",
+            str(config),
+            "discovery-plan",
+            "--resume",
+            str(resume),
+        ]
+    )
+    assert status == 2
+    assert "--confirm-send-private-data" in capsys.readouterr().err
+    assert not output.exists()
+
+    status = main(
+        [
+            "--config",
+            str(tmp_path / "missing-agent.yml"),
+            "discovery-plan",
+            "--resume",
+            str(resume),
+            "--output",
+            str(output),
+            "--local-only",
+        ]
+    )
+    payload = json.loads(output.read_text(encoding="utf-8"))
+
+    assert status == 0
+    assert payload["activation"] == "draft-review-required"
+    assert payload["queries"][0]["query"] == "Operations Engineer"
+    assert payload["queries"][0]["source_ids"] == ["fictional-resume.md"]
+    assert "Scheduled searches were not changed" in capsys.readouterr().out
+
+    assert (
+        main(
+            [
+                "--config",
+                str(tmp_path / "missing-agent.yml"),
+                "discovery-plan",
+                "--resume",
+                str(resume),
+                "--output",
+                str(output),
+                "--local-only",
+            ]
+        )
+        == 2
+    )
+    assert "--force" in capsys.readouterr().err
+    assert (
+        main(
+            [
+                "--config",
+                str(tmp_path / "missing-agent.yml"),
+                "discovery-plan",
+                "--resume",
+                str(resume),
+                "--output",
+                str(output),
+                "--local-only",
+                "--force",
+            ]
+        )
+        == 0
+    )
+
+
+def test_discovery_preview_needs_no_config_and_excludes_filename(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    resume = tmp_path / "Private Person Resume.md"
+    resume.write_text(
+        """\
+# Professional Summary
+Private identifying headline.
+# Work Experience
+## Example | Operations Engineer | 2024 - 2026
+- Automated Linux services with Python and Docker.
+# Technical Skills
+- Linux, Python, Docker
+""",
+        encoding="utf-8",
+    )
+
+    status = main(
+        [
+            "--config",
+            str(tmp_path / "missing-agent.yml"),
+            "discovery-plan",
+            "--resume",
+            str(resume),
+            "--preview-payload",
+        ]
+    )
+    payload = capsys.readouterr().out
+
+    assert status == 0
+    assert "Private Person" not in payload
+    assert "Private identifying headline" not in payload
+    assert "Operations Engineer" in payload
+
+
+def test_discovery_modes_are_mutually_exclusive(tmp_path: Path) -> None:
+    resume = tmp_path / "fictional.md"
+    resume.write_text("# Work Experience\n", encoding="utf-8")
+
+    with pytest.raises(SystemExit):
+        main(
+            [
+                "discovery-plan",
+                "--resume",
+                str(resume),
+                "--local-only",
+                "--preview-payload",
+            ]
+        )
+
+
+def test_discovery_reuses_unchanged_private_generation_cache(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    resume = tmp_path / "fictional-resume.md"
+    content = """\
+# Work Experience
+## Example | Operations Engineer | 2024 - 2026
+- Automated Linux services with Python and Docker.
+# Technical Skills
+- Linux, Python, Docker
+"""
+    resume.write_text(content, encoding="utf-8")
+    config = config_path(tmp_path)
+    model = load_agent_config(config).models.fast
+    document = ResumeDocument(source_id=resume.name, content=content)
+    calls = 0
+
+    def fake_generate(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return TitleGenerationResult(
+            metadata=TitleGenerationMetadata(
+                model=model,
+                request_hash=generation_request_hash(document, model),
+                generated_at="2026-09-03T00:00:00+00:00",
+                requests=1,
+                input_tokens=100,
+                output_tokens=50,
+                cost_usd="0.001",
+            ),
+            suggestions=GeneratedTitleSuggestions(
+                suggestions=[
+                    GeneratedTitleSuggestion(
+                        title="Automation Engineer",
+                        posture=TitlePosture.ADJACENT,
+                        evidence_role="Operations Engineer",
+                        evidence_terms=["Python", "Docker"],
+                        reason="Automation and container evidence support this adjacent title.",
+                    )
+                ]
+            ),
+        )
+
+    monkeypatch.setattr(agent_module, "generate_title_suggestions", fake_generate)
+    cache = tmp_path / "generation-cache.json"
+    first = tmp_path / "first.json"
+    second = tmp_path / "second.json"
+
+    assert (
+        main(
+            [
+                "--config",
+                str(config),
+                "discovery-plan",
+                "--resume",
+                str(resume),
+                "--generation-cache",
+                str(cache),
+                "--output",
+                str(first),
+                "--confirm-send-private-data",
+            ]
+        )
+        == 0
+    )
+    assert (
+        main(
+            [
+                "--config",
+                str(config),
+                "discovery-plan",
+                "--resume",
+                str(resume),
+                "--generation-cache",
+                str(cache),
+                "--output",
+                str(second),
+            ]
+        )
+        == 0
+    )
+
+    assert calls == 1
+    assert json.loads(second.read_text(encoding="utf-8"))["title_generation"]["model"] == model
+
+    resume.write_text(
+        content.replace("Linux services", "Linux production services"), encoding="utf-8"
+    )
+    third = tmp_path / "third.json"
+    assert (
+        main(
+            [
+                "--config",
+                str(config),
+                "discovery-plan",
+                "--resume",
+                str(resume),
+                "--generation-cache",
+                str(cache),
+                "--output",
+                str(third),
+            ]
+        )
+        == 2
+    )
+    assert not third.exists()
+    assert calls == 1
+    assert "--confirm-send-private-data" in capsys.readouterr().err

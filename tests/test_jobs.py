@@ -14,6 +14,7 @@ from resume_builder.jobs import (
     _prescreen_job_hash,
     _with_application_dispositions,
     _write_review_csv,
+    get_job_screening_packet,
 )
 
 
@@ -69,6 +70,22 @@ def test_prescreen_keeps_unwanted_and_mode_mismatch_distinct():
     assert unwanted["category"] == "EASY BUT UNWANTED"
     assert onsite["category"] == "SKIP"
     assert onsite["constraints"]["work_mode_match"] is False
+
+
+def test_prescreen_does_not_apply_onsite_location_terms_to_remote_jobs():
+    result = _prescreen(
+        job(location="New York", work_modes=["remote"]),
+        preferences(
+            accepted_work_modes=["onsite", "remote"],
+            accepted_location_terms=["Texas"],
+            include_unknown_locations=False,
+            screening_profile={"remote_location_terms": []},
+        ),
+        {"python", "api", "incident", "cloud"},
+    )
+
+    assert result["category"] == "SCREEN NEXT"
+    assert result["constraints"]["location_match"] is False
 
 
 def test_prescreen_hides_only_jobs_with_terminal_dispositions():
@@ -284,6 +301,9 @@ accepted_senior_role_terms: [SRE]
 job_dispositions:
   job-1: applied
 include_unknown_locations: false
+screening_profile:
+  requires_sponsorship: true
+  work_mode_strength: preferred
 """,
         encoding="utf-8",
     )
@@ -293,6 +313,57 @@ include_unknown_locations: false
     assert loaded["accepted_location_terms"] == ["US"]
     assert loaded["job_dispositions"] == {"job-1": "applied"}
     assert loaded["include_unknown_locations"] is False
+    assert loaded["screening_profile"]["requires_sponsorship"] is True
+
+
+def test_preferences_reject_unknown_screening_profile_fields(tmp_path: Path):
+    path = tmp_path / "preferences.yml"
+    path.write_text(
+        "schema_version: 1\nscreening_profile:\n  universal_remote_default: true\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="Extra inputs are not permitted"):
+        _load_preferences(path)
+
+
+def test_shared_screening_packet_uses_active_inventory_and_bounded_profile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    preferences_path = tmp_path / "preferences.yml"
+    preferences_path.write_text(
+        """\
+schema_version: 1
+accepted_work_modes: [remote]
+screening_profile:
+  supported_capabilities: [incident response]
+""",
+        encoding="utf-8",
+    )
+
+    class ScreeningInventory:
+        def active_inventory(self):
+            return [
+                job(
+                    id="fictional-shared",
+                    location="Remote",
+                    url="https://example.invalid/jobs/shared",
+                    description_hash="fictional-hash",
+                )
+            ]
+
+    monkeypatch.setattr(jobs_module, "_database", lambda _path: ScreeningInventory())
+    monkeypatch.setattr(jobs_module, "_resume_corpus", lambda _preferences: ("incident", "h"))
+
+    packet = get_job_screening_packet(
+        "fictional-shared",
+        config_path=tmp_path / "search.yml",
+        preferences_path=preferences_path,
+    )
+
+    assert packet.job.id == "fictional-shared"
+    assert packet.job.description_hash == "fictional-hash"
+    assert packet.profile.supported_capabilities == ["incident response"]
 
 
 class FakeInventory:

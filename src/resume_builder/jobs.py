@@ -25,6 +25,7 @@ from job_puller.liveness import verify_job_liveness
 from .applications import DEFAULT_ROOT as DEFAULT_APPLICATIONS_ROOT
 from .applications import application_job_dispositions
 from .atomic import atomic_write_json, atomic_write_text
+from .job_screening import ScreeningPacket, build_screening_packet, profile_from_preferences
 
 DEFAULT_CONFIG = Path("job-search/config/search.yml")
 DEFAULT_PREFERENCES = Path("job-search/preferences.yml")
@@ -127,6 +128,7 @@ def _load_preferences(path: Path) -> dict[str, Any]:
         "include_unknown_locations",
         "minimum_salary",
         "resume_globs",
+        "screening_profile",
     }
     unknown = set(payload) - allowed
     if unknown:
@@ -164,6 +166,10 @@ def _load_preferences(path: Path) -> dict[str, Any]:
         for job_id, status in dispositions.items()
     ):
         raise ValueError("job_dispositions must map job IDs to applied or not_interested")
+    screening_profile = payload.get("screening_profile", {})
+    if not isinstance(screening_profile, dict):
+        raise ValueError("screening_profile must be a mapping")
+    profile_from_preferences(payload)
     return payload
 
 
@@ -188,11 +194,15 @@ def _prescreen_job_hash(job: dict[str, Any]) -> str:
     return _hash_text(json.dumps({field: job.get(field) for field in fields}, sort_keys=True))
 
 
-def _resume_corpus(preferences: dict[str, Any]) -> tuple[str, str]:
+def _resume_paths(preferences: dict[str, Any]) -> list[Path]:
     globs = preferences.get("resume_globs") or ["resumes/baselines/*.md", "resumes/tailored/*.md"]
-    paths = sorted(
+    return sorted(
         {path for pattern in globs for path in Path.cwd().glob(pattern) if path.is_file()}
     )
+
+
+def _resume_corpus(preferences: dict[str, Any]) -> tuple[str, str]:
+    paths = _resume_paths(preferences)
     text = "\n".join(path.read_text(encoding="utf-8") for path in paths)
     return text, _hash_text(text)
 
@@ -317,6 +327,20 @@ def _prescreen(
         and isinstance(salary_min, (int, float))
         and salary_min < minimum_salary
     )
+    screening_profile = preferences.get("screening_profile") or {}
+    mode_required = screening_profile.get("work_mode_strength", "required") == "required"
+    location_required = screening_profile.get("location_strength", "required") == "required"
+    salary_required = screening_profile.get("minimum_salary_strength", "required") == "required"
+    remote_only = "remote" in modes and not {"hybrid", "onsite"} & modes
+    if remote_only and "remote_location_terms" in screening_profile:
+        # Inventory location often names an office rather than a remote-work
+        # residency restriction. Preserve it for semantic review, but do not
+        # turn a non-match into a deterministic rejection.
+        hard_location_match = True
+    else:
+        hard_location_match = location_match or not location_required
+    hard_mode_match = mode_match or not mode_required
+    hard_salary_below = salary_below and salary_required
     complete = bool(
         title.strip() and company.strip() and job.get("description_quality") == "complete"
     )
@@ -326,9 +350,9 @@ def _prescreen(
         and seniority_match
         and not excluded_company
         and not disposition
-        and mode_match
-        and location_match
-        and not salary_below
+        and hard_mode_match
+        and hard_location_match
+        and not hard_salary_below
     )
 
     if disposition:
@@ -337,9 +361,9 @@ def _prescreen(
         excluded_title
         or not seniority_match
         or excluded_company
-        or not mode_match
-        or not location_match
-        or salary_below
+        or not hard_mode_match
+        or not hard_location_match
+        or hard_salary_below
     ):
         category = "SKIP"
     elif unwanted:
@@ -467,6 +491,23 @@ def _shortlist(
     print(f"Shortlist: {output_path.with_suffix('.md')}")
     print(f"Review queue: {review_output_path} ({review_count} jobs)")
     return 0
+
+
+def get_job_screening_packet(
+    job_id: str,
+    *,
+    config_path: Path = DEFAULT_CONFIG,
+    preferences_path: Path = DEFAULT_PREFERENCES,
+) -> ScreeningPacket:
+    """Build one bounded, read-only packet from authoritative local inputs."""
+    preferences = _with_application_dispositions(_load_preferences(preferences_path))
+    inventory = {str(item["id"]): item for item in _database(config_path).active_inventory()}
+    job = inventory.get(job_id)
+    if job is None:
+        raise ValueError(f"active job not found: {job_id}")
+    resume_text, _ = _resume_corpus(preferences)
+    prescreen = _prescreen(job, preferences, _terms(resume_text))
+    return build_screening_packet(job, preferences, prescreen)
 
 
 def _provider_args(config_path: Path, providers: list[str] | None) -> list[str]:

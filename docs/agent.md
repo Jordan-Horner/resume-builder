@@ -33,26 +33,34 @@ not a source of career facts, application state, approvals, or schedule state.
 - console adapter and one-turn CLI
 - read-only scheduler and new-job tools
 
-### Cycle 2 — durable conversation and Telegram
+### Cycle 2 — structured screening validation
 
-- content-limited SQLite conversation/event records outside Git
-- sender allowlist and replay protection
-- Telegram long-polling adapter with no inbound port
-- notification-outbox delivery through the same channel boundary
-- job cards with stable action identifiers
+- provider-neutral structured model requests validated by Pydantic
+- separate deterministic eligibility and semantic career-fit results
+- first-class `worthwhile_stretch` outcomes for credible, non-blocking gaps
+- explicit two-sided evidence before a condition becomes hard-ineligible
+- versioned fictional evaluation profiles that never become runtime defaults
+- content-hash cache in generated SQLite state outside Git
+- direct payload preview and explicit permission before a new provider call
+- fictional discovery-recall fixtures with no candidate-specific defaults
+- local resume evidence extraction into direct, adjacent, and capability concepts
+- bounded, inactive discovery drafts that cannot alter scheduled searches
+- no activation of seeded discovery until live recall and request-volume gates pass
 
-### Cycle 3 — screening and resume preparation
+### Cycle 3 — conversational screening and saved decisions
 
-- deterministic command routing for screen, dismiss, and save actions
+- deterministic command routing for screen, dismiss, and save actions after the
+  direct screening path passes evaluation
 - model-tier selection by task rather than by channel
-- versioned evaluation cases for tool calling, screening, and prose
-- target capture and read-only resume-tailoring preview preparation
+- separately tested tool selection and screening quality
+- durable, auditable shortlist decisions outside model conversation
+- target capture only after the user chooses to pursue a job
 - explicit approval handoff to existing review and mint workflows
 
-### Cycle 4 — WhatsApp and controlled mutations
+### Cycle 4 — communication adapter and controlled notifications
 
-- Twilio or direct Meta adapter behind the same channel contract
-- webhook signature verification, idempotency, and sender allowlist
+- a separately chosen text channel behind the existing channel contract
+- signature verification or polling controls, idempotency, and sender allowlist
 - approved proactive-notification templates
 - narrow application-status and resume-workflow tools
 - approval policy based on consequence, not provider confidence alone
@@ -89,9 +97,76 @@ OpenRouter account-level prompt logging should remain disabled. Its API-key
 budget should also be configured as a second hard boundary outside Resume
 Builder's per-turn limit.
 
+## Prove screening before conversational routing
+
+The deterministic command is the first screening interface so a model's tool
+selection cannot be confused with screening quality:
+
+```bash
+# Shows the complete instructions and bounded packet; makes no provider call.
+resume-builder agent screen <job-id> --preview-payload
+
+# Sends that packet to the configured provider and caches the validated result.
+resume-builder agent screen <job-id> --confirm-send-private-data
+
+# Reuses an unchanged local result without another provider call.
+resume-builder agent screen <job-id>
+
+# Deliberately pays for a new result and therefore requires confirmation again.
+resume-builder agent screen <job-id> --refresh --confirm-send-private-data
+```
+
+Eligibility has four constraint states: `satisfied`, `violated`, `unknown`, and
+`not_configured`. Only an explicit required constraint in the candidate profile
+plus contradictory explicit posting evidence can establish hard ineligibility.
+Missing salary or sponsorship language stays unknown. Skill, tooling, domain,
+title, and years-of-experience gaps belong to career fit and may produce a
+positive `worthwhile_stretch` result.
+
+Optional fields under `screening_profile` in `job-search/preferences.yml`
+declare sponsorship needs, held clearances or licenses, willingness to obtain a
+clearance, evidence-backed capabilities, and whether the existing work-mode,
+location, and minimum-salary filters are `required` or `preferred`. Unset fields
+remain unknown. Nothing from the fictional test profiles is loaded at runtime.
+Onsite and hybrid roles use `accepted_location_terms`. Setting
+`screening_profile.remote_location_terms: []` allows remote roles independently;
+supplying terms restricts remote eligibility to those areas, while omitting the
+field preserves the legacy shared-location behavior.
+
+## Create a cold-start discovery portfolio
+
+The agent can propose a broad first search portfolio from one general resume
+without treating resume history as user preference. Preview the bounded packet,
+then explicitly allow the configured provider call:
+
+```bash
+resume-builder agent discovery-plan \
+  --resume resumes/baselines/<resume>.md \
+  --preview-payload
+resume-builder agent discovery-plan \
+  --resume resumes/baselines/<resume>.md \
+  --confirm-send-private-data
+```
+
+Use `--local-only` to omit model-generated adjacent titles. The generated JSON
+records each query's lane, evidence, source, reason, stable ID, and enabled
+state. Preview and local-only modes require neither an agent configuration nor
+credentials. Provider generation is cached by the resume evidence, model,
+instructions, and policy; rerunning an unchanged plan reuses that private cache.
+Use `--refresh --confirm-send-private-data` only to deliberately regenerate it.
+
+The command refuses to replace an existing editable portfolio. Use `--force`
+only after reviewing the current draft. The portfolio remains
+`draft-review-required`; the command neither edits the active job-search
+configuration nor starts a scan.
+
 ## Current safety boundary
 
-The first cycle cannot edit resumes, mutate applications, send email, run a
-scan, or apply for a job. It can inspect content-free automation status and a
-sanitized subset of newly discovered jobs. Later mutations must be introduced
-as separate tools with explicit validation and audit behavior.
+The agent cannot edit resumes, mutate applications, send email, run a scan, or
+apply for a job. It can create an inactive discovery draft. Normal conversation
+can inspect content-free automation status and a sanitized subset of newly
+discovered jobs. The direct screen command can
+send one explicitly previewable private packet only when the user provides the
+confirmation flag. Its generated result is advisory and cannot update inventory.
+Later mutations must be introduced as separate tools with explicit validation
+and audit behavior.

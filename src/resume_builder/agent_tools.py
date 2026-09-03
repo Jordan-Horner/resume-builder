@@ -67,3 +67,27 @@ def build_read_only_tools(state_path: Path) -> tuple[AgentTool, ...]:
             handler=list_new_job_matches,
         ),
     )
+
+
+def build_job_screening_tools(
+    config_path: Path = jobs.DEFAULT_CONFIG,
+    preferences_path: Path = jobs.DEFAULT_PREFERENCES,
+) -> tuple[AgentTool, ...]:
+    """Build private-data tools for an explicitly authorized conversation path."""
+
+    def get_job_screening_packet(job_id: str) -> dict[str, object]:
+        """Return the bounded packet used by the structured screening service."""
+        return jobs.get_job_screening_packet(
+            job_id, config_path=config_path, preferences_path=preferences_path
+        ).model_dump(mode="json")
+
+    return (
+        AgentTool(
+            name="get_job_screening_packet",
+            description=(
+                "Return one bounded private job screening packet. Register this tool only after "
+                "the user has explicitly authorized sending its contents to the model provider."
+            ),
+            handler=get_job_screening_packet,
+        ),
+    )

@@ -270,9 +270,30 @@ python -m pip install -e ".[agent]"
 resume-builder agent init
 resume-builder agent doctor
 resume-builder agent ask "What new jobs are ready to review?"
+resume-builder agent screen <job-id> --preview-payload
+resume-builder agent screen <job-id> --confirm-send-private-data
+resume-builder agent discovery-plan --resume resumes/baselines/<resume>.md --preview-payload
+resume-builder agent discovery-plan --resume resumes/baselines/<resume>.md --confirm-send-private-data
 ```
 
-The generated configuration contains no API key. See
+Structured screening separates confirmed eligibility conflicts from career fit,
+so a credible skills gap can remain a `worthwhile_stretch`. Screening is cached
+by the posting, preference profile, rubric, and model hashes. A new or refreshed
+screen will not contact OpenRouter without the explicit confirmation flag.
+
+Cold-start discovery can create an editable query portfolio from one general
+resume. It combines recent historical titles, locally grounded capability
+combinations, and model-proposed adjacent or exploratory titles. Generated
+titles are revalidated against literal resume evidence. The resulting
+`build/job-search/cold-start-portfolio.json` is inactive: it does not change the
+scheduled search or trigger a provider scan. Preview and local-only operation
+need no agent configuration. Provider-generated titles are cached for unchanged
+resume evidence and cannot overwrite an existing editable portfolio without
+`--force`.
+
+The generated configuration contains no API key. Screening preferences and
+candidate evidence remain workspace-specific; fictional evaluation profiles do
+not become runtime defaults. See
 [the agent architecture and implementation cycles](docs/agent.md).
 
 Normal scans use a narrow Gmail server-side query for recent application
