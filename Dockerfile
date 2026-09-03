@@ -23,7 +23,7 @@ RUN mkdir -p /workspace /state \
 USER resume-builder
 WORKDIR /workspace
 
-HEALTHCHECK --interval=5m --timeout=15s --start-period=2m --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD ["resume-builder", "automation", "status", "--healthcheck"]
 
 ENTRYPOINT ["resume-builder"]
