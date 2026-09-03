@@ -1,4 +1,5 @@
 schema_version: 1
+enabled: true
 database_path: data/inventory.db
 board_registry_path: job-puller/boards.example.yml
 raw_payload_retention_days: 30

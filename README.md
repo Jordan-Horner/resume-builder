@@ -25,6 +25,18 @@ The agent installs the project, starts the introduction, creates your private
 workspace, and asks how you want to protect it. Returning users skip first-run
 intake because the agent inspects the existing workspace before asking questions.
 
+After one or more sources have been hydrated, the same onboarding journey offers
+an optional job-discovery setup. It shows recent, related, and earlier role
+directions from the combined source vault, then asks only about eligibility,
+work location, and optional compensation. Saving creates an inactive search
+portfolio; activation is a separate previewed action and never starts a scan.
+
+```bash
+resume-builder onboard                 # continue the current stage
+resume-builder onboard --json status   # structured handoff for an agent
+resume-builder onboard start           # begin optional job-search setup
+```
+
 Once setup is complete, you can ask naturally:
 
 ```text
@@ -312,9 +324,11 @@ budget-exhausted or failed jobs visible. The artifact preserves the canonical
 newest-first list and provides a separate advisory order based on eligibility,
 semantic fit, and confidence. Confidence never substitutes for fit.
 
-Cold-start discovery can create an editable query portfolio from one general
-resume. It combines recent historical titles, locally grounded capability
-combinations, and model-proposed adjacent or exploratory titles. Generated
+The unified onboarding flow can create an editable query portfolio from one or
+more registered career sources. It deduplicates identical source content before
+combining recent historical titles and locally grounded capability combinations.
+The lower-level one-resume agent command can also request model-proposed adjacent
+or exploratory titles. Generated
 titles are revalidated against literal resume evidence. The resulting
 `build/job-search/cold-start-portfolio.json` is inactive: it does not change the
 scheduled search or trigger a provider scan. Preview and local-only operation
@@ -326,7 +340,9 @@ Activation prints an exact configuration diff and confirmation hash before it
 can write, preserves manual search and provider settings, creates a rollback
 record, and never starts a scan or changes restart behavior.
 
-The generated configuration contains no API key. Screening preferences and
+Fresh workspaces include neutral preferences and a valid but inactive collector
+configuration, so automation reports setup as required instead of attempting a
+scan. The generated configuration contains no API key. Screening preferences and
 candidate evidence remain workspace-specific; fictional evaluation profiles do
 not become runtime defaults. See
 [the agent architecture and implementation cycles](docs/agent.md).

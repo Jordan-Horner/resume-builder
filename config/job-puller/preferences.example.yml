@@ -21,6 +21,9 @@ accepted_location_terms: []
 excluded_location_terms: []
 include_unknown_locations: true
 minimum_salary: null
+preferred_salary: null
+salary_currency: null
+salary_period: null
 resume_globs:
   - resumes/baselines/*.md
   - resumes/tailored/*.md

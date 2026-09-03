@@ -28,6 +28,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import httpx
 import yaml
 
+from job_puller.config import load_config as load_job_config
+
 from . import gmail_automation, jobs
 from .agent_config import DEFAULT_AGENT_CONFIG, load_agent_config
 from .agent_openrouter import OpenRouterAdapter
@@ -868,6 +870,23 @@ def _ensure_external(path: Path, workspace: Path) -> Path:
 
 
 def _run_jobs(config: AutomationConfig) -> dict[str, object]:
+    if jobs.DEFAULT_CONFIG.is_file():
+        try:
+            discovery = load_job_config(jobs.DEFAULT_CONFIG)
+        except ValueError as exc:
+            raise TaskExecutionError("configure", exc) from exc
+        if not discovery.enabled:
+            return {
+                "exit_code": 0,
+                "refresh_status": "setup_required",
+                "new_jobs": 0,
+                "reviewable_jobs": 0,
+                "screened_jobs": 0,
+                "recommended_jobs": 0,
+                "needs_review_jobs": 0,
+                "screening_status": "disabled",
+                "matches": [],
+            }
     try:
         with Path(os.devnull).open("w", encoding="utf-8") as null_stream:
             with redirect_stdout(null_stream), redirect_stderr(null_stream):
@@ -1280,6 +1299,12 @@ def _parser() -> argparse.ArgumentParser:
 def _doctor(
     workspace: Path, config_path: Path, state_path: Path, config: AutomationConfig
 ) -> dict[str, object]:
+    job_setup_required = False
+    if config.jobs.enabled and jobs.DEFAULT_CONFIG.is_file():
+        try:
+            job_setup_required = not load_job_config(jobs.DEFAULT_CONFIG).enabled
+        except ValueError:
+            job_setup_required = False
     checks: dict[str, bool] = {
         "workspace": (workspace / ".resume-builder.json").is_file()
         or (workspace / "vault" / "vault.json").is_file(),
@@ -1320,7 +1345,12 @@ def _doctor(
         checks["notification"] = True
     except ValueError:
         checks["notification"] = False
-    return {"healthy": all(checks.values()), "checks": checks}
+    return {
+        "healthy": all(checks.values()),
+        "ready": all(checks.values()) and not job_setup_required,
+        "setup_required": job_setup_required,
+        "checks": checks,
+    }
 
 
 def main(argv: Sequence[str] | None = None) -> int:

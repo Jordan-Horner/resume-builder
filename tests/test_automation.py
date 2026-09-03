@@ -482,6 +482,33 @@ def test_job_cli_output_is_suppressed_and_failure_stage_is_safe(
     assert captured_error.value.error_category == "RuntimeError"
 
 
+def test_inactive_job_discovery_waits_without_running_a_scan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    automation_config = tmp_path / "automation.yml"
+    automation_config.write_text(render_default_config("America/New_York"), encoding="utf-8")
+    search = tmp_path / "search.yml"
+    search.write_text(
+        "schema_version: 1\nenabled: false\nsearch:\n  families: []\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(jobs_module, "DEFAULT_CONFIG", search)
+    calls = 0
+
+    def collect(_argv: list[str]) -> int:
+        nonlocal calls
+        calls += 1
+        return 0
+
+    monkeypatch.setattr(jobs_module, "main", collect)
+
+    result = _run_jobs(load_config(automation_config))
+
+    assert result["refresh_status"] == "setup_required"
+    assert result["matches"] == []
+    assert calls == 0
+
+
 def test_unfinalized_job_manifest_is_a_publish_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

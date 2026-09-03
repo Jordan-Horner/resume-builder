@@ -69,6 +69,8 @@ class CandidateScreeningProfile(StrictModel):
     """Explicit candidate inputs; unset fields must never become assumptions."""
 
     requires_sponsorship: bool | None = None
+    intended_work_country: ProfileTerm | None = None
+    authorized_to_work: bool | None = None
     held_clearances: list[ProfileTerm] | None = None
     willing_to_obtain_clearance: bool | None = None
     licenses: list[ProfileTerm] | None = None

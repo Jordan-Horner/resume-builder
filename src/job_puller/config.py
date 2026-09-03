@@ -73,12 +73,10 @@ class SearchSettings(StrictModel):
     location: str = "United States"
     remote_only: bool = True
     accepted_work_modes: set[WorkMode] | None = None
-    families: list[SearchFamily] = Field(min_length=1)
+    families: list[SearchFamily] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def require_enabled_family(self) -> SearchSettings:
-        if not any(family.enabled for family in self.families):
-            raise ValueError("at least one search family must be enabled")
+    def normalize_work_modes(self) -> SearchSettings:
         if (
             "accepted_work_modes" in self.model_fields_set
             and "remote_only" in self.model_fields_set
@@ -189,6 +187,7 @@ class BoardRegistry(StrictModel):
 
 class InventoryConfig(StrictModel):
     schema_version: Literal[1] = 1
+    enabled: bool = True
     database_path: str = "data/inventory.db"
     board_registry_path: str | None = None
     raw_payload_retention_days: int = Field(default=30, ge=1)
@@ -202,6 +201,10 @@ class InventoryConfig(StrictModel):
 
     @model_validator(mode="after")
     def require_provider(self) -> InventoryConfig:
+        if not self.enabled:
+            return self
+        if not any(family.enabled for family in self.search.families):
+            raise ValueError("enabled configuration requires at least one enabled search family")
         if not any(
             getattr(self.providers, name).enabled for name in type(self.providers).model_fields
         ):
@@ -238,9 +241,7 @@ def load_config(path: Path) -> InventoryConfig:
         try:
             result_target = int(linkedin_results_wanted)
         except ValueError as exc:
-            raise ValueError(
-                "JOB_PULLER_LINKEDIN_RESULTS_WANTED must be an integer"
-            ) from exc
+            raise ValueError("JOB_PULLER_LINKEDIN_RESULTS_WANTED must be an integer") from exc
         providers = data.setdefault("providers", {})
         if not isinstance(providers, dict):
             raise ValueError(f"providers must be a mapping: {path}")

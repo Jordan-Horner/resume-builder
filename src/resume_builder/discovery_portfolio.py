@@ -15,6 +15,7 @@ from job_puller.normalize import normalized_key
 
 from .agent_contracts import ModelAdapter, StructuredModelRequest
 from .discovery_evidence import (
+    DiscoveryEvidenceSet,
     HistoricalTitleState,
     ResumeDocument,
     ResumeQueryExpansion,
@@ -22,6 +23,7 @@ from .discovery_evidence import (
     TitleSeedReport,
     _contains_phrase,
     _resume_sections,
+    evidence_set,
 )
 
 COLD_START_POLICY_VERSION: Literal["resume-cold-start-v1"] = "resume-cold-start-v1"
@@ -278,9 +280,8 @@ def build_cold_start_portfolio(
     generation: TitleGenerationResult | None = None,
 ) -> ColdStartPortfolio:
     """Build a bounded draft portfolio without changing the scheduled search."""
-    resume_hash = hashlib.sha256(document.content.encode()).hexdigest()
-    seed_hash = hashlib.sha256(f"{document.source_id}\n{document.content}".encode()).hexdigest()
-    if expansion.corpus_hash != resume_hash or title_seed.corpus_hash != seed_hash:
+    resume_hash = evidence_set([document]).corpus_hash
+    if expansion.corpus_hash != resume_hash or title_seed.corpus_hash != resume_hash:
         raise ValueError("title and capability inputs must come from the same resume document")
     if generation is not None and generation.metadata.request_hash != generation_request_hash(
         document, generation.metadata.model
@@ -416,4 +417,60 @@ def build_cold_start_portfolio(
         queries=queries,
         title_generation=generation.metadata if generation else None,
         rejected_suggestions=rejected,
+    )
+
+
+def build_cold_start_portfolio_set(
+    evidence: DiscoveryEvidenceSet,
+    title_seed: TitleSeedReport,
+    expansion: ResumeQueryExpansion,
+) -> ColdStartPortfolio:
+    """Build a local-only draft portfolio from multiple deduplicated source documents."""
+    if (
+        title_seed.corpus_hash != evidence.corpus_hash
+        or expansion.corpus_hash != evidence.corpus_hash
+    ):
+        raise ValueError("title and capability inputs must match the discovery evidence set")
+    queries: list[ColdStartQuery] = []
+    used: set[str] = set()
+
+    def append(query: ColdStartQuery) -> None:
+        key = normalized_key(query.query)
+        if key and key not in used and len(queries) < MAX_TOTAL_QUERIES:
+            used.add(key)
+            queries.append(query)
+
+    for item in title_seed.historical_titles:
+        append(
+            ColdStartQuery(
+                query_id=_query_id(ColdStartLane.HISTORICAL_TITLE, item.query_title),
+                lane=ColdStartLane.HISTORICAL_TITLE,
+                query=item.query_title,
+                enabled=item.state == HistoricalTitleState.ACTIVE,
+                source_ids=item.source_ids,
+                evidence_role=item.exact_title,
+                reason=item.reason,
+            )
+        )
+    for seed in expansion.capability_combinations[:MAX_CAPABILITY_QUERIES]:
+        append(
+            ColdStartQuery(
+                query_id=_query_id(ColdStartLane.CAPABILITY_COMBINATION, seed.query),
+                lane=ColdStartLane.CAPABILITY_COMBINATION,
+                query=seed.query,
+                enabled=True,
+                source_ids=[seed.source_id],
+                evidence_role=seed.evidence_role,
+                evidence_terms=seed.evidence_terms,
+                reason="Literal capabilities co-occur in one source evidence block.",
+            )
+        )
+    if not queries or not any(item.enabled for item in queries):
+        raise ValueError(
+            "the registered sources did not produce any active grounded discovery queries"
+        )
+    return ColdStartPortfolio(
+        generated_at=datetime.now(UTC).isoformat(),
+        resume_hash=evidence.corpus_hash,
+        queries=queries,
     )

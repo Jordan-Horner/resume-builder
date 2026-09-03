@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .atomic import atomic_write_json, atomic_write_text
+from .job_setup_defaults import scaffold_job_search
 from .layout import VaultLayout
 
 
@@ -77,6 +78,7 @@ def write_workspace_files(root: Path, configuration: dict[str, object]) -> None:
         "`applications/`; they are not career evidence.\n",
     )
     VaultLayout.load(root / "vault", allow_missing=True).initialize()
+    scaffold_job_search(root)
     workspace_resources = files("resume_builder.resources") / "workspace"
     for directory in (
         "vault",
@@ -87,6 +89,7 @@ def write_workspace_files(root: Path, configuration: dict[str, object]) -> None:
         "exports",
         "applications",
         "automation",
+        "job-search",
     ):
         readme = workspace_resources / directory / "README.md"
         atomic_write_text(root / directory / "README.md", readme.read_text(encoding="utf-8"))

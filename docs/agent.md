@@ -190,9 +190,27 @@ will not exceed the lower of `--max-provider-jobs` and
 attempts and total reported cost without storing credentials or unvalidated
 provider responses.
 
+## Continue unified onboarding
+
+Fresh workspaces use the existing workspace and hydration journey first. Once
+canonical career facts exist, `resume-builder onboard` offers optional,
+resumable job-search setup. It reads all registered source snapshots, deduplicates
+identical content, proposes recent, related, and earlier search directions, and
+collects only eligibility, location, and optional compensation preferences.
+
+The default terminal form is interactive. Use `--json` for the structured
+`user_handoff` and answer envelope consumed by an agent. Setup state and
+preferences remain in the private workspace. Resume source bodies are not copied
+into setup state or logs.
+
+Saving setup creates an inactive portfolio and leaves `search.yml` disabled.
+`resume-builder onboard preview-activation` returns the exact confirmation hash;
+`resume-builder onboard activate --confirm <hash>` enables the portfolio without
+running a scan. The scheduler waits until its next configured run.
+
 ## Create a cold-start discovery portfolio
 
-The agent can propose a broad first search portfolio from one general resume
+The lower-level agent command can propose a broad first search portfolio from one general resume
 without treating resume history as user preference. Preview the bounded packet,
 then explicitly allow the configured provider call:
 

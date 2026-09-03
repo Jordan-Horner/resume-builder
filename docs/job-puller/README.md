@@ -23,15 +23,18 @@ uv sync --extra dev
 uv run job-puller config validate
 ```
 
-The personal files live under `workspace/job-search/`. Start from the public
-examples on another installation:
+The personal files live under `workspace/job-search/`. New Resume Builder
+workspaces receive neutral preferences and an inactive collector configuration.
+After career sources have been hydrated, continue the unified setup:
 
 ```bash
-mkdir -p workspace/job-search/config
-cp config/job-puller/search.example.yml workspace/job-search/config/search.yml
-cp config/job-puller/boards.example.yml workspace/job-search/config/boards.yml
-cp config/job-puller/preferences.example.yml workspace/job-search/preferences.yml
+resume-builder onboard
 ```
+
+The wizard accepts multiple registered resumes and source snapshots, keeps old
+roles unsearched by default, and saves an inactive discovery portfolio. Preview
+and confirm activation separately; neither setup action starts a scrape. The
+public files under `config/job-puller/` remain advanced reference examples.
 
 Search configuration describes reusable title families rather than provider query syntax. Each family can be
 enabled independently. `titles` are sent to providers and also admitted by the local title gate. Optional

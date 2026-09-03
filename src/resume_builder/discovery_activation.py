@@ -167,6 +167,7 @@ def preview_activation(
         )
     families = [*retained, *(_family_for(item) for item in enabled)]
     payload.setdefault("search", {})["families"] = families
+    payload["enabled"] = True
     InventoryConfig.model_validate(payload)
     rendered = yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
     diff = "".join(

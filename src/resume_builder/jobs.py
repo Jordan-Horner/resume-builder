@@ -135,6 +135,9 @@ def _load_preferences(path: Path) -> dict[str, Any]:
         "excluded_location_terms",
         "include_unknown_locations",
         "minimum_salary",
+        "preferred_salary",
+        "salary_currency",
+        "salary_period",
         "resume_globs",
         "screening_profile",
         "personalization",
@@ -164,6 +167,21 @@ def _load_preferences(path: Path) -> dict[str, Any]:
     minimum_salary = payload.get("minimum_salary")
     if minimum_salary is not None and not isinstance(minimum_salary, (int, float)):
         raise ValueError("minimum_salary must be a number or null")
+    preferred_salary = payload.get("preferred_salary")
+    if preferred_salary is not None and not isinstance(preferred_salary, (int, float)):
+        raise ValueError("preferred_salary must be a number or null")
+    if (
+        minimum_salary is not None
+        and preferred_salary is not None
+        and preferred_salary < minimum_salary
+    ):
+        raise ValueError("preferred_salary cannot be lower than minimum_salary")
+    currency = payload.get("salary_currency")
+    if currency is not None and (not isinstance(currency, str) or len(currency.strip()) != 3):
+        raise ValueError("salary_currency must be a three-letter code or null")
+    period = payload.get("salary_period")
+    if period not in {None, "hour", "year"}:
+        raise ValueError("salary_period must be hour, year, or null")
     include_unknown = payload.get("include_unknown_locations", True)
     if not isinstance(include_unknown, bool):
         raise ValueError("include_unknown_locations must be true or false")

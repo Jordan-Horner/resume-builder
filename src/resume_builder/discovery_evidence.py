@@ -23,6 +23,14 @@ class ResumeDocument(StrictModel):
     content: str = Field(min_length=1)
 
 
+class DiscoveryEvidenceSet(StrictModel):
+    """A deduplicated set of private source snapshots used for discovery."""
+
+    schema_version: Literal[1] = 1
+    corpus_hash: str
+    documents: list[ResumeDocument] = Field(min_length=1)
+
+
 class HistoricalTitleState(StrEnum):
     ACTIVE = "active"
     HISTORICAL_CONTEXT = "historical_context"
@@ -96,6 +104,29 @@ _LOW_SIGNAL_CAPABILITIES = {"git", "jira", "english", "spanish"}
 def _hash(value: object) -> str:
     rendered = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(rendered.encode("utf-8")).hexdigest()
+
+
+def evidence_set(documents: list[ResumeDocument]) -> DiscoveryEvidenceSet:
+    """Normalize documents by content so tailored copies cannot multiply evidence."""
+    unique: dict[str, ResumeDocument] = {}
+    for document in documents:
+        content_hash = hashlib.sha256(document.content.encode("utf-8")).hexdigest()
+        unique.setdefault(content_hash, document)
+    ordered = sorted(unique.values(), key=lambda item: item.source_id)
+    if not ordered:
+        raise ValueError("job discovery requires at least one source document")
+    return DiscoveryEvidenceSet(
+        corpus_hash=_hash(
+            [
+                {
+                    "source_id": item.source_id,
+                    "content_hash": hashlib.sha256(item.content.encode("utf-8")).hexdigest(),
+                }
+                for item in ordered
+            ]
+        ),
+        documents=ordered,
+    )
 
 
 def _contains_phrase(text: str, phrase: str) -> bool:
@@ -209,7 +240,7 @@ def extract_query_expansion(document: ResumeDocument) -> ResumeQueryExpansion:
     """Extract bounded literal capability combinations from one resume."""
     roles, _ = _resume_sections(document)
     skills = _structured_skills(document)
-    resume_hash = hashlib.sha256(document.content.encode("utf-8")).hexdigest()
+    resume_hash = evidence_set([document]).corpus_hash
     if not roles or not skills:
         return ResumeQueryExpansion(corpus_hash=resume_hash)
 
@@ -257,31 +288,50 @@ def extract_query_expansion(document: ResumeDocument) -> ResumeQueryExpansion:
     return ResumeQueryExpansion(corpus_hash=resume_hash, capability_combinations=combinations)
 
 
+def extract_query_expansion_set(documents: list[ResumeDocument]) -> ResumeQueryExpansion:
+    """Merge literal capability combinations across unique documents without cross-source joins."""
+    evidence = evidence_set(documents)
+    candidates: dict[str, EvidenceQuerySeed] = {}
+    for document in evidence.documents:
+        for seed in extract_query_expansion(document).capability_combinations:
+            key = normalized_key(seed.query)
+            prior = candidates.get(key)
+            if prior is None or seed.support_count > prior.support_count:
+                candidates[key] = seed
+    combinations = sorted(
+        candidates.values(),
+        key=lambda item: (-item.support_count, normalized_key(item.query), item.source_id),
+    )[:6]
+    return ResumeQueryExpansion(
+        corpus_hash=evidence.corpus_hash,
+        capability_combinations=combinations,
+    )
+
+
 def extract_title_seed(documents: list[ResumeDocument]) -> TitleSeedReport:
     """Extract recent and historical employment titles without inferring preferences."""
-    if len(documents) != 1:
-        raise ValueError("title discovery requires exactly one resume document")
-    document = documents[0]
-    roles, _ = _resume_sections(document)
+    evidence = evidence_set(documents)
     observations: dict[str, dict[str, Any]] = {}
-    for role in roles:
-        query_title = _query_title(role.title)
-        key = normalized_key(query_title)
-        if not key:
-            continue
-        item = observations.setdefault(
-            key,
-            {
-                "exact_title": role.title,
-                "query_title": query_title,
-                "source_ids": set(),
-                "end_years": [],
-            },
-        )
-        item["source_ids"].add(document.source_id)
-        year = _end_year(role.date_text)
-        if year is not None:
-            item["end_years"].append(year)
+    for document in evidence.documents:
+        roles, _ = _resume_sections(document)
+        for role in roles:
+            query_title = _query_title(role.title)
+            key = normalized_key(query_title)
+            if not key:
+                continue
+            item = observations.setdefault(
+                key,
+                {
+                    "exact_title": role.title,
+                    "query_title": query_title,
+                    "source_ids": set(),
+                    "end_years": [],
+                },
+            )
+            item["source_ids"].add(document.source_id)
+            year = _end_year(role.date_text)
+            if year is not None:
+                item["end_years"].append(year)
     if not observations:
         raise ValueError("no employment titles were found in Work Experience headings")
 
@@ -314,9 +364,8 @@ def extract_title_seed(documents: list[ResumeDocument]) -> TitleSeedReport:
             )
         )
 
-    corpus_hash = hashlib.sha256(f"{document.source_id}\n{document.content}".encode()).hexdigest()
     return TitleSeedReport(
-        corpus_hash=corpus_hash,
+        corpus_hash=evidence.corpus_hash,
         generated_at=datetime.now(UTC).isoformat(),
         historical_titles=historical_titles,
     )

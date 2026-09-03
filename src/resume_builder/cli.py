@@ -17,6 +17,7 @@ from . import (
     feedback_memory,
     gmail_automation,
     job_matching,
+    job_onboarding,
     jobs,
     migration,
     minting,
@@ -70,6 +71,7 @@ COMMANDS: dict[str, Command] = {
     ),
     "match": (job_matching.main, "Audit a resume against one captured job posting"),
     "jobs": (jobs.main, "Update, inspect, and prescreen the local job inventory"),
+    "onboard": (job_onboarding.main, "Continue setup and optionally configure job discovery"),
     "application": (
         applications.main,
         "Record applications, outcomes, and submitted answers",
@@ -104,6 +106,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     if not arguments and sys.stdin.isatty() and sys.stdout.isatty():
         try:
+            active_workspace = workspace.discover_workspace()
+            if active_workspace is not None:
+                os.chdir(active_workspace)
+                return job_onboarding.main([])
             return workspace.main([])
         except KeyboardInterrupt:
             print("\nSetup canceled. No workspace changes were applied.", file=sys.stderr)

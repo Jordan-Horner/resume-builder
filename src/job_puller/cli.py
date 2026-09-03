@@ -119,6 +119,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Observations retained: {database.stats()['observations']}")
         return 0
 
+    if args.command == "scrape" and not config.enabled:
+        print(
+            "Job discovery setup is not active. Finish onboarding and activate a search plan.",
+            file=sys.stderr,
+        )
+        return 2
+
     if args.command == "boards":
         if args.boards_action == "check":
             service = InventoryService(config, database)

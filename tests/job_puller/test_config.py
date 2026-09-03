@@ -15,6 +15,19 @@ def test_example_config_is_valid():
     assert len(config.search.families) == 5
 
 
+def test_inactive_fresh_install_config_allows_no_search_families(tmp_path):
+    path = tmp_path / "search.yml"
+    path.write_text(
+        "schema_version: 1\nenabled: false\nsearch:\n  families: []\n",
+        encoding="utf-8",
+    )
+
+    config = load_config(path)
+
+    assert config.enabled is False
+    assert config.search.families == []
+
+
 def test_relative_database_path_is_project_relative():
     path = Path(__file__).parents[1] / "config" / "search.example.yml"
     resolved = resolve_database_path(path, "data/inventory.db")

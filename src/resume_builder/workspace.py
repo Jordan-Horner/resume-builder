@@ -12,6 +12,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from .atomic import atomic_write_json
+from .job_setup_defaults import scaffold_job_search
 from .resume_templates import scaffold_template, select_catalog_item, template_catalog
 from .workspace_state import (
     DEFAULT_VAULT_REPOSITORY_NAME,
@@ -56,7 +57,9 @@ def sync_workspace_templates(root: Path) -> dict[str, object]:
     if not (resolved / WORKSPACE_CONFIG).is_file():
         raise WorkspaceError(f"workspace configuration is missing: {resolved}")
     _load_workspace_configuration(resolved / WORKSPACE_CONFIG)
-    return sync_templates(resolved)
+    result = sync_templates(resolved)
+    result["job_search_installed"] = scaffold_job_search(resolved)
+    return result
 
 
 def _require_success(result: CommandResult, action: str) -> None:

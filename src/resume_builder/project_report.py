@@ -32,6 +32,7 @@ from .directions import parse_direction
 from .evaluations import load_case
 from .feedback_memory import validate_feedback_memory
 from .job_matching import validate_target
+from .job_onboarding import onboarding_status as job_onboarding_status
 from .layout import contained_path
 from .report_policy import _initial_draft_readiness, _next_action, _onboarding_status
 from .review_records import load_review_record, review_freshness
@@ -446,6 +447,7 @@ def project_report(vault_root: Path, *, strict: bool = False) -> dict[str, Any]:
         errors,
     )
     result["onboarding"] = _onboarding_status(result["next_action"], vault)
+    result["job_search_onboarding"] = job_onboarding_status(project_root)
     result["status"] = (
         "getting-started"
         if result["onboarding"]["active"]
@@ -505,6 +507,7 @@ def format_summary(result: dict[str, Any]) -> str:
             f"{result['evaluations']['unsealed']} unsealed)"
         ),
         f"Onboarding: {result['onboarding']['stage']}",
+        f"Job search: {result['job_search_onboarding']['status']}",
         f"Next: {result['next_action']['message']}",
     ]
     lines.extend(f"  error: {error}" for error in result["errors"])

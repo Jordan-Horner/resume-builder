@@ -32,6 +32,11 @@ resume-builder automation init --timezone America/New_York
 resume-builder automation doctor
 ```
 
+On a fresh workspace, job discovery remains inactive until the optional
+`resume-builder onboard` flow is saved and activated. The doctor reports
+`setup_required: true` and `ready: false` while keeping service health separate;
+the scheduler waits safely instead of treating incomplete setup as a failed scan.
+
 The generated `automation/config.yml` defaults to one 8:00 AM job scan and one
 Gmail scan every four hours. Add a second job time when desired:
 
