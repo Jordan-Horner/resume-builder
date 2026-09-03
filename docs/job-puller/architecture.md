@@ -31,6 +31,6 @@ summary, and are stored as JSON on the scrape run.
 
 The collector deliberately excludes scheduling, a web server, application
 automation, and destructive fuzzy deduplication. Resume Builder's separate
-workspace workflow may read the canonical inventory for deterministic
-prescreening and application-linked suppression; providers never read resumes or
-application history.
+workspace workflow may read the canonical inventory for deterministic warning
+generation and application-linked suppression. Warnings do not rank or hide
+inventory; providers never read resumes or application history.

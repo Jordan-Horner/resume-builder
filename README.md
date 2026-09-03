@@ -179,19 +179,20 @@ resume-builder jobs reposts
 `update` collects from enabled providers and preserves valid jobs even when they
 do not match the current work-mode preference. `new` performs that refresh and
 returns only active canonical jobs that were not already present in the database;
-it does not recycle the existing backlog. `shortlist` cheaply separates
-interest, constraints, and exact resume keyword visibility across the active
-inventory. It reuses unchanged analyses based on posting, resume, preference,
-and prescreen versions. It also writes `job-search/jobs-review.csv`, a compact
-title/company/salary queue sorted by title and descending salary. Personal
-work-mode, location, title, company, salary, and per-job disposition filters affect this review queue
-without deleting jobs from inventory. Location include/exclude terms and the
+it does not recycle the existing backlog. `shortlist` records deterministic
+warnings and exact resume keyword visibility across the active inventory. It
+does not use those signals to rank or hide opportunities: every job without a
+durable application disposition stays in the review queue, ordered newest
+first. It reuses unchanged analyses based on posting, resume, preference, and
+prescreen versions. It also writes `job-search/jobs-review.csv`, a compact
+title/company/salary queue in the same order. Personal work-mode, location,
+title, company, salary, and seniority rules appear as warnings without deleting
+or suppressing jobs. Location include/exclude terms and the
 unknown-location policy are configurable in `job-search/preferences.yml` for
 different countries and regions. An optional seniority gate can retain senior
-roles only for configured role families instead of rejecting every title that
-contains `Senior`, `Sr.`, `Lead`, `Staff`, or `Principal`. Its bounded keyword-readiness value is
+roles only for configured role families when identifying warnings. Its bounded keyword-readiness value is
 diagnostic—not an ATS score or a hiring prediction. Ask the agent to screen a
-shortlisted job ID for the deeper semantic evidence review; only jobs you choose
+job ID for the deeper semantic evidence review; only jobs you choose
 to pursue become tracked target snapshots.
 
 Provider refreshes retain typed outcomes (`healthy`, `healthy-empty`, `capped`,
@@ -272,14 +273,25 @@ resume-builder agent doctor
 resume-builder agent ask "What new jobs are ready to review?"
 resume-builder agent screen <job-id> --preview-payload
 resume-builder agent screen <job-id> --confirm-send-private-data
+resume-builder agent screen-new
+resume-builder agent screen-new --confirm-send-private-data
 resume-builder agent discovery-plan --resume resumes/baselines/<resume>.md --preview-payload
 resume-builder agent discovery-plan --resume resumes/baselines/<resume>.md --confirm-send-private-data
+resume-builder agent discovery-show --portfolio build/job-search/cold-start-portfolio.json
 ```
 
 Structured screening separates confirmed eligibility conflicts from career fit,
 so a credible skills gap can remain a `worthwhile_stretch`. Screening is cached
 by the posting, preference profile, rubric, and model hashes. A new or refreshed
 screen will not contact OpenRouter without the explicit confirmation flag.
+
+`agent screen-new` builds a complete screening queue without hiding any new
+job. Without confirmation it reuses cached and deterministic results and marks
+everything else `unscreened`. With confirmation it screens no more than the
+configured request limit, records content-free usage totals, and leaves
+budget-exhausted or failed jobs visible. The artifact preserves the canonical
+newest-first list and provides a separate advisory order based on eligibility,
+semantic fit, and confidence. Confidence never substitutes for fit.
 
 Cold-start discovery can create an editable query portfolio from one general
 resume. It combines recent historical titles, locally grounded capability
@@ -290,6 +302,10 @@ scheduled search or trigger a provider scan. Preview and local-only operation
 need no agent configuration. Provider-generated titles are cached for unchanged
 resume evidence and cannot overwrite an existing editable portfolio without
 `--force`.
+Review commands can enable, disable, add, or remove individual queries.
+Activation prints an exact configuration diff and confirmation hash before it
+can write, preserves manual search and provider settings, creates a rollback
+record, and never starts a scan or changes restart behavior.
 
 The generated configuration contains no API key. Screening preferences and
 candidate evidence remain workspace-specific; fictional evaluation profiles do

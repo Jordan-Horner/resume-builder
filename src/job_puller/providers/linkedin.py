@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup, Tag
 
 from job_puller.config import LinkedInProviderSettings, SearchSettings
 from job_puller.detail_cache import ProviderDetailCache
-from job_puller.eligibility import title_matches
+from job_puller.eligibility import commercial_title_matches, title_matches
 from job_puller.models import JobObservation, ProviderResult
 from job_puller.normalize import html_to_text, normalized_key, parse_datetime
 from job_puller.work_modes import WorkMode, explicit_arrangement
@@ -330,7 +330,7 @@ class LinkedInGuestProvider:
             for family in self.search.families:
                 if not family.enabled:
                     continue
-                query = self._provider_query(family.titles)
+                query = family.provider_query or self._provider_query(family.titles)
                 query_key = f"family.{family.name}.query.{normalized_key(query)}."
                 family_key = f"family.{family.name}."
                 target = self.settings.family_results_wanted.get(
@@ -384,11 +384,7 @@ class LinkedInGuestProvider:
                             metrics["card_duplicates"] += 1
                             continue
                         seen_for_query.add(card.job_id)
-                        if not self._title_matches(
-                            card.title,
-                            family.accepted_titles,
-                            family.excluded_titles,
-                        ):
+                        if not commercial_title_matches(card.title, family):
                             metrics["title_rejected"] += 1
                             rejected_titles[normalized_key(card.title)] += 1
                             continue

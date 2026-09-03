@@ -40,6 +40,12 @@ match to keep adjacent categories outside the family. All three are phrase rules
 Keep personal choices such as companies, salary, and acceptable seniority in `preferences.yml`; family exclusions
 should describe the reusable role boundary.
 
+A reviewed capability family can set one transport-neutral `provider_query`,
+`commercial_admission: query_result`, and `commercial_only: true`. This allows
+a commercial search for literal resume capabilities without widening direct
+ATS-board admission. Ordinary manually configured families retain strict title
+matching by default.
+
 LinkedIn receives one compatible Boolean query per family through its public guest jobs surface. Indeed receives
 one plain query per `titles` entry because the GraphQL transport used by JobSpy does not reliably honor
 Indeed.com's Boolean/title syntax; the local title gate removes description-only matches. Senior, lead, staff, and
@@ -105,13 +111,13 @@ The provider scrape summary reports `new_observations`, which counts newly seen
 provider records and must not be interpreted as newly created canonical jobs.
 `jobs new` is the canonical database-delta view.
 
-`jobs shortlist` also creates `job-search/jobs-review.csv`, containing only jobs
-eligible under the current personal review filters. Configure hard title terms,
-company terms, accepted and excluded location terms, unknown-location handling,
-work modes, minimum salary, and optional senior-title role families in the
-private `job-search/preferences.yml`.
-Filtering never deletes collected inventory, so changing a preference can make
-previously hidden jobs visible again without another provider request.
+`jobs shortlist` also creates `job-search/jobs-review.csv`, containing every job
+without a durable application disposition in newest-first order. Configure title
+terms, company terms, accepted and excluded location terms, unknown-location
+handling, work modes, minimum salary, and optional senior-title role families in
+the private `job-search/preferences.yml`. These settings produce visible warnings;
+they do not rank, hide, or delete collected inventory. Incomplete descriptions
+also remain visible and are marked for follow-up.
 Prescreen reuse is invalidated when any decision-relevant inventory field changes,
 including a corrected location, work mode, salary, title, company, or description.
 

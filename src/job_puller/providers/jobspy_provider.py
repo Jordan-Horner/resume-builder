@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from job_puller.config import CommercialProvider, SearchSettings
-from job_puller.eligibility import remote_matches, title_matches
+from job_puller.eligibility import commercial_title_matches, remote_matches, title_matches
 from job_puller.models import JobObservation, ProviderResult
 from job_puller.normalize import html_to_text, normalized_key, parse_datetime
 from job_puller.work_modes import WorkMode, explicit_arrangement
@@ -60,7 +60,12 @@ class JobSpyProvider:
             if not family.enabled:
                 continue
             family_prefix = f"family.{family.name}."
-            for query in self._provider_queries(family.titles):
+            queries = (
+                [family.provider_query]
+                if family.provider_query
+                else self._provider_queries(family.titles)
+            )
+            for query in queries:
                 query_prefix = family_prefix + f"query.{normalized_key(query)}."
                 result_limit = self.settings.family_results_wanted.get(
                     family.name, self.settings.results_wanted
@@ -101,11 +106,7 @@ class JobSpyProvider:
                         observation = self._normalize(row, family.name)
                         if observation is None:
                             metrics["invalid"] += 1
-                        elif not self._title_matches(
-                            observation.title,
-                            family.accepted_titles,
-                            family.excluded_titles,
-                        ):
+                        elif not commercial_title_matches(observation.title, family):
                             metrics["title_rejected"] += 1
                             rejected_titles[normalized_key(observation.title)] += 1
                         elif not self._recent_enough(observation, since):

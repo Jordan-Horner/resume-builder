@@ -21,8 +21,12 @@ from resume_builder.agent_contracts import (
     StructuredModelRequest,
 )
 from resume_builder.agent_openrouter import OpenRouterAdapter
+from resume_builder.discovery_activation import preview_activation, save_portfolio
 from resume_builder.discovery_evidence import ResumeDocument, TitlePosture
 from resume_builder.discovery_portfolio import (
+    ColdStartLane,
+    ColdStartPortfolio,
+    ColdStartQuery,
     GeneratedTitleSuggestion,
     GeneratedTitleSuggestions,
     TitleGenerationMetadata,
@@ -164,7 +168,7 @@ def test_openrouter_adapter_does_not_require_parallel_tool_call_support(
     assert structured.output.fit == FitOutcome.GOOD_MATCH
 
 
-def test_new_job_tool_exposes_only_sanitized_review_eligible_fields(
+def test_new_job_tool_exposes_only_sanitized_review_queue_fields(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     output = tmp_path / "new-jobs.json"
@@ -180,11 +184,14 @@ def test_new_job_tool_exposes_only_sanitized_review_eligible_fields(
                         "description": "Private full description",
                         "prescreen": {
                             "review_eligible": True,
-                            "category": "SCREEN NEXT",
-                            "keyword_readiness": {"percent": 82},
+                            "queue_state": "hard_conflict",
+                            "constraints": {"hard_conflicts": ["location"]},
                         },
                     },
-                    {"id": "job-2", "prescreen": {"review_eligible": False}},
+                    {
+                        "id": "job-2",
+                        "prescreen": {"constraints": {"disposition": "applied"}},
+                    },
                 ]
             }
         ),
@@ -201,8 +208,8 @@ def test_new_job_tool_exposes_only_sanitized_review_eligible_fields(
             "title": "Support Engineer",
             "company": "Example",
             "url": "https://example.invalid/job-1",
-            "category": "SCREEN NEXT",
-            "keyword_readiness_percent": 82,
+            "queue_state": "hard_conflict",
+            "hard_conflicts": ["location"],
         }
     ]
     assert "description" not in result[0]
@@ -524,3 +531,83 @@ def test_discovery_reuses_unchanged_private_generation_cache(
     assert not third.exists()
     assert calls == 1
     assert "--confirm-send-private-data" in capsys.readouterr().err
+
+
+def test_discovery_review_and_activation_cli_never_starts_a_scan(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    portfolio_path = tmp_path / "portfolio.json"
+    search_config = tmp_path / "search.yml"
+    backup = tmp_path / "backup.yml"
+    record = tmp_path / "activation.json"
+    portfolio = ColdStartPortfolio(
+        generated_at="2026-09-03T00:00:00+00:00",
+        resume_hash="fictional",
+        queries=[
+            ColdStartQuery(
+                query_id="fictional-query",
+                lane=ColdStartLane.HISTORICAL_TITLE,
+                query="Production Services Engineer",
+                source_ids=["fictional-resume.md"],
+                reason="Recent fictional title.",
+            )
+        ],
+    )
+    save_portfolio(portfolio_path, portfolio)
+    search_config.write_text(
+        """\
+schema_version: 1
+search:
+  accepted_work_modes: [remote]
+  families:
+    - name: manual
+      titles: [support engineer]
+""",
+        encoding="utf-8",
+    )
+
+    assert main(["discovery-show", "--portfolio", str(portfolio_path)]) == 0
+    assert "fictional-query" in capsys.readouterr().out
+
+    assert (
+        main(
+            [
+                "discovery-activate",
+                "--portfolio",
+                str(portfolio_path),
+                "--search-config",
+                str(search_config),
+                "--backup",
+                str(backup),
+                "--record",
+                str(record),
+            ]
+        )
+        == 0
+    )
+    preview_output = capsys.readouterr().out
+    assert "no scan has been started" in preview_output
+    assert not backup.exists()
+
+    confirmation = preview_activation(
+        portfolio, search_config.read_text(encoding="utf-8")
+    ).confirmation_hash
+    assert (
+        main(
+            [
+                "discovery-activate",
+                "--portfolio",
+                str(portfolio_path),
+                "--search-config",
+                str(search_config),
+                "--backup",
+                str(backup),
+                "--record",
+                str(record),
+                "--confirm",
+                confirmation,
+            ]
+        )
+        == 0
+    )
+    assert "No job scan was started" in capsys.readouterr().out

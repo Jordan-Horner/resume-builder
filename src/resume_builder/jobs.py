@@ -1,4 +1,4 @@
-"""Orchestrate local job inventory collection and inexpensive prescreening."""
+"""Orchestrate local job inventory collection and deterministic review metadata."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ DEFAULT_REVIEW_OUTPUT = Path("job-search/jobs-review.csv")
 DEFAULT_NEW_OUTPUT = Path("job-search/new-jobs.json")
 DEFAULT_NEW_REVIEW_OUTPUT = Path("job-search/new-jobs-review.csv")
 DEFAULT_LATEST_REFRESH = Path("job-search/latest-refresh.json")
-PRESCREEN_VERSION = 5
+PRESCREEN_VERSION = 6
 TOKEN = re.compile(r"[a-z][a-z0-9+#.]{2,}")
 PHRASE_TOKEN = re.compile(r"[a-z0-9]+")
 STOPWORDS = {
@@ -81,7 +81,7 @@ def parser() -> argparse.ArgumentParser:
     )
     new.add_argument("--limit", type=int, default=50)
     commands.add_parser("status", help="Show inventory and shortlist status")
-    shortlist = commands.add_parser("shortlist", help="Prescreen new or changed active jobs")
+    shortlist = commands.add_parser("shortlist", help="Prepare active jobs for review")
     shortlist.add_argument("--limit", type=int, default=50)
     screen = commands.add_parser("screen", help="Show one job and its prescreen evidence")
     screen.add_argument("job_id")
@@ -266,13 +266,7 @@ def _with_application_dispositions(
 
 def _write_review_csv(results: list[dict[str, Any]], output_path: Path) -> int:
     eligible = [item for item in results if item["prescreen"]["review_eligible"]]
-    eligible.sort(
-        key=lambda item: (
-            str(item["title"]).casefold(),
-            -float(item.get("salary_max") or item.get("salary_min") or -1),
-            str(item["company"]).casefold(),
-        )
-    )
+    eligible.sort(key=_newest_first_key)
     stream = io.StringIO(newline="")
     writer = csv.DictWriter(stream, fieldnames=("title", "company", "salary"))
     writer.writeheader()
@@ -286,6 +280,30 @@ def _write_review_csv(results: list[dict[str, Any]], output_path: Path) -> int:
         )
     atomic_write_text(output_path, stream.getvalue())
     return len(eligible)
+
+
+def _recency_timestamp(job: dict[str, Any]) -> float:
+    for field in ("posted_at", "first_seen_at", "last_seen_at"):
+        value = job.get(field)
+        if not isinstance(value, str) or not value:
+            continue
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        return parsed.timestamp()
+    return 0.0
+
+
+def _newest_first_key(job: dict[str, Any]) -> tuple[float, str, str, str]:
+    return (
+        -_recency_timestamp(job),
+        str(job.get("title") or "").casefold(),
+        str(job.get("company") or "").casefold(),
+        str(job.get("id") or ""),
+    )
 
 
 def _prescreen(
@@ -344,43 +362,33 @@ def _prescreen(
     complete = bool(
         title.strip() and company.strip() and job.get("description_quality") == "complete"
     )
-    review_eligible = bool(
-        complete
-        and not excluded_title
-        and seniority_match
-        and not excluded_company
-        and not disposition
-        and hard_mode_match
-        and hard_location_match
-        and not hard_salary_below
-    )
+    hard_conflicts = []
+    if excluded_title:
+        hard_conflicts.append("excluded_title")
+    if not seniority_match:
+        hard_conflicts.append("seniority")
+    if excluded_company:
+        hard_conflicts.append("excluded_company")
+    if not hard_mode_match:
+        hard_conflicts.append("work_mode")
+    if not hard_location_match:
+        hard_conflicts.append("location")
+    if hard_salary_below:
+        hard_conflicts.append("salary")
 
     if disposition:
-        category = str(disposition).replace("_", " ").upper()
-    elif (
-        excluded_title
-        or not seniority_match
-        or excluded_company
-        or not hard_mode_match
-        or not hard_location_match
-        or hard_salary_below
-    ):
-        category = "SKIP"
-    elif unwanted:
-        category = "EASY BUT UNWANTED"
+        queue_state = str(disposition)
     elif not complete:
-        category = "NEEDS REVIEW"
-    elif desired and readiness >= 35:
-        category = "SCREEN NEXT"
-    elif desired:
-        category = "POSSIBLE FIT"
-    elif interesting:
-        category = "INTERESTING STRETCH"
+        queue_state = "needs_description"
+    elif hard_conflicts:
+        queue_state = "hard_conflict"
     else:
-        category = "SKIP"
+        queue_state = "ready"
     return {
-        "category": category,
-        "review_eligible": review_eligible,
+        "queue_state": queue_state,
+        # Kept for artifact compatibility. Relevance and hard-warning rules no
+        # longer suppress jobs; only a durable disposition removes one.
+        "review_eligible": not bool(disposition),
         "interest": {"desired_title_terms": desired, "interest_terms": interesting},
         "constraints": {
             "work_mode_match": mode_match,
@@ -395,6 +403,7 @@ def _prescreen(
             "disposition": disposition,
             "salary_below_minimum": salary_below,
             "unwanted_title_terms": unwanted,
+            "hard_conflicts": hard_conflicts,
         },
         "keyword_readiness": {
             "percent": readiness,
@@ -448,23 +457,7 @@ def _shortlist(
         results.append(
             {**job, "analysis_key": key, "prescreen": _prescreen(job, preferences, resume_terms)}
         )
-    priority = {
-        "SCREEN NEXT": 0,
-        "POSSIBLE FIT": 1,
-        "INTERESTING STRETCH": 2,
-        "NEEDS REVIEW": 3,
-        "EASY BUT UNWANTED": 4,
-        "SKIP": 5,
-        "APPLIED": 6,
-        "NOT INTERESTED": 7,
-    }
-    results.sort(
-        key=lambda item: (
-            priority[str(item["prescreen"]["category"])],
-            -int(item["prescreen"]["keyword_readiness"]["percent"]),
-            str(item["title"]),
-        )
-    )
+    results.sort(key=_newest_first_key)
     payload = {
         "schema_version": 1,
         "prescreen_version": PRESCREEN_VERSION,
@@ -482,13 +475,11 @@ def _shortlist(
     lines = [f"# {heading}", "", f"{count_label}: {len(results)}; reused: {reused}", ""]
     for item in visible_results[: max(1, limit)]:
         screen = item["prescreen"]
-        lines.append(
-            f"- **{screen['category']}** — {item['title']} at {item['company']} "
-            f"(keyword readiness {screen['keyword_readiness']['percent']}%) — {item['id']}"
-        )
+        state = str(screen["queue_state"]).replace("_", " ").upper()
+        lines.append(f"- **{state}** — {item['title']} at {item['company']} — {item['id']}")
     atomic_write_text(output_path.with_suffix(".md"), "\n".join(lines) + "\n")
-    print(f"Prescreened {len(results)} jobs; reused {reused} unchanged analyses.")
-    print(f"Shortlist: {output_path.with_suffix('.md')}")
+    print(f"Prepared {len(results)} jobs; reused {reused} unchanged analyses.")
+    print(f"Newest jobs: {output_path.with_suffix('.md')}")
     print(f"Review queue: {review_output_path} ({review_count} jobs)")
     return 0
 
@@ -687,7 +678,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     )
             if DEFAULT_OUTPUT.exists():
                 payload = json.loads(DEFAULT_OUTPUT.read_text(encoding="utf-8"))
-                print(f"Prescreened Jobs: {len(payload.get('jobs', []))}")
+                print(f"Prepared Jobs: {len(payload.get('jobs', []))}")
             return 0
         if args.command == "shortlist":
             return _shortlist(config_path, args.preferences.expanduser(), args.limit)

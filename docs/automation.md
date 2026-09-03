@@ -8,9 +8,10 @@ required.
 ## What runs automatically
 
 - Job discovery runs at one or more local times each day. Each run refreshes
-  enabled providers, identifies canonical jobs that are genuinely new, applies
-  private preferences, prescreens the delta, and alerts only for review-eligible
-  `SCREEN NEXT`, `POSSIBLE FIT`, or `INTERESTING STRETCH` results.
+  enabled providers, identifies canonical jobs that are genuinely new, records
+  deterministic warnings, and alerts for every new job without a durable
+  application disposition. Alerts and saved review output preserve newest-first
+  order; relevance heuristics do not suppress opportunities.
 - Gmail reconciliation runs on a lower-priority interval. It uses the existing
   read-only Gmail policy and applies only confident lifecycle updates.
 - Empty scans do not notify. A durable outbox prevents duplicate notifications
@@ -40,7 +41,23 @@ jobs:
   times: ["08:00", "17:00"]
   run_on_start: true
   limit: 50
+  semantic_screening:
+    # Enabling this authorizes scheduled bounded posting/profile provider calls.
+    enabled: false
+    max_jobs_per_run: 6
 ```
+
+Semantic screening is disabled by default. Enabling it is explicit ongoing
+authorization for scheduled runs to send bounded posting and candidate-profile
+packets to the provider configured in `agent/config.yml`. The per-run maximum is
+also capped by the agent request limit. Cached and deterministically ineligible
+results do not consume that allowance.
+
+A screening failure is recorded as unresolved and does not fail the completed
+collection run. This prevents the scheduler from repeating provider discovery
+merely because the model provider was unavailable. Notifications report
+recommended, unresolved, additional, and total job counts; every job remains in
+the full queue.
 
 The schedule uses the declared IANA timezone, including daylight-saving changes.
 `run_on_start` makes first deployment immediately test the corresponding scanner.

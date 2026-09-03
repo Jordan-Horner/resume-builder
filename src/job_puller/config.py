@@ -17,6 +17,9 @@ class SearchFamily(StrictModel):
     name: str
     enabled: bool = True
     titles: list[str] = Field(min_length=1)
+    provider_query: str | None = None
+    commercial_admission: Literal["title_match", "query_result"] = "title_match"
+    commercial_only: bool = False
     title_aliases: list[str] = Field(default_factory=list)
     excluded_titles: list[str] = Field(default_factory=list)
 
@@ -32,6 +35,18 @@ class SearchFamily(StrictModel):
             raise ValueError("job title rules must be unique within each list")
         return cleaned
 
+    @field_validator("provider_query")
+    @classmethod
+    def validate_provider_query(cls, query: str | None) -> str | None:
+        if query is None:
+            return None
+        cleaned = query.strip()
+        if not cleaned:
+            raise ValueError("provider query cannot be blank")
+        if '"' in cleaned:
+            raise ValueError("provider query cannot contain double quotes")
+        return cleaned
+
     @model_validator(mode="after")
     def require_distinct_title_rules(self) -> SearchFamily:
         accepted = [*self.titles, *self.title_aliases]
@@ -41,6 +56,10 @@ class SearchFamily(StrictModel):
             title.casefold() for title in self.excluded_titles
         }:
             raise ValueError("accepted and excluded title rules must not overlap")
+        if self.commercial_admission == "query_result" and not self.provider_query:
+            raise ValueError("query_result admission requires provider_query")
+        if self.commercial_only and not self.provider_query:
+            raise ValueError("commercial_only families require provider_query")
         return self
 
     @property

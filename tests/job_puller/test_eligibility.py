@@ -1,5 +1,10 @@
-from job_puller.config import SearchSettings
-from job_puller.eligibility import matches_enabled_family, title_matches
+from job_puller.config import SearchFamily, SearchSettings
+from job_puller.eligibility import (
+    commercial_title_matches,
+    family_keyword_queries,
+    matches_enabled_family,
+    title_matches,
+)
 
 
 def test_title_aliases_expand_recall_without_becoming_provider_queries():
@@ -44,3 +49,18 @@ def test_exclusion_in_one_family_does_not_reject_a_match_in_another_family():
     )
 
     assert matches_enabled_family("Platform Engineer", search)
+
+
+def test_query_result_admission_is_limited_to_commercial_providers():
+    family = SearchFamily(
+        name="capability-discovery",
+        titles=["production services engineer"],
+        provider_query="AWS Kubernetes",
+        commercial_admission="query_result",
+        commercial_only=True,
+    )
+    search = SearchSettings(families=[family])
+
+    assert commercial_title_matches("Customer Reliability Engineer", family)
+    assert not matches_enabled_family("Customer Reliability Engineer", search)
+    assert family_keyword_queries(search) == []

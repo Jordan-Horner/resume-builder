@@ -48,6 +48,13 @@ authoritative whole-board snapshot.
 
 ## Commercial-board title queries
 
+A family normally derives queries from `titles` and admits only matching titles.
+A reviewed discovery family may instead declare one `provider_query`. When
+paired with `commercial_admission: query_result`, results from that commercial
+query are retained for later description ranking even when their titles are
+unfamiliar. Such a family must be `commercial_only`, so direct ATS boards keep
+their normal title-family gate.
+
 Search families contain semantic title aliases, not raw provider syntax. A commercial-board adapter must compile
 those aliases for its tested transport. LinkedIn receives one Boolean query per enabled family. Although
 Indeed.com documents Boolean and `title:` expressions, the GraphQL route used by the pinned JobSpy adapter can

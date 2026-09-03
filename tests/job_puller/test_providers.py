@@ -642,6 +642,52 @@ def test_indeed_uses_plain_individual_title_queries():
     ]
 
 
+def test_indeed_capability_query_admits_query_scoped_titles(monkeypatch):
+    captured = []
+
+    class Frame:
+        def to_dict(self, orient):
+            assert orient == "records"
+            return [
+                {
+                    "id": "fictional-capability-result",
+                    "title": "Customer Reliability Engineer",
+                    "company": "Example",
+                    "job_url": "https://example.invalid/capability-result",
+                    "description": "Uses AWS and Kubernetes.",
+                    "is_remote": True,
+                    "location": "Remote, US",
+                    "date_posted": "2026-08-27",
+                }
+            ]
+
+    def fake_scrape_jobs(**kwargs):
+        captured.append(kwargs)
+        return Frame()
+
+    monkeypatch.setattr("jobspy.scrape_jobs", fake_scrape_jobs)
+    provider = JobSpyProvider(
+        "indeed",
+        CommercialProvider(),
+        SearchSettings(
+            families=[
+                {
+                    "name": "capability-discovery",
+                    "titles": ["production services engineer"],
+                    "provider_query": "AWS Kubernetes",
+                    "commercial_admission": "query_result",
+                    "commercial_only": True,
+                }
+            ]
+        ),
+    )
+
+    result = provider.fetch(SINCE)
+
+    assert captured[0]["search_term"] == "AWS Kubernetes"
+    assert [item.title for item in result.observations] == ["Customer Reliability Engineer"]
+
+
 def test_indeed_freshness_uses_calendar_date():
     provider = JobSpyProvider(
         "indeed",

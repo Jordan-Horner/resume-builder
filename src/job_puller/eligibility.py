@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from .config import SearchSettings
+from .config import SearchFamily, SearchSettings
 from .models import JobObservation
 from .normalize import normalized_key
 from .work_modes import WorkMode
@@ -39,15 +39,24 @@ def title_matches(
 
 def matches_enabled_family(title: str, search: SearchSettings) -> bool:
     return any(
-        family.enabled and title_matches(title, family.accepted_titles, family.excluded_titles)
+        family.enabled
+        and not family.commercial_only
+        and title_matches(title, family.accepted_titles, family.excluded_titles)
         for family in search.families
+    )
+
+
+def commercial_title_matches(title: str, family: SearchFamily) -> bool:
+    """Apply the configured admission policy to one query-scoped commercial result."""
+    return family.commercial_admission == "query_result" or title_matches(
+        title, family.accepted_titles, family.excluded_titles
     )
 
 
 def family_keyword_queries(search: SearchSettings) -> list[str]:
     queries = []
     for family in search.families:
-        if not family.enabled:
+        if not family.enabled or family.commercial_only:
             continue
         terms: list[str] = []
         for title in family.titles:

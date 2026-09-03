@@ -9,6 +9,10 @@ from typing import Protocol
 from pydantic import BaseModel
 
 
+class ModelProviderError(RuntimeError):
+    """Provider-neutral failure safe to expose without retaining provider content."""
+
+
 @dataclass(frozen=True)
 class AgentTool:
     """One explicitly exposed application capability."""

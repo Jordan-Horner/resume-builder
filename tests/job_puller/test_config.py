@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from job_puller.cli import _default_config_path
-from job_puller.config import load_config, resolve_database_path
+from job_puller.config import SearchFamily, load_config, resolve_database_path
 from job_puller.work_modes import WorkMode
 
 
@@ -180,3 +180,22 @@ providers:
     )
     with pytest.raises(ValueError, match="max_cards_scanned"):
         load_config(path)
+
+
+def test_query_result_admission_requires_an_explicit_commercial_query():
+    with pytest.raises(ValueError, match="requires provider_query"):
+        SearchFamily(
+            name="invalid-discovery",
+            titles=["support engineer"],
+            commercial_admission="query_result",
+        )
+
+    family = SearchFamily(
+        name="capability-discovery",
+        titles=["production services engineer"],
+        provider_query="AWS Kubernetes",
+        commercial_admission="query_result",
+        commercial_only=True,
+    )
+
+    assert family.provider_query == "AWS Kubernetes"

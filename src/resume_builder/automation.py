@@ -29,19 +29,33 @@ import httpx
 import yaml
 
 from . import gmail_automation, jobs
+from .agent_config import DEFAULT_AGENT_CONFIG, load_agent_config
+from .agent_openrouter import OpenRouterAdapter
 from .atomic import atomic_write_text
+from .job_screening_queue import (
+    DEFAULT_SCREENING_OUTPUT,
+    build_screening_queue,
+    load_notification_jobs,
+)
 
 DEFAULT_CONFIG = Path("automation/config.yml")
 DEFAULT_JOB_TIMES = ("08:00",)
 DEFAULT_GMAIL_INTERVAL_HOURS = 4
 DEFAULT_NOTIFICATION_RETRY_MINUTES = 5
 DEFAULT_HEARTBEAT_HOURS = 6
-INTERESTING_CATEGORIES = {"SCREEN NEXT", "POSSIBLE FIT", "INTERESTING STRETCH"}
 TASKS = ("jobs", "gmail")
 LOG_FORMAT_VERSION = 1
 LOGGER = logging.getLogger("resume_builder.automation")
 LOG_SUMMARY_FIELDS = {
-    "jobs": ("refresh_status", "new_jobs", "interesting_jobs"),
+    "jobs": (
+        "refresh_status",
+        "new_jobs",
+        "reviewable_jobs",
+        "screened_jobs",
+        "recommended_jobs",
+        "needs_review_jobs",
+        "screening_status",
+    ),
     "gmail": (
         "examined",
         "created",
@@ -64,6 +78,8 @@ class JobSchedule:
     times: tuple[time, ...]
     run_on_start: bool
     limit: int
+    semantic_screening_enabled: bool = False
+    semantic_screening_max_jobs: int = 6
 
 
 @dataclass(frozen=True)
@@ -322,7 +338,11 @@ def load_config(path: Path) -> AutomationConfig:
     gmail_payload = _mapping(payload.get("gmail", {}), "gmail")
     notification_payload = _mapping(payload.get("notifications", {}), "notifications")
     for section, values, allowed_keys in (
-        ("jobs", job_payload, {"enabled", "times", "run_on_start", "limit"}),
+        (
+            "jobs",
+            job_payload,
+            {"enabled", "times", "run_on_start", "limit", "semantic_screening"},
+        ),
         ("gmail", gmail_payload, {"enabled", "every_hours", "run_on_start"}),
         (
             "notifications",
@@ -337,6 +357,19 @@ def load_config(path: Path) -> AutomationConfig:
     job_limit = job_payload.get("limit", 50)
     if not isinstance(job_limit, int) or isinstance(job_limit, bool) or not 1 <= job_limit <= 500:
         raise ValueError("jobs.limit must be an integer from 1 to 500")
+    screening_payload = _mapping(
+        job_payload.get("semantic_screening", {}), "jobs.semantic_screening"
+    )
+    screening_extra = sorted(set(screening_payload) - {"enabled", "max_jobs_per_run"})
+    if screening_extra:
+        raise ValueError("unknown jobs.semantic_screening settings: " + ", ".join(screening_extra))
+    screening_limit = screening_payload.get("max_jobs_per_run", 6)
+    if (
+        not isinstance(screening_limit, int)
+        or isinstance(screening_limit, bool)
+        or not 1 <= screening_limit <= 25
+    ):
+        raise ValueError("jobs.semantic_screening.max_jobs_per_run must be from 1 to 25")
     interval = gmail_payload.get("every_hours", DEFAULT_GMAIL_INTERVAL_HOURS)
     if (
         not isinstance(interval, int | float)
@@ -373,6 +406,8 @@ def load_config(path: Path) -> AutomationConfig:
             times=_parse_job_times(job_payload.get("times", list(DEFAULT_JOB_TIMES))),
             run_on_start=_boolean(job_payload, "run_on_start", True),
             limit=job_limit,
+            semantic_screening_enabled=_boolean(screening_payload, "enabled", False),
+            semantic_screening_max_jobs=screening_limit,
         ),
         gmail=GmailSchedule(
             enabled=_boolean(gmail_payload, "enabled", True),
@@ -401,6 +436,11 @@ jobs:
   times: [\"08:00\"]
   run_on_start: true
   limit: 50
+  semantic_screening:
+    # Enabling this authorizes bounded posting/profile packets to be sent to
+    # the provider configured in agent/config.yml on every job run.
+    enabled: false
+    max_jobs_per_run: 6
 
 gmail:
   enabled: true
@@ -440,6 +480,10 @@ def config_payload(config: AutomationConfig) -> dict[str, object]:
             "times": [value.strftime("%H:%M") for value in config.jobs.times],
             "run_on_start": config.jobs.run_on_start,
             "limit": config.jobs.limit,
+            "semantic_screening": {
+                "enabled": config.jobs.semantic_screening_enabled,
+                "max_jobs_per_run": config.jobs.semantic_screening_max_jobs,
+            },
         },
         "gmail": {
             "enabled": config.gmail.enabled,
@@ -654,18 +698,20 @@ def _notification_key(prefix: str, identities: Sequence[str]) -> str:
     return f"{prefix}:{digest}"
 
 
-def _interesting_jobs(path: Path) -> list[dict[str, Any]]:
+def _reviewable_jobs(path: Path) -> list[dict[str, Any]]:
     if not path.is_file():
         return []
     payload = json.loads(path.read_text(encoding="utf-8"))
-    return [
-        item
-        for item in payload.get("jobs", [])
-        if isinstance(item, dict)
-        and isinstance(item.get("prescreen"), dict)
-        and item["prescreen"].get("review_eligible") is True
-        and item["prescreen"].get("category") in INTERESTING_CATEGORIES
-    ]
+    reviewable = []
+    for item in payload.get("jobs", []):
+        if not isinstance(item, dict):
+            continue
+        prescreen = item.get("prescreen")
+        constraints = prescreen.get("constraints") if isinstance(prescreen, dict) else None
+        disposition = constraints.get("disposition") if isinstance(constraints, dict) else None
+        if not disposition:
+            reviewable.append(item)
+    return reviewable
 
 
 def job_notification(
@@ -674,26 +720,53 @@ def job_notification(
     if not matches:
         return None
     identities = [str(item.get("id", "")) for item in matches]
+    completed = []
+    unresolved = 0
+    for item in matches:
+        screen = item.get("screening")
+        if isinstance(screen, dict) and screen.get("status") == "complete":
+            result = screen.get("result")
+            if isinstance(result, dict):
+                completed.append(result)
+                continue
+        unresolved += 1
+    recommended = sum(
+        str(result.get("recommendation")) in {"pursue", "pursue_as_stretch"} for result in completed
+    )
+    verify = sum(str(result.get("recommendation")) == "verify_eligibility" for result in completed)
+    needs_review = unresolved + verify
+    additional = max(0, len(matches) - recommended - needs_review)
+    overview = (
+        f"{recommended} recommended; {needs_review} need review or screening; "
+        f"{additional} additional."
+    )
     if config.privacy == "counts-only":
-        body = f"{len(matches)} new job match(es) are ready to review."
+        body = f"{len(matches)} new job(s). {overview}"
     else:
         lines = []
         for item in matches[: config.max_items]:
-            screen = item["prescreen"]
-            reasons = list(screen.get("interest", {}).get("desired_title_terms", []))
-            reasons.extend(screen.get("interest", {}).get("interest_terms", []))
-            unique_reasons = list(dict.fromkeys(map(str, reasons)))
-            reason = f" — {', '.join(unique_reasons[:3])}" if unique_reasons else ""
+            screen = item.get("screening")
+            note = ""
+            if isinstance(screen, dict) and screen.get("status") == "complete":
+                result = screen.get("result")
+                if isinstance(result, dict):
+                    fit = str(result.get("fit") or "unknown").replace("_", " ")
+                    confidence = str(result.get("confidence") or "unknown")
+                    note = f" — {fit}, {confidence} confidence"
+            elif isinstance(screen, dict):
+                note = f" — {str(screen.get('status') or 'unscreened').replace('_', ' ')}"
+            else:
+                note = " — unscreened"
             url = str(item.get("url") or "")
             link = f" — {url}" if url.startswith(("https://", "http://")) else ""
-            lines.append(f"• {item.get('title')} at {item.get('company')}{reason}{link}")
+            lines.append(f"• {item.get('title')} at {item.get('company')}{note}{link}")
         remaining = len(matches) - len(lines)
         if remaining:
             lines.append(f"• …and {remaining} more")
-        body = f"{len(matches)} new job match(es):\n" + "\n".join(lines)
+        body = f"{len(matches)} new job(s). {overview}\n" + "\n".join(lines)
     return Notification(
         key=_notification_key("jobs", identities),
-        title="Resume Builder found new job matches",
+        title="Resume Builder found new jobs",
         body=body,
     )
 
@@ -799,15 +872,53 @@ def _run_jobs(config: AutomationConfig) -> dict[str, object]:
         raise TaskExecutionError(stage, RuntimeError("job discovery did not finalize"))
     if not jobs.DEFAULT_NEW_OUTPUT.is_file():
         raise TaskExecutionError("publish", FileNotFoundError("new-job output was not published"))
+    screening_status = "disabled"
+    screened_jobs = 0
+    recommended_jobs = 0
+    needs_review_jobs = 0
     try:
-        matches = _interesting_jobs(jobs.DEFAULT_NEW_OUTPUT)
+        matches = _reviewable_jobs(jobs.DEFAULT_NEW_OUTPUT)
+        if config.jobs.semantic_screening_enabled:
+            try:
+                agent_config = load_agent_config(DEFAULT_AGENT_CONFIG)
+                screening_limit = min(
+                    config.jobs.semantic_screening_max_jobs,
+                    agent_config.limits.max_requests,
+                )
+                queue_summary = build_screening_queue(
+                    adapter=OpenRouterAdapter(agent_config),
+                    model=agent_config.models.fast,
+                    cache_path=default_state_path().with_name("screening-cache.sqlite"),
+                    max_provider_jobs=screening_limit,
+                    allow_provider=True,
+                )
+                matches = load_notification_jobs(DEFAULT_SCREENING_OUTPUT)
+                screening_status = "complete" if queue_summary.failed == 0 else "partial"
+                screened_jobs = queue_summary.completed
+                recommended_jobs = queue_summary.recommended
+                needs_review_jobs = queue_summary.needs_review
+            except (OSError, ValueError, json.JSONDecodeError) as exc:
+                screening_status = "unavailable"
+                needs_review_jobs = len(matches)
+                _log(
+                    logging.WARNING,
+                    "semantic_screening_unavailable",
+                    stage="screen",
+                    error_category=_safe_error(exc),
+                )
+        else:
+            needs_review_jobs = len(matches)
     except (OSError, json.JSONDecodeError, TypeError) as exc:
         raise TaskExecutionError("match", exc) from exc
     return {
         "exit_code": exit_code,
         "refresh_status": refresh_status,
         "new_jobs": len(manifest.get("new_to_database_job_ids", [])),
-        "interesting_jobs": len(matches),
+        "reviewable_jobs": len(matches),
+        "screened_jobs": screened_jobs,
+        "recommended_jobs": recommended_jobs,
+        "needs_review_jobs": needs_review_jobs,
+        "screening_status": screening_status,
         "matches": matches,
     }
 
@@ -1178,6 +1289,17 @@ def _doctor(
     checks["gmail_state_is_external"] = (
         not config.gmail.enabled or not gmail_state.resolve().is_relative_to(workspace)
     )
+    if config.jobs.semantic_screening_enabled:
+        try:
+            agent_config = load_agent_config(DEFAULT_AGENT_CONFIG)
+        except (OSError, ValueError):
+            checks["semantic_screening_config"] = False
+            checks["semantic_screening_key"] = False
+        else:
+            checks["semantic_screening_config"] = True
+            checks["semantic_screening_key"] = bool(
+                os.environ.get(agent_config.api_key_env, "").strip()
+            )
     try:
         if config.notifications.sink == "discord":
             _discord_url(config.notifications)

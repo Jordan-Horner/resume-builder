@@ -9,7 +9,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from job_puller.normalize import normalized_key
 
@@ -155,6 +155,18 @@ class ColdStartPortfolio(StrictModel):
             "Ignored jobs are neutral; only explicit feedback may create a negative rule.",
         ]
     )
+
+    @model_validator(mode="after")
+    def require_unique_queries(self) -> ColdStartPortfolio:
+        ids = [item.query_id for item in self.queries]
+        normalized = [normalized_key(item.query) for item in self.queries]
+        if len(set(ids)) != len(ids):
+            raise ValueError("portfolio query IDs must be unique")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("portfolio queries must be unique")
+        if not any(item.enabled for item in self.queries):
+            raise ValueError("portfolio must have at least one enabled query")
+        return self
 
 
 def title_generation_prompt(document: ResumeDocument) -> str:

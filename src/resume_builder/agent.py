@@ -8,6 +8,7 @@ import os
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Literal
 
 from .agent_config import (
     DEFAULT_AGENT_CONFIG,
@@ -19,16 +20,30 @@ from .agent_contracts import (
     CommunicationAdapter,
     InboundMessage,
     ModelAdapter,
+    ModelReply,
     ModelRequest,
     OutboundMessage,
+    StructuredModelReply,
+    StructuredModelRequest,
 )
 from .agent_openrouter import AgentProviderError, OpenRouterAdapter
 from .agent_tools import build_read_only_tools
 from .atomic import atomic_write_text
 from .automation import default_state_path
+from .discovery_activation import (
+    DiscoveryActivationRecord,
+    activate_portfolio,
+    edit_portfolio,
+    load_portfolio,
+    preview_activation,
+    rollback_activation,
+    rollback_confirmation,
+    save_portfolio,
+)
 from .discovery_evidence import ResumeDocument, extract_query_expansion, extract_title_seed
 from .discovery_portfolio import (
     TITLE_GENERATION_INSTRUCTIONS,
+    ColdStartLane,
     build_cold_start_portfolio,
     generate_title_suggestions,
     load_cached_title_generation,
@@ -41,6 +56,10 @@ from .job_screening import (
     ScreeningResult,
     deterministic_ineligible_result,
     screening_prompt,
+)
+from .job_screening_queue import (
+    DEFAULT_SCREENING_OUTPUT,
+    build_screening_queue,
 )
 from .jobs import DEFAULT_CONFIG as DEFAULT_JOBS_CONFIG
 from .jobs import DEFAULT_PREFERENCES, get_job_screening_packet
@@ -63,6 +82,16 @@ class ConsoleAdapter(CommunicationAdapter):
 
     def send(self, message: OutboundMessage) -> None:
         self.write(message.text)
+
+
+class _LocalOnlyModelAdapter(ModelAdapter):
+    """Satisfy the batch boundary when provider use is deliberately disabled."""
+
+    def run(self, request: ModelRequest) -> ModelReply:
+        raise AssertionError("local-only screening must not make a model request")
+
+    def run_structured(self, request: StructuredModelRequest) -> StructuredModelReply:
+        raise AssertionError("local-only screening must not make a structured model request")
 
 
 class AgentService:
@@ -119,6 +148,20 @@ def _parser() -> argparse.ArgumentParser:
     )
     screen.add_argument("--refresh", action="store_true", help="Ignore an unchanged cached screen")
     screen.add_argument("--json", action="store_true", help="Print the validated result as JSON")
+    screen_new = commands.add_parser(
+        "screen-new", help="Build a complete, non-hiding screening queue for new jobs"
+    )
+    screen_new.add_argument("--input", type=Path, default=Path("job-search/new-jobs.json"))
+    screen_new.add_argument("--output", type=Path, default=DEFAULT_SCREENING_OUTPUT)
+    screen_new.add_argument("--jobs-config", type=Path, default=DEFAULT_JOBS_CONFIG)
+    screen_new.add_argument("--preferences", type=Path, default=DEFAULT_PREFERENCES)
+    screen_new.add_argument("--model-tier", choices=("fast", "reasoning"), default="fast")
+    screen_new.add_argument("--max-provider-jobs", type=int)
+    screen_new.add_argument(
+        "--confirm-send-private-data",
+        action="store_true",
+        help="Allow bounded job and profile packets to be sent to the configured provider",
+    )
     discovery = commands.add_parser(
         "discovery-plan",
         help="Create an editable cold-start search plan from one resume",
@@ -161,6 +204,29 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Replace an existing editable portfolio",
     )
+    show = commands.add_parser("discovery-show", help="Validate and list a discovery portfolio")
+    show.add_argument("--portfolio", type=Path, required=True)
+    edit = commands.add_parser("discovery-edit", help="Edit one discovery query")
+    edit.add_argument("--portfolio", type=Path, required=True)
+    action = edit.add_mutually_exclusive_group(required=True)
+    action.add_argument("--enable", metavar="QUERY_ID")
+    action.add_argument("--disable", metavar="QUERY_ID")
+    action.add_argument("--remove", metavar="QUERY_ID")
+    action.add_argument("--add", metavar="QUERY")
+    edit.add_argument("--lane", choices=tuple(item.value for item in ColdStartLane))
+    activate = commands.add_parser(
+        "discovery-activate", help="Preview or explicitly activate a reviewed portfolio"
+    )
+    activate.add_argument("--portfolio", type=Path, required=True)
+    activate.add_argument("--search-config", type=Path, default=DEFAULT_JOBS_CONFIG)
+    activate.add_argument("--backup", type=Path, required=True)
+    activate.add_argument("--record", type=Path, required=True)
+    activate.add_argument("--confirm", metavar="CONFIRMATION_HASH")
+    rollback = commands.add_parser(
+        "discovery-rollback", help="Preview or explicitly restore an activation backup"
+    )
+    rollback.add_argument("--record", type=Path, required=True)
+    rollback.add_argument("--confirm", metavar="CONFIRMATION_HASH")
     return parser
 
 
@@ -289,6 +355,76 @@ def _run_discovery_plan(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_discovery_show(args: argparse.Namespace) -> int:
+    portfolio = load_portfolio(args.portfolio.expanduser())
+    for item in portfolio.queries:
+        state = "enabled" if item.enabled else "disabled"
+        print(f"{item.query_id}\t{state}\t{item.lane.value}\t{item.query}")
+    print(f"Enabled: {sum(item.enabled for item in portfolio.queries)}")
+    return 0
+
+
+def _run_discovery_edit(args: argparse.Namespace) -> int:
+    path = args.portfolio.expanduser()
+    portfolio = load_portfolio(path)
+    if args.add is not None:
+        if args.lane is None:
+            raise ValueError("--add requires --lane")
+        operation: Literal["enable", "disable", "remove", "add"] = "add"
+        query_id, query = None, args.add
+        lane = ColdStartLane(args.lane)
+    else:
+        operation = "enable" if args.enable else "disable" if args.disable else "remove"
+        query_id = args.enable or args.disable or args.remove
+        query, lane = None, None
+    updated = edit_portfolio(
+        portfolio,
+        operation=operation,
+        query_id=query_id,
+        query=query,
+        lane=lane,
+    )
+    save_portfolio(path, updated)
+    print(f"Updated discovery portfolio: {path}")
+    return _run_discovery_show(args)
+
+
+def _run_discovery_activate(args: argparse.Namespace) -> int:
+    portfolio_path = args.portfolio.expanduser()
+    config_path = args.search_config.expanduser()
+    if args.confirm:
+        record = activate_portfolio(
+            portfolio_path,
+            config_path,
+            args.backup.expanduser(),
+            args.record.expanduser(),
+            args.confirm,
+        )
+        print(f"Activated {len(record.enabled_query_ids)} discovery queries.")
+        print("No job scan was started. Container restart behavior was not changed.")
+        return 0
+    preview = preview_activation(
+        load_portfolio(portfolio_path), config_path.read_text(encoding="utf-8")
+    )
+    print(preview.unified_diff or "No configuration changes.")
+    print(f"Confirmation hash: {preview.confirmation_hash}")
+    print("Rerun with --confirm <hash> to activate; no scan has been started.")
+    return 0
+
+
+def _run_discovery_rollback(args: argparse.Namespace) -> int:
+    record_path = args.record.expanduser()
+    record = DiscoveryActivationRecord.model_validate_json(record_path.read_text(encoding="utf-8"))
+    expected = rollback_confirmation(record)
+    if not args.confirm:
+        print(f"Rollback confirmation hash: {expected}")
+        print("Rerun with --confirm <hash> to restore the prior search configuration.")
+        return 0
+    rollback_activation(record_path, args.confirm)
+    print(f"Restored search configuration: {record.config_path}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if args.command == "init":
@@ -304,6 +440,56 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.command == "discovery-plan":
             return _run_discovery_plan(args)
+        if args.command == "discovery-show":
+            return _run_discovery_show(args)
+        if args.command == "discovery-edit":
+            return _run_discovery_edit(args)
+        if args.command == "discovery-activate":
+            return _run_discovery_activate(args)
+        if args.command == "discovery-rollback":
+            return _run_discovery_rollback(args)
+        if args.command == "screen-new" and not args.confirm_send_private_data:
+            try:
+                local_config = load_agent_config(args.config)
+            except ValueError:
+                local_config = None
+            maximum = args.max_provider_jobs or (
+                local_config.limits.max_requests if local_config is not None else 6
+            )
+            if local_config is not None and maximum > local_config.limits.max_requests:
+                raise ValueError(
+                    "--max-provider-jobs cannot exceed agent limits.max_requests "
+                    f"({local_config.limits.max_requests})"
+                )
+            model = (
+                getattr(local_config.models, args.model_tier)
+                if local_config is not None
+                else "unconfigured"
+            )
+            summary = build_screening_queue(
+                adapter=_LocalOnlyModelAdapter(),
+                model=model,
+                cache_path=args.state.with_name("screening-cache.sqlite"),
+                input_path=args.input.expanduser(),
+                output_path=args.output.expanduser(),
+                config_path=args.jobs_config.expanduser(),
+                preferences_path=args.preferences.expanduser(),
+                max_provider_jobs=maximum,
+                allow_provider=False,
+            )
+            print(
+                json.dumps(
+                    {
+                        **summary.__dict__,
+                        "cost_usd": str(summary.cost_usd),
+                        "output": str(args.output.expanduser()),
+                        "provider_authorized": False,
+                        "agent_configured": local_config is not None,
+                    },
+                    indent=2,
+                )
+            )
+            return 0
         config = load_agent_config(args.config)
         if args.command == "doctor":
             doctor_result = _doctor(config)
@@ -347,6 +533,36 @@ def main(argv: Sequence[str] | None = None) -> int:
                 screen_result.model_dump_json(indent=2)
                 if args.json
                 else _render_screen(screen_result, cached=cached)
+            )
+            return 0
+        if args.command == "screen-new":
+            maximum = args.max_provider_jobs or config.limits.max_requests
+            if maximum > config.limits.max_requests:
+                raise ValueError(
+                    "--max-provider-jobs cannot exceed agent limits.max_requests "
+                    f"({config.limits.max_requests})"
+                )
+            summary = build_screening_queue(
+                adapter=OpenRouterAdapter(config),
+                model=getattr(config.models, args.model_tier),
+                cache_path=args.state.with_name("screening-cache.sqlite"),
+                input_path=args.input.expanduser(),
+                output_path=args.output.expanduser(),
+                config_path=args.jobs_config.expanduser(),
+                preferences_path=args.preferences.expanduser(),
+                max_provider_jobs=maximum,
+                allow_provider=args.confirm_send_private_data,
+            )
+            print(
+                json.dumps(
+                    {
+                        **summary.__dict__,
+                        "cost_usd": str(summary.cost_usd),
+                        "output": str(args.output.expanduser()),
+                        "provider_authorized": args.confirm_send_private_data,
+                    },
+                    indent=2,
+                )
             )
             return 0
         service = AgentService(config, OpenRouterAdapter(config), args.state)

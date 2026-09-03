@@ -22,7 +22,7 @@ def build_read_only_tools(state_path: Path) -> tuple[AgentTool, ...]:
         }
 
     def list_new_job_matches(limit: int = 10) -> list[dict[str, object]]:
-        """List sanitized new jobs that deterministic prescreening marked for review."""
+        """List sanitized new jobs in newest-first review order."""
         if not 1 <= limit <= 25:
             raise ValueError("limit must be from 1 to 25")
         if not jobs.DEFAULT_NEW_OUTPUT.is_file():
@@ -36,18 +36,23 @@ def build_read_only_tools(state_path: Path) -> tuple[AgentTool, ...]:
             if not isinstance(item, dict):
                 continue
             screen = item.get("prescreen")
-            if not isinstance(screen, dict) or screen.get("review_eligible") is not True:
+            if not isinstance(screen, dict):
+                screen = {}
+            constraints = screen.get("constraints")
+            disposition = constraints.get("disposition") if isinstance(constraints, dict) else None
+            if disposition:
                 continue
-            readiness = screen.get("keyword_readiness")
             matches.append(
                 {
                     "id": item.get("id"),
                     "title": item.get("title"),
                     "company": item.get("company"),
                     "url": item.get("url"),
-                    "category": screen.get("category"),
-                    "keyword_readiness_percent": (
-                        readiness.get("percent") if isinstance(readiness, dict) else None
+                    "queue_state": screen.get("queue_state"),
+                    "hard_conflicts": (
+                        screen.get("constraints", {}).get("hard_conflicts", [])
+                        if isinstance(screen.get("constraints"), dict)
+                        else []
                     ),
                 }
             )
@@ -63,7 +68,7 @@ def build_read_only_tools(state_path: Path) -> tuple[AgentTool, ...]:
         ),
         AgentTool(
             name="list_new_job_matches",
-            description="List sanitized newly discovered jobs marked as worth reviewing.",
+            description="List sanitized newly discovered jobs in newest-first order.",
             handler=list_new_job_matches,
         ),
     )

@@ -8,6 +8,7 @@ from typing import Any, cast
 from .agent_config import AgentConfig
 from .agent_contracts import (
     ModelAdapter,
+    ModelProviderError,
     ModelReply,
     ModelRequest,
     StructuredModelReply,
@@ -15,7 +16,7 @@ from .agent_contracts import (
 )
 
 
-class AgentProviderError(RuntimeError):
+class AgentProviderError(ModelProviderError):
     """Report a provider failure without retaining provider content."""
 
 

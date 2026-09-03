@@ -116,6 +116,26 @@ def test_default_config_uses_daily_jobs_and_low_frequency_gmail(tmp_path: Path) 
     assert config.jobs.times == (time(8),)
     assert config.gmail.every == timedelta(hours=4)
     assert config.notifications.sink == "console"
+    assert config.jobs.semantic_screening_enabled is False
+    assert config.jobs.semantic_screening_max_jobs == 6
+
+
+def test_config_accepts_explicit_bounded_semantic_screening(tmp_path: Path) -> None:
+    path = tmp_path / "config.yml"
+    write_config(
+        path,
+        jobs={
+            "enabled": True,
+            "times": ["08:00"],
+            "run_on_start": False,
+            "semantic_screening": {"enabled": True, "max_jobs_per_run": 4},
+        },
+    )
+
+    config = load_config(path)
+
+    assert config.jobs.semantic_screening_enabled is True
+    assert config.jobs.semantic_screening_max_jobs == 4
 
 
 def test_config_accepts_two_daily_job_times(tmp_path: Path) -> None:
@@ -206,10 +226,7 @@ def test_job_notification_ignores_empty_results_and_explains_matches() -> None:
         "company": "Example",
         "url": "https://example.invalid/jobs/1",
         "prescreen": {
-            "interest": {
-                "desired_title_terms": ["support engineer"],
-                "interest_terms": ["cloud"],
-            }
+            "queue_state": "hard_conflict",
         },
     }
 
@@ -218,7 +235,8 @@ def test_job_notification_ignores_empty_results_and_explains_matches() -> None:
 
     assert result is not None
     assert "Cloud Support Engineer at Example" in result.body
-    assert "support engineer, cloud" in result.body
+    assert "unscreened" in result.body
+    assert "0 recommended; 1 need review or screening" in result.body
 
 
 def test_counts_only_notification_omits_company_and_role() -> None:
@@ -334,7 +352,7 @@ def test_task_history_excludes_job_match_details(tmp_path: Path) -> None:
         state=state,
         job_runner=lambda: {
             "new_jobs": 1,
-            "interesting_jobs": 1,
+            "reviewable_jobs": 1,
             "matches": [
                 {
                     "id": "job-1",
@@ -478,6 +496,64 @@ def test_unfinalized_job_manifest_is_a_publish_failure(
     assert captured_error.value.stage == "publish"
 
 
+def test_semantic_screening_failure_does_not_turn_collection_into_a_retry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    config_path = tmp_path / "config.yml"
+    write_config(
+        config_path,
+        jobs={
+            "enabled": True,
+            "times": ["08:00"],
+            "run_on_start": False,
+            "semantic_screening": {"enabled": True, "max_jobs_per_run": 2},
+        },
+    )
+    manifest = tmp_path / "latest-refresh.json"
+    manifest.write_text(
+        '{"status":"complete","new_to_database_job_ids":["job-1"]}', encoding="utf-8"
+    )
+    new_jobs = tmp_path / "new-jobs.json"
+    new_jobs.write_text(
+        json.dumps(
+            {
+                "jobs": [
+                    {
+                        "id": "job-1",
+                        "title": "Fictional Role",
+                        "company": "Fictional Company",
+                        "prescreen": {"review_eligible": True},
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    calls = 0
+
+    def collect(_argv: list[str]) -> int:
+        nonlocal calls
+        calls += 1
+        return 0
+
+    monkeypatch.setattr(jobs_module, "DEFAULT_LATEST_REFRESH", manifest)
+    monkeypatch.setattr(jobs_module, "DEFAULT_NEW_OUTPUT", new_jobs)
+    monkeypatch.setattr(jobs_module, "main", collect)
+    monkeypatch.setattr(
+        "resume_builder.automation.load_agent_config",
+        lambda _path: (_ for _ in ()).throw(ValueError("fictional invalid config")),
+    )
+
+    result = _run_jobs(load_config(config_path))
+
+    assert calls == 1
+    assert result["refresh_status"] == "complete"
+    assert result["screening_status"] == "unavailable"
+    assert result["needs_review_jobs"] == 1
+    assert len(result["matches"]) == 1
+    assert "semantic_screening_unavailable" in caplog.text
+
+
 def test_restart_with_persistent_state_does_not_rescan(
     tmp_path: Path, configured_logs: Callable[[], None]
 ) -> None:
@@ -518,7 +594,7 @@ def test_partial_job_coverage_is_visible_without_discarding_matches(tmp_path: Pa
         job_runner=lambda: {
             "refresh_status": "partial",
             "new_jobs": 1,
-            "interesting_jobs": 0,
+            "reviewable_jobs": 0,
             "matches": [],
         },
     )

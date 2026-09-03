@@ -133,6 +133,38 @@ Onsite and hybrid roles use `accepted_location_terms`. Setting
 supplying terms restricts remote eligibility to those areas, while omitting the
 field preserves the legacy shared-location behavior.
 
+## Screen a complete new-job queue
+
+The batch command reuses the same per-job `ScreeningResult`; it does not create
+a second category vocabulary:
+
+```bash
+# Local only: reuse cached/deterministic results and expose unscreened jobs.
+resume-builder agent screen-new
+
+# Explicitly authorize bounded provider-backed screening for this run.
+resume-builder agent screen-new --confirm-send-private-data
+```
+
+The local-only form also works before `agent init`; without a configured model
+name it cannot reuse model-specific cache entries, but it still records
+deterministic outcomes and every unscreened job without contacting a provider.
+
+`job-search/new-job-screens.json` contains two deliberately different views.
+`jobs` preserves the source's newest-first order and includes every job.
+`suggested_order` contains every active job ID exactly once, ordered by the
+existing recommendation and then confidence. A high-confidence weak fit remains
+below a low-confidence strong fit; confidence describes certainty, not value.
+Provider failures, exhausted budgets, and missing authorization remain visible
+as `failed` or `unscreened`. Only a durable application disposition removes a
+job from the active view.
+
+Each uncached eligible job is a separate bounded provider request. The command
+will not exceed the lower of `--max-provider-jobs` and
+`agent/config.yml`'s `limits.max_requests`. Its summary records provider
+attempts and total reported cost without storing credentials or unvalidated
+provider responses.
+
 ## Create a cold-start discovery portfolio
 
 The agent can propose a broad first search portfolio from one general resume
@@ -160,10 +192,54 @@ only after reviewing the current draft. The portfolio remains
 `draft-review-required`; the command neither edits the active job-search
 configuration nor starts a scan.
 
+## Review and activate discovery
+
+Validate and edit the draft before activation:
+
+```bash
+resume-builder agent discovery-show \
+  --portfolio build/job-search/cold-start-portfolio.json
+resume-builder agent discovery-edit \
+  --portfolio build/job-search/cold-start-portfolio.json \
+  --disable <query-id>
+resume-builder agent discovery-edit \
+  --portfolio build/job-search/cold-start-portfolio.json \
+  --add "Incident Operations Engineer" \
+  --lane adjacent_title
+```
+
+Activation is a two-step local operation. First preview the exact diff:
+
+```bash
+resume-builder agent discovery-activate \
+  --portfolio build/job-search/cold-start-portfolio.json \
+  --search-config job-search/config/search.yml \
+  --backup build/job-search/search-before-discovery.yml \
+  --record build/job-search/discovery-activation.json
+```
+
+Rerun with `--confirm <hash>` to apply it. Existing manual families, location,
+work modes, provider settings, request delays, and result limits are preserved.
+Managed discovery families from an earlier activation are replaced rather than
+duplicated. Capability combinations run only as commercial-provider queries;
+direct ATS boards retain strict title-family admission.
+
+Activation writes the exact previous configuration and a hash-pinned record but
+does not start a scan. Preview rollback with:
+
+```bash
+resume-builder agent discovery-rollback \
+  --record build/job-search/discovery-activation.json
+```
+
+Rollback refuses to overwrite a search configuration changed after activation.
+Use the printed rollback hash with `--confirm` only after reviewing the record.
+
 ## Current safety boundary
 
 The agent cannot edit resumes, mutate applications, send email, run a scan, or
-apply for a job. It can create an inactive discovery draft. Normal conversation
+apply for a job. It can create, review, and explicitly activate a discovery
+portfolio. Normal conversation
 can inspect content-free automation status and a sanitized subset of newly
 discovered jobs. The direct screen command can
 send one explicitly previewable private packet only when the user provides the

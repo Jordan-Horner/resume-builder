@@ -127,6 +127,7 @@ def _screen_snapshot(workspace: Path, job_id: str | None) -> dict[str, Any] | No
                         "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                         "prescreen_version": payload.get("prescreen_version"),
                         "analysis_key": item.get("analysis_key"),
+                        "queue_state": prescreen.get("queue_state"),
                         "category": prescreen.get("category"),
                     },
                 )
@@ -380,7 +381,11 @@ def build_record(args: argparse.Namespace, workspace: Path) -> dict[str, Any]:
         "application_url": _optional(args.url),
         "role_family": _optional(args.role_family),
         "screen_category": _optional(args.screen_category)
-        or (screen_snapshot.get("category") if screen_snapshot else None),
+        or (
+            screen_snapshot.get("queue_state") or screen_snapshot.get("category")
+            if screen_snapshot
+            else None
+        ),
         "screen_snapshot": screen_snapshot,
         "match_classification": _optional(args.match_classification),
         "match_report": _artifact(getattr(args, "match_report", None), workspace),

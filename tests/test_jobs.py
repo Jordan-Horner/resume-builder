@@ -55,7 +55,7 @@ def preferences(**updates):
 def test_prescreen_separates_interest_constraints_and_keyword_readiness():
     result = _prescreen(job(), preferences(), {"python", "api", "incident", "cloud"})
 
-    assert result["category"] == "SCREEN NEXT"
+    assert result["queue_state"] == "ready"
     assert result["interest"]["desired_title_terms"] == ["production support engineer"]
     assert result["constraints"]["work_mode_match"] is True
     assert "not an ATS score" in result["keyword_readiness"]["method"]
@@ -67,8 +67,10 @@ def test_prescreen_keeps_unwanted_and_mode_mismatch_distinct():
     )
     onsite = _prescreen(job(work_modes=["onsite"]), preferences(), {"python"})
 
-    assert unwanted["category"] == "EASY BUT UNWANTED"
-    assert onsite["category"] == "SKIP"
+    assert unwanted["queue_state"] == "ready"
+    assert unwanted["constraints"]["unwanted_title_terms"] == ["computer repair"]
+    assert onsite["queue_state"] == "hard_conflict"
+    assert onsite["review_eligible"] is True
     assert onsite["constraints"]["work_mode_match"] is False
 
 
@@ -84,7 +86,7 @@ def test_prescreen_does_not_apply_onsite_location_terms_to_remote_jobs():
         {"python", "api", "incident", "cloud"},
     )
 
-    assert result["category"] == "SCREEN NEXT"
+    assert result["queue_state"] == "ready"
     assert result["constraints"]["location_match"] is False
 
 
@@ -100,7 +102,7 @@ def test_prescreen_hides_only_jobs_with_terminal_dispositions():
         {"python", "api", "incident", "cloud"},
     )
 
-    assert applied["category"] == "APPLIED"
+    assert applied["queue_state"] == "applied"
     assert applied["review_eligible"] is False
     assert applied["constraints"]["disposition"] == "applied"
     assert other["review_eligible"] is True
@@ -179,11 +181,11 @@ def test_application_history_overlays_legacy_dispositions(tmp_path: Path):
     }
 
 
-def test_prescreen_never_promotes_badly_parsed_inventory():
+def test_prescreen_keeps_badly_parsed_inventory_visible_for_review():
     result = _prescreen(job(company=""), preferences(), {"python", "api", "incident", "cloud"})
 
-    assert result["category"] == "NEEDS REVIEW"
-    assert result["review_eligible"] is False
+    assert result["queue_state"] == "needs_description"
+    assert result["review_eligible"] is True
     assert result["keyword_readiness"]["percent"] <= 100
 
 
@@ -204,9 +206,11 @@ def test_prescreen_applies_configurable_title_and_location_filters():
         {"python", "api", "incident", "cloud"},
     )
 
-    assert foreign["review_eligible"] is False
+    assert foreign["review_eligible"] is True
+    assert foreign["queue_state"] == "hard_conflict"
     assert foreign["constraints"]["excluded_location_terms"] == ["UK"]
-    assert excluded_title["review_eligible"] is False
+    assert excluded_title["review_eligible"] is True
+    assert excluded_title["queue_state"] == "hard_conflict"
     assert excluded_title["constraints"]["excluded_title_terms"] == ["director"]
     assert mixed["review_eligible"] is True
     assert mixed["constraints"]["accepted_location_terms"] == ["United States"]
@@ -220,7 +224,8 @@ def test_location_term_matching_does_not_treat_australia_as_us():
     )
 
     assert result["constraints"]["accepted_location_terms"] == []
-    assert result["review_eligible"] is False
+    assert result["review_eligible"] is True
+    assert result["queue_state"] == "hard_conflict"
 
 
 def test_prescreen_cache_invalidates_when_normalized_location_changes():
@@ -258,17 +263,30 @@ def test_senior_roles_are_allowed_only_for_configured_role_families():
     assert qualified_family["constraints"]["seniority_match"] is True
     assert qualified_family["review_eligible"] is True
     assert unrelated_family["constraints"]["seniority_match"] is False
-    assert unrelated_family["review_eligible"] is False
+    assert unrelated_family["review_eligible"] is True
+    assert unrelated_family["queue_state"] == "hard_conflict"
 
 
-def test_review_csv_contains_only_eligible_jobs_sorted_by_title_and_salary(tmp_path: Path):
+def test_review_csv_contains_reviewable_jobs_sorted_newest_first(tmp_path: Path):
     results = [
         {
-            **job(title="SRE", company="Lower", salary_min=100000, salary_max=120000),
+            **job(
+                title="SRE",
+                company="Lower",
+                salary_min=100000,
+                salary_max=120000,
+                posted_at="2026-09-01T12:00:00Z",
+            ),
             "prescreen": {"review_eligible": True},
         },
         {
-            **job(title="SRE", company="Higher", salary_min=140000, salary_max=160000),
+            **job(
+                title="SRE",
+                company="Higher",
+                salary_min=140000,
+                salary_max=160000,
+                posted_at="2026-09-02T12:00:00+00:00",
+            ),
             "prescreen": {"review_eligible": True},
         },
         {
