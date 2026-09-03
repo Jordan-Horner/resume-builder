@@ -195,6 +195,24 @@ diagnostic—not an ATS score or a hiring prediction. Ask the agent to screen a
 job ID for the deeper semantic evidence review; only jobs you choose
 to pursue become tracked target snapshots.
 
+New-job semantic screening also writes a separate shadow-personalized order.
+It uses explicit preferences and previously applied-to role titles only as
+positive signals, never treats an ignored job as negative feedback, and keeps
+an exploration sample to reduce preference narrowing. Shadow personalization
+cannot hide jobs or change notifications; the canonical queue remains complete.
+
+Compare LinkedIn and Indeed after a completed refresh without starting another
+provider scan:
+
+```bash
+resume-builder jobs compare-providers
+```
+
+The report compares canonical overlap and each provider's unique contribution
+within the same frozen scan window. If semantic screens exist, it separately
+reports useful unique jobs. Raw result volume is never treated as proof that one
+provider has better recall or relevance.
+
 Provider refreshes retain typed outcomes (`healthy`, `healthy-empty`, `capped`,
 `partial`, `blocked`, or `failed`). Transient empty failures receive one bounded
 retry, `jobs status` shows each source's latest state and problem streak, and

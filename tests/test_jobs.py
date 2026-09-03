@@ -345,6 +345,24 @@ def test_preferences_reject_unknown_screening_profile_fields(tmp_path: Path):
         _load_preferences(path)
 
 
+def test_preferences_validate_shadow_personalization(tmp_path: Path):
+    path = tmp_path / "preferences.yml"
+    path.write_text(
+        """\
+schema_version: 1
+personalization:
+  enabled: true
+  mode: shadow
+  exploration_fraction: 0.2
+""",
+        encoding="utf-8",
+    )
+
+    loaded = _load_preferences(path)
+
+    assert loaded["personalization"]["mode"] == "shadow"
+
+
 def test_shared_screening_packet_uses_active_inventory_and_bounded_profile(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):

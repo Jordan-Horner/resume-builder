@@ -10,7 +10,9 @@ from pathlib import Path
 from typing import Any
 
 from .agent_contracts import ModelAdapter, ModelProviderError
+from .applications import applied_job_ids
 from .atomic import atomic_write_json, atomic_write_text
+from .job_personalization import build_shadow_order
 from .job_screening import (
     Confidence,
     FitOutcome,
@@ -18,7 +20,15 @@ from .job_screening import (
     ScreeningCache,
     ScreeningResult,
 )
-from .jobs import DEFAULT_CONFIG, DEFAULT_NEW_OUTPUT, DEFAULT_PREFERENCES, get_job_screening_packet
+from .jobs import (
+    DEFAULT_CONFIG,
+    DEFAULT_NEW_OUTPUT,
+    DEFAULT_PREFERENCES,
+    _database,
+    _load_preferences,
+    _with_application_dispositions,
+    get_job_screening_packet,
+)
 from .screening_service import ScreeningService
 
 DEFAULT_SCREENING_OUTPUT = Path("job-search/new-job-screens.json")
@@ -59,6 +69,7 @@ def _job_view(job: dict[str, Any], *, source_order: int, active: bool) -> dict[s
         constraints = prescreen.get("constraints")
         view["deterministic"] = {
             "queue_state": prescreen.get("queue_state"),
+            "interest": prescreen.get("interest", {}),
             "hard_conflicts": (
                 constraints.get("hard_conflicts", []) if isinstance(constraints, dict) else []
             ),
@@ -221,6 +232,33 @@ def build_screening_queue(
         items.append(item)
 
     ordered = sorted((item for item in items if item["active"]), key=_priority)
+    preferences = (
+        _with_application_dispositions(_load_preferences(preferences_path))
+        if preferences_path.exists()
+        else {}
+    )
+    dispositions = preferences.get("job_dispositions") or {}
+    positive_ids = applied_job_ids() | {
+        str(job_id) for job_id, status in dispositions.items() if status == "applied"
+    }
+    positive_titles = (
+        [
+            str(job.get("title") or "")
+            for job in _database(config_path).active_inventory()
+            if str(job.get("id") or "") in positive_ids
+        ]
+        if positive_ids
+        else []
+    )
+    shadow_order, shadow_scores = build_shadow_order(
+        items,
+        preferences=preferences,
+        positive_titles=positive_titles,
+    )
+    for item in items:
+        job_id = str(item.get("id") or "")
+        if job_id in shadow_scores:
+            item["shadow_personalization"] = shadow_scores[job_id]
     summary = _summary(items, provider_calls, input_tokens, output_tokens, total_cost)
     output = {
         "schema_version": SCREENING_QUEUE_SCHEMA_VERSION,
@@ -235,6 +273,14 @@ def build_screening_queue(
         "jobs": items,
         # Advisory ordering only. Every active job appears exactly once.
         "suggested_order": [str(item.get("id") or "") for item in ordered],
+        # Evaluation-only ordering. Notifications and canonical completeness do not use it.
+        "shadow_personalized_order": shadow_order,
+        "personalization_policy": {
+            "mode": "shadow",
+            "changes_visibility": False,
+            "changes_notifications": False,
+            "ignored_jobs_are_negative_feedback": False,
+        },
     }
     atomic_write_json(output_path, output)
     lines = [

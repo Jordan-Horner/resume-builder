@@ -29,6 +29,11 @@ resume_globs:
 # unknown: the screener will report uncertainty instead of inventing an answer.
 # These are per-workspace facts, never product-wide defaults.
 screening_profile: {}
+personalization:
+  # Shadow mode produces an evaluation order but cannot hide jobs or change notifications.
+  enabled: true
+  mode: shadow
+  exploration_fraction: 0.15
 # Optional screening facts can be added when known:
 # screening_profile:
 #   requires_sponsorship: null

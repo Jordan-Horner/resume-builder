@@ -34,6 +34,7 @@ DEFAULT_REVIEW_OUTPUT = Path("job-search/jobs-review.csv")
 DEFAULT_NEW_OUTPUT = Path("job-search/new-jobs.json")
 DEFAULT_NEW_REVIEW_OUTPUT = Path("job-search/new-jobs-review.csv")
 DEFAULT_LATEST_REFRESH = Path("job-search/latest-refresh.json")
+DEFAULT_PROVIDER_COMPARISON = Path("job-search/provider-comparison.json")
 PRESCREEN_VERSION = 6
 TOKEN = re.compile(r"[a-z][a-z0-9+#.]{2,}")
 PHRASE_TOKEN = re.compile(r"[a-z0-9]+")
@@ -91,6 +92,13 @@ def parser() -> argparse.ArgumentParser:
     reposts.add_argument("--window-days", type=int, default=90)
     reposts.add_argument("--min-span-days", type=int, default=1)
     reposts.add_argument("--aggregator", action="append", default=[])
+    comparison = commands.add_parser(
+        "compare-providers",
+        help="Compare LinkedIn and Indeed canonical deltas from one completed refresh",
+    )
+    comparison.add_argument("--refresh", type=Path, default=DEFAULT_LATEST_REFRESH)
+    comparison.add_argument("--screens", type=Path, default=Path("job-search/new-job-screens.json"))
+    comparison.add_argument("--output", type=Path, default=DEFAULT_PROVIDER_COMPARISON)
     return command_parser
 
 
@@ -129,6 +137,7 @@ def _load_preferences(path: Path) -> dict[str, Any]:
         "minimum_salary",
         "resume_globs",
         "screening_profile",
+        "personalization",
     }
     unknown = set(payload) - allowed
     if unknown:
@@ -170,11 +179,22 @@ def _load_preferences(path: Path) -> dict[str, Any]:
     if not isinstance(screening_profile, dict):
         raise ValueError("screening_profile must be a mapping")
     profile_from_preferences(payload)
+    from .job_personalization import load_shadow_settings
+
+    load_shadow_settings(payload)
     return payload
 
 
 def _hash_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _file_hash(path: Path) -> str | None:
+    """Hash an existing policy input without making test or recovery fixtures mandatory."""
+    try:
+        return _hash_text(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None
 
 
 def _prescreen_job_hash(job: dict[str, Any]) -> str:
@@ -587,6 +607,8 @@ def _new_jobs_unlocked(
         "completed_at": None,
         "provider_selection": selected_providers or ["all_enabled"],
         "new_to_database_job_ids": [],
+        "search_config_hash": _file_hash(config_path),
+        "preference_hash": _file_hash(preferences_path),
     }
     atomic_write_json(DEFAULT_LATEST_REFRESH, manifest)
 
@@ -706,6 +728,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                     sort_keys=True,
                 )
             )
+            return 0
+        if args.command == "compare-providers":
+            from .provider_comparison import compare_providers, write_provider_comparison
+
+            comparison = compare_providers(
+                _database(config_path),
+                manifest_path=args.refresh.expanduser(),
+                screening_path=args.screens.expanduser(),
+            )
+            write_provider_comparison(comparison, args.output.expanduser())
+            print(comparison.markdown, end="")
+            print(f"Saved: {args.output.expanduser()}")
             return 0
         config = load_config(config_path)
         inventory = {str(job["id"]): job for job in _database(config_path).active_inventory()}

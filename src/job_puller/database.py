@@ -1115,6 +1115,39 @@ class InventoryDatabase:
                 )
             }
 
+    def provider_window_jobs(
+        self,
+        started_at: datetime,
+        completed_at: datetime,
+        providers: set[str],
+    ) -> list[dict[str, object]]:
+        """Return canonical jobs observed by selected providers in one fixed window."""
+        if completed_at < started_at:
+            raise ValueError("provider comparison window ends before it starts")
+        if not providers:
+            return []
+        placeholders = ",".join("?" for _ in providers)
+        with self.connect() as conn:
+            rows = conn.execute(
+                f"""SELECT o.provider, j.id AS job_id, j.display_title AS title,
+                            j.display_company AS company,
+                            MAX(CASE WHEN o.description_quality='complete' THEN 1 ELSE 0 END)
+                                AS complete_description,
+                            MAX(CASE WHEN o.posted_at IS NOT NULL THEN 1 ELSE 0 END)
+                                AS has_posted_at,
+                            MAX(CASE WHEN o.location_raw<>'' THEN 1 ELSE 0 END)
+                                AS has_location
+                     FROM observations o
+                     JOIN job_observation_links l ON l.observation_id=o.id
+                     JOIN jobs j ON j.id=l.job_id
+                     WHERE o.provider IN ({placeholders})
+                       AND o.last_seen_at>=? AND o.last_seen_at<=?
+                     GROUP BY o.provider, j.id
+                     ORDER BY o.provider, j.id""",
+                (*sorted(providers), _iso(started_at), _iso(completed_at)),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def scrape_runs_since(self, started_at: datetime) -> list[dict[str, object]]:
         """Return provider coverage recorded during one orchestration refresh."""
         with self.connect() as conn:

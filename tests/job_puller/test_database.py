@@ -319,6 +319,43 @@ def test_repeated_observation_is_idempotent(tmp_path):
     assert db.stats()["observations"] == 1
 
 
+def test_provider_window_jobs_uses_canonical_identity_and_fixed_observation_window(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    observed_at = datetime.now(UTC)
+    canonical = "https://example.com/jobs/shared"
+    db.record_result(
+        result(
+            observation(
+                provider="linkedin",
+                job_id="linkedin-shared",
+                direct=canonical,
+            ),
+            observed_at,
+        )
+    )
+    db.record_result(
+        result(
+            observation(
+                provider="indeed",
+                job_id="indeed-shared",
+                source="https://indeed.com/viewjob?jk=shared",
+                direct=canonical,
+            ),
+            observed_at,
+        )
+    )
+
+    rows = db.provider_window_jobs(
+        observed_at - timedelta(minutes=1),
+        observed_at + timedelta(minutes=1),
+        {"linkedin", "indeed"},
+    )
+
+    assert {row["provider"] for row in rows} == {"linkedin", "indeed"}
+    assert len({row["job_id"] for row in rows}) == 1
+
+
 def test_provider_identity_survives_url_change(tmp_path):
     db = InventoryDatabase(tmp_path / "inventory.db")
     db.migrate()

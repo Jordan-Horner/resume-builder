@@ -125,6 +125,12 @@ def test_queue_keeps_every_job_and_bounds_provider_work(
     assert [item["id"] for item in payload["jobs"]] == ["recommended", "blocked", "waiting"]
     assert all("description_text" not in item for item in payload["jobs"])
     assert set(payload["suggested_order"]) == {"recommended", "blocked", "waiting"}
+    assert set(payload["shadow_personalized_order"]) == {
+        "recommended",
+        "blocked",
+        "waiting",
+    }
+    assert payload["personalization_policy"]["changes_notifications"] is False
     assert payload["suggested_order"][0] == "recommended"
     assert summary.active == 3
     assert summary.completed == 2

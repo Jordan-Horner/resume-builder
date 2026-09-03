@@ -159,6 +159,31 @@ Provider failures, exhausted budgets, and missing authorization remain visible
 as `failed` or `unscreened`. Only a durable application disposition removes a
 job from the active view.
 
+`shadow_personalized_order` is a third, evaluation-only view. It contains every
+active job exactly once and cannot affect `suggested_order`, notifications, or
+visibility. Its explainable score may use explicit preference matches,
+structured semantic fit, and title similarity to previously applied-to jobs as
+positive evidence. Ignored jobs and reasonless `not_interested` dispositions
+are never learned as negative rules. A configurable exploration fraction
+interleaves lower-ranked jobs so shadow evaluation can reveal useful
+opportunities that personalization would otherwise push down.
+
+Configure only the safe shadow behavior in `job-search/preferences.yml`:
+
+```yaml
+personalization:
+  enabled: true
+  mode: shadow
+  exploration_fraction: 0.15
+```
+
+After a complete refresh, `resume-builder jobs compare-providers` creates a
+same-window LinkedIn/Indeed report under `job-search/`. The refresh manifest
+pins hashes of both search configuration and preferences. The report uses
+canonical job identities, separates shared from unique provider contributions,
+and counts useful unique jobs only when a completed semantic screen is
+available. It does not contact either provider or claim exhaustive recall.
+
 Each uncached eligible job is a separate bounded provider request. The command
 will not exceed the lower of `--max-provider-jobs` and
 `agent/config.yml`'s `limits.max_requests`. Its summary records provider
