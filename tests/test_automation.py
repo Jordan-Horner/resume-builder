@@ -275,7 +275,7 @@ def test_outbox_deduplicates_and_survives_delivery_failure(tmp_path: Path) -> No
     assert state.pending_notifications() == []
 
 
-def test_pending_routine_notification_does_not_make_status_unhealthy(
+def test_healthcheck_requires_the_running_service_lock(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     workspace = tmp_path / "workspace"
@@ -287,9 +287,14 @@ def test_pending_routine_notification_does_not_make_status_unhealthy(
     state_path = tmp_path / "runtime" / "automation.sqlite"
     state = AutomationState(state_path)
     state.enqueue(Notification("routine", "Jobs", "One match"))
+    state.record_run("jobs", datetime.now(UTC), "failed", {}, "ProviderError")
     monkeypatch.chdir(workspace)
 
-    assert automation_main(["--state", str(state_path), "status", "--healthcheck"]) == 0
+    assert automation_main(["--state", str(state_path), "status", "--healthcheck"]) == 2
+    assert json.loads(capsys.readouterr().out)["healthy"] is False
+
+    with state.locked():
+        assert automation_main(["--state", str(state_path), "status", "--healthcheck"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["healthy"] is True
     assert payload["pending_notifications"] == 1

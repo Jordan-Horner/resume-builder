@@ -560,6 +560,7 @@ class AutomationState:
         descriptor = os.open(self.path, os.O_WRONLY | os.O_CREAT, 0o600)
         os.close(descriptor)
         os.chmod(self.path, 0o600)
+
         with sqlite3.connect(self.path) as connection:
             connection.executescript(
                 """
@@ -586,6 +587,19 @@ class AutomationState:
                 """
             )
         os.chmod(self.path, 0o600)
+
+    def service_is_running(self) -> bool:
+        """Return whether another process holds the scheduler's exclusive lock."""
+        lock_path = self.path.with_suffix(f"{self.path.suffix}.lock")
+        if not lock_path.is_file():
+            return False
+        with lock_path.open("r+", encoding="utf-8") as stream:
+            try:
+                fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return True
+            fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+        return False
 
     def record_run(
         self,
@@ -1376,12 +1390,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0 if result["healthy"] else 2
         if args.command == "status":
             result = state.status()
-            task_statuses = result["tasks"]
-            healthy = isinstance(task_statuses, dict) and all(
-                item is None
-                or (isinstance(item, dict) and item.get("status") in {"success", "partial"})
-                for item in task_statuses.values()
-            )
+            if args.healthcheck:
+                healthy = state.service_is_running()
+            else:
+                task_statuses = result["tasks"]
+                healthy = isinstance(task_statuses, dict) and all(
+                    item is None
+                    or (isinstance(item, dict) and item.get("status") in {"success", "partial"})
+                    for item in task_statuses.values()
+                )
             result["healthy"] = healthy
             print(json.dumps(result, indent=2))
             return 0 if healthy or not args.healthcheck else 2

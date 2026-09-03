@@ -173,7 +173,10 @@ safe as long as the same `/state` mount is retained.
 The image runs as a non-root user, exposes no port, has a built-in health check,
 and mounts rather than copies private data. Docker probes readiness every 30
 seconds after a short startup grace period, so container dashboards do not stay
-in a misleading deploying state for several minutes:
+in a misleading deploying state for several minutes. The probe verifies that
+the scheduler process holds its exclusive service lock; scan failures remain
+visible in task status and alerts without incorrectly marking the container
+itself unhealthy:
 
 ```text
 private workspace  -> /workspace
