@@ -1,55 +1,63 @@
 # Resume Builder
 
-**Keep the strongest parts of every resume version, then build honest, targeted
-resumes without starting over.**
+[![CI](https://github.com/Jordan-Horner/resume-builder/actions/workflows/ci.yml/badge.svg)](https://github.com/Jordan-Horner/resume-builder/actions/workflows/ci.yml)
+![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue)
+[![Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-Your career is bigger than two pages. What matters most will change with each
-opportunity, so tailor every resume to the job while preserving the rest of your
-story.
+**Build honest, targeted resumes without losing the strongest parts of your
+career history.**
 
-Resume Builder gives an AI agent a private, organized record of your career. It
-brings together useful details scattered across old resumes, LinkedIn exports,
-and career notes so they remain available for future resumes.
+> **Your career is bigger than two pages.** What matters most changes with each
+> opportunity, so tailor every resume while preserving the rest of your story.
 
-**Requires:** a local source checkout · Python 3.11 or newer · Codex or Claude Code
+Resume Builder is a private, Git-first career workspace. It turns old resumes,
+LinkedIn exports, and career notes into traceable evidence, then uses that
+evidence to create role-specific resumes, discover jobs, and track applications.
 
-## Start here
+It combines deterministic safeguards with structured AI: models can help select,
+screen, and phrase information, while validation prevents unsupported claims
+from reaching approved outputs and keeps undispositioned opportunities visible.
 
-Clone this repository, open the checkout in Codex or Claude Code, and say:
+**Project status:** Resume workflows, job discovery, Gmail tracking, AI-assisted
+screening, scheduled container automation, and private Telegram conversations
+work today. Automatic job submission remains future work.
+
+## What it can do
+
+- Import multiple resumes and consolidate durable career evidence.
+- Build directional and job-tailored resumes with source-backed claims.
+- Check ATS readability, keyword retrieval, page limits, and PDF extraction.
+- Discover jobs from LinkedIn, Indeed, and direct employer ATS boards.
+- Screen jobs without treating credible stretches as automatic failures.
+- Track applications and hiring-stage changes through read-only Gmail access.
+- Run scheduled job and email scans with Docker.
+- Use interchangeable AI providers and communication channels through adapters.
+
+## Quick start
+
+**Requires:** Python 3.11 or newer, a local checkout, and Codex or Claude Code.
+
+Clone the repository, open it in your coding agent, and say:
 
 ```text
 Set up Resume Builder and help me import my existing resume.
 ```
 
-The agent installs the project, starts the introduction, creates your private
-workspace, and asks how you want to protect it. Returning users skip first-run
-intake because the agent inspects the existing workspace before asking questions.
+The onboarding flow creates a separate private workspace, offers guided setup
+for optional Telegram, Gmail, and Discord integrations—including QR-guided
+pairing for a personal Telegram bot—imports one or more
+career sources, and offers optional job-discovery setup. Returning users resume
+from the current workspace state instead of repeating intake.
 
-After one or more sources have been hydrated, the same onboarding journey offers
-an optional job-discovery setup. It shows recent, related, and earlier role
-directions from the combined source vault, then asks only about eligibility,
-work location, and optional compensation. Saving creates an inactive search
-portfolio; activation is a separate previewed action and never starts a scan.
-
-```bash
-resume-builder onboard                 # continue the current stage
-resume-builder onboard --json status   # structured handoff for an agent
-resume-builder onboard start           # begin optional job-search setup
-```
-
-Once setup is complete, you can ask naturally:
+You can then ask naturally:
 
 ```text
 Build a Support Operations resume from my career history.
 Screen this job: <posting URL>
 Tailor my closest resume to this job description: <paste description>
-Update my Incident Management resume without losing approved content.
-What important experience is missing from this draft?
+Check this resume for ATS readability.
+Show me new jobs I have not reviewed.
 ```
-
-Quick screens and detailed matches use the same gate-first semantic classifier.
-It keeps required role evidence separate from resume polish and exact keyword
-retrieval, and it never reports an ATS score or interview probability.
 
 <details>
 <summary>Manual installation</summary>
@@ -66,352 +74,191 @@ resume-builder
 
 </details>
 
-## See the preservation model in one minute
+## Agent architecture
 
-The included Phoenix Wright fixture starts with one fictional career record. The
-agent selects the evidence that supports a senior criminal-defense direction,
-keeps adverse history available without presenting it as an accomplishment, and
-refuses to use mentorship claims whose exact role placement is unresolved.
+Resume Builder includes a structured PydanticAI agent for job screening and
+discovery planning. Model providers and communication channels sit behind
+adapters, keeping them separate from the career vault, application tracker, and
+job inventory.
+
+```text
+User interface or communication adapter
+            ↓
+      PydanticAI agent
+            ↓
+ Resume · Jobs · Gmail · Applications
+            ↓
+       Private workspace
+```
+
+Agent tools begin read-only. Structured outputs, bounded request budgets, and
+explicit approval before private data leaves the workspace make the automation
+observable and controllable. OpenRouter is the current provider, and the agent
+contract is designed to support alternatives.
+
+See [the agent architecture](docs/agent.md) for provider configuration, tool
+contracts, and implementation status.
+
+## How it works
+
+1. **Capture evidence.** Register source resumes, exports, and notes while
+   retaining provenance.
+2. **Build the career vault.** Store approved facts independently from any one
+   resume.
+3. **Choose a target.** Select a direction or preserve a real job posting.
+4. **Draft and review.** Build from supported evidence, check language and fit,
+   and present a readable preview.
+5. **Mint the result.** After approval, enforce page, rendering, grounding, and
+   text-extraction checks before producing the final PDF.
+
+```text
+Sources → Career vault → Targeting → Review → Resume
+```
+
+The vault remains the durable record. Individual resumes are focused views, not
+competing versions of a manually maintained “master resume.”
+
+## See the preservation model
+
+The included Phoenix Wright fixture demonstrates the workflow with fictional
+career data. Strong evidence is surfaced, limited ownership remains limited,
+adverse history is preserved without being marketed, and unresolved claims are
+held for review.
 
 [![Phoenix Wright evidence flows from a career vault through targeting decisions into a focused resume](docs/assets/phoenix-demo-flow.svg)](examples/phoenix-wright/README.md)
 
-| Vault evidence | Resume decision | What the safeguard proves |
-|---|---|---|
-| Reconstructed a fifteen-year-old case | Lead with it | Strong, target-relevant proof is easy to find. |
-| Supported another attorney as co-counsel | Include with limited ownership | Collaboration does not become false leadership. |
-| Disbarment history | Preserve; do not sell | A true fact does not automatically belong on a resume. |
-| Mentorship under an unresolved interim title | Hold for clarification | The agent does not guess chronology to complete a story. |
+Explore the [complete fictional case study](examples/phoenix-wright/README.md)
+or the shorter [project demo](docs/demo.md).
 
-The [complete fictional case study](examples/phoenix-wright/README.md) shows the
-source material, selection decisions, current resume, and an alternate direction
-the evidence cannot yet support cleanly.
+## Engineering highlights
 
-## Why this exists
+- Provider-agnostic model and communication adapters
+- Typed contracts and structured model responses
+- Git-versioned facts with stable provenance
+- Deterministic validation around probabilistic AI decisions
+- Append-only application history and explicit corrections
+- Idempotent imports, scans, and notification delivery
+- Content-limited logs and external secret storage
+- Automated tests, static checks, architecture checks, and CI
+- Containerized scheduling with health and failure reporting
 
-Changing a resume for one opportunity can quietly remove a strong bullet, metric,
-project, or leadership example that would help with the next one. Repeated AI
-rewrites create another risk: wording can become stronger than the underlying
-experience.
+The broader component boundaries and dependency rules are documented in
+[architecture](docs/architecture.md) and [design decisions](docs/design-decisions.md).
 
-Resume Builder keeps your career history separate from any individual resume:
+## Privacy model
 
-- Old accomplishments remain available even when they do not fit the current
-  target.
-- Each resume can emphasize a different direction without changing the facts.
-- Job descriptions guide what to highlight but never become evidence about you.
-- New memories strengthen future resumes instead of living in one temporary chat.
-
-There is no single “master resume” that must contain everything. Your private
-career record is the foundation; each resume is a focused view of that record.
-
-## What the agent does
-
-1. **Builds your career record.** Import resumes, pasted text, a LinkedIn export,
-   career notes, or begin with a guided interview. Useful claims retain their
-   sources and employment context.
-2. **Targets one direction.** Choose a role or provide a real job posting. The
-   agent selects relevant stories and records what it intentionally leaves out.
-3. **Drafts and checks the resume.** It looks for unsupported metrics,
-   exaggerated authority, lost accomplishments, weak wording, and missing
-   evidence. Named content templates keep section architecture explicit, while
-   separately selected visual themes control appearance without changing the
-   career argument.
-4. **Shows you the result.** An independent reviewer always checks new or changed
-   resume language. A deeper career-strategist and hiring-manager review runs
-   when the resume is competitive but can be positioned more strongly. You
-   approve a readable web preview before the system
-   creates a final, format-checked PDF. The preview step returns a structured,
-   required handoff with organized, ready-to-post Markdown so the agent presents
-   the complete review prompt instead of merely generating a file in the
-   background. For a real posting, the browser tab, preview handoff, and mint
-   result identify the company and role so concurrent applications remain easy
-   to distinguish. Final application PDFs are collected under `exports/resumes/`;
-   company targeting stays in the folder name, while the upload-visible PDF uses
-   the neutral `<candidate-name>-Resume.pdf` filename. Internal manifests,
-   previews, and diagnostics stay grouped under
-   `build/resumes/<resume-slug>/`.
-
-Resume presentation is extensible without forking the resume workflow. Content
-templates control allowed sections and their order; visual themes control only
-typography, color, spacing, and print styling. Workspaces include a compatible
-default and an alternate conservative theme. Use
-`resume-builder workspace templates list` to inspect them,
-`resume-builder workspace templates scaffold theme <id>` to create a custom
-theme, and `resume-builder workspace templates validate` before using it.
-
-If a draft is weak, the agent checks your saved career evidence and imported
-sources before asking a question. It asks only focused questions that could
-materially improve the resume; it does not ask you to repeat information it
-already has or invent a metric to fill a gap.
-
-## Your career data stays private
-
-The reusable Resume Builder engine and your personal career data use separate Git
-repositories inside one project folder:
+The reusable engine and personal career workspace are separate Git repositories:
 
 ```text
 resume-builder/          Reusable engine
-└── workspace/           Your ignored, private Git repository
+└── workspace/           Ignored private repository
     ├── vault/           Career sources and facts
-    ├── directions/      Roles you may pursue
-    ├── job-search/      Private inventory, search settings, and shortlist
-    ├── targets/         Job postings you choose to save
-    └── resumes/         Your resume source files
+    ├── directions/      Target role profiles
+    ├── job-search/      Inventory and preferences
+    ├── applications/    Application history
+    ├── targets/         Preserved job postings
+    └── resumes/         Editable resume sources
 ```
 
-The public engine ignores `workspace/`, so normal engine commits do not include
-your career files. During setup, choose either:
+Personal data, credentials, email content, and generated career artifacts stay
+out of the public engine repository. The workspace can use local Git only, a
+private backup, or an existing private repository.
 
-1. **Local Git with a private GitHub backup** (recommended).
-2. **Local Git only** if you do not want anything uploaded.
-3. **An existing private workspace** that you already manage.
+If a repository has ever contained real career data, keep its complete history
+private; deleting a file from the latest revision does not remove it from earlier
+commits.
 
-Nothing is uploaded without confirmation. A private backup is recommended because
-local Git cannot recover files after device loss.
+## Connect and automate
 
-## Build and screen a job inventory
+Resume Builder works locally by default. Run it with Docker when you want an
+always-available career agent that can keep searching, screening, and tracking
+applications without requiring manual scans.
 
-Resume Builder includes a local inventory backend for LinkedIn, Indeed, and
-direct employer ATS boards. Collection can run manually or through the native
-low-noise automation service; there is no authenticated LinkedIn automation.
-Mutable inventory, schedules, and personal search preferences stay under the
-private workspace.
+- **Automated job discovery** runs daily or on your chosen schedule to find
+  opportunities from LinkedIn, Indeed, and employer ATS boards.
+- **Gmail** keeps the jobs in your tracker up to date automatically when you
+  apply, get rejected, receive an interview request, or get an offer—without
+  storing your messages.
+- **OpenRouter** screens and prioritizes jobs with a configurable AI model.
+- **Telegram** lets you communicate remotely with the agent, receive direct
+  updates, and give it new directives.
+- **Discord** provides one-way alerts when a scan finds something meaningful.
+
+Every connection is optional and configured separately. Private workspaces,
+credentials, and runtime data remain outside the Docker image. See
+[automation and Docker deployment](docs/automation.md) for setup instructions.
+
+## Job discovery and application tracking
+
+The job inventory keeps every active, undispositioned opportunity visible. User
+preferences and deterministic checks add warnings and advisory ordering without
+silently deleting jobs. Semantic screening separates hard eligibility conflicts
+from worthwhile stretches and confidence from fit.
 
 ```bash
-resume-builder jobs update
 resume-builder jobs new
-resume-builder jobs new --retry-failed
 resume-builder jobs status
 resume-builder jobs shortlist
 resume-builder jobs screen <job-id>
-resume-builder jobs verify <job-id>
-resume-builder jobs reposts
 ```
 
-`update` collects from enabled providers and preserves valid jobs even when they
-do not match the current work-mode preference. `new` performs that refresh and
-returns only active canonical jobs that were not already present in the database;
-it does not recycle the existing backlog. `shortlist` records deterministic
-warnings and exact resume keyword visibility across the active inventory. It
-does not use those signals to rank or hide opportunities: every job without a
-durable application disposition stays in the review queue, ordered newest
-first. It reuses unchanged analyses based on posting, resume, preference, and
-prescreen versions. It also writes `job-search/jobs-review.csv`, a compact
-title/company/salary queue in the same order. Personal work-mode, location,
-title, company, salary, and seniority rules appear as warnings without deleting
-or suppressing jobs. Location include/exclude terms and the
-unknown-location policy are configurable in `job-search/preferences.yml` for
-different countries and regions. An optional seniority gate can retain senior
-roles only for configured role families when identifying warnings. Its bounded keyword-readiness value is
-diagnostic—not an ATS score or a hiring prediction. Ask the agent to screen a
-job ID for the deeper semantic evidence review; only jobs you choose
-to pursue become tracked target snapshots.
-
-New-job semantic screening also writes a separate shadow-personalized order.
-It uses explicit preferences and previously applied-to role titles only as
-positive signals, never treats an ignored job as negative feedback, and keeps
-an exploration sample to reduce preference narrowing. Shadow personalization
-cannot hide jobs or change notifications; the canonical queue remains complete.
-
-Compare LinkedIn and Indeed after a completed refresh without starting another
-provider scan:
+Application events are private and append-only. Gmail can create a confidently
+identified application and advance one uniquely matched application when an
+email contains explicit lifecycle evidence. Weak phrases such as
+`unfortunately` or `another candidate` broaden discovery but do not establish a
+rejection without supporting body context.
 
 ```bash
-resume-builder jobs compare-providers
-```
-
-The report compares canonical overlap and each provider's unique contribution
-within the same frozen scan window. If semantic screens exist, it separately
-reports useful unique jobs. Raw result volume is never treated as proof that one
-provider has better recall or relevance.
-
-Provider refreshes retain typed outcomes (`healthy`, `healthy-empty`, `capped`,
-`partial`, `blocked`, or `failed`). Transient empty failures receive one bounded
-retry, `jobs status` shows each source's latest state and problem streak, and
-`jobs new --retry-failed` reruns only failures marked safe to retry. Screening
-also performs a conservative live-URL check for postings backed by a direct ATS;
-aggregator-only URLs remain inconclusive instead of being guessed open or closed.
-
-## Record applications and outcomes
-
-Application history is private, Git-versioned workspace data. It stays separate
-from the canonical career-fact vault: a submitted answer can cite confirmed facts,
-but it cannot establish a new one.
-
-```bash
-resume-builder application record --company Example --role "Support Engineer" --job-id <job-id>
-resume-builder application record --company Example --role "Support Engineer" --job-id <job-id> --apply
-resume-builder application outcome <application-id> interview --stage "Recruiter screen" --apply
-resume-builder application outcome <application-id> rejected --feedback "Verbatim feedback" --apply
 resume-builder application report
-resume-builder application validate
-```
-
-Writes require `--apply`; otherwise commands return a preview. Events are
-append-only, corrections explicitly supersede an earlier event, and application
-dates are never inferred from posting or inventory dates. Recorded job IDs are
-automatically treated as applied during shortlisting. Outcome reports show raw
-counts and withhold rates until at least ten applications in a group have
-concluded. Reports never modify the match rubric or claim an interview
-probability.
-
-When a job has already been prescreened, `record` automatically pins that
-decision and its analysis hash. `--target`, `--resume`, and `--match-report`
-can additionally pin the submitted artifacts and detailed match record.
-
-Submitted application answers can be preserved with canonical fact citations
-and retrieved for similar future questions. Unknown and `needs-review` fact IDs
-are rejected. Application commands always read and write the active private
-workspace; they do not accept an alternate output root. `jobs reposts` provides
-an advisory same-employer, exact-title signal while excluding concurrent
-postings, shared provider identities, and configured multi-employer aggregators.
-The repost calculation is read-only, and its output records the detector options
-used for that run.
-
-## Detect submitted applications from Gmail
-
-The optional Gmail adapter uses Google's official read-only client to detect
-explicit application confirmations and strongly contextual rejections. It
-automatically creates or links an `applied` application only when company and
-role identity are both present. A rejection updates only one confidently
-matched existing application; it never invents a new application. Ambiguous and
-unrelated messages do not change application history. Explicit recruiter
-outreach, interview invitations, assessments, and offers can advance a uniquely
-matched existing application without retaining the correspondence.
-
-```bash
-python -m pip install -e ".[gmail]"
-resume-builder gmail connect                              # show setup step 1
-resume-builder gmail connect --step 2                     # show another setup step
-resume-builder gmail connect --credentials /secure/path/google-client.json  # scripted setup
-resume-builder gmail scan                         # preview recent lifecycle mail
-resume-builder gmail scan --apply                 # commit confident rule matches
-resume-builder gmail scan --semantic-fallback --confirm-send-private-data  # opt-in experiment
-resume-builder gmail backfill                     # preview historical matches
-resume-builder gmail backfill --apply             # reconstruct applications
+resume-builder gmail connect
+resume-builder gmail scan
 resume-builder gmail status
 ```
 
-## Run the private career-agent foundation
+Gmail uses Google's official read-only API. Email bodies are processed in memory
+and are not written to the engine, workspace, runtime database, or logs. OAuth
+credentials and content-free scan state live outside the repository.
 
-The optional agent uses PydanticAI with OpenRouter behind provider- and
-communication-channel adapters. Its first toolset is read-only.
+See [job discovery](docs/job-puller/README.md),
+[inventory integration](docs/job-inventory-integration.md), and
+[Gmail automation](docs/gmail-automation.md) for configuration and command
+reference.
 
-```bash
-python -m pip install -e ".[agent]"
-resume-builder agent init
-resume-builder agent doctor
-resume-builder agent ask "What new jobs are ready to review?"
-resume-builder agent screen <job-id> --preview-payload
-resume-builder agent screen <job-id> --confirm-send-private-data
-resume-builder agent screen-new
-resume-builder agent screen-new --confirm-send-private-data
-resume-builder agent discovery-plan --resume resumes/baselines/<resume>.md --preview-payload
-resume-builder agent discovery-plan --resume resumes/baselines/<resume>.md --confirm-send-private-data
-resume-builder agent discovery-show --portfolio build/job-search/cold-start-portfolio.json
-```
+## Quality safeguards
 
-Structured screening separates confirmed eligibility conflicts from career fit,
-so a credible skills gap can remain a `worthwhile_stretch`. Screening is cached
-by the posting, preference profile, rubric, and model hashes. A new or refreshed
-screen will not contact OpenRouter without the explicit confirmation flag.
+- If a draft is weak, the agent checks your saved career evidence and imported sources
+  before asking a focused question that could materially improve it.
+- Resume claims retain links to approved source evidence.
+- Job descriptions guide targeting but never become candidate facts.
+- Authorship and authority cannot be strengthened beyond the evidence.
+- Important content cannot disappear silently during revision.
+- Independent language review checks every new or changed narrative block.
+- The user approves a readable preview before minting a final PDF.
+- ATS diagnostics measure retrieval and parseability, not hiring probability.
+- Ambiguous email and job matches remain unresolved instead of forcing a status.
 
-`agent screen-new` builds a complete screening queue without hiding any new
-job. Without confirmation it reuses cached and deterministic results and marks
-everything else `unscreened`. With confirmation it screens no more than the
-configured request limit, records content-free usage totals, and leaves
-budget-exhausted or failed jobs visible. The artifact preserves the canonical
-newest-first list and provides a separate advisory order based on eligibility,
-semantic fit, and confidence. Confidence never substitutes for fit.
+These controls do not predict an employer's decision. They make each result
+traceable, revisable, and defensible.
 
-The unified onboarding flow can create an editable query portfolio from one or
-more registered career sources. It deduplicates identical source content before
-combining recent historical titles and locally grounded capability combinations.
-The lower-level one-resume agent command can also request model-proposed adjacent
-or exploratory titles. Generated
-titles are revalidated against literal resume evidence. The resulting
-`build/job-search/cold-start-portfolio.json` is inactive: it does not change the
-scheduled search or trigger a provider scan. Preview and local-only operation
-need no agent configuration. Provider-generated titles are cached for unchanged
-resume evidence and cannot overwrite an existing editable portfolio without
-`--force`.
-Review commands can enable, disable, add, or remove individual queries.
-Activation prints an exact configuration diff and confirmation hash before it
-can write, preserves manual search and provider settings, creates a rollback
-record, and never starts a scan or changes restart behavior.
+## Documentation
 
-Fresh workspaces include neutral preferences and a valid but inactive collector
-configuration, so automation reports setup as required instead of attempting a
-scan. The generated configuration contains no API key. Screening preferences and
-candidate evidence remain workspace-specific; fictional evaluation profiles do
-not become runtime defaults. See
-[the agent architecture and implementation cycles](docs/agent.md).
-
-Normal scans use a narrow Gmail server-side query for recent application
-confirmations and rejection signals; no labels or Gmail filters are required.
-Historical backfill uses the same application-activity query over a longer
-window and processes messages oldest first. Gmail bodies are processed in memory
-and never written to
-the engine, private workspace, runtime database, or logs. The OAuth token,
-mailbox cursor, message IDs, and dispositions live in an external runtime
-directory with owner-only file permissions. See
-[`docs/gmail-automation.md`](docs/gmail-automation.md) for setup, privacy, and
-scheduling guidance.
-
-## Schedule job and Gmail scans
-
-The native automation service can run job discovery once or twice daily and
-Gmail reconciliation every few hours, then notify only when a meaningful change
-is found. Console output is the default; Discord uses an environment-provided
-webhook and a durable deduplication outbox. Docker Compose is supported without
-putting the workspace, OAuth token, runtime databases, or webhook secret in the
-image.
-
-```bash
-resume-builder automation init --timezone America/New_York
-resume-builder automation doctor
-resume-builder automation once --task jobs
-resume-builder automation run
-```
-
-See [`docs/automation.md`](docs/automation.md) for schedules, notifications,
-privacy boundaries, and Docker deployment.
-
-If a repository has ever contained real career data, keep its complete Git history
-private. Removing personal files from the latest version does not remove them from
-earlier commits.
-
-## How it keeps the result honest
-
-- **Claims retain their sources.** Resume statements can be traced back to saved
-  career evidence.
-- **Targeting cannot become biography.** A role profile or job posting can guide
-  selection but cannot establish candidate experience.
-- **Important information is checked for accidental removal.** Plans and
-  regression checks distinguish deliberate targeting from a lost accomplishment.
-  Every new or changed narrative block receives an independent language check
-  before preview. Exact approved unchanged blocks are reused. The deeper career
-  review runs only when hybrid routing finds an improvable fit or the user asks
-  for it.
-- **The user owns the wording loop.** The normal lifecycle is build, language
-  review, preview, edit, changed-block review, preview, and mint. An explicit
-  mint request approves the current
-  preview; mint then performs the hard source, evidence, page, rendering, and
-  PDF-extraction checks.
-- **Drafting stays conversational until wording is chosen.** If you reject or
-  question a sentence, the agent proposes distinct alternatives without
-  starting build and review work. Once you select one, only the changed language
-  is reviewed; unchanged strategy and hiring judgments carry forward.
-
-These safeguards do not predict an employer's decision or produce a universal ATS
-score. They make the resume easier to verify, revise, and defend.
+| Topic | Guide |
+|---|---|
+| System boundaries | [Architecture](docs/architecture.md) |
+| Agent and OpenRouter | [Agent architecture](docs/agent.md) |
+| Job collection | [Job puller](docs/job-puller/README.md) |
+| Inventory behavior | [Job inventory integration](docs/job-inventory-integration.md) |
+| Gmail setup and privacy | [Gmail automation](docs/gmail-automation.md) |
+| Scheduling and containers | [Automation](docs/automation.md) |
+| Design rationale | [Design decisions](docs/design-decisions.md) |
+| Fictional walkthrough | [Phoenix Wright example](examples/phoenix-wright/README.md) |
 
 ## Help and contributing
 
 For setup problems or feature requests, [open an
-issue](https://github.com/Jordan-Horner/resume-builder/issues/new). Use fictional or
-redacted examples only—never attach a real resume, career source, contact details,
-or private job-search information to a public issue.
+issue](https://github.com/Jordan-Horner/resume-builder/issues/new). Use fictional
+or redacted examples only—never attach a real resume, contact details, or private
+job-search information to a public issue.
 
 - Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing a change.
 - Follow [SECURITY.md](SECURITY.md) to report a vulnerability or privacy concern.
