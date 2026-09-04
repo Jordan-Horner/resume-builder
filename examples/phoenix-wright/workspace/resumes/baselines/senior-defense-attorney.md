@@ -17,10 +17,10 @@ Active criminal defense attorney with experience reconstructing contested eviden
 
 ## Wright Anything Agency | Senior Defense Attorney | 2027–2028 <!-- evidence: WAA-003 -->
 
-- Volunteered to defend a local guide in a Khura'inese court that had gone roughly twenty years without a defense attorney. Challenged divination-based evidence, identified another perpetrator, and secured Khura'in's first not-guilty verdict in twenty-three years. <!-- evidence: WAA-013 --><!-- story: khurain-first-defense -->
+- Secured Khura'in's first not-guilty verdict in twenty-three years by challenging inconsistencies in divination-based evidence and proving another person committed the crime. <!-- evidence: WAA-013 --><!-- story: khurain-first-defense -->
 - Defended Maya Fey in a legal system where defense counsel faced the same punishment as a convicted client, securing a not-guilty verdict. <!-- evidence: WAA-014 --><!-- story: culpability-act-defense -->
 - Led the first case after returning to courtroom practice following reinstatement and obtained an acquittal. <!-- evidence: WAA-012 --><!-- story: return-to-practice -->
-- Supported Apollo Justice as co-counsel in the final Khura'in matter, where Apollo led the decisive trial. <!-- evidence: WAA-015 --><!-- story: apollo-co-counsel -->
+- Served as co-counsel to Apollo Justice in the final Khura'in matter, with Apollo leading the decisive trial. <!-- evidence: WAA-015 --><!-- story: apollo-co-counsel -->
 
 ## Wright & Co. Law Offices | Defense Attorney and Firm Head | 2016–2019 <!-- evidence: WAA-001 -->
 

@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "id": "ER-13453b615fd9",
+  "status": "active",
+  "identity": {
+    "subject_key": "khurain-landmark-outcome-first",
+    "kind": "presentation",
+    "scope": {
+      "level": "story",
+      "fact_ids": [],
+      "resume": "resumes/baselines/senior-defense-attorney.md",
+      "story_id": "khurain-first-defense",
+      "direction": null,
+      "section": "experience"
+    }
+  },
+  "strength": "preference",
+  "current_revision": 1,
+  "revisions": [
+    {
+      "revision": 1,
+      "accepted_at": "2026-09-04T16:45:23.888136+00:00",
+      "source_session": "FB-13453b615fd9",
+      "source_session_revision": 1,
+      "summary": "Lead the Khura'in defense story with its landmark verdict rather than the decision to volunteer.",
+      "instruction": "Lead with the historic not-guilty verdict, then show the evidence challenge and proof that produced it; omit setup that delays the hiring value.",
+      "must_preserve": [
+        "Khura'in's first not-guilty verdict in twenty-three years",
+        "The challenge to divination-based evidence",
+        "Proof that another person committed the crime"
+      ],
+      "must_avoid": [
+        "Leading with volunteering",
+        "Making the reader wait through institutional background before the result",
+        "Claiming broader legal-system reform"
+      ],
+      "preferred_examples": []
+    }
+  ],
+  "retired_at": null,
+  "retirement_reason": null
+}

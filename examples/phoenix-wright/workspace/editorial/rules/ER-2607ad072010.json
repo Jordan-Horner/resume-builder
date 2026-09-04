@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "id": "ER-2607ad072010",
+  "status": "active",
+  "identity": {
+    "subject_key": "co-counsel-position-value",
+    "kind": "presentation",
+    "scope": {
+      "level": "story",
+      "fact_ids": [],
+      "resume": "resumes/baselines/senior-defense-attorney.md",
+      "story_id": "apollo-co-counsel",
+      "direction": null,
+      "section": "experience"
+    }
+  },
+  "strength": "preference",
+  "current_revision": 1,
+  "revisions": [
+    {
+      "revision": 1,
+      "accepted_at": "2026-09-04T16:45:23.615677+00:00",
+      "source_session": "FB-2607ad072010",
+      "source_session_revision": 1,
+      "summary": "Treat appointment as co-counsel as a meaningful position and lead the bullet with that position.",
+      "instruction": "Lead with the co-counsel position itself; treat trusted participation in the matter as decision-relevant value without inventing a separate task or outcome.",
+      "must_preserve": [
+        "Apollo Justice's ownership of the decisive trial",
+        "The confirmed co-counsel relationship",
+        "The final Khura'in matter scope"
+      ],
+      "must_avoid": [
+        "Requiring an unsupported deliverable or outcome",
+        "Calling the matter high-profile without evidence",
+        "Taking credit for Apollo's lead role"
+      ],
+      "preferred_examples": []
+    }
+  ],
+  "retired_at": null,
+  "retirement_reason": null
+}

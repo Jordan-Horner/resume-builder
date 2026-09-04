@@ -146,6 +146,12 @@ scale, breadth, or differentiation. Do not preserve an item merely because it
 is factually supported; preserve it only when it strengthens this bullet's one
 claim.
 
+A clearly named position, formal assignment, or trusted role may itself be the
+bullet's hiring claim when the relationship and scope make its value legible.
+Do not force every such signal to name a separate task, deliverable, or outcome,
+and never invent one merely to satisfy an accomplishment pattern. Judge whether
+the appointment is relevant and specific enough to earn space in the role arc.
+
 Apply the resume-quality contract's direct-relationship and opening-rhythm
 checks during this gate. A constructed modifier should be revised when it makes
 the reader infer what a technology did in the work, and repeated opening verbs

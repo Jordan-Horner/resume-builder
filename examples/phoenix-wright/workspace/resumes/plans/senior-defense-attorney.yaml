@@ -58,17 +58,17 @@ stories:
     core_fact_ids: [WAA-013]
     claim:
       subject: candidate
-      action: volunteered to defend and challenged evidence
-      object: a local guide
-      scope: in a court system that had gone roughly twenty years without a defense attorney
-      outcome: proved another person committed the crime and secured the first not-guilty result under the twenty-three-year-old Defense Culpability Act
+      action: secured
+      object: Khura'in's first not-guilty verdict in twenty-three years
+      scope: by challenging inconsistencies in divination-based evidence and proving another person committed the crime
+      outcome: null
       composition: single-fact
       relationship: One case fact supports the client, court context, and result.
       evidence:
         action: [WAA-013]
         object: [WAA-013]
         scope: [WAA-013]
-        outcome: [WAA-013]
+        outcome: []
   - id: culpability-act-defense
     section: experience
     role_ids: [WAA-003]
@@ -104,8 +104,8 @@ stories:
     core_fact_ids: [WAA-015]
     claim:
       subject: candidate
-      action: supported
-      object: Apollo Justice as co-counsel
+      action: served
+      object: as co-counsel to Apollo Justice
       scope: in the final Khura'in matter
       outcome: null
       composition: single-fact

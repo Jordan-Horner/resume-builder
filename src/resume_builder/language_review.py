@@ -19,7 +19,7 @@ LANGUAGE_REVIEW_METHOD = "independent-cold-review"
 LANGUAGE_REVIEW_STATUSES = {"approved", "changes-required"}
 LANGUAGE_BLOCK_DECISIONS = {"approved", "revise"}
 LANGUAGE_REVIEW_STANDARD = {
-    "version": 4,
+    "version": 5,
     "context_test": (
         "Can a reviewer identify the actor, action, object, and why the claim matters "
         "using only the visible block and its supplied context?"
@@ -31,7 +31,10 @@ LANGUAGE_REVIEW_STANDARD = {
     "concrete_object_rule": (
         "Judge whether the action's object identifies a decision-relevant system, "
         "deliverable, operation, or change. Reject a grammatically complete but "
-        "semantically generic object when the reader still cannot tell what work occurred."
+        "semantically generic object when the reader still cannot tell what work occurred. "
+        "A clearly named position, formal assignment, or trusted role may itself be the "
+        "decision-relevant value when its relationship and scope are explicit; do not require "
+        "an invented task, deliverable, or outcome to make that position valid."
     ),
     "summary_inventory_rule": (
         "Reject a summary sentence whose main function is to inventory technologies, "

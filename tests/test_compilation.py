@@ -828,10 +828,14 @@ def test_language_review_reuses_unchanged_approved_blocks(tmp_path: Path) -> Non
     assert "email" not in json.dumps(context).casefold()
     assert "PROFILE-001" not in json.dumps(context)
     assert cold["review_standard"] == language_review.LANGUAGE_REVIEW_STANDARD
-    assert cold["review_standard"]["version"] == 4
+    assert cold["review_standard"]["version"] == 5
     assert "actor, action, object" in cold["review_standard"]["context_test"]
     assert "unstated premise" in cold["review_standard"]["unstated_premise_rule"]
     assert "semantically generic object" in cold["review_standard"]["concrete_object_rule"]
+    assert "clearly named position" in cold["review_standard"]["concrete_object_rule"]
+    assert (
+        "invented task, deliverable, or outcome" in cold["review_standard"]["concrete_object_rule"]
+    )
     assert (
         "system, deliverable, operation, or change"
         in cold["review_standard"]["concrete_object_rule"]
