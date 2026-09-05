@@ -32,17 +32,20 @@ editorial approval.
 11. **Application history** preserves submitted-artifact pins, append-only
     outcomes, and evidence-cited answers without turning application prose into
     career evidence.
-12. **Portal career views** derive base resumes from explicitly typed source-manifest
-    entries (with a conservative filename fallback for legacy workspaces),
-    generated Resumes from canonical Markdown and build reports, and Skills from
-    `vault/facts/skills/`. FastAPI organizes these views and owns their status
-    labels. For generated resumes, FastAPI resolves and serves only the existing
-    `build/resumes/<slug>/resume.html` preview; it does not introduce a second
-    renderer or expose arbitrary workspace files. Enabled skill search signals are derived from the existing discovery
+12. **Portal career views** keep imported source documents in the evidence layer,
+    expose generated Resumes from canonical Markdown and build reports, and Skills from
+    `vault/facts/skills/`. The library shows every directional resume and only tailored
+    resumes backed by a current successful mint; internal build and review status is
+    not presented as document metadata. FastAPI compiles and renders the current
+    canonical Markdown with the existing selected theme for a read-only portal view.
+    That view omits CLI workflow notices and does not change review or mint state,
+    publish a reviewed preview, or expose arbitrary workspace files.
+    Enabled skill search signals are derived from the existing discovery
     portfolio's vault-backed `source_ids`; the portal does not maintain a second
-    skill registry or career profile. Onboarding marks its upload as a resume in
-    the same source manifest, and resume-driven role suggestions select from those
-    typed entries rather than guessing from the longest career source. Operating-system
+    skill registry or career profile. Onboarding marks every uploaded career document
+    as a resume in the same source manifest, while the Resumes page presents only
+    directional and tailored outputs. Resume-driven role suggestions select from typed
+    source entries rather than unrelated career notes. Operating-system
     metadata files are ignored during both import and generated-resume discovery.
 13. **Portal resume recommendations** reuse preserved targets, direction metadata,
     and existing match reports. FastAPI selects and presents the closest supported

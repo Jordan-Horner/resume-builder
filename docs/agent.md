@@ -209,6 +209,55 @@ Missing salary or sponsorship language stays unknown. Skill, tooling, domain,
 title, and years-of-experience gaps belong to career fit and may produce a
 positive `worthwhile_stretch` result.
 
+When a posting has neither salary bound, semantic screening also requests an
+advisory base-pay estimate in the **same structured model call**. This applies
+to authorized individual and batch screening, including scheduled screening
+that already has provider authorization. Collection, shortlist preparation and
+dashboard browsing never request estimates. Deterministic ineligible screens
+still skip the model entirely.
+
+The shared salary workflow uses title, company, location, employment type and
+up to 8,000 description characters. It adds up to twelve salary-bearing active
+inventory postings, prioritizing the same company and title, then the same
+title elsewhere, then other roles at the company. Related postings retain their
+URLs, dates, currencies and pay periods; they are context, not automatically
+comparable roles. No CareerPulse data or database is read at runtime.
+
+Results include a range, currency, year/hour period, low/medium confidence,
+reasoning, company-data basis, assumptions and cited inventory IDs. The model
+may return `unavailable` when evidence is insufficient. Company size, funding
+and pay policy must not be invented from a company name. This version does not
+perform live company or market research: model knowledge alone is labeled low
+confidence. Supplied posting references are validated, not fabricated citations.
+
+Estimates are stored separately as `salary_estimate` in screening results and
+appear in the readable screen/queue report. They never populate posted salary
+fields, satisfy minimum-pay constraints, change deterministic eligibility or
+filter jobs out. Missing posted pay remains unknown even if an estimate is
+below the user's minimum. Screening instructions also exclude estimates from
+career-fit judgments. Screening caches containing salary context expire after
+30 days; changed input packets invalidate them immediately.
+
+### Request an estimate from the dashboard API
+
+`POST /api/jobs/{job_id}/estimate-salary` explicitly requests an estimate using
+the configured fast model and provider credentials. No frontend button is wired
+yet. The route requires no request body; `?refresh=true` deliberately bypasses
+the cache. Its JSON response contains `status` (`posted`, `estimated` or
+`unavailable`), `job_id`, `posted_salary`, `estimate`, `model`, `generated_at`,
+`input_hash`, `method_version`, `related_postings` and `cached`.
+
+If either salary bound is already posted, including an extractable description
+range, the endpoint returns `posted` without making a model call. Otherwise it
+reuses an unchanged estimate for up to 30 days from
+`build/job-search/salary-estimates/`. The key includes the model, workflow
+version, target posting and supplied related postings. The API estimate cache
+and screening cache are independent. Failed provider requests are surfaced and
+are not cached as estimates. A missing job returns 404, missing provider setup
+or invalid structured output returns 400, and provider failure returns 502.
+Only whitelisted posting data is sent by this endpoint; it does not include
+resumes, career facts or compensation preferences.
+
 Optional fields under `screening_profile` in `job-search/preferences.yml`
 declare sponsorship needs, held clearances or licenses, willingness to obtain a
 clearance, evidence-backed capabilities, and whether the existing work-mode,

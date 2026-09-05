@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 from typing import Any
 
+from .agent_contracts import ModelProviderError
 from .web_service import DashboardService
 from .workspace_state import discover_workspace
 
@@ -43,8 +44,7 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         except ValueError as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    @app.post("/api/onboarding/resume", status_code=201)
-    async def upload_resume(file: UploadFile = File(...)) -> dict[str, Any]:  # noqa: B008
+    async def import_career_material(file: UploadFile) -> dict[str, Any]:
         try:
             content = await file.read(10 * 1024 * 1024 + 1)
             return service.import_resume(file.filename or "", content)
@@ -52,6 +52,16 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         finally:
             await file.close()
+
+    @app.post("/api/onboarding/resume", status_code=201)
+    async def upload_resume(file: UploadFile = File(...)) -> dict[str, Any]:  # noqa: B008
+        return await import_career_material(file)
+
+    @app.post("/api/career-material/resumes", status_code=201)
+    async def upload_career_material(
+        file: UploadFile = File(...),  # noqa: B008
+    ) -> dict[str, Any]:
+        return await import_career_material(file)
 
     @app.post("/api/onboarding/skip", status_code=204)
     def skip_onboarding() -> None:
@@ -131,6 +141,7 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
             filename=document["filename"],
             content_disposition_type="inline",
             headers={
+                "Cache-Control": "no-store",
                 "X-Content-Type-Options": "nosniff",
                 "Content-Security-Policy": (
                     "sandbox; default-src 'none'; style-src 'unsafe-inline'; "
@@ -211,6 +222,23 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         if item is None:
             raise HTTPException(status_code=404, detail="Job not found")
         return item
+
+    @app.post("/api/jobs/{job_id}/estimate-salary")
+    def estimate_job_salary(job_id: str, refresh: bool = False) -> dict[str, Any]:
+        try:
+            return service.estimate_job_salary(job_id, refresh=refresh)
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ModelProviderError as exc:
+            raise HTTPException(
+                status_code=502, detail="Salary estimation failed. Please try again."
+            ) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except OSError as exc:
+            raise HTTPException(
+                status_code=500, detail="Could not read or save the salary estimate."
+            ) from exc
 
     @app.get("/api/jobs/{job_id}/resume-recommendation")
     def job_resume_recommendation(job_id: str) -> dict[str, Any]:

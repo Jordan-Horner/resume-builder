@@ -122,9 +122,7 @@ export interface SearchPreferences {
 export interface CareerResume {
   id: string;
   name: string;
-  kind: "original" | "directional" | "tailored";
-  status_label: string;
-  status_tone: "neutral" | "positive" | "attention" | "negative";
+  kind: "directional" | "tailored";
   updated_at: string | null;
   detail: string;
   error: string | null;
@@ -133,7 +131,7 @@ export interface CareerResume {
 }
 
 export interface ResumeSection {
-  id: "originals" | "directional" | "tailored";
+  id: "directional" | "tailored";
   title: string;
   description: string;
   items: CareerResume[];

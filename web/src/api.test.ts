@@ -79,7 +79,7 @@ describe("dashboard API client", () => {
     await uploadResume(file);
 
     const [, options] = fetchMock.mock.calls[0];
-    expect(fetchMock.mock.calls[0][0]).toBe("/api/onboarding/resume");
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/career-material/resumes");
     expect(options?.method).toBe("POST");
     expect(options?.body).toBeInstanceOf(FormData);
     expect((options?.body as FormData).get("file")).toBe(file);

@@ -29,6 +29,7 @@ from .jobs import (
     _with_application_dispositions,
     get_job_screening_packet,
 )
+from .salary_estimation import SalaryEstimate, format_salary_estimate
 from .screening_service import ScreeningService
 
 DEFAULT_SCREENING_OUTPUT = Path("job-search/new-job-screens.json")
@@ -300,6 +301,9 @@ def build_screening_queue(
         else:
             label = f"{screen['status']} / {screen.get('reason', 'unknown')}"
         lines.append(f"- **{label.upper()}** — {item.get('title')} at {item.get('company')}")
+        if screen["status"] == "complete" and screen["result"].get("salary_estimate"):
+            estimate = SalaryEstimate.model_validate(screen["result"]["salary_estimate"])
+            lines.append(f"  {format_salary_estimate(estimate)}")
     atomic_write_text(output_path.with_suffix(".md"), "\n".join(lines) + "\n")
     return summary
 

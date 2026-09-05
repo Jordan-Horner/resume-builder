@@ -9,6 +9,17 @@ from resume_builder.automation import DEFAULT_CONFIG, render_default_config
 from resume_builder.job_setup_defaults import scaffold_job_search
 
 
+def test_fresh_workspace_enables_every_builtin_job_source(tmp_path: Path) -> None:
+    scaffold_job_search(tmp_path)
+
+    status = sources.source_status(tmp_path)
+
+    assert {item["id"] for item in status["providers"]} == set(sources.NAMES)
+    assert all(item["enabled"] for item in status["providers"])
+    raw = yaml.safe_load((tmp_path / sources.CONFIG).read_text(encoding="utf-8"))
+    assert raw["providers"] == {provider: {"enabled": True} for provider in sources.NAMES}
+
+
 def test_toggles_persist_without_starting_scans(tmp_path: Path) -> None:
     scaffold_job_search(tmp_path)
     for provider in sources.NAMES:

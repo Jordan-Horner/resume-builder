@@ -15,6 +15,17 @@ SEARCH_CONFIG_PATH = Path("job-search/config/search.yml")
 PORTFOLIO_PATH = Path("build/job-search/cold-start-portfolio.json")
 ACTIVATION_BACKUP_PATH = Path("build/job-search/search-before-discovery.yml")
 ACTIVATION_RECORD_PATH = Path("build/job-search/discovery-activation.json")
+DEFAULT_JOB_PROVIDERS = (
+    "linkedin",
+    "indeed",
+    "jazzhr",
+    "rippling",
+    "greenhouse",
+    "lever",
+    "ashby",
+    "smartrecruiters",
+    "workday",
+)
 
 
 def neutral_preferences() -> dict[str, Any]:
@@ -63,7 +74,7 @@ def inactive_search_config() -> dict[str, Any]:
             "accepted_work_modes": ["remote"],
             "families": [],
         },
-        "providers": {},
+        "providers": {provider: {"enabled": True} for provider in DEFAULT_JOB_PROVIDERS},
     }
 
 

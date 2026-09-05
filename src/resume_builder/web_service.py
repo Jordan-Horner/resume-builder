@@ -72,6 +72,12 @@ from .layout import VaultLayout
 from .preferences import _validated as validate_preferences
 from .project_report import project_report
 from .role_policy import MAX_TITLE_LENGTH, MIN_TITLE_LENGTH, check_query_capacity, clean_titles
+from .salary_estimation import (
+    SALARY_CACHE_PATH,
+    SalaryEstimationService,
+    build_salary_packet,
+    has_posted_salary,
+)
 from .source_import import (
     SUPPORTED,
     apply_import_plan,
@@ -147,6 +153,7 @@ class DashboardService:
         self.workspace = workspace.expanduser().resolve()
         self._inventory_loader = inventory_loader or self._load_inventory
         self._state_lock = threading.Lock()
+        self._salary_lock = threading.Lock()
 
     def _onboarding_record(self) -> dict[str, Any]:
         path = self.workspace / ONBOARDING_STATE_PATH
@@ -981,6 +988,30 @@ class DashboardService:
             if str(raw.get("id")) == job_id:
                 return self._serialize_job(raw)
         return None
+
+    def estimate_job_salary(self, job_id: str, *, refresh: bool = False) -> dict[str, Any]:
+        """Run only on an explicit estimate request; browsing never calls the model."""
+        with self._salary_lock:
+            inventory = self._inventory_loader()
+            job = next((item for item in inventory if str(item.get("id")) == job_id), None)
+            if job is None:
+                raise LookupError(f"job not found: {job_id}")
+            packet = build_salary_packet(job, inventory)
+            estimator = SalaryEstimationService(self.workspace / SALARY_CACHE_PATH)
+            if has_posted_salary(packet.job):
+                posted, cached = estimator.estimate(packet, adapter=None, model="")
+                return {**posted.model_dump(mode="json"), "cached": cached}
+            config_path = self.workspace / DEFAULT_AGENT_CONFIG
+            config = load_agent_config(config_path) if config_path.is_file() else None
+            api_key = self._openrouter_key() if config else ""
+            adapter = OpenRouterAdapter(config, api_key=api_key) if config and api_key else None
+            result, cached = estimator.estimate(
+                packet,
+                adapter=adapter,
+                model=config.models.fast if config else "",
+                refresh=refresh,
+            )
+            return {**result.model_dump(mode="json"), "cached": cached}
 
     def mark_not_interested(self, job_id: str) -> None:
         if self.get_job(job_id) is None:

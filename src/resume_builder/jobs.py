@@ -541,7 +541,7 @@ def get_job_screening_packet(
         raise ValueError(f"active job not found: {job_id}")
     resume_text, _ = _resume_corpus(preferences)
     prescreen = _prescreen(job, preferences, _terms(resume_text))
-    return build_screening_packet(job, preferences, prescreen)
+    return build_screening_packet(job, preferences, prescreen, inventory=list(inventory.values()))
 
 
 def _provider_args(config_path: Path, providers: list[str] | None) -> list[str]:

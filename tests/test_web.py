@@ -40,12 +40,61 @@ def test_resume_upload_route_accepts_multipart_file(tmp_path: Path) -> None:
     assert client.get("/api/onboarding").json()["step"] == "ai_choice"
 
 
-def test_generated_resume_opens_its_existing_html_preview(tmp_path: Path) -> None:
+def test_career_material_upload_uses_the_same_resume_importer(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+
+    response = client.post(
+        "/api/career-material/resumes",
+        files={"file": ("older-resume.md", b"# Experience\n\nSupported production systems.\n")},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["filename"] == "older-resume.md"
+    assert response.json()["registered_sources"] == 1
+
+
+def test_generated_resume_reader_renders_current_markdown_not_old_preview(tmp_path: Path) -> None:
     client = _client(tmp_path)
     workspace = tmp_path / "workspace"
+    fact = workspace / "vault" / "facts" / "skills" / "SKILL-001.md"
+    fact.parent.mkdir(parents=True, exist_ok=True)
+    fact.write_text(
+        """---
+schema_version: 2
+id: SKILL-001
+title: Production support
+type: responsibility
+status: confirmed
+category: skills
+sources: [SRC-example]
+---
+
+# Production support
+
+Supported production systems.
+""",
+        encoding="utf-8",
+    )
     resume = workspace / "resumes" / "baselines" / "support.md"
     resume.parent.mkdir(parents=True, exist_ok=True)
-    resume.write_text("# Support resume\n", encoding="utf-8")
+    resume.write_text(
+        """---
+version: 1
+lang: en
+page_format: letter
+candidate:
+  name: Example User
+  headline: Current Support Resume
+  email: example@example.invalid
+  evidence: [SKILL-001]
+---
+
+# Professional Summary
+
+Production support specialist. <!-- evidence: SKILL-001 -->
+""",
+        encoding="utf-8",
+    )
     rendered = workspace / "build" / "resumes" / "support" / "resume.html"
     rendered.parent.mkdir(parents=True)
     rendered.write_text("<!doctype html><title>Support resume</title>", encoding="utf-8")
@@ -57,8 +106,70 @@ def test_generated_resume_opens_its_existing_html_preview(tmp_path: Path) -> Non
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
+    assert response.headers["cache-control"] == "no-store"
     assert response.headers["content-security-policy"].startswith("sandbox;")
-    assert response.text == "<!doctype html><title>Support resume</title>"
+    assert "Current Support Resume" in response.text
+    assert "<title>Support resume</title>" not in response.text
+    assert "Previous preview" not in response.text
+    assert "Refresh preview" not in response.text
+
+
+def test_generated_resume_without_published_preview_renders_on_demand(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    workspace = tmp_path / "workspace"
+    fact = workspace / "vault" / "facts" / "skills" / "SKILL-001.md"
+    fact.parent.mkdir(parents=True, exist_ok=True)
+    fact.write_text(
+        """---
+schema_version: 2
+id: SKILL-001
+title: Incident response
+type: responsibility
+status: confirmed
+category: skills
+sources: [SRC-example]
+---
+
+# Incident response
+
+Supported production incidents.
+""",
+        encoding="utf-8",
+    )
+    resume = workspace / "resumes" / "baselines" / "support.md"
+    resume.parent.mkdir(parents=True, exist_ok=True)
+    resume.write_text(
+        """---
+version: 1
+lang: en
+page_format: letter
+candidate:
+  name: Example User
+  headline: Support Engineer
+  email: example@example.invalid
+  evidence: [SKILL-001]
+---
+
+# Professional Summary
+
+Production support specialist. <!-- evidence: SKILL-001 -->
+
+# Technical Skills
+
+- **Operations:** Incident response <!-- evidence: SKILL-001 -->
+""",
+        encoding="utf-8",
+    )
+
+    library = client.get("/api/resumes").json()
+    item = library["sections"][0]["items"][0]
+    response = client.get(item["preview_url"])
+
+    assert item["preview_url"].startswith("/api/resume-preview?")
+    assert response.status_code == 200
+    assert "Support Engineer" in response.text
+    assert "Current draft preview" not in response.text
+    assert "Refresh preview" not in response.text
 
 
 def test_resume_preview_rejects_files_outside_generated_resume_folders(tmp_path: Path) -> None:
@@ -111,7 +222,6 @@ def test_career_library_routes_expose_vault_backed_resumes_and_skills(tmp_path: 
 
     resume_payload = client.get("/api/resumes").json()
     assert [section["id"] for section in resume_payload["sections"]] == [
-        "originals",
         "directional",
         "tailored",
     ]

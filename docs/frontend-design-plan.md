@@ -51,13 +51,16 @@ search, one decision at a time:
 4. Compensation.
 5. Review before activation.
 
-The implemented flow begins with resume intake. A fresh workspace opens directly
-to a focused upload screen with drag-and-drop and file-picker support for PDF,
-DOCX, Markdown, HTML, and text resumes up to 10 MB. Successful uploads are
-registered through the canonical source-import workflow; the temporary raw
-upload is removed after registration. Reloading the portal returns to a saved
-role-suggestion choice instead of asking for the same resume again. `Set up
-later` remains available and persists that choice.
+The implemented flow begins with career-material intake. A fresh workspace opens
+directly to a focused multi-file upload screen with drag-and-drop and file-picker
+support for PDF, DOCX, Markdown, HTML, and text resumes or LinkedIn profile PDFs
+up to 10 MB each. One successful document is enough to continue; the page keeps
+the user in place after import so older and role-specific documents can be added
+without becoming an onboarding requirement. Successful uploads are registered
+through the canonical source-import workflow; temporary raw uploads are removed
+after registration. Reloading the portal returns to a saved role-suggestion
+choice instead of asking for the same material again. `Set up later` remains
+available and persists that choice.
 
 OpenRouter is optional. When chosen, it creates evidence-checked adjacent and
 exploratory role suggestions; when skipped, the user can keep literal roles
@@ -75,7 +78,9 @@ unchanged retries reuse verified evidence. If an excerpt fails validation, the r
 one corrective attempt with validation feedback. A second mismatch still fails
 safely; it never accepts invented evidence. The connected OpenRouter button
 shows generation progress during this request.
-Job providers remain outside onboarding. The remaining steps collect eligibility,
+Job providers remain outside onboarding and every built-in provider is enabled by
+default on a fresh installation. Users may disable providers later in Settings.
+The remaining steps collect eligibility,
 work modes and locations, and optional compensation in compact forms. The final
 review offers an Edit action for every section, saves the canonical job preferences,
 and activates the generated search families. It does not start a scrape or enable
@@ -175,11 +180,16 @@ not a ceiling. A revision token prevents one open browser tab from overwriting n
 changes from another.
 
 Resumes and Skills are read-only projections of the career workspace, except for
-the explicit skill search toggle. FastAPI returns pre-grouped original sources,
-directional resumes, and tailored resumes with presentation-ready lifecycle status.
-Generated resume rows open the HTML artifact already published by the resume preview
-workflow inside a dedicated reading view. Imported source evidence remains distinct
-and is not presented as a generated resume preview.
+the explicit skill search toggle. Imported documents remain vault evidence and do
+not appear as application-ready resumes. The Resumes page presents every directional
+resume and only tailored resumes with a current successful mint. It does not expose
+internal build, review, or mint lifecycle labels.
+Generated resume rows render the current canonical Markdown with the existing resume
+renderer inside a dedicated reading view. The portal reader omits CLI workflow notices;
+rendering a document does not change its review or mint state. Imported source evidence
+remains distinct and is not presented as a generated resume preview. The page provides a compact, progressive
+`Add career material` area for importing more resumes and LinkedIn profile PDFs after
+onboarding; this registers evidence without silently rewriting generated resumes.
 It also returns each canonical skill's evidence and resume usage plus whether the
 existing discovery portfolio currently uses that fact as a search signal. React
 does not infer status, create search terms, or keep a parallel skill registry.

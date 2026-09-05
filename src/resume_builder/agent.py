@@ -70,6 +70,7 @@ from .job_screening_queue import (
 )
 from .jobs import DEFAULT_CONFIG as DEFAULT_JOBS_CONFIG
 from .jobs import DEFAULT_PREFERENCES, get_job_screening_packet
+from .salary_estimation import format_salary_estimate
 from .screening_service import ScreeningService
 
 AGENT_INSTRUCTIONS = """\
@@ -345,6 +346,8 @@ def _render_screen(result: ScreeningResult, *, cached: bool) -> str:
         "",
         result.reasoning_summary,
     ]
+    if result.salary_estimate:
+        lines.extend(("", format_salary_estimate(result.salary_estimate)))
     if result.stretch_case:
         lines.extend(("", f"Why it may be worth the stretch: {result.stretch_case}"))
     violated = [item for item in result.constraints if item.state.value == "violated"]

@@ -1,5 +1,6 @@
 import { useRef, useState, type ReactNode } from "react";
-import { activateJobSearch, answerOnboarding, backOnboarding, getOnboardingStatus, skipOnboarding, startOnboarding, uploadResume, previewRoleTitles } from "../api";
+import { activateJobSearch, answerOnboarding, backOnboarding, getOnboardingStatus, skipOnboarding, startOnboarding, previewRoleTitles } from "../api";
+import { CareerMaterialUploader } from "../components/CareerMaterialUploader";
 import type { OnboardingSetup, OnboardingStatus, WorkMode } from "../types";
 
 interface PageProps { initial: OnboardingStatus; onComplete: () => void }
@@ -14,21 +15,13 @@ function Progress({ status }: { status: OnboardingStatus }) {
 }
 
 function ResumeStep({ busy, error, done }: { busy: boolean; error: string; done: () => void }) {
-  const [file, setFile] = useState<File | null>(null);
-  const [dragging, setDragging] = useState(false);
-  const input = useRef<HTMLInputElement>(null);
-  async function submit() { if (file) { await uploadResume(file); done(); } }
+  const [imported, setImported] = useState(0);
   return <div className="onboarding-content">
-    <p className="eyebrow">Your starting point</p><h1 id="onboarding-title">Add your resume</h1>
-    <p className="onboarding-lede">We’ll use it to suggest roles. You review every choice before job search is configured.</p>
-    <div className={dragging ? "resume-dropzone dragging" : "resume-dropzone"} onDragEnter={(event) => { event.preventDefault(); setDragging(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); setFile(event.dataTransfer.files[0] || null); }}>
-      <span className="file-glyph" aria-hidden="true">↥</span><strong>{file?.name || "Drop your resume here"}</strong>
-      <span>{file ? `${Math.max(1, Math.round(file.size / 1024))} KB selected` : "PDF, DOCX, Markdown, HTML, or text · up to 10 MB"}</span>
-      <input ref={input} type="file" accept=".pdf,.docx,.md,.txt,.html,.htm,.tex" onChange={(event) => setFile(event.target.files?.[0] || null)} />
-      <button className="secondary-button" onClick={() => input.current?.click()}>{file ? "Choose another" : "Choose a file"}</button>
-    </div>
+    <p className="eyebrow">Build your career record</p><h1 id="onboarding-title">Add your career material</h1>
+    <p className="onboarding-lede">Start with one resume. Add older or role-specific resumes and a LinkedIn profile PDF to recover experience a single document may leave out.</p>
+    <CareerMaterialUploader onImported={(items) => setImported((count) => count + items.length)} />
     {error && <p className="onboarding-error" role="alert">{error}</p>}
-    <div className="onboarding-footer"><p>Your resume stays in this private workspace.</p><button className="onboarding-primary" onClick={submit} disabled={!file || busy}>{busy ? "Adding…" : "Add resume"}</button></div>
+    <div className="onboarding-footer"><p>{imported ? "You can add more later. Your originals remain private evidence, not application resumes." : "One document is enough to continue. Everything stays in this private workspace."}</p><button className="onboarding-primary" onClick={done} disabled={!imported || busy}>Continue</button></div>
   </div>;
 }
 

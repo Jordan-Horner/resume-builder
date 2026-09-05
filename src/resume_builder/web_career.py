@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import hashlib
 from datetime import UTC, datetime
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
 import yaml
 
 from .artifact_paths import resume_output_base
+from .atomic import atomic_write_text
+from .ats import normalize_payload
 from .discovery_activation import (
     apply_portfolio_update,
     edit_portfolio,
@@ -26,9 +28,10 @@ from .discovery_portfolio import (
 from .job_setup_defaults import PORTFOLIO_PATH, PREFERENCES_PATH, scaffold_job_search
 from .layout import VaultLayout
 from .project_report import project_report
+from .rendering import known_fact_ids, render_payload
 from .resume_parser import compile_markdown
+from .resume_templates import load_rendering_theme, rendering_theme_text
 from .role_policy import check_query_capacity
-from .source_import import is_metadata_name, load_manifest, resume_manifest_sources
 from .validation import parse_frontmatter
 
 SEARCH_CONFIG_PATH = Path("job-search/config/search.yml")
@@ -37,13 +40,46 @@ PORTFOLIO_BACKUP_PATH = Path("build/job-search/portfolio-before-last-portal-chan
 CONFIG_BACKUP_PATH = Path("build/job-search/search-before-last-portal-change.yml")
 
 
-def _preview_url(resume_id: str) -> str:
-    return f"/api/resume-preview?resume_id={quote(resume_id, safe='')}"
+def _preview_url(resume_id: str, version: int) -> str:
+    return f"/api/resume-preview?resume_id={quote(resume_id, safe='')}&v={version}"
 
 
-def _generated_preview(root: Path, resume: Path) -> Path | None:
-    candidate = resume_output_base(root, resume).with_suffix(".html")
-    return candidate if candidate.is_file() else None
+def _without_workflow_notice(template: str) -> str:
+    """Remove the build-workflow banner from the portal's document reader."""
+    start = template.find('<aside class="draft-notice"')
+    if start == -1:
+        return template
+    end = template.find("</aside>", start)
+    if end == -1:
+        return template
+    return template[:start] + template[end + len("</aside>") :]
+
+
+def _render_portal_preview(root: Path, resume: Path) -> Path:
+    """Render current Markdown for reading without changing workflow state."""
+    payload, _ = normalize_payload(compile_markdown(resume.read_text(encoding="utf-8")))
+    default_template = root / "templates" / "resume-template.html"
+    plan_path = root / "resumes" / "plans" / f"{resume.stem}.yaml"
+    if plan_path.is_file():
+        raw_plan = yaml.safe_load(plan_path.read_text(encoding="utf-8"))
+        resume_template = raw_plan.get("resume_template") if isinstance(raw_plan, dict) else None
+        theme_id = resume_template.get("theme") if isinstance(resume_template, dict) else None
+        if isinstance(theme_id, str) and theme_id:
+            template = rendering_theme_text(load_rendering_theme(root, theme_id))
+        else:
+            template = default_template.read_text(encoding="utf-8").replace("{{THEME_CSS}}", "")
+    else:
+        template = default_template.read_text(encoding="utf-8").replace("{{THEME_CSS}}", "")
+    rendered = render_payload(
+        payload,
+        _without_workflow_notice(template),
+        known_fact_ids((root / "vault").resolve()),
+        preview_notice="",
+    )
+    output = resume_output_base(root, resume).with_suffix(".portal.html")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write_text(output, rendered)
+    return output
 
 
 def resolve_resume_preview(root: Path, resume_id: str) -> dict[str, Any]:
@@ -59,9 +95,7 @@ def resolve_resume_preview(root: Path, resume_id: str) -> dict[str, Any]:
         or not any(candidate.is_relative_to(base) for base in allowed)
     ):
         raise ValueError("generated resume was not found")
-    rendered = _generated_preview(root, candidate)
-    if rendered is None:
-        raise ValueError("this resume does not have an HTML preview yet")
+    rendered = _render_portal_preview(root, candidate)
     return {
         "path": rendered,
         "filename": f"{candidate.stem}.html",
@@ -73,21 +107,6 @@ def _display_name(path: Path, payload: dict[str, Any] | None = None) -> str:
     candidate = payload.get("candidate") if isinstance(payload, dict) else None
     headline = candidate.get("headline") if isinstance(candidate, dict) else None
     return str(headline).strip() if headline else path.stem.replace("-", " ").title()
-
-
-def _generated_status(record: dict[str, Any]) -> tuple[str, str]:
-    if record.get("mint", {}).get("status") == "current":
-        return "Ready", "positive"
-    if record.get("preview", {}).get("status") == "current":
-        return "In review", "attention"
-    if record.get("build", {}).get("status") == "current":
-        return "Built", "neutral"
-    statuses = [
-        record.get(owner, {}).get("status") for owner in ("build", "critique", "preview", "mint")
-    ]
-    if "invalid" in statuses:
-        return "Needs attention", "negative"
-    return "Draft", "neutral"
 
 
 def _all_evidence_ids(value: object) -> set[str]:
@@ -105,57 +124,12 @@ def _all_evidence_ids(value: object) -> set[str]:
 
 
 def list_resumes(root: Path) -> dict[str, Any]:
-    """Adapt canonical sources and project status into a presentation-ready library."""
-    layout = VaultLayout.load(root / "vault", allow_missing=True)
-    grouped_originals: dict[str, dict[str, Any]] = {}
-    for source in resume_manifest_sources(load_manifest(layout)):
-        names = [name for name in source.get("filenames", []) if not is_metadata_name(name)]
-        if not names:
-            continue
-        source_name = str(names[0])
-        source_path = PurePosixPath(source_name)
-        group_id = source_path.with_suffix("").as_posix().casefold()
-        item = grouped_originals.get(group_id)
-        if item is None:
-            item = {
-                "id": source["id"],
-                "name": source_path.with_suffix("").as_posix(),
-                "kind": "original",
-                "status_label": "Imported",
-                "status_tone": "neutral",
-                "updated_at": source.get("refreshed_at") or source.get("imported_at"),
-                "formats": set(),
-                "has_empty_source": False,
-                "preview_url": None,
-                "preview_message": "Directional resumes include a formatted HTML preview.",
-            }
-            grouped_originals[group_id] = item
-        item["formats"].add(str(source.get("format") or "source").upper())
-        item["has_empty_source"] = (
-            item["has_empty_source"] or source.get("extraction_status") != "ok"
-        )
-        updated_at = source.get("refreshed_at") or source.get("imported_at")
-        if updated_at and str(updated_at) > str(item.get("updated_at") or ""):
-            item["updated_at"] = updated_at
-
-    originals = []
-    for item in grouped_originals.values():
-        formats = ", ".join(sorted(item.pop("formats")))
-        has_empty_source = bool(item.pop("has_empty_source"))
-        item.update(
-            {
-                "detail": f"{formats} · Base resume",
-                "error": "No readable text was extracted from one format."
-                if has_empty_source
-                else None,
-            }
-        )
-        originals.append(item)
-    originals.sort(key=lambda item: str(item["name"]).casefold())
-
+    """Adapt generated resume artifacts into a presentation-ready library."""
     report = project_report(root / "vault", strict=False)
     generated: dict[str, list[dict[str, Any]]] = {"directional": [], "tailored": []}
     for record in report["resumes"]:
+        if record["kind"] == "tailored" and record.get("mint", {}).get("status") != "current":
+            continue
         path = root / record["path"]
         try:
             payload = compile_markdown(path.read_text(encoding="utf-8"))
@@ -163,42 +137,32 @@ def list_resumes(root: Path) -> dict[str, Any]:
         except (OSError, ValueError) as exc:
             payload = None
             error = str(exc)
-        status_label, status_tone = _generated_status(record)
         kind = "directional" if record["kind"] == "baseline" else "tailored"
-        rendered = _generated_preview(root, path)
         direction = record.get("direction")
         detail = (
             f"Direction · {Path(direction).stem.replace('-', ' ').title()}"
             if kind == "directional" and direction
             else "Reusable role direction"
             if kind == "directional"
-            else "Job-specific resume"
+            else "Minted application resume"
         )
         generated[kind].append(
             {
                 "id": record["path"],
                 "name": _display_name(path, payload),
                 "kind": kind,
-                "status_label": "Needs attention" if error else status_label,
-                "status_tone": "negative" if error else status_tone,
                 "updated_at": datetime.fromtimestamp(path.stat().st_mtime, UTC).isoformat(),
                 "detail": detail,
                 "skill_fact_ids": sorted(_all_evidence_ids(payload or {})),
                 "error": error,
-                "preview_url": _preview_url(record["path"]) if rendered else None,
-                "preview_message": (
-                    None if rendered else "This resume does not have an HTML preview yet."
-                ),
+                "preview_url": _preview_url(record["path"], path.stat().st_mtime_ns)
+                if payload is not None
+                else None,
+                "preview_message": None,
             }
         )
     return {
         "sections": [
-            {
-                "id": "originals",
-                "title": "Base resumes",
-                "description": "Resume sources used to build role-specific versions.",
-                "items": originals,
-            },
             {
                 "id": "directional",
                 "title": "Directional resumes",
@@ -208,7 +172,7 @@ def list_resumes(root: Path) -> dict[str, Any]:
             {
                 "id": "tailored",
                 "title": "Tailored resumes",
-                "description": "Job-specific versions kept with application history.",
+                "description": "Minted job-specific resumes used with applications.",
                 "items": generated["tailored"],
             },
         ]

@@ -6,7 +6,12 @@ from pathlib import Path
 import yaml
 
 from resume_builder.job_setup_defaults import scaffold_job_search
-from resume_builder.web_career import list_resumes, list_skills, set_skill_search_enabled
+from resume_builder.web_career import (
+    list_resumes,
+    list_skills,
+    resolve_resume_preview,
+    set_skill_search_enabled,
+)
 from resume_builder.workspace import initialize_workspace
 
 
@@ -41,7 +46,7 @@ Used {title} while supporting production systems.
     )
 
 
-def test_resume_library_includes_imported_sources_and_generated_resumes(tmp_path: Path) -> None:
+def test_resume_library_keeps_imported_sources_out_of_generated_resumes(tmp_path: Path) -> None:
     root = _workspace(tmp_path)
     from resume_builder.layout import VaultLayout
     from resume_builder.source_import import apply_import_plan, build_import_plan
@@ -54,13 +59,14 @@ def test_resume_library_includes_imported_sources_and_generated_resumes(tmp_path
 
     library = list_resumes(root)
 
-    assert library["sections"][0]["id"] == "originals"
-    assert library["sections"][0]["items"][0]["name"] == "Jordan Resume"
-    assert library["sections"][0]["items"][0]["kind"] == "original"
-    assert library["sections"][0]["items"][0]["preview_url"] is None
+    assert [section["id"] for section in library["sections"]] == [
+        "directional",
+        "tailored",
+    ]
+    assert all(section["items"] == [] for section in library["sections"])
 
 
-def test_resume_library_excludes_non_resume_sources_and_groups_format_variants(
+def test_resume_library_does_not_present_source_documents_as_resumes(
     tmp_path: Path,
 ) -> None:
     root = _workspace(tmp_path)
@@ -80,11 +86,13 @@ def test_resume_library_excludes_non_resume_sources_and_groups_format_variants(
     )
     apply_import_plan(layout, build_import_plan(layout, [str(note)], []))
 
-    originals = list_resumes(root)["sections"][0]["items"]
+    library = list_resumes(root)
 
-    assert len(originals) == 1
-    assert originals[0]["name"] == "Jordan Resume"
-    assert originals[0]["detail"] == "HTML, MD · Base resume"
+    assert [section["id"] for section in library["sections"]] == [
+        "directional",
+        "tailored",
+    ]
+    assert all(section["items"] == [] for section in library["sections"])
 
 
 def test_resume_library_ignores_macos_metadata_generated_resumes(tmp_path: Path) -> None:
@@ -141,9 +149,9 @@ Production support specialist. <!-- evidence: SKILL-001 -->
     ]
 
     assert [item["id"] for item in skills] == ["SKILL-001", "SKILL-002"]
-    assert skills[0]["resumes"] == ["Support Operations", "Support Operations"]
+    assert skills[0]["resumes"] == ["Support Operations"]
     assert skills[1]["resumes"] == []
-    assert [item["kind"] for item in resumes] == ["directional", "tailored"]
+    assert [item["kind"] for item in resumes] == ["directional"]
     assert all(item["skill_fact_ids"] == ["SKILL-001"] for item in resumes)
 
 
@@ -215,3 +223,75 @@ Evidence-backed resume.
         section for section in list_resumes(root)["sections"] if section["id"] == "directional"
     )
     assert all("primary" not in item for item in directional["items"])
+
+
+def test_portal_reader_renders_current_markdown_instead_of_old_preview(
+    tmp_path: Path, monkeypatch
+) -> None:
+    root = tmp_path / "workspace"
+    resume = root / "resumes" / "tailored" / "example.md"
+    resume.parent.mkdir(parents=True)
+    resume.write_text("# Example", encoding="utf-8")
+    old_preview = root / "build" / "resumes" / "example" / "resume.html"
+    old_preview.parent.mkdir(parents=True)
+    old_preview.write_text("Previous preview · Refresh preview", encoding="utf-8")
+    current_draft = old_preview.with_name("resume.portal.html")
+    current_draft.write_text("Current draft preview", encoding="utf-8")
+    monkeypatch.setattr(
+        "resume_builder.web_career._render_portal_preview", lambda *_args: current_draft
+    )
+
+    resolved = resolve_resume_preview(root, "resumes/tailored/example.md")
+
+    assert resolved["path"] == current_draft
+
+
+def test_resume_library_only_shows_minted_tailored_resumes(
+    tmp_path: Path, monkeypatch
+) -> None:
+    root = _workspace(tmp_path)
+    source = """---
+version: 1
+lang: en
+page_format: letter
+candidate:
+  name: Example User
+  headline: {headline}
+  email: example@example.invalid
+  evidence: []
+---
+
+# Professional Summary
+
+Evidence-backed resume.
+"""
+    tailored = root / "resumes" / "tailored"
+    tailored.mkdir(parents=True, exist_ok=True)
+    (tailored / "minted.md").write_text(source.format(headline="Minted"), encoding="utf-8")
+    (tailored / "draft.md").write_text(source.format(headline="Draft"), encoding="utf-8")
+    monkeypatch.setattr(
+        "resume_builder.web_career.project_report",
+        lambda *_args, **_kwargs: {
+            "resumes": [
+                {
+                    "path": "resumes/tailored/minted.md",
+                    "kind": "tailored",
+                    "mint": {"status": "current"},
+                    "direction": None,
+                },
+                {
+                    "path": "resumes/tailored/draft.md",
+                    "kind": "tailored",
+                    "mint": {"status": "missing"},
+                    "direction": None,
+                },
+            ]
+        },
+    )
+
+    tailored_section = next(
+        section for section in list_resumes(root)["sections"] if section["id"] == "tailored"
+    )
+
+    assert [item["name"] for item in tailored_section["items"]] == ["Minted"]
+    assert tailored_section["items"][0]["detail"] == "Minted application resume"

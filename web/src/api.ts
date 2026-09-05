@@ -70,10 +70,10 @@ export function getOnboardingStatus(): Promise<OnboardingStatus> {
   return request<OnboardingStatus>("/api/onboarding");
 }
 
-export function uploadResume(file: File): Promise<{ filename: string; registered_sources: number }> {
+export function uploadResume(file: File): Promise<{ filename: string; registered_sources: number; added?: number; already_registered?: boolean }> {
   const body = new FormData();
   body.append("file", file);
-  return request("/api/onboarding/resume", { method: "POST", body });
+  return request("/api/career-material/resumes", { method: "POST", body });
 }
 
 export function skipOnboarding(): Promise<void> {
