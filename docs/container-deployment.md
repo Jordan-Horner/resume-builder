@@ -1,12 +1,42 @@
 # Container releases and host-managed updates
 
 Every push to `main` runs Python, frontend, security, and container checks. Only
-after all jobs pass does CI publish an AMD64/ARM64 image to
+after all required checks pass does CI advance the AMD64/ARM64 release tags in
 `ghcr.io/jordan-horner/resume-builder`. Pull requests never publish images.
 The local-build Compose file remains a development configuration. The published
 image is a single-container appliance: the portal, scheduler, and optional
 Telegram worker start together and share the same mounted workspace and runtime
 state.
+
+CI runs the general checks first. On main, native Ubuntu AMD64 and ARM64 runners
+then build candidates in parallel with separate architecture caches, maximum
+provenance, and SBOM attestations. Candidates are pushed to GHCR by digest without
+release tags, pulled back by that exact digest, and checked for fresh startup,
+portal HTML, and the disabled-by-default scheduler. Only successful candidates
+upload a tested-digest artifact. Pull requests use a local validation image and
+have no registry write permission.
+
+The serialized publication job combines the two tested image indexes without
+rebuilding. It checks that every runtime and attestation descriptor is preserved,
+then checks main's current commit immediately before advancing the `main` and
+`sha-<commit>` tags to the verified combined digest. The release notice is updated
+only after both tags resolve to that digest. Native runner labels are
+`ubuntu-24.04` and `ubuntu-24.04-arm`; the repository's Actions policy must permit
+both. The frontend build stage also stays native because it produces static assets.
+
+Candidate uploads precede smoke testing: failed candidates may remain untagged in
+GHCR, but cannot advance release tags. Assembly uses a `candidate-<run>-<attempt>`
+tag, which may also remain after failure or supersession. These are intermediate
+registry artifacts, not deployment channels. No automatic registry deletion is
+performed. Tested-digest artifacts expire after one day; after expiry, rerun all
+jobs to rebuild and retest. Before expiry, rerunning failed jobs can reuse a
+successful architecture's tested digest from the same workflow run.
+
+GitHub's branch head and GHCR tags cannot be updated atomically. A new commit can
+arrive just after the final check; publication serialization prevents an older
+publisher from overwriting an already-published newer run. Registry tagging and
+GitHub release announcements are also separate operations: a partial failure
+fails CI and requires a rerun, rather than claiming atomic rollback.
 
 ## Channels and identity
 

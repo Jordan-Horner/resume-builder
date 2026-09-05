@@ -10,16 +10,39 @@ import yaml
 def test_publication_waits_for_checks_and_announces_only_after_push():
     workflow = yaml.load(Path(".github/workflows/ci.yml").read_text(), Loader=yaml.BaseLoader)
     publish = workflow["jobs"]["publish"]
-    assert set(publish["needs"]) == {"secrets", "container", "test", "frontend"}
+    assert set(publish["needs"]) == {"quality", "secrets", "candidate", "test", "frontend"}
     assert "github.event_name == 'push'" in publish["if"]
     assert "refs/heads/main" in publish["if"]
     steps = publish["steps"]
-    build = next(step for step in steps if step.get("id") == "image")
-    assert build["with"]["push"] == "true"
-    assert build["with"]["platforms"] == "linux/amd64,linux/arm64"
-    assert "github.sha" in build["with"]["tags"]
+    assert not any("build-push-action" in step.get("uses", "") for step in steps)
+    promote = next(step for step in steps if step.get("id") == "promote")
+    assert "promote_container_image.py" in promote["run"]
     assert "publish_container_release.py" in steps[-1]["run"]
-    assert steps[-1]["env"]["IMAGE_DIGEST"] == "${{ steps.image.outputs.digest }}"
+    assert steps[-1]["if"] == "steps.promote.outputs.promoted == 'true'"
+    assert steps[-1]["env"]["IMAGE_DIGEST"] == "${{ steps.promote.outputs.digest }}"
+    candidate = workflow["jobs"]["candidate"]
+    assert "github.event_name == 'push'" in candidate["if"]
+    assert set(candidate["needs"]) == {"quality", "secrets", "test", "frontend"}
+    assert candidate["strategy"]["matrix"]["include"] == [
+        {"arch": "amd64", "runner": "ubuntu-24.04"},
+        {"arch": "arm64", "runner": "ubuntu-24.04-arm"},
+    ]
+    candidate_steps = candidate["steps"]
+    build = next(step for step in candidate_steps if step.get("id") == "image")
+    assert "push-by-digest=true" in build["with"]["outputs"]
+    assert "tags" not in build["with"]
+    assert build["with"]["provenance"] == "mode=max"
+    assert build["with"]["sbom"] == "true"
+    smoke = next(
+        i for i, step in enumerate(candidate_steps) if "smoke_container.sh" in step.get("run", "")
+    )
+    upload = next(
+        i for i, step in enumerate(candidate_steps) if "upload-artifact" in step.get("uses", "")
+    )
+    assert smoke < upload
+    assert "@$IMAGE_DIGEST" in candidate_steps[smoke]["run"]
+    assert workflow["jobs"]["container"]["if"] == "github.event_name == 'pull_request'"
+    assert "permissions" not in workflow["jobs"]["container"]
 
 
 def test_registry_deployment_preserves_volume_and_has_no_docker_control():
@@ -39,6 +62,22 @@ def test_registry_deployment_preserves_volume_and_has_no_docker_control():
     ]
     assert set(document["volumes"]) == {"workspace", "state"}
     assert "docker.sock" not in str(document)
+
+
+def test_ci_gates_expensive_checks_and_only_cancels_obsolete_pull_requests():
+    workflow = yaml.load(Path(".github/workflows/ci.yml").read_text(), Loader=yaml.BaseLoader)
+    assert workflow["concurrency"]["cancel-in-progress"] == (
+        "${{ github.event_name == 'pull_request' }}"
+    )
+    assert "github.run_id" in workflow["concurrency"]["group"]
+    jobs = workflow["jobs"]
+    assert jobs["publish"]["concurrency"]["cancel-in-progress"] == "false"
+    for name in ("test", "container"):
+        assert jobs[name]["needs"] == "quality"
+    for job in jobs.values():
+        assert 0 < int(job["timeout-minutes"]) <= 30
+    assert jobs["test"]["strategy"]["matrix"]["python-version"] == ["3.11", "3.14"]
+    assert any(step.get("run") == "pytest" for step in jobs["test"]["steps"])
 
 
 def test_local_compose_is_one_container_with_shared_workspace_and_state():

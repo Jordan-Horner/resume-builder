@@ -33,6 +33,30 @@ The complete test suite installs Chromium through Playwright. A pull request
 should pass the same test, lint, format, type, build, distribution, and fictional
 fixture checks defined in `.github/workflows/ci.yml`.
 
+CI runs lint, formatting, and type checks once on Python 3.11 before starting
+the Python matrix and pull-request container build. Both Python 3.11 and 3.14 run the full
+test suite, including Chromium PDF tests. Architecture and committed demo-asset
+audits already run inside pytest; their standalone commands remain useful locally.
+Packaging, clean-install checks, and the fictional CLI demonstration run once on
+Python 3.14. Frontend and secret checks run independently. New pull-request commits
+cancel obsolete runs; main-branch publication remains serialized and non-cancelling.
+After the main-branch checks pass, native AMD64 and ARM64 jobs build and test
+registry candidates by digest. Publication combines those tested images and their
+attestations without rebuilding; see [container releases](docs/container-deployment.md)
+for promotion, partial-failure, and rerun behavior.
+
+To exercise the same fresh-container startup check locally:
+
+```bash
+docker build --tag resume-builder-automation:ci .
+sh scripts/smoke_container.sh resume-builder-automation:ci
+```
+
+The check uses no host mounts or credentials. It waits up to two minutes for
+health, verifies the portal HTML and status response, checks that the scheduler
+starts disabled, prints container logs on failure, and removes the container.
+CI job timeouts bound dependency installation, builds, and checks as well.
+
 ## Data and privacy rules
 
 - Use fictional fixtures in tests and examples.
