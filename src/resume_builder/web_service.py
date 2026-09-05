@@ -593,7 +593,9 @@ class DashboardService:
             preview = preview_activation(portfolio, yaml.safe_dump(config, sort_keys=False))
 
             atomic_write_text(preferences_path, yaml.safe_dump(preferences, sort_keys=False))
-            atomic_write_text(self.workspace / PORTFOLIO_PATH, portfolio.model_dump_json(indent=2) + "\n")
+            atomic_write_text(
+                self.workspace / PORTFOLIO_PATH, portfolio.model_dump_json(indent=2) + "\n"
+            )
             atomic_write_text(config_path, preview.rendered_config)
             save_setup_state(self.workspace, state)
         return self.job_search_preferences()

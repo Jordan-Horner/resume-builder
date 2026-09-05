@@ -397,7 +397,11 @@ def test_onboarding_does_not_claim_completion_when_activation_fails(tmp_path, mo
         "location", {"search_country": "United States", "accepted_work_modes": ["remote"]}
     )
     service.answer_preference_step("compensation", {"skipped": True})
-    monkeypatch.setattr(web_service, "activate_setup", lambda *_args: (_ for _ in ()).throw(ValueError("activation failed")))
+    monkeypatch.setattr(
+        web_service,
+        "activate_setup",
+        lambda *_args: (_ for _ in ()).throw(ValueError("activation failed")),
+    )
 
     with pytest.raises(ValueError, match="activation failed"):
         service.answer_preference_step("review", {"action": "save"})
