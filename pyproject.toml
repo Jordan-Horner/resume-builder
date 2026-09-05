@@ -38,6 +38,7 @@ telegram = [
 web = [
   "fastapi>=0.115,<1",
   "python-multipart>=0.0.20,<1",
+  "supervisor>=4.2,<5",
   "uvicorn>=0.34,<1",
 ]
 dev = [

@@ -23,12 +23,18 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
 
     updates = UpdateChecker()
     from .web_job_sources import source_status, start_scan, toggle_source
+    from .web_schedule import save_schedule, schedule_status
+    from .web_system import system_status
 
     app = FastAPI(title="Resume Builder", docs_url="/api/docs", redoc_url=None)
 
     @app.get("/api/system/version")
     def system_version() -> dict[str, Any]:
         return updates.status()
+
+    @app.get("/api/system/status")
+    def runtime_status() -> dict[str, Any]:
+        return system_status(workspace)
 
     @app.get("/api/onboarding")
     def onboarding() -> dict[str, Any]:
@@ -170,6 +176,20 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
     def scan_job_sources() -> dict[str, Any]:
         try:
             return start_scan(workspace)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/api/scrape-schedule")
+    def scrape_schedule() -> dict[str, Any]:
+        try:
+            return schedule_status(workspace)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.put("/api/scrape-schedule")
+    def update_scrape_schedule(payload: dict[str, Any]) -> dict[str, Any]:
+        try:
+            return save_schedule(workspace, payload)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 

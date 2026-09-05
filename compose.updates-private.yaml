@@ -1,6 +1,6 @@
 # Optional read-only GitHub credential, kept on the host outside the repository.
 services:
-  onboarding:
+  resume-builder:
     environment:
       RESUME_BUILDER_UPDATE_TOKEN_FILE: /run/secrets/update-token
     secrets:

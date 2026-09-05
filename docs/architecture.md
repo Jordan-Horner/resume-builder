@@ -33,6 +33,20 @@ editorial approval.
     outcomes, and evidence-cited answers without turning application prose into
     career evidence.
 
+## Local appliance boundary
+
+The published Docker image presents one container and one portal port. A small
+process supervisor keeps the FastAPI portal, native automation scheduler, and
+optional Telegram worker isolated inside that container while they share the
+mounted private workspace and external runtime directory. This is a deployment
+boundary, not a new source of truth: the existing CLI workflows, configuration
+files, locks, and databases remain authoritative.
+
+The portal is the core health surface. Scheduler or Telegram failures are
+reported as degraded component status and do not deliberately make the portal
+unavailable. Fresh installations create an inactive automation configuration;
+the user explicitly enables recurring scraping in the portal.
+
 ## Trust boundaries
 
 | Input | What it may influence | What it may not establish |

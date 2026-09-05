@@ -24,13 +24,50 @@ def test_publication_waits_for_checks_and_announces_only_after_push():
 
 def test_registry_deployment_preserves_volume_and_has_no_docker_control():
     document = yaml.safe_load(Path("compose.deploy.yaml").read_text())
-    service = document["services"]["onboarding"]
+    assert list(document["services"]) == ["resume-builder"]
+    service = document["services"]["resume-builder"]
     assert "build" not in service
     assert service["image"].startswith("ghcr.io/jordan-horner/resume-builder:")
-    assert (
-        document["volumes"]["onboarding-workspace"]["name"] == "resume-builder-onboarding-workspace"
-    )
+    assert service["command"] == ["serve"]
+    assert service["environment"]["RESUME_BUILDER_WORKSPACE"] == "/workspace"
+    assert service["ports"] == [
+        "${RESUME_BUILDER_WEB_BIND:-127.0.0.1}:${RESUME_BUILDER_WEB_PORT:-8766}:8765"
+    ]
+    assert service["volumes"] == [
+        "${RESUME_BUILDER_WORKSPACE_PATH:-resume-builder-workspace}:/workspace",
+        "${RESUME_BUILDER_RUNTIME_PATH:-resume-builder-state}:/state",
+    ]
+    assert set(document["volumes"]) == {"workspace", "state"}
     assert "docker.sock" not in str(document)
+
+
+def test_local_compose_is_one_container_with_shared_workspace_and_state():
+    document = yaml.safe_load(Path("compose.yaml").read_text())
+    assert list(document["services"]) == ["resume-builder"]
+    service = document["services"]["resume-builder"]
+    assert service["command"] == ["serve"]
+    assert service["environment"]["RESUME_BUILDER_WORKSPACE"] == "/workspace"
+    assert service["environment"]["RESUME_BUILDER_AUTOMATION_STATE"].startswith("/state/")
+    assert service["environment"]["RESUME_BUILDER_AGENT_STATE"].startswith("/state/")
+    assert service["volumes"] == [
+        "${RESUME_BUILDER_WORKSPACE_PATH:?Set RESUME_BUILDER_WORKSPACE_PATH}:/workspace",
+        "${RESUME_BUILDER_RUNTIME_PATH:?Set RESUME_BUILDER_RUNTIME_PATH}:/state",
+    ]
+
+
+def test_image_starts_the_portal_first_service_and_checks_its_health():
+    dockerfile = Path("Dockerfile").read_text()
+    assert 'ENTRYPOINT ["resume-builder-entrypoint"]' in dockerfile
+    assert 'CMD ["serve"]' in dockerfile
+    assert "/api/system/status" in dockerfile
+
+
+def test_entrypoint_keeps_existing_roots_and_nests_fresh_read_only_parents():
+    entrypoint = Path("docker/resume-builder-entrypoint.sh").read_text()
+    assert 'workspace_parent=$(dirname "${workspace}")' in entrypoint
+    assert 'if [ ! -w "${workspace_parent}" ]' in entrypoint
+    assert 'workspace="${workspace%/}/workspace"' in entrypoint
+    assert 'export RESUME_BUILDER_WORKSPACE="${workspace}"' in entrypoint
 
 
 def test_version_api_is_read_only(tmp_path, monkeypatch):

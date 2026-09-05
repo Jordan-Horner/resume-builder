@@ -38,8 +38,8 @@ COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
 RUN python -m pip install --no-cache-dir ".[agent,gmail,telegram,web]"
 COPY --from=web-build /web/dist /app/web/dist
-COPY docker/onboarding-web-entrypoint.sh /usr/local/bin/onboarding-web-entrypoint
-RUN chmod 0755 /usr/local/bin/onboarding-web-entrypoint
+COPY docker/resume-builder-entrypoint.sh /usr/local/bin/resume-builder-entrypoint
+RUN chmod 0755 /usr/local/bin/resume-builder-entrypoint
 
 RUN mkdir -p /workspace /state /onboarding \
     && chown -R resume-builder:resume-builder /workspace /state /onboarding
@@ -48,7 +48,7 @@ USER resume-builder
 WORKDIR /workspace
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD ["resume-builder", "automation", "status", "--healthcheck"]
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/api/system/status', timeout=5)"]
 
-ENTRYPOINT ["resume-builder"]
-CMD ["automation", "run"]
+ENTRYPOINT ["resume-builder-entrypoint"]
+CMD ["serve"]

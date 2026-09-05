@@ -125,6 +125,19 @@ class AgentState:
             finally:
                 fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
 
+    def telegram_service_is_running(self) -> bool:
+        """Return whether a Telegram polling process holds the channel lock."""
+        lock_path = self.path.with_suffix(f"{self.path.suffix}.telegram.lock")
+        if not lock_path.is_file():
+            return False
+        with lock_path.open("r+", encoding="utf-8") as stream:
+            try:
+                fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return True
+            fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+        return False
+
     def load_history(
         self,
         channel: str,

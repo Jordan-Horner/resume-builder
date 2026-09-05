@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getJobs,
   getOnboardingStatus,
+  getSystemStatus,
+  getScrapeSchedule,
   markJobApplied,
   markJobNotInterested,
   skipOnboarding,
@@ -81,5 +83,29 @@ describe("dashboard API client", () => {
     expect(options?.method).toBe("POST");
     expect(options?.body).toBeInstanceOf(FormData);
     expect((options?.body as FormData).get("file")).toBe(file);
+  });
+
+  it("explains when an older server returns the app shell for a new API route", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("<!doctype html><html></html>", {
+        status: 200,
+        headers: { "Content-Type": "text/html" },
+      }),
+    );
+
+    await expect(getScrapeSchedule()).rejects.toThrow("portal and server are out of sync");
+  });
+
+  it("loads component health from the portal", async () => {
+    const payload = { status: "healthy", components: [] };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await expect(getSystemStatus()).resolves.toEqual(payload);
+    expect(fetchMock).toHaveBeenCalledWith("/api/system/status", undefined);
   });
 });

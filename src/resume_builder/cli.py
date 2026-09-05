@@ -28,6 +28,7 @@ from . import (
     rendering,
     review_records,
     schema_upgrade,
+    service,
     source_import,
     synthesis,
     validation,
@@ -82,6 +83,7 @@ COMMANDS: dict[str, Command] = {
         automation.main,
         "Schedule job discovery, Gmail updates, and notifications",
     ),
+    "serve": (service.main, "Run the portal and background services together"),
     "gmail": (
         gmail_automation.main,
         "Detect application confirmations without retaining email content",

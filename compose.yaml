@@ -1,49 +1,32 @@
 services:
-  automation:
+  resume-builder:
     build:
       context: .
-    image: resume-builder-automation:${RESUME_BUILDER_IMAGE_TAG:-local}
+    image: resume-builder:${RESUME_BUILDER_IMAGE_TAG:-local}
     restart: unless-stopped
+    command: ["serve"]
     environment:
       RESUME_BUILDER_WORKSPACE: /workspace
       RESUME_BUILDER_AUTOMATION_STATE: /state/automation-state.sqlite
       RESUME_BUILDER_GMAIL_STATE: /state/gmail-state.sqlite
       RESUME_BUILDER_GMAIL_TOKEN: /state/gmail-token.json
+      RESUME_BUILDER_AGENT_STATE: /state/agent-state.sqlite
+      RESUME_BUILDER_TELEGRAM_TOKEN_FILE: /state/telegram-bot-token
+      RESUME_BUILDER_STATE_DIR: /state
+      RESUME_BUILDER_WEB_PORT: 8765
       RESUME_BUILDER_DISCORD_WEBHOOK: ${RESUME_BUILDER_DISCORD_WEBHOOK:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      RESUME_BUILDER_TELEGRAM_BOT_TOKEN: ${RESUME_BUILDER_TELEGRAM_BOT_TOKEN:-}
       RESUME_BUILDER_LOG_LEVEL: ${RESUME_BUILDER_LOG_LEVEL:-INFO}
       JOB_PULLER_LINKEDIN_RESULTS_WANTED: ${JOB_PULLER_LINKEDIN_RESULTS_WANTED:-}
       TZ: ${RESUME_BUILDER_TIMEZONE:-America/New_York}
+    ports:
+      - "${RESUME_BUILDER_WEB_BIND:-127.0.0.1}:${RESUME_BUILDER_WEB_PORT:-8766}:8765"
     logging:
       driver: json-file
       options:
         max-file: "3"
         max-size: 10m
-    volumes:
-      - ${RESUME_BUILDER_WORKSPACE_PATH:?Set RESUME_BUILDER_WORKSPACE_PATH}:/workspace
-      - ${RESUME_BUILDER_RUNTIME_PATH:?Set RESUME_BUILDER_RUNTIME_PATH}:/state
-  telegram-agent:
-    profiles: ["telegram"]
-    build:
-      context: .
-    image: resume-builder-automation:${RESUME_BUILDER_IMAGE_TAG:-local}
-    restart: unless-stopped
-    command: ["agent", "serve", "--channel", "telegram"]
-    environment:
-      RESUME_BUILDER_WORKSPACE: /workspace
-      RESUME_BUILDER_AUTOMATION_STATE: /state/automation-state.sqlite
-      RESUME_BUILDER_AGENT_STATE: /state/agent-state.sqlite
-      RESUME_BUILDER_TELEGRAM_BOT_TOKEN: ${RESUME_BUILDER_TELEGRAM_BOT_TOKEN:-}
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      RESUME_BUILDER_LOG_LEVEL: ${RESUME_BUILDER_LOG_LEVEL:-INFO}
-      TZ: ${RESUME_BUILDER_TIMEZONE:-America/New_York}
-    logging:
-      driver: json-file
-      options:
-        max-file: "3"
-        max-size: 10m
-    healthcheck:
-      disable: true
     volumes:
       - ${RESUME_BUILDER_WORKSPACE_PATH:?Set RESUME_BUILDER_WORKSPACE_PATH}:/workspace
       - ${RESUME_BUILDER_RUNTIME_PATH:?Set RESUME_BUILDER_RUNTIME_PATH}:/state

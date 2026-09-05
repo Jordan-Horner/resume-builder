@@ -402,14 +402,54 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
 .role-empty { padding: 16px 0; color: var(--muted); }
 .role-draft-status { margin-top: 16px; color: var(--muted); font-size: 12px; }
 .job-sources { max-width: 900px; margin-bottom: 36px; }
-.job-sources > p, .source-scan-actions small { color: var(--muted); font-size: 13px; }
+.job-sources p { color: var(--muted); font-size: 13px; }
+.scrape-schedule { padding-bottom: 32px; border-bottom: 1px solid var(--line); margin-bottom: 32px; }
+.schedule-heading, .provider-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+.schedule-heading h2, .provider-heading h2 { margin-bottom: 4px; }
+.schedule-heading p, .provider-heading p { margin: 0; }
+.schedule-controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 28px; margin-top: 24px; }
+.schedule-controls.disabled { opacity: .48; }
+.schedule-label { display: block; margin-bottom: 9px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.schedule-presets { display: inline-flex; padding: 3px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.schedule-presets button { min-height: 34px; padding: 0 12px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); font-weight: 650; cursor: pointer; }
+.schedule-presets button.active { background: #30363d; color: var(--text); box-shadow: 0 1px 2px #0006; }
+.schedule-presets button:focus-visible, .time-chip button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.schedule-times { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.time-chip { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 0 11px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); font-size: 13px; font-weight: 650; }
+.time-chip button { border: 0; background: transparent; color: var(--muted); font-size: 18px; cursor: pointer; }
+.add-time { display: inline-flex; gap: 6px; }
+.add-time input, .add-time button { width: auto; min-height: 36px; }
+.schedule-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-top: 24px; padding: 14px 16px; border-radius: 7px; background: var(--surface); font-size: 13px; }
+.schedule-summary span { display: grid; gap: 4px; }
+.schedule-summary small { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.scheduler-state::after { content: ''; width: 7px; height: 7px; margin-left: 7px; border-radius: 50%; background: var(--muted); display: inline-block; }
+.scheduler-state.online::after { background: #3fb950; }
+.scheduler-state.offline::after { background: #d29922; }
+.schedule-warning { color: #d29922 !important; }
+.schedule-notice { color: #3fb950 !important; }
+.schedule-save { margin-top: 14px; }
+.provider-heading { align-items: center; margin-bottom: 10px; }
+.provider-heading .onboarding-primary { width: auto; white-space: nowrap; }
 .job-source-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); gap: 16px; }
 .job-source-row strong { font-size: 14px; }.job-source-row small { display: block; color: var(--muted); margin-top: 4px; font-size: 12px; }
 .source-toggle { display: flex; align-items: center; gap: 10px; font-size: 13px; }
 .source-toggle input { appearance: none; width: 44px; height: 26px; border-radius: 20px; border: 1px solid var(--line); background: #30363d; cursor: pointer; }
 .source-toggle input::before { content: ''; display: block; width: 18px; height: 18px; margin: 3px; border-radius: 50%; background: #e6edf3; }
 .source-toggle input:checked { background: #238636; }.source-toggle input:checked::before { transform: translateX(17px); }.source-toggle input:focus-visible { outline: 2px solid #58a6ff; outline-offset: 4px; }.source-toggle input:disabled { opacity: .5; }
-.source-scan-actions { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-top: 22px; }.source-scan-result { margin-top: 16px; font-size: 14px; }
+.source-scan-result { margin-top: 16px; font-size: 14px; }
+.system-health-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 34px; padding-top: 26px; border-top: 1px solid var(--line); }
+.system-health-heading h3 { margin: 0; font-size: 16px; }
+.system-summary { font-size: 12px; font-weight: 700; }
+.system-summary.healthy { color: #3fb950; }
+.system-summary.degraded { color: #d29922; }
+.system-health-list { margin: 12px 0 0; }
+.system-health-list > div { display: grid; grid-template-columns: minmax(130px, 1fr) 2fr; gap: 18px; padding: 11px 0; border-top: 1px solid var(--line); }
+.system-health-list dt { display: flex; align-items: center; gap: 9px; font-weight: 650; }
+.system-health-list dd { margin: 0; color: var(--muted); }
+.service-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.service-dot.online { background: #3fb950; }
+.service-dot.offline, .service-dot.error { background: #f85149; }
+.service-dot.disabled, .service-dot.not_configured { background: #8b949e; }
 .company-block-tools { margin: 0 0 12px; }
 .jobs-search-tools { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 10px; position: relative; z-index: 3; }
 .jobs-search-tools .search-field { flex: 1 1 calc(60% - 5px); order: 0; }
@@ -448,6 +488,12 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
   .settings-navigation { display: none; }
   .settings-mobile-navigation { display: grid; gap: 6px; margin-bottom: 22px; color: var(--muted); font-size: 13px; }
   .settings-mobile-navigation select { padding: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; color: var(--ink); }
+  .schedule-controls, .schedule-summary { grid-template-columns: 1fr; }
+  .schedule-heading, .provider-heading { align-items: stretch; }
+  .provider-heading { flex-direction: column; }
+  .provider-heading .onboarding-primary { width: 100%; }
+  .schedule-presets { display: flex; }
+  .schedule-presets button { flex: 1; padding-inline: 8px; }
 }
 .settings-page h2 { font-size: 20px; margin: 0 0 8px; }
 .settings-page .page-intro { margin-bottom: 20px; }

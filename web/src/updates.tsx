@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { getUpdateStatus, type UpdateStatus } from "./api";
+import { getSystemStatus, getUpdateStatus, type SystemStatus, type UpdateStatus } from "./api";
 
 const UpdateContext = createContext<{ status: UpdateStatus | null; error: string; dismissed: string | null; dismiss: () => void }>({ status: null, error: "", dismissed: null, dismiss: () => undefined });
 const DISMISSED_KEY = "resume-builder.dismissed-update.v1";
@@ -46,6 +46,15 @@ export function UpdateNotice() {
 
 export function AboutSection() {
   const { status, error, dismissed, dismiss } = useContext(UpdateContext);
+  const [system, setSystem] = useState<SystemStatus | null>(null);
+  const [systemError, setSystemError] = useState("");
+  useEffect(() => {
+    let active = true;
+    getSystemStatus().then((next) => {
+      if (active) { setSystem(next); setSystemError(""); }
+    }).catch(() => { if (active) setSystemError("System status is temporarily unavailable."); });
+    return () => { active = false; };
+  }, []);
   return <section className="about-panel" aria-labelledby="about-heading">
     <h2 id="about-heading">About Resume Builder</h2>
     <p>Your private career workspace.</p>
@@ -63,5 +72,17 @@ export function AboutSection() {
       <div className="about-links"><a href={status.release_url} target="_blank" rel="noreferrer">View release ↗</a><a href="https://github.com/Jordan-Horner/resume-builder/blob/main/docs/container-deployment.md" target="_blank" rel="noreferrer">Docker update instructions ↗</a></div>
       {!error && status.status === "update_available" && status.latest_revision && <p className="update-dismissal">{dismissed === status.latest_revision ? "Navigation notice hidden for this build. Future updates will still appear." : <button className="text-button" onClick={dismiss}>Dismiss this update notice</button>}</p>}
     </>}
+    <div className="system-health-heading">
+      <h3>System status</h3>
+      {system && <span className={`system-summary ${system.status}`}>{system.status === "healthy" ? "All systems ready" : "Needs attention"}</span>}
+    </div>
+    {!system && !systemError && <p role="status">Checking services…</p>}
+    {systemError && <p role="alert">{systemError}</p>}
+    {system && <dl className="system-health-list">
+      {system.components.map((component) => <div key={component.id}>
+        <dt><span className={`service-dot ${component.status}`} aria-hidden="true" />{component.name}</dt>
+        <dd>{component.detail}</dd>
+      </div>)}
+    </dl>}
   </section>;
 }

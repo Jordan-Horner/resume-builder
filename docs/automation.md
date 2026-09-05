@@ -76,6 +76,13 @@ resume-builder automation configure --gmail-hours 6
 resume-builder automation configure --notifications discord --privacy summary
 ```
 
+The same job schedule is available in the portal under **Settings → Scrapers**.
+Turn automatic scraping on or off, choose once daily, twice daily, or custom
+times, and save. The page shows the configured timezone, next run, and whether
+the scheduler service is online. It edits this same `automation/config.yml`;
+there is no second web-only scheduler. A running service reloads validated
+schedule changes without a container restart.
+
 Test exactly one task without starting the service:
 
 ```bash
@@ -129,39 +136,34 @@ responses or email content.
 
 ## Run with Docker Compose
 
-Authorize Gmail on the host before starting the container. The runtime mount
-should be the external directory that already contains `gmail-token.json` and
-`gmail-state.sqlite`.
+The Docker image is a single local appliance. Starting it brings up the portal,
+the existing automation scheduler, and a managed Telegram worker inside one
+container. The portal is available immediately; an unconfigured Telegram worker
+waits quietly, and a fresh scheduler configuration remains inactive until the
+user enables automatic scraping in **Settings → Scrapers**.
+
+For an existing installation, the runtime mount should be the external
+directory that already contains automation state, Gmail state and tokens, and
+Telegram state. Preserve the same private workspace mount.
 
 ```bash
 cp automation.env.example .env
 # Edit the two absolute paths in .env.
 docker compose build
-docker compose run --rm automation automation doctor
 docker compose up -d
-docker compose logs -f automation
+docker compose logs -f resume-builder
 ```
 
-### Run the isolated onboarding portal
+Open `http://127.0.0.1:8766`. `RESUME_BUILDER_WEB_PORT` changes the host port,
+and `RESUME_BUILDER_WEB_BIND` changes the bind address. Keep the default loopback
+binding unless the portal is protected by a trusted private network or reverse
+proxy. For a trusted TrueNAS LAN address, set `RESUME_BUILDER_WEB_BIND=0.0.0.0`
+and open `http://<truenas-address>:8766`.
 
-The onboarding portal has a separate Compose project and persistent workspace.
-It does not mount or modify the automation workspace:
-
-```bash
-docker compose -f compose.onboarding.yaml up -d --build
-```
-
-Open `http://127.0.0.1:8767`. The container creates a private local workspace
-inside the `resume-builder-onboarding-workspace` Docker volume on first start.
-Uploaded resumes are registered in that workspace and temporary upload files
-are removed. Stop the portal without deleting its saved onboarding state with:
-
-```bash
-docker compose -f compose.onboarding.yaml down
-```
-
-Add `--volumes` only when intentionally deleting the isolated onboarding
-workspace and starting over.
+The Scrapers page edits the same `automation/config.yml` used by the running
+scheduler. **Settings → About** reports Portal, Scheduler, and Telegram status.
+An optional integration can be degraded without making the entire container
+unhealthy.
 
 The container writes concise, human-readable events directly to standard output
 and standard error. It immediately confirms that the scheduler started, groups
@@ -191,18 +193,16 @@ LinkedIn qualified-result target without rewriting the mounted private search
 configuration. The configured `max_cards_scanned` remains the hard safety
 ceiling and must be at least as large as the override.
 
-Restarting the container does not itself run either scanner. The service reads
+Restarting the container does not itself run either scanner for an existing
+configuration. The service reads
 the last completion times from the external state database, logs the resulting
 schedule, and waits until a task is due. Replacing the container is therefore
 safe as long as the same `/state` mount is retained.
 
-The image runs as a non-root user, exposes no port, has a built-in health check,
-and mounts rather than copies private data. Docker probes readiness every 30
-seconds after a short startup grace period, so container dashboards do not stay
-in a misleading deploying state for several minutes. The probe verifies that
-the scheduler process holds its exclusive service lock; scan failures remain
-visible in task status and alerts without incorrectly marking the container
-itself unhealthy:
+The image runs as a non-root user, publishes one portal port, has a built-in
+health check, and mounts rather than copies private data. Docker probes the
+portal every 30 seconds. Scheduler and integration failures remain visible in
+About and logs without turning a usable portal into a restart loop:
 
 ```text
 private workspace  -> /workspace

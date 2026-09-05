@@ -13,6 +13,18 @@ export interface UpdateStatus {
 }
 export function getUpdateStatus(): Promise<UpdateStatus> { return request("/api/system/version"); }
 
+export interface SystemComponent {
+  id: "portal" | "scheduler" | "telegram";
+  name: string;
+  status: "online" | "offline" | "disabled" | "not_configured" | "error" | "unknown";
+  detail: string;
+}
+export interface SystemStatus {
+  status: "healthy" | "degraded";
+  components: SystemComponent[];
+}
+export function getSystemStatus(): Promise<SystemStatus> { return request("/api/system/status"); }
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   if (!response.ok) {
@@ -20,6 +32,9 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     throw new Error(payload?.detail || `Request failed (${response.status})`);
   }
   if (response.status === 204) return undefined as T;
+  if (!response.headers.get("content-type")?.includes("application/json")) {
+    throw new Error("The portal and server are out of sync. Refresh the page or restart the portal.");
+  }
   return response.json() as Promise<T>;
 }
 
@@ -103,3 +118,17 @@ export function setJobSource(id: string, enabled: boolean): Promise<JobSourcesSt
   return request(`/api/job-sources/${encodeURIComponent(id)}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }) });
 }
 export function startJobScan(): Promise<JobSourcesState> { return request("/api/job-sources/scan", { method: "POST" }); }
+
+export interface ScrapeSchedule {
+  configured: boolean;
+  enabled: boolean;
+  times: string[];
+  timezone: string;
+  next_run: string | null;
+  last_run: string | null;
+  service_status: "online" | "offline" | "unknown";
+}
+export function getScrapeSchedule(): Promise<ScrapeSchedule> { return request("/api/scrape-schedule"); }
+export function saveScrapeSchedule(enabled: boolean, times: string[]): Promise<ScrapeSchedule> {
+  return request("/api/scrape-schedule", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled, times }) });
+}

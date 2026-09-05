@@ -29,6 +29,7 @@ def test_module_cli_lists_commands() -> None:
     assert "review" in result.stdout
     assert "feedback" in result.stdout
     assert "automation" in result.stdout
+    assert "serve" in result.stdout
     assert "workspace" in result.stdout
 
 

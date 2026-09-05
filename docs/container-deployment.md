@@ -3,7 +3,10 @@
 Every push to `main` runs Python, frontend, security, and container checks. Only
 after all jobs pass does CI publish an AMD64/ARM64 image to
 `ghcr.io/jordan-horner/resume-builder`. Pull requests never publish images.
-The existing local-build Compose files remain development configurations.
+The local-build Compose file remains a development configuration. The published
+image is a single-container appliance: the portal, scheduler, and optional
+Telegram worker start together and share the same mounted workspace and runtime
+state.
 
 ## Channels and identity
 
@@ -34,16 +37,36 @@ docker compose -f compose.deploy.yaml pull
 docker compose -f compose.deploy.yaml up -d --no-build --wait --wait-timeout 120
 ```
 
-The portal is available at http://127.0.0.1:8767. It uses the existing named
-`resume-builder-onboarding-workspace` volume, not the separate private CLI vault.
-No Docker socket or privileged mode is used. For a remote host, use an SSH tunnel
-or a separately secured reverse proxy; do not expose this unauthenticated local
-portal directly to the internet.
+The portal is available at http://127.0.0.1:8766. Fresh deployments use the
+`resume-builder-workspace` and `resume-builder-state` volumes. The container
+creates a private workspace inside the empty workspace volume and an inactive
+scheduler configuration on first start;
+automatic scraping is enabled later in **Settings → Scrapers**. No Docker socket
+or privileged mode is used.
 
-To migrate the existing local onboarding container, run `docker compose -f
-compose.onboarding.yaml stop onboarding` first, then use the commands above from
-the same project directory (or retain the existing Compose project name with
-`-p`). Never run both installations against the same data volume concurrently.
+For a trusted LAN such as a private TrueNAS network, set
+`RESUME_BUILDER_WEB_BIND=0.0.0.0`. Do not expose the unauthenticated portal to the
+public internet. Host ports, volume paths, image tags, TLS, and reverse-proxy
+settings remain host deployment concerns rather than portal settings.
+
+## Migrate an existing two-container installation
+
+1. Record the current image identity and take a restorable snapshot of both the
+   private workspace and runtime directory.
+2. Stop the existing automation and Telegram containers. Do not start the new
+   appliance while either old writer is running.
+3. Set `RESUME_BUILDER_WORKSPACE_PATH` and `RESUME_BUILDER_RUNTIME_PATH` to the
+   existing host directories. When these are unset, Compose creates fresh named
+   volumes instead.
+4. Start the new `resume-builder` service and open Settings → About. Confirm the
+   Portal and Scheduler rows are online before enabling or changing a schedule.
+5. Keep the previous Compose definition and image available for rollback. Image
+   rollback does not reverse an incompatible data migration, so restore the
+   matching snapshot if stored data ever changes incompatibly.
+
+The scheduler's exclusive lock prevents a duplicate writer, but stopping the old
+containers is still a required migration step. A lock conflict is reported as a
+degraded Scheduler state rather than silently running twice.
 
 ## Update checks in the portal
 
@@ -76,7 +99,7 @@ the override. Never reuse the workflow's write-capable token for update checks.
 ## Install an update and recover
 
 1. Record the current container's image ID/digest and keep the old image locally.
-2. Finish active operations, stop the services that write to the workspace, and
+2. Finish active operations, stop the container that writes to the workspace, and
    take a restorable snapshot/backup of the **entire** persistent volume. Keep
    credentials protected in backups. Use your host's volume backup tooling.
 3. Pull the image, then recreate and verify health:

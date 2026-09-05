@@ -161,6 +161,7 @@ class _ReadableLogFormatter(logging.Formatter):
         "scan_failed": "Scan failed",
         "scan_scheduled": "Next scan scheduled",
         "scan_started": "Scan started",
+        "schedule_updated": "Schedule updated",
         "service_heartbeat": "Service healthy",
         "service_start_failed": "Service failed to start",
         "service_started": "Service started",
@@ -427,14 +428,21 @@ def load_config(path: Path) -> AutomationConfig:
     )
 
 
-def render_default_config(timezone: str) -> str:
+def render_default_config(
+    timezone: str,
+    *,
+    jobs_enabled: bool = True,
+    gmail_enabled: bool = True,
+) -> str:
     """Render a human-editable low-noise default configuration."""
+    jobs_value = str(jobs_enabled).lower()
+    gmail_value = str(gmail_enabled).lower()
     return f"""\
 schema_version: 1
 timezone: {timezone}
 
 jobs:
-  enabled: true
+  enabled: {jobs_value}
   times: [\"08:00\"]
   run_on_start: true
   limit: 50
@@ -445,7 +453,7 @@ jobs:
     max_jobs_per_run: 6
 
 gmail:
-  enabled: true
+  enabled: {gmail_value}
   every_hours: 4
   run_on_start: true
 
@@ -505,12 +513,15 @@ def configure(
     gmail_hours: float | None,
     notification_sink: str | None,
     privacy: str | None,
+    job_enabled: bool | None = None,
 ) -> AutomationConfig:
     """Apply explicit schedule changes and revalidate the resulting file."""
     payload = config_payload(config)
     if timezone is not None:
         payload["timezone"] = timezone
     job_payload = _mapping(payload["jobs"], "jobs")
+    if job_enabled is not None:
+        job_payload["enabled"] = job_enabled
     if job_times:
         job_payload["times"] = job_times
     gmail_payload = _mapping(payload["gmail"], "gmail")
@@ -586,12 +597,31 @@ class AutomationState:
                     attempts INTEGER NOT NULL DEFAULT 0,
                     last_error TEXT
                 );
+                CREATE TABLE IF NOT EXISTS service_runtime(
+                    singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+                    running INTEGER NOT NULL CHECK(running IN (0, 1)),
+                    updated_at TEXT NOT NULL
+                );
                 """
             )
         os.chmod(self.path, 0o600)
 
     def service_is_running(self) -> bool:
-        """Return whether another process holds the scheduler's exclusive lock."""
+        """Return whether the scheduler has a fresh heartbeat or holds its lock."""
+        if self.path.is_file():
+            try:
+                with sqlite3.connect(self.path) as connection:
+                    row = connection.execute(
+                        "SELECT running, updated_at FROM service_runtime WHERE singleton = 1"
+                    ).fetchone()
+                if row is not None:
+                    updated_at = datetime.fromisoformat(str(row[1]))
+                    if bool(row[0]) and datetime.now(UTC) - updated_at <= timedelta(minutes=2):
+                        return True
+                    if not bool(row[0]):
+                        return False
+            except (OSError, sqlite3.Error, ValueError):
+                LOGGER.debug("scheduler heartbeat unavailable; falling back to lock", exc_info=True)
         lock_path = self.path.with_suffix(f"{self.path.suffix}.lock")
         if not lock_path.is_file():
             return False
@@ -602,6 +632,22 @@ class AutomationState:
                 return True
             fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
         return False
+
+    def record_service_heartbeat(self, *, running: bool) -> None:
+        """Persist a content-free scheduler heartbeat for portable liveness checks."""
+        if not self.path.is_file():
+            self.initialize()
+        with sqlite3.connect(self.path) as connection:
+            connection.execute(
+                """
+                INSERT INTO service_runtime(singleton, running, updated_at)
+                VALUES (1, ?, ?)
+                ON CONFLICT(singleton) DO UPDATE SET
+                    running = excluded.running,
+                    updated_at = excluded.updated_at
+                """,
+                (int(running), datetime.now(UTC).isoformat()),
+            )
 
     def record_run(
         self,
@@ -996,16 +1042,34 @@ class AutomationService:
         workspace: Path,
         config: AutomationConfig,
         state: AutomationState,
+        config_path: Path | None = None,
         job_runner: TaskRunner | None = None,
         gmail_runner: TaskRunner | None = None,
     ):
         self.workspace = workspace
         self.config = config
         self.state = state
+        self.config_path = config_path
+        self._config_signature = self._current_config_signature()
         self.runners = {
-            "jobs": job_runner or (lambda: _run_jobs(config)),
-            "gmail": gmail_runner or (lambda: _run_gmail(workspace)),
+            "jobs": job_runner,
+            "gmail": gmail_runner,
         }
+
+    def _current_config_signature(self) -> tuple[int, int] | None:
+        if self.config_path is None:
+            return None
+        stat = self.config_path.stat()
+        return stat.st_mtime_ns, stat.st_size
+
+    def reload_config(self) -> bool:
+        """Reload an atomically replaced config while the service remains online."""
+        signature = self._current_config_signature()
+        if signature == self._config_signature or self.config_path is None:
+            return False
+        self.config = load_config(self.config_path)
+        self._config_signature = signature
+        return True
 
     def run_task(self, task: str, *, trigger: str = "manual", attempt: int = 1) -> bool:
         started = datetime.now(UTC)
@@ -1019,7 +1083,13 @@ class AutomationService:
             attempt=attempt,
         )
         try:
-            result = self.runners[task]()
+            runner = self.runners[task]
+            if runner is not None:
+                result = runner()
+            elif task == "jobs":
+                result = _run_jobs(self.config)
+            else:
+                result = _run_gmail(self.workspace)
             public_summary = {key: value for key, value in result.items() if key != "matches"}
             run_status = "partial" if result.get("refresh_status") == "partial" else "success"
             self.state.record_run(task, started, run_status, public_summary)
@@ -1183,6 +1253,7 @@ def run_forever(service: AutomationService, stop: threading.Event) -> int:
     """Run due tasks and retry pending alerts until asked to stop."""
     with service.state.locked():
         service.state.initialize()
+        service.state.record_service_heartbeat(running=True)
         now = datetime.now(UTC)
         job_last = _last_finished(service.state, "jobs")
         gmail_last = _last_finished(service.state, "gmail")
@@ -1219,7 +1290,22 @@ def run_forever(service: AutomationService, stop: threading.Event) -> int:
         next_delivery = now
         next_heartbeat = now + timedelta(hours=DEFAULT_HEARTBEAT_HOURS)
         while not stop.is_set():
+            service.state.record_service_heartbeat(running=True)
             now = datetime.now(UTC)
+            if service.reload_config():
+                job_last = _last_finished(service.state, "jobs")
+                gmail_last = _last_finished(service.state, "gmail")
+                due["jobs"] = next_job_run(now, service.config.jobs, service.config.timezone)
+                due["gmail"] = (
+                    gmail_last + service.config.gmail.every
+                    if gmail_last and gmail_last + service.config.gmail.every > now
+                    else now + service.config.gmail.every
+                )
+                _log(
+                    logging.INFO,
+                    "schedule_updated",
+                    **_schedule_log_fields(service, due),
+                )
             ran = False
             for task, enabled in (
                 ("jobs", service.config.jobs.enabled),
@@ -1271,6 +1357,7 @@ def run_forever(service: AutomationService, stop: threading.Event) -> int:
             wait_seconds = 30 if ran else 60
             stop.wait(wait_seconds)
         _log(logging.INFO, "service_stopped", state="stopped")
+        service.state.record_service_heartbeat(running=False)
     return 0
 
 
@@ -1281,6 +1368,11 @@ def _parser() -> argparse.ArgumentParser:
     commands = command_parser.add_subparsers(dest="command", required=True)
     init = commands.add_parser("init", help="Create a low-noise automation configuration")
     init.add_argument("--timezone", default=os.environ.get("TZ", "America/New_York"))
+    init.add_argument(
+        "--disabled",
+        action="store_true",
+        help="Create an inactive configuration for portal-first setup",
+    )
     configure_parser = commands.add_parser("configure", help="Update schedules and alerts")
     configure_parser.add_argument("--timezone")
     configure_parser.add_argument("--job-time", action="append")
@@ -1393,7 +1485,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         except ZoneInfoNotFoundError:
             print(f"Unknown timezone: {args.timezone}", file=sys.stderr)
             return 2
-        atomic_write_text(config_path, render_default_config(args.timezone))
+        atomic_write_text(
+            config_path,
+            render_default_config(
+                args.timezone,
+                jobs_enabled=not args.disabled,
+                gmail_enabled=not args.disabled,
+            ),
+        )
         print(f"Created {config_path}")
         print("Run `resume-builder automation doctor` before starting the service.")
         return 0
@@ -1432,7 +1531,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             result["healthy"] = healthy
             print(json.dumps(result, indent=2))
             return 0 if healthy or not args.healthcheck else 2
-        service = AutomationService(workspace=workspace, config=config, state=state)
+        service = AutomationService(
+            workspace=workspace,
+            config=config,
+            config_path=config_path,
+            state=state,
+        )
         if args.command == "once":
             selected = TASKS if args.task == "all" else (args.task,)
             enabled = tuple(

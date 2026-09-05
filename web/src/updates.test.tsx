@@ -3,9 +3,9 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { AboutSection, UpdateNotice, UpdateProvider } from "./updates";
-import { getUpdateStatus, type UpdateStatus } from "./api";
+import { getSystemStatus, getUpdateStatus, type UpdateStatus } from "./api";
 
-vi.mock("./api", () => ({ getUpdateStatus: vi.fn() }));
+vi.mock("./api", () => ({ getUpdateStatus: vi.fn(), getSystemStatus: vi.fn() }));
 const available: UpdateStatus = { version: "0.12.0", revision: "a".repeat(40), channel: "main", built_at: "", status: "update_available", latest_revision: "b".repeat(40), release_url: "https://github.com/Jordan-Horner/resume-builder/releases/tag/main-build", last_success_at: null, message: "Update available" };
 let host: HTMLDivElement;
 let root: Root;
@@ -14,6 +14,11 @@ beforeEach(() => {
   localStorage.clear();
   host = document.createElement("div"); document.body.append(host); root = createRoot(host);
   vi.mocked(getUpdateStatus).mockResolvedValue(available);
+  vi.mocked(getSystemStatus).mockResolvedValue({ status: "degraded", components: [
+    { id: "portal", name: "Portal", status: "online", detail: "Available" },
+    { id: "scheduler", name: "Scheduler", status: "offline", detail: "Starting" },
+    { id: "telegram", name: "Telegram", status: "not_configured", detail: "Not configured" },
+  ] });
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.useRealTimers(); vi.restoreAllMocks(); });
 async function render() { await act(async () => root.render(<UpdateProvider><UpdateNotice /><AboutSection /></UpdateProvider>)); }
@@ -26,6 +31,9 @@ it("shares one check and provides release links without an installer", async () 
   expect(host.querySelector('.update-indicator')?.getAttribute('href')).toBe('/settings/about');
   expect(host.querySelector('.about-links a')?.getAttribute('href')).toBe(available.release_url);
   expect([...host.querySelectorAll('button')].map(item => item.textContent)).toEqual(["Dismiss this update notice"]);
+  expect(host.textContent).toContain("System status");
+  expect(host.textContent).toContain("Scheduler");
+  expect(host.textContent).toContain("Needs attention");
 });
 
 it("dismisses only the announced revision and shows the next one", async () => {

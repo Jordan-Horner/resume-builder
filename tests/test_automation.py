@@ -155,6 +155,7 @@ def test_configure_updates_daily_times_and_gmail_interval(tmp_path: Path) -> Non
     updated = configure(
         path,
         load_config(path),
+        job_enabled=False,
         timezone=None,
         job_times=["07:30", "16:30"],
         gmail_hours=6,
@@ -163,6 +164,7 @@ def test_configure_updates_daily_times_and_gmail_interval(tmp_path: Path) -> Non
     )
 
     assert updated.jobs.times == (time(7, 30), time(16, 30))
+    assert updated.jobs.enabled is False
     assert updated.gmail.every == timedelta(hours=6)
     assert updated.notifications.sink == "discord"
     assert "RESUME_BUILDER_DISCORD_WEBHOOK" in path.read_text(encoding="utf-8")
@@ -178,6 +180,7 @@ def test_configure_rejects_invalid_schedule_without_replacing_config(tmp_path: P
         configure(
             path,
             load_config(path),
+            job_enabled=None,
             timezone=None,
             job_times=["not-a-time"],
             gmail_hours=None,
@@ -298,6 +301,16 @@ def test_healthcheck_requires_the_running_service_lock(
     payload = json.loads(capsys.readouterr().out)
     assert payload["healthy"] is True
     assert payload["pending_notifications"] == 1
+
+
+def test_service_heartbeat_reports_running_without_relying_on_file_lock(tmp_path: Path) -> None:
+    state = AutomationState(tmp_path / "runtime" / "automation.sqlite")
+
+    state.record_service_heartbeat(running=True)
+    assert state.service_is_running() is True
+
+    state.record_service_heartbeat(running=False)
+    assert state.service_is_running() is False
 
 
 def test_quiet_hours_delay_routine_alerts_but_not_interviews(tmp_path: Path, capsys) -> None:
@@ -613,6 +626,32 @@ def test_restart_with_persistent_state_does_not_rescan(
         assert run_forever(service, OneLoopEvent()) == 0
 
     assert calls == []
+
+
+def test_running_service_reloads_schedule_configuration(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yml"
+    config_path.write_text(render_default_config("America/New_York"), encoding="utf-8")
+    service = AutomationService(
+        workspace=tmp_path,
+        config=load_config(config_path),
+        config_path=config_path,
+        state=AutomationState(tmp_path / "runtime" / "automation.sqlite"),
+    )
+    configure(
+        config_path,
+        service.config,
+        timezone=None,
+        job_times=["09:30"],
+        gmail_hours=None,
+        notification_sink=None,
+        privacy=None,
+        job_enabled=False,
+    )
+
+    assert service.reload_config() is True
+    assert service.config.jobs.enabled is False
+    assert service.config.jobs.times == (time(9, 30),)
+    assert service.reload_config() is False
 
 
 def test_partial_job_coverage_is_visible_without_discarding_matches(tmp_path: Path) -> None:

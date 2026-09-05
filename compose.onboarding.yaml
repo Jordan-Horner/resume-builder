@@ -1,29 +1,29 @@
+# Backward-compatible local alias for the unified application.
 services:
-  onboarding:
+  resume-builder:
     build:
       context: .
-    image: resume-builder-onboarding:${RESUME_BUILDER_IMAGE_TAG:-local}
+    image: resume-builder:${RESUME_BUILDER_IMAGE_TAG:-local}
     restart: unless-stopped
-    entrypoint: ["onboarding-web-entrypoint"]
+    command: ["serve"]
     environment:
-      RESUME_BUILDER_WORKSPACE: /onboarding/workspace
+      RESUME_BUILDER_WORKSPACE: /workspace
+      RESUME_BUILDER_AUTOMATION_STATE: /state/automation-state.sqlite
+      RESUME_BUILDER_GMAIL_STATE: /state/gmail-state.sqlite
+      RESUME_BUILDER_GMAIL_TOKEN: /state/gmail-token.json
+      RESUME_BUILDER_AGENT_STATE: /state/agent-state.sqlite
+      RESUME_BUILDER_TELEGRAM_TOKEN_FILE: /state/telegram-bot-token
+      RESUME_BUILDER_STATE_DIR: /state
       RESUME_BUILDER_WEB_PORT: 8765
       TZ: ${RESUME_BUILDER_TIMEZONE:-America/New_York}
     ports:
-      - "127.0.0.1:${RESUME_BUILDER_ONBOARDING_PORT:-8767}:8765"
+      - "${RESUME_BUILDER_WEB_BIND:-127.0.0.1}:${RESUME_BUILDER_WEB_PORT:-8766}:8765"
     volumes:
-      - onboarding-workspace:/onboarding
-    healthcheck:
-      test:
-        - CMD
-        - python
-        - -c
-        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/api/onboarding', timeout=5)
-      interval: 15s
-      timeout: 5s
-      start_period: 15s
-      retries: 3
+      - workspace:/workspace
+      - state:/state
 
 volumes:
-  onboarding-workspace:
-    name: resume-builder-onboarding-workspace
+  workspace:
+    name: resume-builder-workspace
+  state:
+    name: resume-builder-state
