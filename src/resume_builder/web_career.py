@@ -83,8 +83,7 @@ def _generated_status(record: dict[str, Any]) -> tuple[str, str]:
     if record.get("build", {}).get("status") == "current":
         return "Built", "neutral"
     statuses = [
-        record.get(owner, {}).get("status")
-        for owner in ("build", "critique", "preview", "mint")
+        record.get(owner, {}).get("status") for owner in ("build", "critique", "preview", "mint")
     ]
     if "invalid" in statuses:
         return "Needs attention", "negative"
@@ -120,7 +119,9 @@ def list_resumes(root: Path) -> dict[str, Any]:
                 "status_tone": "neutral",
                 "updated_at": source.get("refreshed_at") or source.get("imported_at"),
                 "detail": f"{str(source.get('format') or 'source').upper()} · Career evidence",
-                "error": None if source.get("extraction_status") == "ok" else "No readable text was extracted.",
+                "error": None
+                if source.get("extraction_status") == "ok"
+                else "No readable text was extracted.",
                 "preview_url": None,
                 "preview_message": "Build a directional resume to create an HTML preview.",
             }
@@ -198,6 +199,10 @@ def _description(body: str) -> str:
     return next((paragraph for paragraph in paragraphs if paragraph), "")
 
 
+def _strings(value: object) -> list[str]:
+    return [str(item) for item in value] if isinstance(value, list) else []
+
+
 def _selected_skill_ids(root: Path) -> set[str]:
     path = root / PORTFOLIO_PATH
     if not path.is_file():
@@ -234,15 +239,19 @@ def list_skills(root: Path) -> list[dict[str, Any]]:
                 "id": fact_id,
                 "title": title,
                 "description": _description(body),
-                "status_label": "Confirmed" if metadata.get("status") == "confirmed" else "Review needed",
+                "status_label": "Confirmed"
+                if metadata.get("status") == "confirmed"
+                else "Review needed",
                 "status_tone": "positive" if metadata.get("status") == "confirmed" else "attention",
-                "themes": [str(item) for item in metadata.get("themes", [])],
-                "sources": [str(item) for item in metadata.get("sources", [])],
+                "themes": _strings(metadata.get("themes")),
+                "sources": _strings(metadata.get("sources")),
                 "resumes": resume_names.get(fact_id, []),
                 "search": {
                     "enabled": fact_id in selected,
                     "can_change": metadata.get("status") == "confirmed",
-                    "disabled_reason": None if metadata.get("status") == "confirmed" else "Confirm this evidence before using it for search.",
+                    "disabled_reason": None
+                    if metadata.get("status") == "confirmed"
+                    else "Confirm this evidence before using it for search.",
                 },
             }
         )
@@ -310,9 +319,7 @@ def set_skill_search_enabled(root: Path, fact_id: str, enabled: bool) -> dict[st
     if enabled and not skill["search"]["can_change"]:
         raise ValueError("only confirmed vault skills can be used for search")
     portfolio = _portfolio(root)
-    matching = [
-        item for item in portfolio.queries if f"vault:{fact_id}" in item.source_ids
-    ]
+    matching = [item for item in portfolio.queries if f"vault:{fact_id}" in item.source_ids]
     if enabled and not matching:
         portfolio = edit_portfolio(
             portfolio,

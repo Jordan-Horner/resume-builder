@@ -92,9 +92,7 @@ def test_mark_applied_creates_application_and_removes_job_from_queue(tmp_path, i
     assert application["current_status"] == "applied"
 
 
-def test_mark_applied_pins_the_only_directional_resume_when_no_target_exists(
-    tmp_path, inventory
-):
+def test_mark_applied_pins_the_only_directional_resume_when_no_target_exists(tmp_path, inventory):
     resume = tmp_path / "resumes" / "baselines" / "support.md"
     resume.parent.mkdir(parents=True)
     resume.write_text("# Support resume\n", encoding="utf-8")
@@ -111,9 +109,7 @@ def test_mark_applied_pins_the_only_directional_resume_when_no_target_exists(
     assert application["resume_attribution"] == "directional"
 
 
-def test_mark_applied_does_not_guess_between_multiple_directional_resumes(
-    tmp_path, inventory
-):
+def test_mark_applied_does_not_guess_between_multiple_directional_resumes(tmp_path, inventory):
     folder = tmp_path / "resumes" / "baselines"
     folder.mkdir(parents=True)
     (folder / "support.md").write_text("# Support\n", encoding="utf-8")

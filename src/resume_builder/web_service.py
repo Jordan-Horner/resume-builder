@@ -665,10 +665,9 @@ class DashboardService:
             except ValueError:
                 continue
             same_url = bool(job.get("url") and data.get("source", {}).get("url") == job["url"])
-            same_identity = (
-                normalized_key(str(data.get("company"))) == normalized_key(job["company"])
-                and normalized_key(str(data.get("role"))) == normalized_key(job["title"])
-            )
+            same_identity = normalized_key(str(data.get("company"))) == normalized_key(
+                job["company"]
+            ) and normalized_key(str(data.get("role"))) == normalized_key(job["title"])
             if same_url or same_identity:
                 target_path, target_data = candidate, data
                 break
@@ -702,7 +701,10 @@ class DashboardService:
                     kind = "directional"
             if selected is not None:
                 candidate_report = (
-                    self.workspace / "build" / "matches" / f"{target_path.stem}--{selected.stem}.json"
+                    self.workspace
+                    / "build"
+                    / "matches"
+                    / f"{target_path.stem}--{selected.stem}.json"
                 )
                 if candidate_report.is_file():
                     match_report = candidate_report
@@ -721,7 +723,9 @@ class DashboardService:
             return {
                 "status": "unavailable",
                 "recommended_resume": None,
-                "target": target_path.relative_to(self.workspace).as_posix() if target_path else None,
+                "target": target_path.relative_to(self.workspace).as_posix()
+                if target_path
+                else None,
                 "match": None,
                 "message": "Build a directional resume before attaching one to applications.",
             }
@@ -966,7 +970,9 @@ class DashboardService:
                 application_url=job["url"],
                 resume=resume_path,
                 target=self.workspace / target_value if isinstance(target_value, str) else None,
-                match_report=self.workspace / report_value if isinstance(report_value, str) else None,
+                match_report=self.workspace / report_value
+                if isinstance(report_value, str)
+                else None,
                 match_classification=(
                     match_value.get("label") if isinstance(match_value, dict) else None
                 ),

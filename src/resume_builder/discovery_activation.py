@@ -87,7 +87,9 @@ def edit_portfolio(
             if lane == ColdStartLane.ADJACENT_TITLE
             else None
         )
-        digest = hashlib.sha256(f"{lane.value}\n{query.casefold().strip()}".encode()).hexdigest()[:12]
+        digest = hashlib.sha256(f"{lane.value}\n{query.casefold().strip()}".encode()).hexdigest()[
+            :12
+        ]
         items.append(
             ColdStartQuery(
                 query_id=query_id or f"user-{lane.value}-{digest}",
