@@ -1,4 +1,4 @@
-import type { Application, Integration, Job, JobFilters, OnboardingStatus, SearchPreferences } from "./types";
+import type { Application, CareerSkill, Integration, Job, JobFilters, OnboardingStatus, ResumeLibrary, ResumeRecommendation, SearchPreferences } from "./types";
 
 export interface UpdateStatus {
   version: string;
@@ -116,6 +116,25 @@ export function saveSearchPreferences(preferences: SearchPreferences): Promise<S
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(preferences),
+  });
+}
+
+export function getResumes(): Promise<ResumeLibrary> { return request("/api/resumes"); }
+
+export function getResumeRecommendation(jobId: string): Promise<ResumeRecommendation> {
+  return request(`/api/jobs/${encodeURIComponent(jobId)}/resume-recommendation`);
+}
+
+export async function getSkills(): Promise<CareerSkill[]> {
+  const payload = await request<{ skills: CareerSkill[] }>("/api/skills");
+  return payload.skills;
+}
+
+export function setSkillSearch(factId: string, enabled: boolean): Promise<CareerSkill> {
+  return request(`/api/skills/${encodeURIComponent(factId)}/search`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
   });
 }
 

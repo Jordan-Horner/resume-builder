@@ -105,6 +105,49 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    @app.get("/api/resumes")
+    def resumes() -> dict[str, Any]:
+        try:
+            return service.career_resumes()
+        except ValueError as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.get("/api/resume-preview")
+    def resume_preview(resume_id: str = Query(min_length=1, max_length=500)) -> FileResponse:
+        try:
+            document = service.career_resume_preview(resume_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return FileResponse(
+            document["path"],
+            media_type=document["media_type"],
+            filename=document["filename"],
+            content_disposition_type="inline",
+            headers={
+                "X-Content-Type-Options": "nosniff",
+                "Content-Security-Policy": (
+                    "sandbox; default-src 'none'; style-src 'unsafe-inline'; "
+                    "img-src data:; font-src data:"
+                ),
+            },
+        )
+
+    @app.get("/api/skills")
+    def skills() -> dict[str, Any]:
+        try:
+            return {"skills": service.career_skills()}
+        except ValueError as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.put("/api/skills/{fact_id}/search")
+    def set_skill_search(fact_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        if type(payload.get("enabled")) is not bool:
+            raise HTTPException(status_code=400, detail="enabled must be true or false")
+        try:
+            return service.set_skill_search(fact_id, payload["enabled"])
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     @app.get("/api/job-filter-defaults")
     def job_filter_defaults() -> dict[str, Any]:
         try:
@@ -161,6 +204,13 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         if item is None:
             raise HTTPException(status_code=404, detail="Job not found")
         return item
+
+    @app.get("/api/jobs/{job_id}/resume-recommendation")
+    def job_resume_recommendation(job_id: str) -> dict[str, Any]:
+        try:
+            return service.job_resume_recommendation(job_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @app.post("/api/jobs/{job_id}/not-interested", status_code=204)
     def mark_not_interested(job_id: str) -> None:

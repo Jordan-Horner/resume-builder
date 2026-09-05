@@ -1,9 +1,9 @@
 import { useDeferredValue, useEffect, useState } from "react";
-import { activateJobSearch, getJobs, markJobApplied, markJobNotInterested, getBlockedCompanies, setCompanyBlocked, getJobFilterDefaults, getSearchPreferences, getJobSources, startJobScan } from "../api";
+import { activateJobSearch, getJobs, getResumeRecommendation, markJobApplied, markJobNotInterested, getBlockedCompanies, setCompanyBlocked, getJobFilterDefaults, getSearchPreferences, getJobSources, startJobScan } from "../api";
 import { ArrowIcon, EmptyState, ErrorMessage, LoadingRows, SearchIcon } from "../components";
 import { EMPTY_FILTERS, persistView, restoreView } from "../viewPreferences";
 import { JobViewFilters } from "../JobViewFilters";
-import type { Job, JobFilters, SearchPreferences, ViewFilters } from "../types";
+import type { Job, JobFilters, ResumeRecommendation, SearchPreferences, ViewFilters } from "../types";
 
 
 const DATE_FILTERS = [
@@ -67,6 +67,8 @@ export function JobsPage() {
   const [searchPreferences, setSearchPreferences] = useState<SearchPreferences | null>(null);
   const [scanning, setScanning] = useState(false);
   const [selected, setSelected] = useState<Job | null>(null);
+  const [resumeRecommendation, setResumeRecommendation] = useState<ResumeRecommendation | null>(null);
+  const [resumeRecommendationError, setResumeRecommendationError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
@@ -90,7 +92,11 @@ export function JobsPage() {
 
   useEffect(() => {
     let active = true;
-    getSearchPreferences().then((value) => { if (active) setSearchPreferences(value); }).catch(() => undefined);
+    getSearchPreferences()
+      .then((value) => { if (active) setSearchPreferences(value); })
+      .catch((reason: unknown) => {
+        if (active) setError(reason instanceof Error ? reason.message : "Could not load search preferences.");
+      });
     return () => { active = false; };
   }, [reloadKey]);
   const companyKey = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -140,6 +146,23 @@ export function JobsPage() {
   function openJob(job: Job) {
     setSelected(job);
   }
+
+  useEffect(() => {
+    let active = true;
+    setResumeRecommendation(null);
+    setResumeRecommendationError("");
+    if (!selected) return () => { active = false; };
+    getResumeRecommendation(selected.id)
+      .then((result) => { if (active) setResumeRecommendation(result); })
+      .catch((reason: unknown) => {
+        if (!active) return;
+        setResumeRecommendation(null);
+        setResumeRecommendationError(
+          reason instanceof Error ? reason.message : "Could not load the resume recommendation.",
+        );
+      });
+    return () => { active = false; };
+  }, [selected]);
 
   async function runManualScan() {
     if (scanning) return;
@@ -327,6 +350,17 @@ export function JobsPage() {
                 <span>{selected.location}</span>
                 {formatSalary(selected) && <span>{formatSalary(selected)}</span>}
               </div>
+              {resumeRecommendation?.recommended_resume && <div className="resume-recommendation">
+                <span>Recommended resume</span>
+                <strong>{resumeRecommendation.recommended_resume.name}</strong>
+                {resumeRecommendation.match && <em>{resumeRecommendation.match.label}</em>}
+              </div>}
+              {resumeRecommendation?.status === "unavailable" && resumeRecommendation.message && (
+                <p className="recommendation-empty">{resumeRecommendation.message}</p>
+              )}
+              {resumeRecommendationError && (
+                <p className="recommendation-error" role="status">{resumeRecommendationError}</p>
+              )}
               <div className="job-actions" aria-label="Update job status">
                 {selected.url && (
                   <a className="secondary-button original-link" href={selected.url} target="_blank" rel="noreferrer">

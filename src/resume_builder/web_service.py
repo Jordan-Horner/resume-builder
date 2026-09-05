@@ -68,8 +68,10 @@ from .job_onboarding import (
     save_state as save_setup_state,
 )
 from .job_setup_defaults import PORTFOLIO_PATH, PREFERENCES_PATH, scaffold_job_search
+from .job_target import parse_target
 from .layout import VaultLayout
 from .preferences import _validated as validate_preferences
+from .project_report import project_report
 from .source_import import SUPPORTED, apply_import_plan, build_import_plan, load_manifest
 
 JOBS_CONFIG = Path("job-search/config/search.yml")
@@ -455,15 +457,13 @@ class DashboardService:
         )
         profile = dict(preferences.get("screening_profile") or {})
         setup = load_setup_state(self.workspace)
-        titles = [
-            *preferences.get("desired_title_terms", []),
-            *preferences.get("interest_terms", []),
-        ]
+        titles = preferences.get("desired_title_terms", [])
         titles = list(dict.fromkeys(str(title).strip() for title in titles if str(title).strip()))
         return {
             "status": setup.status.value if setup else "not_configured",
             "revision": self._job_search_preferences_revision(),
             "titles": titles,
+            "skill_terms": list(preferences.get("interest_terms", [])),
             "country": profile.get("intended_work_country") or "United States",
             "work_modes": preferences.get("accepted_work_modes") or [],
             "onsite_locations": preferences.get("accepted_location_terms") or [],
@@ -557,7 +557,6 @@ class DashboardService:
             config_path = self.workspace / JOBS_CONFIG
             preferences = yaml.safe_load(preferences_path.read_text(encoding="utf-8"))
             preferences["desired_title_terms"] = titles
-            preferences["interest_terms"] = []
             preferences["accepted_work_modes"] = location.accepted_work_modes
             preferences["accepted_location_terms"] = [
                 value.strip() for value in location.accepted_onsite_locations if value.strip()
@@ -582,6 +581,19 @@ class DashboardService:
                 )
                 for title in titles
             ]
+            if (self.workspace / PORTFOLIO_PATH).is_file():
+                current_portfolio = ColdStartPortfolio.model_validate_json(
+                    (self.workspace / PORTFOLIO_PATH).read_text(encoding="utf-8")
+                )
+                existing_queries = {normalized_key(item.query) for item in queries}
+                queries.extend(
+                    item
+                    for item in current_portfolio.queries
+                    if any(source.startswith("vault:") for source in item.source_ids)
+                    and normalized_key(item.query) not in existing_queries
+                )
+            if len(queries) > MAX_TOTAL_QUERIES:
+                raise ValueError("remove a role or search skill before adding another title")
             portfolio = ColdStartPortfolio(
                 generated_at=datetime.now(UTC).isoformat(),
                 resume_hash=state.evidence_hash,
@@ -616,6 +628,117 @@ class DashboardService:
         state.updated_at = datetime.now(UTC).isoformat()
         save_setup_state(self.workspace, state)
         return self.onboarding_status()
+
+    def career_resumes(self) -> dict[str, Any]:
+        from .web_career import list_resumes
+
+        return list_resumes(self.workspace)
+
+    def career_resume_preview(self, resume_id: str) -> dict[str, Any]:
+        from .web_career import resolve_resume_preview
+
+        return resolve_resume_preview(self.workspace, resume_id)
+
+    def career_skills(self) -> list[dict[str, Any]]:
+        from .web_career import list_skills
+
+        return list_skills(self.workspace)
+
+    def set_skill_search(self, fact_id: str, enabled: bool) -> dict[str, Any]:
+        from .web_career import set_skill_search_enabled
+
+        with self._state_lock:
+            return set_skill_search_enabled(self.workspace, fact_id, enabled)
+
+    def job_resume_recommendation(self, job_id: str) -> dict[str, Any]:
+        """Resolve existing target, direction, match, and resume artifacts for one job."""
+        job = self.get_job(job_id)
+        if job is None:
+            raise ValueError(f"job not found: {job_id}")
+        target_path: Path | None = None
+        target_data: dict[str, Any] | None = None
+        for candidate in sorted((self.workspace / "targets").glob("*.md")):
+            if candidate.name == "README.md":
+                continue
+            try:
+                data, _ = parse_target(candidate)
+            except ValueError:
+                continue
+            same_url = bool(job.get("url") and data.get("source", {}).get("url") == job["url"])
+            same_identity = (
+                normalized_key(str(data.get("company"))) == normalized_key(job["company"])
+                and normalized_key(str(data.get("role"))) == normalized_key(job["title"])
+            )
+            if same_url or same_identity:
+                target_path, target_data = candidate, data
+                break
+
+        baselines = sorted((self.workspace / "resumes" / "baselines").glob("*.md"))
+        selected: Path | None = None
+        kind: str | None = None
+        match_report: Path | None = None
+        match_label: str | None = None
+        if target_path is not None and (self.workspace / "vault" / "vault.json").is_file():
+            report = project_report(self.workspace / "vault", strict=False)
+            relative_target = target_path.relative_to(self.workspace).as_posix()
+            target_record = next(
+                (item for item in report["targets"] if item["path"] == relative_target), None
+            )
+            if target_record and target_record.get("tailored_resume"):
+                selected = self.workspace / target_record["tailored_resume"]
+                kind = "tailored"
+            else:
+                direction = str(target_data.get("direction")) if target_data else ""
+                baseline_record = next(
+                    (
+                        item
+                        for item in report["resumes"]
+                        if item["kind"] == "baseline" and item.get("direction") == direction
+                    ),
+                    None,
+                )
+                if baseline_record:
+                    selected = self.workspace / baseline_record["path"]
+                    kind = "directional"
+            if selected is not None:
+                candidate_report = (
+                    self.workspace / "build" / "matches" / f"{target_path.stem}--{selected.stem}.json"
+                )
+                if candidate_report.is_file():
+                    match_report = candidate_report
+                    try:
+                        match_payload = json.loads(candidate_report.read_text(encoding="utf-8"))
+                    except (OSError, json.JSONDecodeError):
+                        match_payload = {}
+                    semantic = match_payload.get("semantic_review")
+                    if isinstance(semantic, dict) and isinstance(semantic.get("label"), str):
+                        match_label = semantic["label"]
+        if selected is None and len(baselines) == 1:
+            selected = baselines[0]
+            kind = "directional"
+
+        if selected is None:
+            return {
+                "status": "unavailable",
+                "recommended_resume": None,
+                "target": target_path.relative_to(self.workspace).as_posix() if target_path else None,
+                "match": None,
+                "message": "Build a directional resume before attaching one to applications.",
+            }
+        return {
+            "status": "available",
+            "recommended_resume": {
+                "id": selected.relative_to(self.workspace).as_posix(),
+                "name": selected.stem.replace("-", " ").title(),
+                "kind": kind,
+            },
+            "target": target_path.relative_to(self.workspace).as_posix() if target_path else None,
+            "match": {"label": match_label or "Unknown match"},
+            "match_report": (
+                match_report.relative_to(self.workspace).as_posix() if match_report else None
+            ),
+            "message": None,
+        }
 
     def _load_inventory(self) -> list[dict[str, Any]]:
         config_path = self.workspace / JOBS_CONFIG
@@ -826,6 +949,14 @@ class DashboardService:
             for _, record in iter_records(self.workspace / APPLICATIONS_ROOT):
                 if str(record["application"].get("job_id")) == job_id:
                     return record
+            recommendation = self.job_resume_recommendation(job_id)
+            resume_record = recommendation.get("recommended_resume")
+            resume_path = (
+                self.workspace / resume_record["id"] if isinstance(resume_record, dict) else None
+            )
+            target_value = recommendation.get("target")
+            report_value = recommendation.get("match_report")
+            match_value = recommendation.get("match")
             return record_application(
                 self.workspace / APPLICATIONS_ROOT,
                 self.workspace,
@@ -833,6 +964,12 @@ class DashboardService:
                 role=job["title"],
                 job_id=job_id,
                 application_url=job["url"],
+                resume=resume_path,
+                target=self.workspace / target_value if isinstance(target_value, str) else None,
+                match_report=self.workspace / report_value if isinstance(report_value, str) else None,
+                match_classification=(
+                    match_value.get("label") if isinstance(match_value, dict) else None
+                ),
             )
 
     def list_applications(self) -> list[dict[str, Any]]:
@@ -857,6 +994,8 @@ class DashboardService:
                     "applied_on": application["applied_on"],
                     "created_at": application["created_at"],
                     "current_status": current_application_status(record),
+                    "resume": self._application_resume_view(application.get("resume")),
+                    "resume_attribution": self._resume_attribution(application.get("resume")),
                     "events": [
                         {
                             "id": event["id"],
@@ -870,6 +1009,30 @@ class DashboardService:
                 }
             )
         return sorted(applications, key=lambda item: item["applied_on"], reverse=True)
+
+    def _application_resume_view(self, artifact: object) -> dict[str, Any] | None:
+        if not isinstance(artifact, dict) or not isinstance(artifact.get("path"), str):
+            return None
+        path = Path(artifact["path"])
+        kind = "tailored" if path.parts[:2] == ("resumes", "tailored") else "directional"
+        available = (self.workspace / path).is_file()
+        return {
+            "name": path.stem.replace("-", " ").title(),
+            "kind": kind,
+            "path": artifact["path"],
+            "sha256": artifact.get("sha256"),
+            "available": available,
+            "detail": (
+                "Tailored for this job" if kind == "tailored" else "Closest directional resume"
+            )
+            + ("" if available else " · File unavailable"),
+        }
+
+    @staticmethod
+    def _resume_attribution(artifact: object) -> str:
+        if not isinstance(artifact, dict) or not isinstance(artifact.get("path"), str):
+            return "not_recorded"
+        return "tailored" if artifact["path"].startswith("resumes/tailored/") else "directional"
 
     def list_integrations(self) -> list[dict[str, Any]]:
         job_config_path = self.workspace / JOBS_CONFIG

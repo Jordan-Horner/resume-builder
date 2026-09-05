@@ -8,7 +8,9 @@ from resume_builder.discovery_activation import (
     MANAGED_FAMILY_PREFIX,
     DiscoveryActivationRecord,
     activate_portfolio,
+    apply_portfolio_update,
     edit_portfolio,
+    load_portfolio,
     preview_activation,
     rollback_activation,
     rollback_confirmation,
@@ -125,6 +127,39 @@ def test_activation_preview_changes_only_managed_families() -> None:
     assert payload["providers"] == before["providers"]
     assert payload["search"]["location"] == before["search"]["location"]
     assert payload["search"]["accepted_work_modes"] == before["search"]["accepted_work_modes"]
+
+
+def test_portal_update_saves_both_rollback_files_and_compiled_config(tmp_path: Path) -> None:
+    portfolio_path = tmp_path / "portfolio.json"
+    config_path = tmp_path / "search.yml"
+    portfolio_backup = tmp_path / "portfolio.backup.json"
+    config_backup = tmp_path / "search.backup.yml"
+    original = portfolio()
+    save_portfolio(portfolio_path, original)
+    config_path.write_text(search_config(), encoding="utf-8")
+    updated = edit_portfolio(
+        original,
+        operation="add",
+        query_id="vault-skill-example",
+        query="Incident response",
+        lane=ColdStartLane.CAPABILITY_COMBINATION,
+        source_ids=["vault:SKILL-001"],
+        evidence_terms=["Incident response"],
+        reason="Confirmed vault evidence.",
+    )
+
+    preview = apply_portfolio_update(
+        portfolio_path,
+        config_path,
+        portfolio_backup,
+        config_backup,
+        updated,
+    )
+
+    assert portfolio_backup.read_text(encoding="utf-8") == original.model_dump_json(indent=2) + "\n"
+    assert config_backup.read_text(encoding="utf-8") == search_config()
+    assert load_portfolio(portfolio_path) == updated
+    assert config_path.read_text(encoding="utf-8") == preview.rendered_config
 
 
 def test_activation_refuses_to_duplicate_a_manual_search() -> None:

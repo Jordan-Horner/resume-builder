@@ -32,6 +32,19 @@ editorial approval.
 11. **Application history** preserves submitted-artifact pins, append-only
     outcomes, and evidence-cited answers without turning application prose into
     career evidence.
+12. **Portal career views** derive imported sources from the source manifest,
+    generated Resumes from canonical Markdown and build reports, and Skills from
+    `vault/facts/skills/`. FastAPI organizes these views and owns their status
+    labels. For generated resumes, FastAPI resolves and serves only the existing
+    `build/resumes/<slug>/resume.html` preview; it does not introduce a second
+    renderer or expose arbitrary workspace files. Enabled skill search signals are derived from the existing discovery
+    portfolio's vault-backed `source_ids`; the portal does not maintain a second
+    skill registry or career profile.
+13. **Portal resume recommendations** reuse preserved targets, direction metadata,
+    and existing match reports. FastAPI selects and presents the closest supported
+    resume; the browser does not score or choose one. Marking a job applied pins
+    that target, resume, and match report in the existing application record when
+    available, so later interview work can recover the submitted artifact.
 
 ## Local appliance boundary
 
@@ -149,6 +162,9 @@ their reviewed budgets.
 ## Release invariants
 
 - Canonical facts are never edited outside a validated change plan.
+- Imported resume terms do not become portal skills until hydration creates a
+  canonical vault fact. Only confirmed skill facts may be enabled as scrape-search
+  signals.
 - A `needs-review` fact cannot appear in visible resume prose.
 - High-authority verbs must be supported by the action evidence.
 - A changed resume or evidence source makes the published preview stale until

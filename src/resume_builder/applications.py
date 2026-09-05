@@ -413,6 +413,10 @@ def record_application(
     application_url: str | None = None,
     applied_on: str | None = None,
     note: str | None = None,
+    target: Path | None = None,
+    resume: Path | None = None,
+    match_report: Path | None = None,
+    match_classification: str | None = None,
 ) -> dict[str, Any]:
     """Create one durable, manually confirmed application record."""
     args = argparse.Namespace(
@@ -423,10 +427,10 @@ def record_application(
         url=application_url,
         role_family=None,
         screen_category=None,
-        match_classification=None,
-        match_report=None,
-        target=None,
-        resume=None,
+        match_classification=match_classification,
+        match_report=match_report,
+        target=target,
+        resume=resume,
         note=note,
     )
     return _write_or_preview(root, build_record(args, workspace), apply=True)["record"]

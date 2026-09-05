@@ -69,6 +69,9 @@ def edit_portfolio(
     query_id: str | None = None,
     query: str | None = None,
     lane: ColdStartLane | None = None,
+    source_ids: list[str] | None = None,
+    evidence_terms: list[str] | None = None,
+    reason: str | None = None,
 ) -> ColdStartPortfolio:
     """Apply one explicit, locally validated portfolio edit."""
     items = [item.model_copy(deep=True) for item in portfolio.queries]
@@ -84,16 +87,15 @@ def edit_portfolio(
             if lane == ColdStartLane.ADJACENT_TITLE
             else None
         )
-        digest = hashlib.sha256(f"{lane.value}\n{query.casefold().strip()}".encode()).hexdigest()[
-            :12
-        ]
+        digest = hashlib.sha256(f"{lane.value}\n{query.casefold().strip()}".encode()).hexdigest()[:12]
         items.append(
             ColdStartQuery(
-                query_id=f"user-{lane.value}-{digest}",
+                query_id=query_id or f"user-{lane.value}-{digest}",
                 lane=lane,
                 query=query,
-                source_ids=["user-explicit"],
-                reason="Explicitly added during discovery portfolio review.",
+                source_ids=source_ids or ["user-explicit"],
+                evidence_terms=evidence_terms or [],
+                reason=reason or "Explicitly added during discovery portfolio review.",
                 posture=posture,
             )
         )
@@ -110,6 +112,31 @@ def edit_portfolio(
     payload = portfolio.model_dump(mode="json")
     payload["queries"] = [item.model_dump(mode="json") for item in items]
     return ColdStartPortfolio.model_validate(payload)
+
+
+def apply_portfolio_update(
+    portfolio_path: Path,
+    config_path: Path,
+    portfolio_backup_path: Path,
+    config_backup_path: Path,
+    portfolio: ColdStartPortfolio,
+) -> DiscoveryActivationPreview:
+    """Apply an explicit portal portfolio edit with validation and rollback files."""
+    portfolio_path = portfolio_path.resolve()
+    config_path = config_path.resolve()
+    before_portfolio = portfolio_path.read_text(encoding="utf-8")
+    before_config = config_path.read_text(encoding="utf-8")
+    preview = preview_activation(portfolio, before_config)
+    atomic_write_text(portfolio_backup_path.resolve(), before_portfolio)
+    atomic_write_text(config_backup_path.resolve(), before_config)
+    try:
+        save_portfolio(portfolio_path, portfolio)
+        atomic_write_text(config_path, preview.rendered_config)
+    except Exception:
+        atomic_write_text(portfolio_path, before_portfolio)
+        atomic_write_text(config_path, before_config)
+        raise
+    return preview
 
 
 def _family_for(query: ColdStartQuery) -> dict[str, object]:

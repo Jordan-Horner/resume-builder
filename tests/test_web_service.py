@@ -2,6 +2,7 @@ import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
+import yaml
 
 from resume_builder import web_service
 from resume_builder.web_service import DashboardService, _clean_description
@@ -89,6 +90,40 @@ def test_mark_applied_creates_application_and_removes_job_from_queue(tmp_path, i
     application = service.list_applications()[0]
     assert application["role"] == "Support Engineer"
     assert application["current_status"] == "applied"
+
+
+def test_mark_applied_pins_the_only_directional_resume_when_no_target_exists(
+    tmp_path, inventory
+):
+    resume = tmp_path / "resumes" / "baselines" / "support.md"
+    resume.parent.mkdir(parents=True)
+    resume.write_text("# Support resume\n", encoding="utf-8")
+    service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
+
+    record = service.mark_applied("remote-1")
+
+    assert record["application"]["resume"]["path"] == "resumes/baselines/support.md"
+    assert len(record["application"]["resume"]["sha256"]) == 64
+    application = service.list_applications()[0]
+    assert application["resume"]["name"] == "Support"
+    assert application["resume"]["kind"] == "directional"
+    assert application["resume"]["detail"] == "Closest directional resume"
+    assert application["resume_attribution"] == "directional"
+
+
+def test_mark_applied_does_not_guess_between_multiple_directional_resumes(
+    tmp_path, inventory
+):
+    folder = tmp_path / "resumes" / "baselines"
+    folder.mkdir(parents=True)
+    (folder / "support.md").write_text("# Support\n", encoding="utf-8")
+    (folder / "platform.md").write_text("# Platform\n", encoding="utf-8")
+    service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
+
+    record = service.mark_applied("remote-1")
+
+    assert record["application"]["resume"] is None
+    assert service.list_applications()[0]["resume_attribution"] == "not_recorded"
 
 
 def test_applied_jobs_do_not_appear_in_review_queue(tmp_path, inventory, monkeypatch):
@@ -469,6 +504,30 @@ def test_search_preferences_update_preserves_providers_and_manual_families(tmp_p
     assert "Platform Engineer" in rendered and "Support Engineer" in rendered
     assert "Technical Support Engineer" not in rendered
     assert not (root / "build/job-search/latest-refresh.json").exists()
+
+
+def test_search_preferences_keep_skill_terms_out_of_role_titles(tmp_path):
+    root = _fresh_workspace(tmp_path)
+    service = DashboardService(root, inventory_loader=lambda: [])
+    service.import_resume("resume.md", b"# Experience\n\nSupported production systems.\n")
+    service.start_preference_setup(use_ai=False)
+    service.answer_preference_step(
+        "roles", {"decisions": {}, "add": ["Technical Support Engineer"]}
+    )
+    service.answer_preference_step(
+        "location", {"search_country": "United States", "accepted_work_modes": ["remote"]}
+    )
+    service.answer_preference_step("compensation", {"skipped": True})
+    service.answer_preference_step("review", {"action": "save"})
+    preferences_path = root / "job-search/preferences.yml"
+    preferences = yaml.safe_load(preferences_path.read_text(encoding="utf-8"))
+    preferences["interest_terms"] = ["Incident response"]
+    preferences_path.write_text(yaml.safe_dump(preferences, sort_keys=False), encoding="utf-8")
+
+    result = service.job_search_preferences()
+
+    assert result["titles"] == ["Technical Support Engineer"]
+    assert result["skill_terms"] == ["Incident response"]
 
 
 @pytest.mark.parametrize(

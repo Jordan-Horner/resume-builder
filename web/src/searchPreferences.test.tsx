@@ -12,6 +12,7 @@ const preferences: SearchPreferences = {
   status: "active",
   revision: "rev-1",
   titles: ["Support Engineer"],
+  skill_terms: [],
   country: "United States",
   work_modes: ["remote"],
   onsite_locations: [],

@@ -62,6 +62,10 @@ export function ApplicationsPage() {
               </button>
               {openId === item.id && (
                 <div className="application-history">
+                  <div className="application-resume">
+                    <span>Resume used</span>
+                    {item.resume ? <strong>{item.resume.name}<small>{item.resume.detail}</small></strong> : <strong>Not recorded<small>This application predates resume tracking.</small></strong>}
+                  </div>
                   <h3>History</h3>
                   {item.events.map((event) => (
                     <div className="history-event" key={event.id}>

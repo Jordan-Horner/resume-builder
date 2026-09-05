@@ -13,11 +13,15 @@ execute in CI rather than silently skipping.
 
 ## Product shape
 
-The frontend has three pages:
+The frontend has five primary pages:
 
 1. **Jobs** — search, filter, and disposition inventory jobs.
 2. **Applications** — see the jobs the user applied for and their current status.
-3. **Settings** — integration setup/job sources and blocked-company management,
+3. **Resumes** — inspect the primary baseline plus directional and tailored
+   canonical Markdown resume sources and their current readiness.
+4. **Skills** — inspect canonical skill facts, see which resumes cite them, and
+   select a bounded set of confirmed facts for job-search expansion.
+5. **Settings** — integration setup/job sources and blocked-company management,
    organized into `/settings/scrapers`, `/settings/integrations`, and
    `/settings/blocked-companies`. Desktop uses left navigation; mobile uses a
    section selector. `/settings` restores the last section (Scrapers initially).
@@ -160,12 +164,32 @@ enabled value, and POST /api/job-sources/scan. No credentials form is added.
 
 Settings includes Search preferences as the primary editable source of scraper
 intent after onboarding. Titles are one removable bubble list; every visible title
-becomes a managed search family. Country, work modes, hybrid/on-site locations,
+becomes a managed title family. Confirmed skills selected on the Skills page remain
+a separate capability lane, reference stable vault fact IDs, and are shown here as
+read-only search signals. Saving ordinary preferences preserves those capability
+queries instead of flattening them into job titles. Country, work modes, hybrid/on-site locations,
 remote location terms, and compensation can be edited without AI or network calls.
 Saving preserves provider toggles and manual search families, updates only managed
 families, and does not start a scan. Target compensation remains a ranking preference,
 not a ceiling. A revision token prevents one open browser tab from overwriting newer
 changes from another.
+
+Resumes and Skills are read-only projections of the career workspace, except for
+the explicit skill search toggle. FastAPI returns pre-grouped original sources,
+directional resumes, and tailored resumes with presentation-ready lifecycle status.
+Generated resume rows open the HTML artifact already published by the resume preview
+workflow inside a dedicated reading view. Imported source evidence remains distinct
+and is not presented as a generated resume preview.
+It also returns each canonical skill's evidence and resume usage plus whether the
+existing discovery portfolio currently uses that fact as a search signal. React
+does not infer status, create search terms, or keep a parallel skill registry.
+
+Opening a job asks FastAPI for its recommended resume. The recommendation reuses a
+preserved target, its direction, a matching tailored resume, and an existing match
+report when those artifacts exist. Without a target, the only directional resume
+may be used as an unscored fallback; multiple baselines are never guessed between.
+Marking the job applied pins the recommendation through the existing application
+record, and Applications displays the server-provided attribution.
 
 When Jobs has no reviewable inventory, its empty state offers Find jobs now and
 polls the existing manual scan status through completion. When jobs exist but filters
@@ -175,12 +199,11 @@ offers Finish setup before any scrape action.
 Use a simple top navigation:
 
 ```text
-Resume Builder       Jobs     Applications     Integrations
+Resume Builder       Jobs     Applications     Resumes     Skills     Settings
 ```
 
-The active page is clearly marked. A small status indicator on Integrations may
-show when a configured connection needs attention, but global health does not
-need its own page.
+The active page is clearly marked. Connection health stays inside the Integrations
+section under Settings; global health does not need its own page.
 
 ## Jobs
 

@@ -58,6 +58,17 @@ export interface Application {
   applied_on: string;
   current_status: string;
   events: ApplicationEvent[];
+  resume: ApplicationResume | null;
+  resume_attribution: "tailored" | "directional" | "not_recorded";
+}
+
+export interface ApplicationResume {
+  name: string;
+  kind: "tailored" | "directional";
+  path: string;
+  sha256: string;
+  available: boolean;
+  detail: string;
 }
 
 export interface Integration {
@@ -94,6 +105,7 @@ export interface SearchPreferences {
   status: "active" | "ready_to_activate" | "in_progress" | "skipped" | "not_configured";
   revision: string;
   titles: string[];
+  skill_terms: string[];
   country: string;
   work_modes: WorkMode[];
   onsite_locations: string[];
@@ -105,6 +117,52 @@ export interface SearchPreferences {
     currency: string | null;
     period: "hour" | "year" | null;
   };
+}
+
+export interface CareerResume {
+  id: string;
+  name: string;
+  kind: "original" | "directional" | "tailored";
+  status_label: string;
+  status_tone: "neutral" | "positive" | "attention" | "negative";
+  updated_at: string | null;
+  detail: string;
+  error: string | null;
+  preview_url: string | null;
+  preview_message: string | null;
+}
+
+export interface ResumeSection {
+  id: "originals" | "directional" | "tailored";
+  title: string;
+  description: string;
+  items: CareerResume[];
+}
+
+export interface ResumeLibrary { sections: ResumeSection[]; }
+
+export interface CareerSkill {
+  id: string;
+  title: string;
+  description: string;
+  status_label: string;
+  status_tone: "neutral" | "positive" | "attention" | "negative";
+  themes: string[];
+  sources: string[];
+  resumes: string[];
+  search: {
+    enabled: boolean;
+    can_change: boolean;
+    disabled_reason: string | null;
+  };
+}
+
+export interface ResumeRecommendation {
+  status: "available" | "unavailable";
+  recommended_resume: { id: string; name: string; kind: "directional" | "tailored" } | null;
+  target: string | null;
+  match: { label: "Strong match" | "Partial match" | "Weak match" | "Unknown match" } | null;
+  message: string | null;
 }
 
 export type RoleIntent = "search" | "explore" | "dont_seed";

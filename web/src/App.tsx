@@ -3,12 +3,14 @@ import { getOnboardingStatus } from "./api";
 import { ApplicationsPage } from "./pages/ApplicationsPage";
 import { JobsPage } from "./pages/JobsPage";
 import { OnboardingPage } from "./pages/OnboardingPage";
+import { ResumesPage } from "./pages/ResumesPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { SkillsPage } from "./pages/SkillsPage";
 import type { OnboardingStatus } from "./types";
 import { UpdateNotice, UpdateProvider } from "./updates";
 
-type Route = "jobs" | "applications" | "settings";
-const ROUTES: Route[] = ["jobs", "applications", "settings"];
+type Route = "jobs" | "applications" | "resumes" | "skills" | "settings";
+const ROUTES: Route[] = ["jobs", "applications", "resumes", "skills", "settings"];
 
 function routeFromPath(): Route {
   const candidate = window.location.pathname.split("/")[1] as Route;
@@ -78,6 +80,8 @@ export function App() {
       <main>
         {route === "jobs" && <JobsPage />}
         {route === "applications" && <ApplicationsPage />}
+        {route === "resumes" && <ResumesPage />}
+        {route === "skills" && <SkillsPage />}
         {route === "settings" && <SettingsPage />}
       </main>
     </div></UpdateProvider>
