@@ -41,3 +41,16 @@ it("saves the twice-daily preset as two canonical times", async () => {
   await act(async () => save.click());
   expect(saveScrapeSchedule).toHaveBeenCalledWith(true, ["08:00", "17:00"]);
 });
+
+it("uses the toggle immediately while leaving manual searches available", async () => {
+  vi.mocked(getJobSources).mockResolvedValue({ providers: [{ id: "indeed", name: "Indeed", enabled: true, detail: "Ready" }], scan: { status: "idle" } });
+  vi.mocked(saveScrapeSchedule).mockResolvedValue({ ...schedule, enabled: false, next_run: null, service_status: "offline" });
+  await act(async () => root.render(<JobSources />));
+
+  const toggle = host.querySelector('input[aria-label="Automatic scraping"]') as HTMLInputElement;
+  await act(async () => toggle.click());
+
+  expect(saveScrapeSchedule).toHaveBeenCalledWith(false, ["08:00"]);
+  const manual = [...host.querySelectorAll("button")].find((item) => item.textContent === "Find jobs now") as HTMLButtonElement;
+  expect(manual.disabled).toBe(false);
+});

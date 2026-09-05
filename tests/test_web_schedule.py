@@ -26,11 +26,14 @@ def test_missing_schedule_is_reported_without_creating_configuration(tmp_path: P
 
 
 def test_save_schedule_reuses_automation_config_and_preserves_other_settings(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     path = tmp_path / DEFAULT_CONFIG
     path.parent.mkdir(parents=True)
     path.write_text(render_default_config("America/Chicago"), encoding="utf-8")
+
+    actions: list[bool] = []
+    monkeypatch.setattr(web_schedule, "set_scheduler_enabled", actions.append)
 
     result = web_schedule.save_schedule(
         tmp_path,
@@ -46,6 +49,46 @@ def test_save_schedule_reuses_automation_config_and_preserves_other_settings(
     assert saved.notifications.sink == "console"
     assert result["configured"] is True
     assert result["next_run"] is None
+    assert actions == [False]
+
+
+def test_enabling_schedule_starts_managed_scheduler(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    actions: list[bool] = []
+    monkeypatch.setattr(web_schedule, "set_scheduler_enabled", actions.append)
+
+    web_schedule.save_schedule(
+        tmp_path,
+        {"enabled": True, "times": ["08:00"]},
+        state_path=tmp_path / "state.sqlite",
+    )
+
+    assert actions == [True]
+    assert load_config(tmp_path / DEFAULT_CONFIG).jobs.enabled is True
+
+
+def test_service_control_failure_restores_previous_schedule(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / DEFAULT_CONFIG
+    path.parent.mkdir(parents=True)
+    original = render_default_config("America/New_York", jobs_enabled=False, gmail_enabled=True)
+    path.write_text(original, encoding="utf-8")
+
+    def fail_control(_enabled: bool) -> None:
+        raise RuntimeError("scheduler control failed")
+
+    monkeypatch.setattr(web_schedule, "set_scheduler_enabled", fail_control)
+
+    with pytest.raises(RuntimeError, match="scheduler control failed"):
+        web_schedule.save_schedule(
+            tmp_path,
+            {"enabled": True, "times": ["09:00"]},
+            state_path=tmp_path / "state.sqlite",
+        )
+
+    assert path.read_text(encoding="utf-8") == original
 
 
 @pytest.mark.parametrize(

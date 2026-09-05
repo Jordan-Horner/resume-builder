@@ -13,7 +13,8 @@ from .web_schedule import schedule_status
 
 def system_status(workspace: Path) -> dict[str, Any]:
     """Report core and optional service state without exposing private data."""
-    scheduler = schedule_status(workspace)["service_status"]
+    schedule = schedule_status(workspace)
+    scheduler = schedule["service_status"] if schedule["enabled"] else "disabled"
     telegram_config = telegram_configuration_status(workspace)
     telegram = telegram_config
     if telegram_config == "ready":
@@ -32,7 +33,12 @@ def system_status(workspace: Path) -> dict[str, Any]:
             "id": "scheduler",
             "name": "Scheduler",
             "status": scheduler,
-            "detail": "Running" if scheduler == "online" else "Starting or unavailable",
+            "detail": {
+                "online": "Running",
+                "disabled": "Off",
+                "offline": "Enabled but unavailable",
+                "unknown": "Status unavailable",
+            }.get(scheduler, "Status unavailable"),
         },
         {
             "id": "telegram",
@@ -49,6 +55,6 @@ def system_status(workspace: Path) -> dict[str, Any]:
         },
     ]
     return {
-        "status": "healthy" if scheduler == "online" else "degraded",
+        "status": "healthy" if scheduler in {"online", "disabled"} else "degraded",
         "components": components,
     }

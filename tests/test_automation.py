@@ -313,6 +313,16 @@ def test_service_heartbeat_reports_running_without_relying_on_file_lock(tmp_path
     assert state.service_is_running() is False
 
 
+def test_named_service_heartbeats_are_independent(tmp_path: Path) -> None:
+    state = AutomationState(tmp_path / "runtime" / "automation.sqlite")
+
+    state.record_service_heartbeat(running=True, service="jobs")
+    state.record_service_heartbeat(running=False, service="gmail")
+
+    assert state.service_is_running(service="jobs") is True
+    assert state.service_is_running(service="gmail") is False
+
+
 def test_quiet_hours_delay_routine_alerts_but_not_interviews(tmp_path: Path, capsys) -> None:
     config_path = tmp_path / "config.yml"
     config_path.write_text(render_default_config("America/New_York"), encoding="utf-8")

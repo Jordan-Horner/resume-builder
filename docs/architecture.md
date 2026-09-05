@@ -36,16 +36,19 @@ editorial approval.
 ## Local appliance boundary
 
 The published Docker image presents one container and one portal port. A small
-process supervisor keeps the FastAPI portal, native automation scheduler, and
-optional Telegram worker isolated inside that container while they share the
+process supervisor keeps the FastAPI portal and independently managed job,
+Gmail, and Telegram workers isolated inside that container while they share the
 mounted private workspace and external runtime directory. This is a deployment
 boundary, not a new source of truth: the existing CLI workflows, configuration
-files, locks, and databases remain authoritative.
+files, locks, and databases remain authoritative. The portal may start or stop
+the job scheduler through the supervisor's container-private socket; it never
+receives Docker or host control privileges.
 
-The portal is the core health surface. Scheduler or Telegram failures are
-reported as degraded component status and do not deliberately make the portal
-unavailable. Fresh installations create an inactive automation configuration;
-the user explicitly enables recurring scraping in the portal.
+The portal is the core health surface. An intentionally disabled scheduler is a
+healthy state; an enabled but unavailable scheduler is degraded. Optional
+worker failures do not deliberately make the portal unavailable. Fresh
+installations create an inactive automation configuration; the user explicitly
+enables recurring scraping in the portal.
 
 ## Trust boundaries
 

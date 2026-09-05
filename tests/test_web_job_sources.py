@@ -5,6 +5,7 @@ import pytest
 import yaml
 
 from resume_builder import web_job_sources as sources
+from resume_builder.automation import DEFAULT_CONFIG, render_default_config
 from resume_builder.job_setup_defaults import scaffold_job_search
 
 
@@ -35,6 +36,12 @@ def test_invalid_toggle_and_duplicate_scan_are_rejected(tmp_path: Path) -> None:
 
 def test_manual_scan_uses_snapshot_not_activation(tmp_path: Path, monkeypatch) -> None:
     scaffold_job_search(tmp_path)
+    automation_config = tmp_path / DEFAULT_CONFIG
+    automation_config.parent.mkdir(parents=True)
+    automation_config.write_text(
+        render_default_config("America/New_York", jobs_enabled=False, gmail_enabled=True),
+        encoding="utf-8",
+    )
     path = tmp_path / sources.CONFIG
     raw = yaml.safe_load(path.read_text())
     raw["search"]["families"] = [{"name": "support", "titles": ["Support Engineer"]}]

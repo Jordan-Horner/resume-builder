@@ -82,13 +82,34 @@ function ScheduleEditor() {
     }
   }
 
+  async function toggleAutomation(next: boolean) {
+    const previous = enabled;
+    setEnabled(next);
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const result = await saveScrapeSchedule(next, times);
+      setSaved(result);
+      setEnabled(result.enabled);
+      setTimes(result.times);
+      setFrequency(frequencyFor(result.times));
+      setNotice(result.enabled ? "Automatic scraping started." : "Automatic scraping stopped. Manual searches are still available.");
+    } catch (reason) {
+      setEnabled(previous);
+      setError(reason instanceof Error ? reason.message : "Could not change automatic scraping");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const changed = saved
     ? enabled !== saved.enabled || times.join(",") !== saved.times.join(",")
     : true;
   return <section className="scrape-schedule" aria-labelledby="scrape-schedule-title">
     <div className="schedule-heading">
       <div><h2 id="scrape-schedule-title">Automatic scraping</h2><p>Keep your job queue fresh without starting each search yourself.</p></div>
-      <label className="source-toggle"><span>{enabled ? "On" : "Off"}</span><input type="checkbox" role="switch" aria-label="Automatic scraping" checked={enabled} onChange={(event) => { setEnabled(event.target.checked); setNotice(""); }} /></label>
+      <label className="source-toggle"><span>{enabled ? "On" : "Off"}</span><input type="checkbox" role="switch" aria-label="Automatic scraping" checked={enabled} disabled={busy} onChange={(event) => void toggleAutomation(event.target.checked)} /></label>
     </div>
     <div className={enabled ? "schedule-controls" : "schedule-controls disabled"} aria-disabled={!enabled}>
       <div><span className="schedule-label">How often</span><div className="schedule-presets" role="group" aria-label="Scrape frequency">
@@ -102,9 +123,9 @@ function ScheduleEditor() {
     {saved && <div className="schedule-summary">
       <span><small>Time zone</small>{saved.timezone}</span>
       <span><small>Next scrape</small>{enabled ? dateLabel(saved.next_run, saved.timezone) : "Paused"}</span>
-      <span className={`scheduler-state ${saved.service_status}`}><small>Service</small>Scheduler {saved.service_status}</span>
+      <span className={`scheduler-state ${saved.service_status}`}><small>Service</small>{saved.enabled ? `Scheduler ${saved.service_status}` : "Scheduler stopped"}</span>
     </div>}
-    {saved?.service_status === "offline" && <p className="schedule-warning">The schedule is saved, but it will not run until the automation service is started.</p>}
+    {saved?.enabled && saved.service_status === "offline" && <p className="schedule-warning">Automatic scraping could not start. Check Settings → About for service status.</p>}
     {error && <p role="alert" className="onboarding-error">{error}</p>}
     {notice && <p role="status" className="schedule-notice">{notice}</p>}
     <button className="onboarding-primary schedule-save" disabled={busy || !changed || !times.length} onClick={() => void save()}>{busy ? "Saving…" : "Save schedule"}</button>

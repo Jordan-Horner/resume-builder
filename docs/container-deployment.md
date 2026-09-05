@@ -44,6 +44,10 @@ scheduler configuration on first start;
 automatic scraping is enabled later in **Settings → Scrapers**. No Docker socket
 or privileged mode is used.
 
+The Automatic scraping switch controls the job scheduler process through the
+container's private process supervisor. Turning it off does not disable manual
+**Find jobs now** runs and does not stop the independently managed Gmail worker.
+
 For a trusted LAN such as a private TrueNAS network, set
 `RESUME_BUILDER_WEB_BIND=0.0.0.0`. Do not expose the unauthenticated portal to the
 public internet. Host ports, volume paths, image tags, TLS, and reverse-proxy
@@ -59,7 +63,8 @@ settings remain host deployment concerns rather than portal settings.
    existing host directories. When these are unset, Compose creates fresh named
    volumes instead.
 4. Start the new `resume-builder` service and open Settings → About. Confirm the
-   Portal and Scheduler rows are online before enabling or changing a schedule.
+   Portal is online. Scheduler is correctly shown as Off until automatic
+   scraping is enabled, then must change to Running.
 5. Keep the previous Compose definition and image available for rollback. Image
    rollback does not reverse an incompatible data migration, so restore the
    matching snapshot if stored data ever changes incompatibly.

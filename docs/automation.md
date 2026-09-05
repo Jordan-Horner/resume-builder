@@ -80,8 +80,11 @@ The same job schedule is available in the portal under **Settings → Scrapers**
 Turn automatic scraping on or off, choose once daily, twice daily, or custom
 times, and save. The page shows the configured timezone, next run, and whether
 the scheduler service is online. It edits this same `automation/config.yml`;
-there is no second web-only scheduler. A running service reloads validated
-schedule changes without a container restart.
+there is no second web-only scheduler. The On/Off switch acts immediately: On
+starts the managed job scheduler and Off stops it. Manual **Find jobs now** runs
+remain available while the scheduler is off. Gmail monitoring is managed by a
+separate worker, so pausing scheduled job discovery does not pause application
+reconciliation.
 
 Test exactly one task without starting the service:
 
@@ -129,18 +132,18 @@ notification adapter with separate credentials so Gmail scanning can remain
 resume-builder automation run
 ```
 
-The process handles `SIGINT` and `SIGTERM`, prevents a second scheduler from
-using the same automation state, and prevents overlapping job or Gmail scans.
+The processes handle `SIGINT` and `SIGTERM`, prevent duplicate workers from
+using the same automation state, and prevent overlapping job or Gmail scans.
 Operational failures are recorded by category without serializing provider
 responses or email content.
 
 ## Run with Docker Compose
 
-The Docker image is a single local appliance. Starting it brings up the portal,
-the existing automation scheduler, and a managed Telegram worker inside one
-container. The portal is available immediately; an unconfigured Telegram worker
-waits quietly, and a fresh scheduler configuration remains inactive until the
-user enables automatic scraping in **Settings → Scrapers**.
+The Docker image is a single local appliance. Starting it brings up the portal
+and independently managed job-scheduler, Gmail, and Telegram workers inside one
+container. The portal is available immediately; unconfigured optional workers
+wait quietly, and a fresh job scheduler remains stopped until the user enables
+automatic scraping in **Settings → Scrapers**.
 
 For an existing installation, the runtime mount should be the external
 directory that already contains automation state, Gmail state and tokens, and

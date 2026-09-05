@@ -554,8 +554,9 @@ class AutomationState:
         self.path = path.expanduser().resolve()
 
     @contextmanager
-    def locked(self) -> Iterator[None]:
-        lock_path = self.path.with_suffix(f"{self.path.suffix}.lock")
+    def locked(self, service: str | None = None) -> Iterator[None]:
+        suffix = f".{service}.lock" if service else ".lock"
+        lock_path = self.path.with_suffix(f"{self.path.suffix}{suffix}")
         lock_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         with lock_path.open("a+", encoding="utf-8") as stream:
             os.chmod(lock_path, 0o600)
@@ -602,18 +603,29 @@ class AutomationState:
                     running INTEGER NOT NULL CHECK(running IN (0, 1)),
                     updated_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS service_heartbeats(
+                    service TEXT PRIMARY KEY,
+                    running INTEGER NOT NULL CHECK(running IN (0, 1)),
+                    updated_at TEXT NOT NULL
+                );
                 """
             )
         os.chmod(self.path, 0o600)
 
-    def service_is_running(self) -> bool:
+    def service_is_running(self, *, service: str | None = None) -> bool:
         """Return whether the scheduler has a fresh heartbeat or holds its lock."""
         if self.path.is_file():
             try:
                 with sqlite3.connect(self.path) as connection:
-                    row = connection.execute(
-                        "SELECT running, updated_at FROM service_runtime WHERE singleton = 1"
-                    ).fetchone()
+                    if service:
+                        row = connection.execute(
+                            "SELECT running, updated_at FROM service_heartbeats WHERE service = ?",
+                            (service,),
+                        ).fetchone()
+                    else:
+                        row = connection.execute(
+                            "SELECT running, updated_at FROM service_runtime WHERE singleton = 1"
+                        ).fetchone()
                 if row is not None:
                     updated_at = datetime.fromisoformat(str(row[1]))
                     if bool(row[0]) and datetime.now(UTC) - updated_at <= timedelta(minutes=2):
@@ -622,7 +634,8 @@ class AutomationState:
                         return False
             except (OSError, sqlite3.Error, ValueError):
                 LOGGER.debug("scheduler heartbeat unavailable; falling back to lock", exc_info=True)
-        lock_path = self.path.with_suffix(f"{self.path.suffix}.lock")
+        suffix = f".{service}.lock" if service else ".lock"
+        lock_path = self.path.with_suffix(f"{self.path.suffix}{suffix}")
         if not lock_path.is_file():
             return False
         with lock_path.open("r+", encoding="utf-8") as stream:
@@ -633,21 +646,33 @@ class AutomationState:
             fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
         return False
 
-    def record_service_heartbeat(self, *, running: bool) -> None:
+    def record_service_heartbeat(self, *, running: bool, service: str | None = None) -> None:
         """Persist a content-free scheduler heartbeat for portable liveness checks."""
         if not self.path.is_file():
             self.initialize()
         with sqlite3.connect(self.path) as connection:
-            connection.execute(
-                """
-                INSERT INTO service_runtime(singleton, running, updated_at)
-                VALUES (1, ?, ?)
-                ON CONFLICT(singleton) DO UPDATE SET
-                    running = excluded.running,
-                    updated_at = excluded.updated_at
-                """,
-                (int(running), datetime.now(UTC).isoformat()),
-            )
+            if service:
+                connection.execute(
+                    """
+                    INSERT INTO service_heartbeats(service, running, updated_at)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(service) DO UPDATE SET
+                        running = excluded.running,
+                        updated_at = excluded.updated_at
+                    """,
+                    (service, int(running), datetime.now(UTC).isoformat()),
+                )
+            else:
+                connection.execute(
+                    """
+                    INSERT INTO service_runtime(singleton, running, updated_at)
+                    VALUES (1, ?, ?)
+                    ON CONFLICT(singleton) DO UPDATE SET
+                        running = excluded.running,
+                        updated_at = excluded.updated_at
+                    """,
+                    (int(running), datetime.now(UTC).isoformat()),
+                )
 
     def record_run(
         self,
@@ -1249,11 +1274,19 @@ def _schedule_log_fields(service: AutomationService, due: dict[str, datetime]) -
     return fields
 
 
-def run_forever(service: AutomationService, stop: threading.Event) -> int:
+def run_forever(
+    service: AutomationService,
+    stop: threading.Event,
+    tasks: Sequence[str] = TASKS,
+) -> int:
     """Run due tasks and retry pending alerts until asked to stop."""
-    with service.state.locked():
+    selected = tuple(dict.fromkeys(tasks))
+    if not selected or any(task not in TASKS for task in selected):
+        raise ValueError("automation service requires at least one valid task")
+    service_name = selected[0] if len(selected) == 1 else "automation"
+    with service.state.locked(service_name):
         service.state.initialize()
-        service.state.record_service_heartbeat(running=True)
+        service.state.record_service_heartbeat(running=True, service=service_name)
         now = datetime.now(UTC)
         job_last = _last_finished(service.state, "jobs")
         gmail_last = _last_finished(service.state, "gmail")
@@ -1290,7 +1323,7 @@ def run_forever(service: AutomationService, stop: threading.Event) -> int:
         next_delivery = now
         next_heartbeat = now + timedelta(hours=DEFAULT_HEARTBEAT_HOURS)
         while not stop.is_set():
-            service.state.record_service_heartbeat(running=True)
+            service.state.record_service_heartbeat(running=True, service=service_name)
             now = datetime.now(UTC)
             if service.reload_config():
                 job_last = _last_finished(service.state, "jobs")
@@ -1311,7 +1344,7 @@ def run_forever(service: AutomationService, stop: threading.Event) -> int:
                 ("jobs", service.config.jobs.enabled),
                 ("gmail", service.config.gmail.enabled),
             ):
-                if not enabled or now < due[task]:
+                if task not in selected or not enabled or now < due[task]:
                     continue
                 attempt = failures[task] + 1
                 trigger = "retry" if failures[task] else "scheduled"
@@ -1357,7 +1390,7 @@ def run_forever(service: AutomationService, stop: threading.Event) -> int:
             wait_seconds = 30 if ran else 60
             stop.wait(wait_seconds)
         _log(logging.INFO, "service_stopped", state="stopped")
-        service.state.record_service_heartbeat(running=False)
+        service.state.record_service_heartbeat(running=False, service=service_name)
     return 0
 
 
@@ -1381,7 +1414,8 @@ def _parser() -> argparse.ArgumentParser:
     configure_parser.add_argument("--privacy", choices=("counts-only", "summary"))
     once = commands.add_parser("once", help="Run configured scanners once")
     once.add_argument("--task", choices=("all", *TASKS), default="all")
-    commands.add_parser("run", help="Run the automation service continuously")
+    run = commands.add_parser("run", help="Run the automation service continuously")
+    run.add_argument("--task", choices=("all", *TASKS), default="all")
     status = commands.add_parser("status", help="Show content-free automation health")
     status.add_argument("--healthcheck", action="store_true")
     commands.add_parser("doctor", help="Validate automation, credentials, and workspace paths")
@@ -1520,7 +1554,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "status":
             result = state.status()
             if args.healthcheck:
-                healthy = state.service_is_running()
+                healthy = any(
+                    (
+                        state.service_is_running(),
+                        state.service_is_running(service="jobs"),
+                        state.service_is_running(service="gmail"),
+                    )
+                )
             else:
                 task_statuses = result["tasks"]
                 healthy = isinstance(task_statuses, dict) and all(
@@ -1554,7 +1594,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         signal.signal(signal.SIGTERM, stop_service)
         signal.signal(signal.SIGINT, stop_service)
-        return run_forever(service, stop)
+        selected = TASKS if args.task == "all" else (args.task,)
+        return run_forever(service, stop, selected)
     except (OSError, ValueError, sqlite3.Error, json.JSONDecodeError) as exc:
         if structured_logs:
             _log(

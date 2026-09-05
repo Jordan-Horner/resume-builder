@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from .atomic import atomic_write_text
 from .automation import (
     DEFAULT_CONFIG,
     AutomationConfig,
@@ -20,6 +21,7 @@ from .automation import (
     next_job_run,
     render_default_config,
 )
+from .service import managed_service_status, set_scheduler_enabled
 
 
 def _default_timezone() -> str:
@@ -56,9 +58,14 @@ def _load(root: Path) -> tuple[AutomationConfig, bool]:
 def _state_status(path: Path) -> tuple[str, dict[str, object] | None]:
     state = AutomationState(path)
     try:
-        running = state.service_is_running()
+        managed = managed_service_status("scheduler")
+        running = (
+            managed in {"running", "starting"}
+            if managed is not None
+            else state.service_is_running(service="jobs") or state.service_is_running()
+        )
         last_run = state.last_run("jobs")
-    except (OSError, ValueError, sqlite3.Error):
+    except (OSError, RuntimeError, ValueError, sqlite3.Error):
         return "unknown", None
     return ("online" if running else "offline"), last_run
 
@@ -110,14 +117,24 @@ def save_schedule(
     config, _ = _load(root)
     path = root / DEFAULT_CONFIG
     path.parent.mkdir(parents=True, exist_ok=True)
-    configure(
-        path,
-        config,
-        timezone=None,
-        job_times=times,
-        gmail_hours=None,
-        notification_sink=None,
-        privacy=None,
-        job_enabled=enabled,
-    )
+    existed = path.is_file()
+    previous = path.read_text(encoding="utf-8") if existed else None
+    try:
+        configure(
+            path,
+            config,
+            timezone=None,
+            job_times=times,
+            gmail_hours=None,
+            notification_sink=None,
+            privacy=None,
+            job_enabled=enabled,
+        )
+        set_scheduler_enabled(enabled)
+    except (OSError, RuntimeError, ValueError):
+        if previous is not None:
+            atomic_write_text(path, previous)
+        elif not existed:
+            path.unlink(missing_ok=True)
+        raise
     return schedule_status(root, now=now, state_path=state_path)

@@ -90,7 +90,7 @@ def test_system_status_keeps_optional_services_out_of_core_health(tmp_path: Path
 
     assert status.status_code == 200
     payload = status.json()
-    assert payload["status"] == "degraded"
+    assert payload["status"] == "healthy"
     assert payload["components"][0] == {
         "id": "portal",
         "name": "Portal",
@@ -99,6 +99,8 @@ def test_system_status_keeps_optional_services_out_of_core_health(tmp_path: Path
     }
     telegram = next(item for item in payload["components"] if item["id"] == "telegram")
     assert telegram["status"] == "not_configured"
+    scheduler = next(item for item in payload["components"] if item["id"] == "scheduler")
+    assert scheduler["status"] == "disabled"
 
 
 def test_resume_upload_route_returns_readable_validation_error(tmp_path: Path) -> None:
