@@ -23,6 +23,7 @@ from .atomic import atomic_write_json, atomic_write_text
 from .layout import LayoutError, VaultLayout
 
 SUPPORTED = {".md", ".txt", ".html", ".htm", ".tex", ".pdf", ".docx"}
+DOCUMENT_KINDS = frozenset({"career_source", "resume"})
 WORD_NAMESPACE = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
 
@@ -135,6 +136,59 @@ def matches_any(value: str, patterns: list[str]) -> bool:
     return any(fnmatch.fnmatch(value, pattern) for pattern in patterns)
 
 
+def is_metadata_name(value: str) -> bool:
+    """Return whether a path names operating-system metadata, not user evidence."""
+    return any(part.startswith("._") or part == ".DS_Store" for part in Path(value).parts)
+
+
+def _looks_like_legacy_resume_name(value: str) -> bool:
+    if is_metadata_name(value):
+        return False
+    stem = Path(value).stem.casefold()
+    if stem.startswith("readme"):
+        return False
+    return bool(
+        "resume" in stem
+        or "curriculum vitae" in stem
+        or re.search(r"(?:^|[\s_-])cv(?:$|[\s_-])", stem)
+        or stem == "profile"
+    )
+
+
+def resume_manifest_sources(manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return explicitly tagged resumes, with a one-import legacy fallback.
+
+    Older manifests did not distinguish resumes from other career evidence. In
+    those workspaces the latest resume-shaped import is the safest proxy for the
+    baseline uploaded during setup. Returning every historical file with
+    ``resume`` or ``cv`` in its name exposes generated archives as base resumes.
+    """
+    sources = [item for item in manifest.get("sources", []) if isinstance(item, dict)]
+    explicit = [
+        item
+        for item in sources
+        if item.get("document_kind") == "resume"
+        and any(not is_metadata_name(name) for name in item.get("filenames", []))
+    ]
+    if explicit:
+        return explicit
+    legacy = [
+        item
+        for item in sources
+        if any(_looks_like_legacy_resume_name(name) for name in item.get("filenames", []))
+    ]
+    if not legacy:
+        return []
+    latest_import = max(
+        str(item.get("refreshed_at") or item.get("imported_at") or "") for item in legacy
+    )
+    return [
+        item
+        for item in legacy
+        if str(item.get("refreshed_at") or item.get("imported_at") or "") == latest_import
+    ]
+
+
 def iter_sources(
     arguments: list[str],
     excludes: list[str],
@@ -155,6 +209,8 @@ def iter_sources(
             ]
         for path, display_name in candidates:
             if path in seen_paths or path.suffix.lower() not in SUPPORTED:
+                continue
+            if is_metadata_name(display_name) or is_metadata_name(path.name):
                 continue
             if matches_any(display_name, excludes) or matches_any(path.name, excludes):
                 continue
@@ -244,8 +300,12 @@ def build_import_plan(
     layout: VaultLayout,
     source_arguments: list[str],
     excludes: list[str],
+    *,
+    document_kind: str = "career_source",
 ) -> ImportPlan:
     """Read all inputs and build a complete import plan without writing files."""
+    if document_kind not in DOCUMENT_KINDS:
+        raise ValueError(f"unsupported document kind: {document_kind}")
     candidates = list(iter_sources(source_arguments, excludes))
     manifest = load_manifest(layout)
     plan = ImportPlan(manifest=manifest, discovered=len(candidates))
@@ -271,6 +331,8 @@ def build_import_plan(
                 aliases.add(display_name)
                 existing["filenames"] = sorted(aliases)
                 plan.aliases_added += 1
+            if document_kind == "resume" or "document_kind" not in existing:
+                existing["document_kind"] = document_kind
             if existing.get("extraction_status") == "empty" and extracted:
                 snapshot_path = layout.snapshot_path(existing.get("snapshot"))
                 snapshot = snapshot_content(
@@ -307,6 +369,7 @@ def build_import_plan(
             "id": source_id,
             "sha256": digest,
             "format": path.suffix.lower().lstrip("."),
+            "document_kind": document_kind,
             "filenames": [display_name],
             "snapshot": layout.relative(snapshot_path),
             "snapshot_sha256": sha256_bytes(snapshot.encode("utf-8")),

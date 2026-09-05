@@ -46,6 +46,58 @@ def test_exact_duplicates_become_aliases(tmp_path: Path, run_main) -> None:
     assert entries[0]["filenames"] == ["resume-a.md", "resume-b.md"]
 
 
+def test_import_ignores_macos_resource_forks(tmp_path: Path) -> None:
+    sources = tmp_path / "sources"
+    sources.mkdir()
+    (sources / "resume.md").write_text("Real resume\n", encoding="utf-8")
+    (sources / "._resume.md").write_bytes(b"\x00\x05\x16\x07metadata")
+
+    candidates = list(source_import.iter_sources([str(sources)], []))
+
+    assert [display_name for _path, display_name in candidates] == ["resume.md"]
+
+
+def test_resume_import_kind_is_persisted_and_not_downgraded(tmp_path: Path) -> None:
+    source = tmp_path / "resume.md"
+    source.write_text("Production support engineer.\n", encoding="utf-8")
+    layout = source_import.VaultLayout.load(tmp_path / "vault", allow_missing=True)
+
+    resume_plan = source_import.build_import_plan(
+        layout,
+        [str(source)],
+        [],
+        document_kind="resume",
+    )
+    source_import.apply_import_plan(layout, resume_plan)
+    generic_plan = source_import.build_import_plan(layout, [str(source)], [])
+
+    assert generic_plan.manifest["sources"][0]["document_kind"] == "resume"
+
+
+def test_legacy_resume_fallback_uses_only_latest_resume_import() -> None:
+    manifest = {
+        "sources": [
+            {
+                "id": "SRC-OLD",
+                "filenames": ["archive/old-resume.pdf"],
+                "imported_at": "2026-01-01T00:00:00+00:00",
+            },
+            {
+                "id": "SRC-README",
+                "filenames": ["README-Resume-Lanes.txt"],
+                "imported_at": "2026-03-01T00:00:00+00:00",
+            },
+            {
+                "id": "SRC-BASE",
+                "filenames": ["Jordan Resume.docx"],
+                "imported_at": "2026-02-01T00:00:00+00:00",
+            },
+        ]
+    }
+
+    assert [item["id"] for item in source_import.resume_manifest_sources(manifest)] == ["SRC-BASE"]
+
+
 def test_exclusion_never_removes_registered_source(tmp_path: Path, run_main) -> None:
     sources = tmp_path / "sources"
     sources.mkdir()

@@ -171,6 +171,9 @@ def validate_sources(
         source_format = entry.get("format")
         if source_format not in ALLOWED_FORMATS:
             errors.append(f"{source_id}: invalid source format {source_format!r}")
+        document_kind = entry.get("document_kind")
+        if document_kind is not None and document_kind not in {"career_source", "resume"}:
+            errors.append(f"{source_id}: invalid document_kind {document_kind!r}")
         string_list(entry.get("filenames"), "filenames", source_id, errors)
 
         extracted = entry.get("extracted_characters")

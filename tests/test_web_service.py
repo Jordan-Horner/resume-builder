@@ -47,6 +47,34 @@ def test_openrouter_status_uses_same_credentials_after_restart(tmp_path, monkeyp
     assert token not in json.dumps(status)
 
 
+def test_primary_resume_uses_explicit_resume_source_instead_of_longest_source(tmp_path):
+    initialize_workspace(tmp_path, git_name="Example User", git_email="example@example.invalid")
+    layout = web_service.VaultLayout.load(tmp_path / "vault")
+    note = tmp_path / "very-long-note.md"
+    note.write_text("not a resume " * 1000, encoding="utf-8")
+    resume = tmp_path / "resume.md"
+    resume.write_text("Support Engineer\n", encoding="utf-8")
+    web_service.apply_import_plan(
+        layout,
+        web_service.build_import_plan(layout, [str(note)], []),
+    )
+    resume_plan = web_service.build_import_plan(
+        layout,
+        [str(resume)],
+        [],
+        document_kind="resume",
+    )
+    web_service.apply_import_plan(layout, resume_plan)
+
+    document = DashboardService(tmp_path)._primary_resume_document()
+
+    resume_entry = next(
+        item for item in resume_plan.manifest["sources"] if item["document_kind"] == "resume"
+    )
+    assert document.source_id == resume_entry["id"]
+    assert "Support Engineer" in document.content
+
+
 @pytest.fixture
 def inventory() -> list[dict]:
     return [

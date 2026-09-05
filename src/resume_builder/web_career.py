@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import quote
 
@@ -28,7 +28,7 @@ from .job_setup_defaults import PORTFOLIO_PATH, PREFERENCES_PATH, scaffold_job_s
 from .layout import VaultLayout
 from .project_report import project_report
 from .resume_parser import compile_markdown
-from .source_import import load_manifest
+from .source_import import is_metadata_name, load_manifest, resume_manifest_sources
 from .validation import parse_frontmatter
 
 SEARCH_CONFIG_PATH = Path("job-search/config/search.yml")
@@ -107,25 +107,51 @@ def _all_evidence_ids(value: object) -> set[str]:
 def list_resumes(root: Path) -> dict[str, Any]:
     """Adapt canonical sources and project status into a presentation-ready library."""
     layout = VaultLayout.load(root / "vault", allow_missing=True)
-    originals = []
-    for source in load_manifest(layout).get("sources", []):
-        names = source.get("filenames") or [source["id"]]
-        originals.append(
-            {
+    grouped_originals: dict[str, dict[str, Any]] = {}
+    for source in resume_manifest_sources(load_manifest(layout)):
+        names = [name for name in source.get("filenames", []) if not is_metadata_name(name)]
+        if not names:
+            continue
+        source_name = str(names[0])
+        source_path = PurePosixPath(source_name)
+        group_id = source_path.with_suffix("").as_posix().casefold()
+        item = grouped_originals.get(group_id)
+        if item is None:
+            item = {
                 "id": source["id"],
-                "name": str(names[0]),
+                "name": source_path.with_suffix("").as_posix(),
                 "kind": "original",
                 "status_label": "Imported",
                 "status_tone": "neutral",
                 "updated_at": source.get("refreshed_at") or source.get("imported_at"),
-                "detail": f"{str(source.get('format') or 'source').upper()} · Career evidence",
-                "error": None
-                if source.get("extraction_status") == "ok"
-                else "No readable text was extracted.",
+                "formats": set(),
+                "has_empty_source": False,
                 "preview_url": None,
-                "preview_message": "Build a directional resume to create an HTML preview.",
+                "preview_message": "Directional resumes include a formatted HTML preview.",
+            }
+            grouped_originals[group_id] = item
+        item["formats"].add(str(source.get("format") or "source").upper())
+        item["has_empty_source"] = (
+            item["has_empty_source"] or source.get("extraction_status") != "ok"
+        )
+        updated_at = source.get("refreshed_at") or source.get("imported_at")
+        if updated_at and str(updated_at) > str(item.get("updated_at") or ""):
+            item["updated_at"] = updated_at
+
+    originals = []
+    for item in grouped_originals.values():
+        formats = ", ".join(sorted(item.pop("formats")))
+        has_empty_source = bool(item.pop("has_empty_source"))
+        item.update(
+            {
+                "detail": f"{formats} · Base resume",
+                "error": "No readable text was extracted from one format."
+                if has_empty_source
+                else None,
             }
         )
+        originals.append(item)
+    originals.sort(key=lambda item: str(item["name"]).casefold())
 
     report = project_report(root / "vault", strict=False)
     generated: dict[str, list[dict[str, Any]]] = {"directional": [], "tailored": []}
@@ -169,8 +195,8 @@ def list_resumes(root: Path) -> dict[str, Any]:
         "sections": [
             {
                 "id": "originals",
-                "title": "Original resumes",
-                "description": "Documents imported as career evidence.",
+                "title": "Base resumes",
+                "description": "Resume sources used to build role-specific versions.",
                 "items": originals,
             },
             {

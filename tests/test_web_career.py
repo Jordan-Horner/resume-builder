@@ -49,15 +49,55 @@ def test_resume_library_includes_imported_sources_and_generated_resumes(tmp_path
     upload = tmp_path / "Jordan Resume.md"
     upload.write_text("# Jordan Example\n\nProduction support engineer.\n", encoding="utf-8")
     layout = VaultLayout.load(root / "vault")
-    plan = build_import_plan(layout, [str(upload)], [])
+    plan = build_import_plan(layout, [str(upload)], [], document_kind="resume")
     apply_import_plan(layout, plan)
 
     library = list_resumes(root)
 
     assert library["sections"][0]["id"] == "originals"
-    assert library["sections"][0]["items"][0]["name"] == "Jordan Resume.md"
+    assert library["sections"][0]["items"][0]["name"] == "Jordan Resume"
     assert library["sections"][0]["items"][0]["kind"] == "original"
     assert library["sections"][0]["items"][0]["preview_url"] is None
+
+
+def test_resume_library_excludes_non_resume_sources_and_groups_format_variants(
+    tmp_path: Path,
+) -> None:
+    root = _workspace(tmp_path)
+    from resume_builder.layout import VaultLayout
+    from resume_builder.source_import import apply_import_plan, build_import_plan
+
+    uploads = tmp_path / "uploads"
+    uploads.mkdir()
+    (uploads / "Jordan Resume.md").write_text("Resume source\n", encoding="utf-8")
+    (uploads / "Jordan Resume.html").write_text("<p>Resume source</p>\n", encoding="utf-8")
+    note = tmp_path / "incident-note.md"
+    note.write_text("Career evidence that is not a resume.\n", encoding="utf-8")
+    layout = VaultLayout.load(root / "vault")
+    apply_import_plan(
+        layout,
+        build_import_plan(layout, [str(uploads)], [], document_kind="resume"),
+    )
+    apply_import_plan(layout, build_import_plan(layout, [str(note)], []))
+
+    originals = list_resumes(root)["sections"][0]["items"]
+
+    assert len(originals) == 1
+    assert originals[0]["name"] == "Jordan Resume"
+    assert originals[0]["detail"] == "HTML, MD · Base resume"
+
+
+def test_resume_library_ignores_macos_metadata_generated_resumes(tmp_path: Path) -> None:
+    root = _workspace(tmp_path)
+    baseline = root / "resumes" / "baselines"
+    baseline.mkdir(parents=True, exist_ok=True)
+    (baseline / "._support.md").write_bytes(b"\x00\xa3metadata")
+
+    directional = next(
+        section for section in list_resumes(root)["sections"] if section["id"] == "directional"
+    )
+
+    assert directional["items"] == []
 
 
 def test_skills_are_derived_from_vault_facts_and_resume_evidence(tmp_path: Path) -> None:

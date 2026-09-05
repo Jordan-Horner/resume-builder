@@ -72,7 +72,13 @@ from .job_target import parse_target
 from .layout import VaultLayout
 from .preferences import _validated as validate_preferences
 from .project_report import project_report
-from .source_import import SUPPORTED, apply_import_plan, build_import_plan, load_manifest
+from .source_import import (
+    SUPPORTED,
+    apply_import_plan,
+    build_import_plan,
+    load_manifest,
+    resume_manifest_sources,
+)
 
 JOBS_CONFIG = Path("job-search/config/search.yml")
 APPLICATIONS_ROOT = Path("applications")
@@ -155,7 +161,7 @@ class DashboardService:
     def onboarding_status(self) -> dict[str, Any]:
         layout = VaultLayout.load(self.workspace / "vault", allow_missing=True)
         manifest = load_manifest(layout)
-        sources = manifest.get("sources", [])
+        sources = resume_manifest_sources(manifest)
         source_names = [
             str(item.get("filenames", ["Resume"])[0])
             for item in sources
@@ -228,7 +234,7 @@ class DashboardService:
         try:
             source.write_bytes(content)
             layout = VaultLayout.load(self.workspace / "vault", allow_missing=True)
-            plan = build_import_plan(layout, [str(source)], [])
+            plan = build_import_plan(layout, [str(source)], [], document_kind="resume")
             if plan.errors:
                 raise ValueError(plan.errors[0]["error"])
             if plan.empty:
@@ -285,16 +291,25 @@ class DashboardService:
     def _primary_resume_document(self) -> ResumeDocument:
         layout = VaultLayout.load(self.workspace / "vault")
         manifest = load_manifest(layout)
+        sources = resume_manifest_sources(manifest)
         documents = [
             ResumeDocument(
                 source_id=str(item["id"]),
                 content=layout.snapshot_path(item["snapshot"]).read_text(encoding="utf-8"),
             )
-            for item in manifest["sources"]
+            for item in sources
         ]
         if not documents:
             raise ValueError("add a resume before choosing role suggestions")
-        return max(documents, key=lambda item: len(item.content))
+        by_id = {item.source_id: item for item in documents}
+        selected = max(
+            sources,
+            key=lambda item: (
+                str(item.get("refreshed_at") or item.get("imported_at") or ""),
+                int(item.get("extracted_characters") or 0),
+            ),
+        )
+        return by_id[str(selected["id"])]
 
     def _semantic_roles(self, api_key: str) -> list[RoleProposal]:
         document = self._primary_resume_document()

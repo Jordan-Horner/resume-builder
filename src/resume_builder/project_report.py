@@ -300,6 +300,8 @@ def _resume_records(
     records: list[dict[str, Any]] = []
     for kind in ("baselines", "tailored"):
         for resume in sorted((project_root / "resumes" / kind).glob("*.md")):
+            if resume.name.startswith("."):
+                continue
             plan_path = project_root / "resumes" / "plans" / f"{resume.stem}.yaml"
             plan_status = "missing"
             direction: str | None = None
