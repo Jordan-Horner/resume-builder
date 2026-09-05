@@ -62,6 +62,17 @@ def test_manual_onboarding_routes_through_preference_steps(tmp_path: Path) -> No
     assert roles.json()["step"] == "location"
 
 
+def test_job_search_preferences_route_exposes_editable_defaults(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+
+    response = client.get("/api/job-search/preferences")
+
+    assert response.status_code == 200
+    assert response.json()["titles"] == []
+    assert response.json()["country"] == "United States"
+    assert response.json()["revision"]
+
+
 @pytest.mark.parametrize(
     "payload", [{}, {"company": None, "blocked": True}, {"company": "Example", "blocked": "false"}]
 )

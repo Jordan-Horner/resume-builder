@@ -14,6 +14,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import yaml
 from bs4 import BeautifulSoup
 
 from job_puller.compensation import extract_compensation_range
@@ -27,6 +28,7 @@ from .agent_contracts import ModelProviderError
 from .agent_openrouter import OpenRouterAdapter
 from .applications import current_application_status, iter_records, record_application
 from .atomic import atomic_write_json, atomic_write_text
+from .discovery_activation import preview_activation
 from .discovery_evidence import (
     ResumeDocument,
     extract_query_expansion,
@@ -34,20 +36,30 @@ from .discovery_evidence import (
     interpret_resume_evidence,
 )
 from .discovery_portfolio import (
+    MAX_TOTAL_QUERIES,
     ColdStartLane,
+    ColdStartPortfolio,
+    ColdStartQuery,
     build_cold_start_portfolio,
     generate_title_suggestions,
     load_cached_title_generation,
 )
 from .job_onboarding import (
+    CompensationAnswers,
+    EligibilityAnswers,
     JobSearchSetupAnswer,
+    LocationAnswers,
     RoleGroup,
     RoleIntent,
     RoleProposal,
     SetupStatus,
     SetupStep,
+    activation_preview,
     apply_answer,
     start_setup,
+)
+from .job_onboarding import (
+    activate as activate_setup,
 )
 from .job_onboarding import (
     load_state as load_setup_state,
@@ -55,7 +67,9 @@ from .job_onboarding import (
 from .job_onboarding import (
     save_state as save_setup_state,
 )
+from .job_setup_defaults import PORTFOLIO_PATH, PREFERENCES_PATH, scaffold_job_search
 from .layout import VaultLayout
+from .preferences import _validated as validate_preferences
 from .source_import import SUPPORTED, apply_import_plan, build_import_plan, load_manifest
 
 JOBS_CONFIG = Path("job-search/config/search.yml")
@@ -155,17 +169,21 @@ class DashboardService:
         # Existing configured workspaces should not be forced through a new first-run flow.
         if not record and source_names and existing_search_active:
             complete = True
-        if setup is not None and setup.status in {
-            SetupStatus.READY_TO_ACTIVATE,
-            SetupStatus.ACTIVE,
-        }:
-            complete = True
+        if setup is not None:
+            if setup.status == SetupStatus.READY_TO_ACTIVATE:
+                # Older portal versions recorded completion before activating the
+                # generated search families. Require the explicit recovery step.
+                complete = False
+            elif setup.status == SetupStatus.ACTIVE:
+                complete = True
         if not source_names:
             step = "resume"
         elif setup is None or setup.status == SetupStatus.SKIPPED:
             step = "ai_choice"
         elif setup.status == SetupStatus.IN_PROGRESS:
             step = "location" if setup.step == SetupStep.ELIGIBILITY else setup.step.value
+        elif setup.status == SetupStatus.READY_TO_ACTIVATE:
+            step = "activation"
         else:
             step = "complete"
         progress = {
@@ -176,6 +194,7 @@ class DashboardService:
             "location": 3,
             "compensation": 4,
             "review": 5,
+            "activation": 5,
             "complete": 5,
         }[step]
         return {
@@ -391,6 +410,8 @@ class DashboardService:
             ),
         )
         if updated.status == SetupStatus.READY_TO_ACTIVATE:
+            preview = activation_preview(self.workspace)
+            updated = activate_setup(self.workspace, preview["confirmation_hash"])
             atomic_write_json(
                 self.workspace / ONBOARDING_STATE_PATH,
                 {
@@ -400,6 +421,182 @@ class DashboardService:
                 },
             )
         return self.onboarding_status()
+
+    def activate_job_search(self) -> dict[str, Any]:
+        """Finish a legacy ready-to-activate setup without starting a scan."""
+        with self._state_lock:
+            preview = activation_preview(self.workspace)
+            activate_setup(self.workspace, preview["confirmation_hash"])
+            atomic_write_json(
+                self.workspace / ONBOARDING_STATE_PATH,
+                {
+                    "schema_version": 2,
+                    "completed": True,
+                    "completed_at": datetime.now(UTC).isoformat(),
+                },
+            )
+        return self.onboarding_status()
+
+    def _job_search_preferences_revision(self) -> str:
+        paths = [
+            self.workspace / PREFERENCES_PATH,
+            self.workspace / JOBS_CONFIG,
+            self.workspace / PORTFOLIO_PATH,
+        ]
+        rendered = "\n".join(
+            path.read_text(encoding="utf-8") if path.is_file() else "" for path in paths
+        )
+        return hashlib.sha256(rendered.encode("utf-8")).hexdigest()
+
+    def job_search_preferences(self) -> dict[str, Any]:
+        scaffold_job_search(self.workspace)
+        preferences = validate_preferences(
+            yaml.safe_load((self.workspace / PREFERENCES_PATH).read_text(encoding="utf-8"))
+        )
+        profile = dict(preferences.get("screening_profile") or {})
+        setup = load_setup_state(self.workspace)
+        titles = [
+            *preferences.get("desired_title_terms", []),
+            *preferences.get("interest_terms", []),
+        ]
+        titles = list(dict.fromkeys(str(title).strip() for title in titles if str(title).strip()))
+        return {
+            "status": setup.status.value if setup else "not_configured",
+            "revision": self._job_search_preferences_revision(),
+            "titles": titles,
+            "country": profile.get("intended_work_country") or "United States",
+            "work_modes": preferences.get("accepted_work_modes") or [],
+            "onsite_locations": preferences.get("accepted_location_terms") or [],
+            "remote_location_terms": profile.get("remote_location_terms") or [],
+            "compensation": {
+                "skipped": preferences.get("minimum_salary") is None
+                and preferences.get("preferred_salary") is None,
+                "minimum": preferences.get("minimum_salary"),
+                "target": preferences.get("preferred_salary"),
+                "currency": preferences.get("salary_currency"),
+                "period": preferences.get("salary_period"),
+            },
+        }
+
+    @staticmethod
+    def _clean_titles(values: object) -> list[str]:
+        if not isinstance(values, list) or not values:
+            raise ValueError("add at least one job title")
+        titles: list[str] = []
+        seen: set[str] = set()
+        for value in values:
+            if not isinstance(value, str):
+                raise ValueError("job titles must be text")
+            title = " ".join(value.split())
+            if not 2 <= len(title) <= 150:
+                raise ValueError("job titles must be between 2 and 150 characters")
+            key = normalized_key(title)
+            if key and key not in seen:
+                titles.append(title)
+                seen.add(key)
+        if not titles:
+            raise ValueError("add at least one job title")
+        if len(titles) > MAX_TOTAL_QUERIES:
+            raise ValueError(f"you can search at most {MAX_TOTAL_QUERIES} job titles")
+        return titles
+
+    def update_job_search_preferences(self, payload: dict[str, Any]) -> dict[str, Any]:
+        with self._state_lock:
+            current = self.job_search_preferences()
+            if payload.get("revision") != current["revision"]:
+                raise ValueError("these preferences changed in another tab; reload and try again")
+            titles = self._clean_titles(payload.get("titles"))
+            country = str(payload.get("country") or "").strip()
+            location = LocationAnswers.model_validate(
+                {
+                    "search_country": country,
+                    "accepted_work_modes": payload.get("work_modes"),
+                    "accepted_onsite_locations": payload.get("onsite_locations", []),
+                    "remote_location_terms": payload.get("remote_location_terms") or None,
+                }
+            )
+            compensation = CompensationAnswers.model_validate(payload.get("compensation"))
+            state = load_setup_state(self.workspace)
+            if state is None:
+                raise ValueError("finish job-search setup before editing search preferences")
+            existing = {normalized_key(item.title): item for item in state.roles}
+            selected_keys = {normalized_key(title) for title in titles}
+            roles = [
+                item.model_copy(update={"intent": RoleIntent.DONT_SEED})
+                for item in state.roles
+                if normalized_key(item.title) not in selected_keys
+            ]
+            for title in titles:
+                role = existing.get(normalized_key(title))
+                roles.append(
+                    role.model_copy(update={"title": title, "intent": RoleIntent.SEARCH})
+                    if role
+                    else RoleProposal(
+                        role_id=f"role-user-{hashlib.sha256(title.casefold().encode()).hexdigest()[:12]}",
+                        title=title,
+                        group=RoleGroup.RELATED,
+                        intent=RoleIntent.SEARCH,
+                        lane=ColdStartLane.ADJACENT_TITLE,
+                        source_ids=["user-confirmed-settings"],
+                        reason="Explicitly added in Search preferences.",
+                    )
+                )
+            state.roles = roles
+            state.location = location
+            state.eligibility = (
+                state.eligibility.model_copy(update={"intended_country": country})
+                if state.eligibility
+                else EligibilityAnswers(intended_country=country)
+            )
+            state.compensation = compensation
+            state.status = SetupStatus.ACTIVE
+            state.step = SetupStep.COMPLETE
+            state.updated_at = datetime.now(UTC).isoformat()
+
+            preferences_path = self.workspace / PREFERENCES_PATH
+            config_path = self.workspace / JOBS_CONFIG
+            preferences = yaml.safe_load(preferences_path.read_text(encoding="utf-8"))
+            preferences["desired_title_terms"] = titles
+            preferences["interest_terms"] = []
+            preferences["accepted_work_modes"] = location.accepted_work_modes
+            preferences["accepted_location_terms"] = [
+                value.strip() for value in location.accepted_onsite_locations if value.strip()
+            ]
+            preferences["minimum_salary"] = compensation.minimum
+            preferences["preferred_salary"] = compensation.target
+            preferences["salary_currency"] = compensation.currency
+            preferences["salary_period"] = compensation.period
+            profile = dict(preferences.get("screening_profile") or {})
+            profile["intended_work_country"] = country
+            profile["remote_location_terms"] = location.remote_location_terms
+            preferences["screening_profile"] = profile
+            preferences = validate_preferences(preferences)
+
+            queries = [
+                ColdStartQuery(
+                    query_id=f"user-{hashlib.sha256(title.casefold().encode()).hexdigest()[:12]}",
+                    lane=ColdStartLane.ADJACENT_TITLE,
+                    query=title,
+                    source_ids=["user-confirmed-settings"],
+                    reason="Explicitly included in Search preferences.",
+                )
+                for title in titles
+            ]
+            portfolio = ColdStartPortfolio(
+                generated_at=datetime.now(UTC).isoformat(),
+                resume_hash=state.evidence_hash,
+                queries=queries,
+            )
+            config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+            config.setdefault("search", {})["location"] = country
+            config["search"]["accepted_work_modes"] = location.accepted_work_modes
+            preview = preview_activation(portfolio, yaml.safe_dump(config, sort_keys=False))
+
+            atomic_write_text(preferences_path, yaml.safe_dump(preferences, sort_keys=False))
+            atomic_write_text(self.workspace / PORTFOLIO_PATH, portfolio.model_dump_json(indent=2) + "\n")
+            atomic_write_text(config_path, preview.rendered_config)
+            save_setup_state(self.workspace, state)
+        return self.job_search_preferences()
 
     def previous_preference_step(self) -> dict[str, Any]:
         state = load_setup_state(self.workspace)

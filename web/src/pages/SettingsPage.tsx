@@ -3,6 +3,7 @@ import { getBlockedCompanies, setCompanyBlocked } from "../api";
 import { IntegrationsSection } from "./IntegrationsPage";
 import { JobSources } from "./JobSources";
 import { AboutSection } from "../updates";
+import { SearchPreferencesSection } from "./SearchPreferencesSection";
 import { SETTINGS_SECTIONS, SETTINGS_SECTION_KEY, resolveSettingsSection } from "../settingsNavigation";
 
 export function SettingsPage() {
@@ -25,6 +26,7 @@ export function SettingsPage() {
     </nav>
     <label className="settings-mobile-navigation">Settings section<select value={section} onChange={(event) => window.location.assign(`/settings/${event.target.value}`)}>{SETTINGS_SECTIONS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
     <div className="settings-content">
+      {section === "search-preferences" && <SearchPreferencesSection />}
       {section === "scrapers" && <JobSources />}
       {section === "integrations" && <IntegrationsSection />}
       {section === "blocked-companies" && <BlockedCompaniesSection />}

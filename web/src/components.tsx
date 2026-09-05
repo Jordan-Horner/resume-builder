@@ -17,12 +17,11 @@ export function ArrowIcon() {
   );
 }
 
-export function EmptyState({ title, children }: { title: string; children: ReactNode }) {
+export function EmptyState({ title, children, actions }: { title: string; children: ReactNode; actions?: ReactNode }) {
   return (
     <div className="empty-state">
-      <span className="empty-orbit" aria-hidden="true" />
-      <h2>{title}</h2>
-      <p>{children}</p>
+      <div className="empty-state-copy"><h2>{title}</h2><div className="empty-state-content">{children}</div></div>
+      {actions && <div className="empty-state-actions">{actions}</div>}
     </div>
   );
 }

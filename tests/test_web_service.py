@@ -336,7 +336,7 @@ def test_portal_skips_eligibility_and_supports_back_and_reload(tmp_path):
     assert service.previous_preference_step()["step"] == "roles"
 
 
-def test_manual_onboarding_saves_preferences_without_activating_scraping(tmp_path):
+def test_manual_onboarding_activates_searches_without_starting_a_scrape(tmp_path):
     root = _fresh_workspace(tmp_path)
     service = DashboardService(root, inventory_loader=lambda: [])
     service.import_resume(
@@ -379,8 +379,92 @@ def test_manual_onboarding_saves_preferences_without_activating_scraping(tmp_pat
     assert completed["setup"]["eligibility"]["intended_country"] == "Canada"
     search = (root / "job-search/config/search.yml").read_text(encoding="utf-8")
     preferences = (root / "job-search/preferences.yml").read_text(encoding="utf-8")
-    assert "enabled: false" in search
+    assert "enabled: true" in search
+    assert "resume-discovery-" in search
+    assert "Technical Support Engineer" in search
     assert "Technical Support Engineer" in preferences
+    assert not (root / "build/job-search/latest-refresh.json").exists()
+    assert not (root / "build/job-search/web-scan.json").exists()
+
+
+def test_onboarding_does_not_claim_completion_when_activation_fails(tmp_path, monkeypatch):
+    root = _fresh_workspace(tmp_path)
+    service = DashboardService(root, inventory_loader=lambda: [])
+    service.import_resume("resume.md", b"# Experience\n\nSupported production systems.\n")
+    service.start_preference_setup(use_ai=False)
+    service.answer_preference_step("roles", {"decisions": {}, "add": ["Support Engineer"]})
+    service.answer_preference_step(
+        "location", {"search_country": "United States", "accepted_work_modes": ["remote"]}
+    )
+    service.answer_preference_step("compensation", {"skipped": True})
+    monkeypatch.setattr(web_service, "activate_setup", lambda *_args: (_ for _ in ()).throw(ValueError("activation failed")))
+
+    with pytest.raises(ValueError, match="activation failed"):
+        service.answer_preference_step("review", {"action": "save"})
+
+    status = service.onboarding_status()
+    assert status["needs_onboarding"] is True
+    assert status["step"] == "activation"
+    assert not (root / "job-search/web-onboarding.json").exists()
+
+    (root / "job-search/web-onboarding.json").write_text(
+        json.dumps({"schema_version": 2, "completed": True}), encoding="utf-8"
+    )
+    assert service.onboarding_status()["needs_onboarding"] is True
+
+
+def test_search_preferences_update_preserves_providers_and_manual_families(tmp_path):
+    root = _fresh_workspace(tmp_path)
+    service = DashboardService(root, inventory_loader=lambda: [])
+    service.import_resume("resume.md", b"# Experience\n\nSupported production systems.\n")
+    service.start_preference_setup(use_ai=False)
+    service.answer_preference_step(
+        "roles", {"decisions": {}, "add": ["Technical Support Engineer"]}
+    )
+    service.answer_preference_step(
+        "location",
+        {"search_country": "United States", "accepted_work_modes": ["remote"]},
+    )
+    service.answer_preference_step("compensation", {"skipped": True})
+    service.answer_preference_step("review", {"action": "save"})
+    config_path = root / "job-search/config/search.yml"
+    config = config_path.read_text(encoding="utf-8")
+    config = config.replace(
+        "providers: {}",
+        "providers:\n  linkedin:\n    enabled: false",
+    ).replace(
+        "  families:\n",
+        "  families:\n  - name: manual-sre\n    enabled: true\n    titles:\n    - Site Reliability Engineer\n",
+    )
+    config_path.write_text(config, encoding="utf-8")
+
+    current = service.job_search_preferences()
+    updated = service.update_job_search_preferences(
+        {
+            "revision": current["revision"],
+            "titles": ["Platform Engineer", "Support Engineer"],
+            "country": "United States",
+            "work_modes": ["remote", "hybrid"],
+            "onsite_locations": ["New York, NY"],
+            "remote_location_terms": ["USA"],
+            "compensation": {
+                "skipped": False,
+                "minimum": 90000,
+                "target": 125000,
+                "currency": "USD",
+                "period": "year",
+            },
+        }
+    )
+
+    rendered = config_path.read_text(encoding="utf-8")
+    assert updated["titles"] == ["Platform Engineer", "Support Engineer"]
+    assert "manual-sre" in rendered
+    assert "Site Reliability Engineer" in rendered
+    assert "linkedin:" in rendered and "enabled: false" in rendered
+    assert "Platform Engineer" in rendered and "Support Engineer" in rendered
+    assert "Technical Support Engineer" not in rendered
+    assert not (root / "build/job-search/latest-refresh.json").exists()
 
 
 @pytest.mark.parametrize(

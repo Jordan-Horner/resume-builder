@@ -73,8 +73,10 @@ safely; it never accepts invented evidence. The connected OpenRouter button
 shows generation progress during this request.
 Job providers remain outside onboarding. The remaining steps collect eligibility,
 work modes and locations, and optional compensation in compact forms. The final
-review offers an Edit action for every section and saves the canonical job
-preferences while leaving scheduled scanning disabled.
+review offers an Edit action for every section, saves the canonical job preferences,
+and activates the generated search families. It does not start a scrape or enable
+the scheduler. Older `ready_to_activate` workspaces receive a one-click Finish setup
+recovery step instead of being incorrectly treated as complete.
 
 Roles are one wrapping list of removable bubbles: every visible title is included
 in search. Add or Enter inserts a role; × removes it with Undo. Duplicate titles
@@ -155,6 +157,20 @@ are surfaced as failures. Provider switches are locked during a portal scan.
 
 Endpoints: GET /api/job-sources, PUT /api/job-sources/{provider} with a boolean
 enabled value, and POST /api/job-sources/scan. No credentials form is added.
+
+Settings includes Search preferences as the primary editable source of scraper
+intent after onboarding. Titles are one removable bubble list; every visible title
+becomes a managed search family. Country, work modes, hybrid/on-site locations,
+remote location terms, and compensation can be edited without AI or network calls.
+Saving preserves provider toggles and manual search families, updates only managed
+families, and does not start a scan. Target compensation remains a ranking preference,
+not a ceiling. A revision token prevents one open browser tab from overwriting newer
+changes from another.
+
+When Jobs has no reviewable inventory, its empty state offers Find jobs now and
+polls the existing manual scan status through completion. When jobs exist but filters
+hide them, the empty state offers filter recovery instead. A legacy unactivated setup
+offers Finish setup before any scrape action.
 
 Use a simple top navigation:
 
@@ -339,6 +355,9 @@ The onboarding and dashboard API includes:
 - `POST /api/onboarding/start`
 - `POST /api/onboarding/answer`
 - `POST /api/onboarding/back`
+- `POST /api/job-search/activate`
+- `GET /api/job-search/preferences`
+- `PUT /api/job-search/preferences`
 - `GET /api/jobs?search=&work_mode=&date_days=&employment_type=`
 - `GET /api/jobs/{job_id}`
 - `POST /api/jobs/{job_id}/not-interested`
@@ -353,7 +372,7 @@ The onboarding and dashboard API includes:
 1. Add persistent resume intake to the first-run portal. **Complete.**
 2. Offer optional semantic role suggestions without making AI mandatory. **Complete.**
 3. Move role, eligibility, work-mode, location, and compensation setup into the portal. **Complete.**
-4. Add a review screen that saves preferences without silently activating search. **Complete.**
+4. Add a review screen that activates confirmed search families without starting a scrape. **Complete.**
 5. Continue browser-level accessibility and failure-state testing before a public release.
 
 ## First-release success

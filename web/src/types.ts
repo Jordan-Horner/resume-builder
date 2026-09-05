@@ -87,7 +87,25 @@ export type OnboardingStep =
   | "location"
   | "compensation"
   | "review"
+  | "activation"
   | "complete";
+
+export interface SearchPreferences {
+  status: "active" | "ready_to_activate" | "in_progress" | "skipped" | "not_configured";
+  revision: string;
+  titles: string[];
+  country: string;
+  work_modes: WorkMode[];
+  onsite_locations: string[];
+  remote_location_terms: string[];
+  compensation: {
+    skipped: boolean;
+    minimum: number | null;
+    target: number | null;
+    currency: string | null;
+    period: "hour" | "year" | null;
+  };
+}
 
 export type RoleIntent = "search" | "explore" | "dont_seed";
 

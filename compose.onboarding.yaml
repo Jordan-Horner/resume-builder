@@ -16,14 +16,14 @@ services:
       RESUME_BUILDER_STATE_DIR: /state
       RESUME_BUILDER_WEB_PORT: 8765
       TZ: ${RESUME_BUILDER_TIMEZONE:-America/New_York}
-    ports:
-      - "${RESUME_BUILDER_WEB_BIND:-127.0.0.1}:${RESUME_BUILDER_WEB_PORT:-8766}:8765"
+    ports: !override
+      - "127.0.0.1:${RESUME_BUILDER_ONBOARDING_PORT:-8767}:8765"
     volumes:
       - workspace:/workspace
       - state:/state
 
 volumes:
   workspace:
-    name: resume-builder-workspace
+    name: resume-builder-onboarding-workspace
   state:
-    name: resume-builder-state
+    name: resume-builder-onboarding-state

@@ -84,6 +84,27 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    @app.post("/api/job-search/activate")
+    def activate_job_search() -> dict[str, Any]:
+        try:
+            return service.activate_job_search()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/api/job-search/preferences")
+    def job_search_preferences() -> dict[str, Any]:
+        try:
+            return service.job_search_preferences()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.put("/api/job-search/preferences")
+    def update_job_search_preferences(payload: dict[str, Any]) -> dict[str, Any]:
+        try:
+            return service.update_job_search_preferences(payload)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     @app.get("/api/job-filter-defaults")
     def job_filter_defaults() -> dict[str, Any]:
         try:
@@ -108,9 +129,14 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
                 employment_type=employment_type,
                 view_filters=view_filters,
             )
+            reviewable = service.list_jobs()
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return {"jobs": items[:limit], "count": len(items)}
+        return {
+            "jobs": items[:limit],
+            "count": len(items),
+            "reviewable_count": len(reviewable),
+        }
 
     @app.get("/api/blocked-companies")
     def blocked_companies() -> dict[str, Any]:

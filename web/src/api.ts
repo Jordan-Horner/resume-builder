@@ -1,4 +1,4 @@
-import type { Application, Integration, Job, JobFilters, OnboardingStatus } from "./types";
+import type { Application, Integration, Job, JobFilters, OnboardingStatus, SearchPreferences } from "./types";
 
 export interface UpdateStatus {
   version: string;
@@ -38,14 +38,14 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function getJobs(filters: JobFilters): Promise<{ jobs: Job[]; count: number }> {
+export async function getJobs(filters: JobFilters): Promise<{ jobs: Job[]; count: number; reviewable_count: number }> {
   const params = new URLSearchParams();
   if (filters.view) params.set("view_filters", JSON.stringify({ ...filters.view, roles: [], locations: filters.view.locations.map((item) => item.trim()).filter(Boolean) }));
   if (filters.search.trim()) params.set("search", filters.search.trim());
   if (filters.workMode) params.set("work_mode", filters.workMode);
   if (filters.dateDays) params.set("date_days", String(filters.dateDays));
   if (filters.employmentType) params.set("employment_type", filters.employmentType);
-  return request<{ jobs: Job[]; count: number }>(`/api/jobs?${params.toString()}`);
+  return request<{ jobs: Job[]; count: number; reviewable_count: number }>(`/api/jobs?${params.toString()}`);
 }
 
 export function markJobNotInterested(jobId: string): Promise<void> {
@@ -101,6 +101,22 @@ export function answerOnboarding(
 
 export function backOnboarding(): Promise<OnboardingStatus> {
   return request("/api/onboarding/back", { method: "POST" });
+}
+
+export function activateJobSearch(): Promise<OnboardingStatus> {
+  return request("/api/job-search/activate", { method: "POST" });
+}
+
+export function getSearchPreferences(): Promise<SearchPreferences> {
+  return request("/api/job-search/preferences");
+}
+
+export function saveSearchPreferences(preferences: SearchPreferences): Promise<SearchPreferences> {
+  return request("/api/job-search/preferences", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(preferences),
+  });
 }
 
 export function getBlockedCompanies(): Promise<{ companies: string[] }> { return request("/api/blocked-companies"); }

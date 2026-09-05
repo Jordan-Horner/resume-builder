@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
-import { answerOnboarding, backOnboarding, getOnboardingStatus, skipOnboarding, startOnboarding, uploadResume } from "../api";
+import { activateJobSearch, answerOnboarding, backOnboarding, getOnboardingStatus, skipOnboarding, startOnboarding, uploadResume } from "../api";
 import type { OnboardingSetup, OnboardingStatus, WorkMode } from "../types";
 
 interface PageProps { initial: OnboardingStatus; onComplete: () => void }
@@ -149,7 +149,11 @@ function ReviewStep({ setup, busy, error, onSubmit, onBack }: StepProps) {
   const roles = setup.roles.filter((role) => role.intent !== "dont_seed").map((role) => role.title).join(", ") || "None";
   const pay = setup.compensation?.skipped ? "Not specified" : [setup.compensation?.minimum, setup.compensation?.target, setup.compensation?.currency, setup.compensation?.period].filter(Boolean).join(" · ");
   const rows = [["Roles", roles, "roles"], ["Location & work mode", [setup.eligibility?.intended_country, setup.location?.accepted_work_modes.join(", "), setup.location?.accepted_onsite_locations.join(", ")].filter(Boolean).join(" · ") || "Not set", "location"], ["Compensation", pay, "compensation"]];
-  return <div className="onboarding-content"><p className="eyebrow">Final check</p><h1 id="onboarding-title">Review your preferences</h1><p className="onboarding-lede">Saving creates your settings. Scraping stays off until providers are configured later.</p><div className="review-list">{rows.map(([label, value, section]) => <div className="review-row" key={label}><span>{label}</span><strong>{value}</strong><button onClick={() => onSubmit({ action: "change", section })}>Edit</button></div>)}</div><Actions busy={busy} error={error} onBack={onBack} onContinue={() => onSubmit({ action: "save" })} label="Save and open dashboard" /></div>;
+  return <div className="onboarding-content"><p className="eyebrow">Final check</p><h1 id="onboarding-title">Review your preferences</h1><p className="onboarding-lede">Finishing setup activates these searches. It does not start a scrape, and you can change everything later in Settings.</p><div className="review-list">{rows.map(([label, value, section]) => <div className="review-row" key={label}><span>{label}</span><strong>{value}</strong><button onClick={() => onSubmit({ action: "change", section })}>Edit</button></div>)}</div><Actions busy={busy} error={error} onBack={onBack} onContinue={() => onSubmit({ action: "save" })} label="Finish setup" /></div>;
+}
+
+function ActivationStep({ busy, error, activate }: { busy: boolean; error: string; activate: () => void }) {
+  return <div className="onboarding-content"><p className="eyebrow">One last step</p><h1 id="onboarding-title">Activate your saved searches</h1><p className="onboarding-lede">Your preferences were saved by an older setup flow. Activate them so scheduled and manual scrapes use your roles. This will not start a scrape.</p>{error && <p className="onboarding-error" role="alert">{error}</p>}<div className="onboarding-footer"><span /><button className="onboarding-primary" disabled={busy} onClick={activate}>{busy ? "Activating…" : "Finish setup"}</button></div></div>;
 }
 
 export function OnboardingPage({ initial, onComplete }: PageProps) {
@@ -163,5 +167,6 @@ export function OnboardingPage({ initial, onComplete }: PageProps) {
     {status.step === "location" && setup && <LocationStep setup={setup} busy={busy} error={error} onSubmit={(answer) => run(() => answerOnboarding("location", answer))} onBack={() => run(backOnboarding)} />}
     {status.step === "compensation" && setup && <CompensationStep setup={setup} busy={busy} error={error} onSubmit={(answer) => run(() => answerOnboarding("compensation", answer))} onBack={() => run(backOnboarding)} />}
     {status.step === "review" && setup && <ReviewStep setup={setup} busy={busy} error={error} onSubmit={(answer) => run(() => answerOnboarding("review", answer))} onBack={() => run(backOnboarding)} />}
+    {status.step === "activation" && <ActivationStep busy={busy} error={error} activate={() => run(activateJobSearch)} />}
   </section></main>;
 }

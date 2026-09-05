@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { resolveSettingsSection } from "./settingsNavigation";
 
 describe("Settings section routing", () => {
-  it("starts with scrapers and restores the last section", () => {
-    expect(resolveSettingsSection("/settings", null)).toBe("scrapers");
+  it("starts with search preferences and restores the last section", () => {
+    expect(resolveSettingsSection("/settings", null)).toBe("search-preferences");
     expect(resolveSettingsSection("/settings", "blocked-companies")).toBe("blocked-companies");
   });
   it("honors deep links over previous section", () => {
@@ -13,6 +13,6 @@ describe("Settings section routing", () => {
   });
   it("preserves legacy links and safely handles unknown sections", () => {
     expect(resolveSettingsSection("/integrations", "scrapers")).toBe("integrations");
-    expect(resolveSettingsSection("/settings/invalid", "integrations")).toBe("scrapers");
+    expect(resolveSettingsSection("/settings/invalid", "integrations")).toBe("search-preferences");
   });
 });
