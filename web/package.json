@@ -10,6 +10,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@copilotkit/react-core": "1.70.1",
+    "@copilotkit/react-ui": "1.70.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

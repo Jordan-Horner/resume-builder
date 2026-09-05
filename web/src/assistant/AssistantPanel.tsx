@@ -1,0 +1,168 @@
+import { useEffect, useRef, useState } from "react";
+import { CopilotKitProvider, useAgent, useCopilotKit } from "@copilotkit/react-core/v2";
+import { assistantRequest, type Conversation, type Proposal } from "./api";
+
+interface Props { open: boolean; target: { id: string; name: string; nonce: number } | null; onClose: () => void }
+
+function ProposalView({ proposal, decide }: { proposal: Proposal; decide: (id: string, action: string) => void }) {
+  return <section className="assistant-proposal" aria-label="Proposed resume change">
+    <strong>Suggested wording</strong>
+    <small>Current</small><p>{proposal.payload.before}</p>
+    <small>Proposed</small><p>{proposal.payload.after}</p>
+    {proposal.status === "pending" ? <div className="assistant-actions">
+      <button className="primary-button" onClick={() => decide(proposal.id, "accept")}>Use this wording</button>
+      <button className="text-button" onClick={() => decide(proposal.id, "decline")}>Keep current</button>
+    </div> : <p role="status">{proposal.status === "applying" ? "Applying and reviewing…" : proposal.message}</p>}
+    {proposal.status === "applied" && <a href={`/api/resume-preview?resume_id=${encodeURIComponent(proposal.payload.resume_id)}`} target="_blank" rel="noreferrer">View updated résumé ↗</a>}
+  </section>;
+}
+
+function ConversationView({ initial, changed }: { initial: Conversation; changed: (thread: Conversation) => void }) {
+  const { agent, isReady } = useAgent({ agentId: "default" });
+  const { copilotkit } = useCopilotKit();
+  const [thread, setThread] = useState(initial);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  const initialized = useRef(false);
+  const end = useRef<HTMLDivElement>(null);
+  const running = sending || thread.runs.some((run) => run.status === "running");
+
+  useEffect(() => {
+    if (!isReady || initialized.current) return;
+    agent.threadId = initial.id;
+    agent.setMessages(initial.messages);
+    initialized.current = true;
+  }, [agent, initial, isReady]);
+
+  useEffect(() => {
+    let active = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const next = await assistantRequest<Conversation>(`/threads/${initial.id}`);
+        if (!active) return;
+        setThread(next); changed(next);
+      } catch (reason) {
+        if (active) setError(reason instanceof Error ? reason.message : "Could not restore conversation.");
+      }
+      if (active) timer = setTimeout(poll, 1500);
+    };
+    timer = setTimeout(poll, 1500);
+    return () => { active = false; clearTimeout(timer); };
+  }, [initial.id, changed]);
+
+  useEffect(() => { end.current?.scrollIntoView?.({ block: "nearest" }); }, [thread.messages.length, sending]);
+
+  async function send() {
+    if (!input.trim() || running || !isReady) return;
+    const content = input.trim(); const id = crypto.randomUUID();
+    setError(""); setSending(true); setInput("");
+    agent.threadId = initial.id;
+    agent.setMessages(thread.messages);
+    agent.addMessage({ id, role: "user", content });
+    setThread((current) => ({ ...current, messages: [...current.messages, { id, role: "user", content }] }));
+    try {
+      await copilotkit.runAgent({ agent, runId: id });
+      const next = await assistantRequest<Conversation>(`/threads/${initial.id}`);
+      setThread(next); changed(next);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not send message.");
+      setInput(content);
+    } finally { setSending(false); }
+  }
+
+  async function stop() {
+    try {
+      await assistantRequest(`/threads/${initial.id}/stop`, { method: "POST" });
+      agent.abortRun(); setSending(false);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not stop response."); }
+  }
+
+  async function decide(id: string, action: string) {
+    setError("");
+    try {
+      const next = await assistantRequest<Conversation>(`/threads/${initial.id}/proposals/${id}/${action}`, { method: "POST" });
+      setThread(next); changed(next);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not save your decision."); }
+  }
+
+  return <>
+    <div className="assistant-transcript" aria-label="Conversation">
+      {!thread.messages.length && <div className="assistant-intro"><h3>What would you like to work on?</h3><p>{thread.resume_id ? "Ask about this résumé or work through a wording change together." : "Ask about your job queue, or open a directional résumé to discuss it."}</p></div>}
+      {thread.messages.map((message) => <div className={`assistant-message ${message.role}`} key={message.id}><small>{message.role === "user" ? "You" : "Assistant"}</small><p>{message.content}</p></div>)}
+      {thread.proposals.map((proposal) => <ProposalView key={proposal.id} proposal={proposal} decide={decide} />)}
+      {running && <p className="assistant-progress" role="status">Working with your career workspace…</p>}
+      <div ref={end} />
+    </div>
+    <form className="assistant-composer" onSubmit={(event) => { event.preventDefault(); void send(); }}>
+      {error && <p className="error-text" role="alert">{error}</p>}
+      <label className="sr-only" htmlFor="assistant-message">Message the assistant</label>
+      <textarea id="assistant-message" value={input} maxLength={12000} placeholder="Ask about your résumé…" rows={3} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => {
+        if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); }
+      }} />
+      <div className="assistant-compose-footer"><small>Changes stay in your control</small>{running ? <button className="secondary-button" type="button" onClick={() => void stop()}>Stop</button> : <button className="primary-button" disabled={!isReady || !input.trim()}>Send</button>}</div>
+    </form>
+  </>;
+}
+
+export default function AssistantPanel({ open, target, onClose }: Props) {
+  const [thread, setThread] = useState<Conversation | null>(null);
+  const [threads, setThreads] = useState<Conversation[]>([]);
+  const [history, setHistory] = useState(false);
+  const [status, setStatus] = useState<{ configured: boolean; online: boolean } | null>(null);
+  const [error, setError] = useState("");
+  const header = useRef<HTMLButtonElement>(null);
+  const observedTarget = useRef<number | null>(null);
+  const active = useRef<Conversation | null>(null);
+  const update = useRef((next: Conversation) => { active.current = next; setThread(next); }).current;
+
+  async function select(id: string) {
+    const next = await assistantRequest<Conversation>(`/threads/${id}`);
+    setThread(next); active.current = next; setHistory(false);
+    try { localStorage.setItem("resume-builder.assistant.v1", id); } catch { console.warn("Assistant history preference could not be saved; server history remains available."); }
+  }
+  async function start(resumeId: string | null = null) {
+    try {
+      const next = await assistantRequest<Conversation>("/threads", { method: "POST", body: JSON.stringify({ resume_id: resumeId }) });
+      await select(next.id);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not start conversation."); }
+  }
+  async function refresh() {
+    try {
+      const [health, list] = await Promise.all([
+        assistantRequest<{ configured: boolean; online: boolean }>("/status"),
+        assistantRequest<{ threads: Conversation[] }>("/threads"),
+      ]);
+      setStatus(health); setThreads(list.threads); setError("");
+      if (!active.current) {
+        let saved: string | null = null;
+        try { saved = localStorage.getItem("resume-builder.assistant.v1"); } catch { console.warn("Assistant history preference unavailable; use History to reopen a conversation."); }
+        const previous = list.threads.find((item) => item.id === saved);
+        if (previous) await select(previous.id); else await start();
+      }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not open assistant."); }
+  }
+  useEffect(() => { void refresh(); }, []);
+  useEffect(() => { if (open) header.current?.focus(); }, [open]);
+  const busy = active.current?.runs.some((run) => run.status === "running") || active.current?.proposals.some((proposal) => proposal.status === "applying");
+  const pendingTarget = target && observedTarget.current !== target.nonce && target.id !== thread?.resume_id;
+
+  return <aside className="assistant-panel" aria-label="Career assistant" onKeyDown={(event) => { if (event.key === "Escape") onClose(); }}>
+    <header className="assistant-header"><strong>Assistant</strong><div>
+      <button className="text-button" disabled={busy} onClick={() => { setHistory(!history); void refresh(); }}>History</button>
+      <button className="text-button" disabled={busy} onClick={() => void start()}>New</button>
+      <button ref={header} className="assistant-close" aria-label="Close assistant" onClick={onClose}>×</button>
+    </div></header>
+    {pendingTarget && <div className="assistant-context"><span>{target.name}</span><button className="text-button" disabled={busy} onClick={() => { observedTarget.current = target.nonce; void start(target.id); }}>Discuss this résumé</button></div>}
+    {thread?.resume_id && <div className="assistant-context"><small>Working on</small><span>{thread.resume_id.split("/").pop()?.replace(/\.md$/, "").replaceAll("-", " ")}</span></div>}
+    {error && <div className="assistant-context" role="alert">{error}<button className="text-button" onClick={() => void refresh()}>Retry</button></div>}
+    {history ? <div className="assistant-history">{threads.map((item) => <button key={item.id} onClick={() => { select(item.id).catch((reason: Error) => setError(reason.message)); }}>{item.title}<small>{new Date(item.updated_at).toLocaleDateString()}</small></button>)}</div>
+      : !status ? <p className="assistant-context" role="status">Connecting…</p>
+      : !status.configured ? <div className="assistant-intro"><h3>Connect your AI provider</h3><p>The assistant uses your existing model settings.</p><a href="/settings/integrations">Configure AI →</a><button className="text-button" onClick={() => void refresh()}>Check again</button></div>
+      : !status.online ? <div className="assistant-intro"><h3>Assistant temporarily unavailable</h3><p>Your workspace is still available. Try reconnecting shortly.</p><button className="secondary-button" onClick={() => void refresh()}>Reconnect</button></div>
+      : thread && <CopilotKitProvider key={thread.id} runtimeUrl="/api/assistant/runtime" useSingleEndpoint={false} enableInspector={false} onError={() => setError("Assistant connection interrupted. Your saved conversation is safe.")}>
+        <ConversationView initial={thread} changed={update} />
+      </CopilotKitProvider>}
+  </aside>;
+}

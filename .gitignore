@@ -18,6 +18,7 @@
 /.venv/
 /web/dist/
 /web/node_modules/
+/assistant-runtime/node_modules/
 *.db
 *.docx
 *.egg-info/

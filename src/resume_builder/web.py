@@ -28,6 +28,9 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
     from .web_system import system_status
 
     app = FastAPI(title="Resume Builder", docs_url="/api/docs", redoc_url=None)
+    from .web_agent import install_assistant
+
+    install_assistant(app, workspace)
 
     @app.get("/api/system/version")
     def system_version() -> dict[str, Any]:

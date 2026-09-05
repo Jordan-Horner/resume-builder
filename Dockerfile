@@ -6,7 +6,14 @@ RUN npm ci
 COPY web ./
 RUN npm run build
 
-FROM python:3.12-slim
+FROM node:22-bookworm-slim AS assistant-build
+ENV COPILOTKIT_TELEMETRY_DISABLED=true DO_NOT_TRACK=1 SCARF_ANALYTICS=false
+WORKDIR /assistant-runtime
+COPY assistant-runtime/package.json assistant-runtime/package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+COPY assistant-runtime/server.mjs ./
+
+FROM python:3.12-slim-bookworm
 
 ARG BUILD_REVISION=development
 ARG BUILD_DATE=
@@ -23,6 +30,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     RESUME_BUILDER_WORKSPACE=/workspace \
     RESUME_BUILDER_AUTOMATION_STATE=/state/automation-state.sqlite \
     RESUME_BUILDER_GMAIL_STATE=/state/gmail-state.sqlite \
+    RESUME_BUILDER_AGENT_STATE=/state/agent-state.sqlite \
+    COPILOTKIT_TELEMETRY_DISABLED=true \
+    DO_NOT_TRACK=1 \
+    NODE_ENV=production \
     RESUME_BUILDER_LOG_LEVEL=INFO \
     RESUME_BUILDER_LOG_FORMAT=text
 
@@ -38,6 +49,8 @@ COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
 RUN python -m pip install --no-cache-dir ".[agent,gmail,telegram,web]"
 COPY --from=web-build /web/dist /app/web/dist
+COPY --from=assistant-build /usr/local/bin/node /usr/local/bin/node
+COPY --from=assistant-build /assistant-runtime /app/assistant-runtime
 COPY docker/resume-builder-entrypoint.sh /usr/local/bin/resume-builder-entrypoint
 RUN chmod 0755 /usr/local/bin/resume-builder-entrypoint
 

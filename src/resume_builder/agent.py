@@ -18,7 +18,9 @@ from .agent_config import (
     render_default_agent_config,
 )
 from .agent_contracts import (
+    AgentTool,
     CommunicationAdapter,
+    ConversationTurn,
     InboundMessage,
     ModelAdapter,
     ModelReply,
@@ -126,6 +128,9 @@ class AgentService:
         model_tier: str = "fast",
         history_max_turns: int = 20,
         retain_history: bool = True,
+        instructions: str = AGENT_INSTRUCTIONS,
+        additional_tools: Sequence[AgentTool] = (),
+        supplied_history: Sequence[ConversationTurn] | None = None,
     ) -> OutboundMessage:
         """Run one bounded turn and optionally retain it after generation succeeds."""
         history = (
@@ -137,13 +142,15 @@ class AgentService:
             if self.conversation_state is not None
             else ()
         )
+        if supplied_history is not None:
+            history = tuple(supplied_history)
         model = getattr(self.config.models, model_tier)
         reply = self.model_adapter.run(
             ModelRequest(
                 prompt=inbound.text,
-                instructions=AGENT_INSTRUCTIONS,
+                instructions=instructions,
                 model=model,
-                tools=self.tools,
+                tools=(*self.tools, *additional_tools),
                 history=history,
                 conversation_id=inbound.conversation_id,
             )

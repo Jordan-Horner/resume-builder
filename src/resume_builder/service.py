@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import secrets
 import shlex
 import shutil
 import signal
@@ -140,6 +141,20 @@ stdout_logfile=/dev/fd/1
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/fd/2
 stderr_logfile_maxbytes=0
+
+[program:assistant]
+command=node /app/assistant-runtime/server.mjs
+directory=/app/assistant-runtime
+priority=15
+autostart=true
+autorestart=true
+startsecs=2
+stopasgroup=true
+killasgroup=true
+stdout_logfile=/dev/fd/1
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/fd/2
+stderr_logfile_maxbytes=0
 """
 
 
@@ -257,6 +272,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error('service dependencies are missing; install with pip install -e ".[web]"')
     state_root = Path(os.environ.get("RESUME_BUILDER_STATE_DIR", "/state")).expanduser()
     state_root.mkdir(parents=True, exist_ok=True)
+    os.environ["RESUME_BUILDER_ASSISTANT_TOKEN"] = secrets.token_urlsafe(32)
+    os.environ["RESUME_BUILDER_PORTAL_PORT"] = str(args.port)
     config_path = state_root / "supervisord.conf"
     scheduler_autostart = False
     gmail_autostart = False

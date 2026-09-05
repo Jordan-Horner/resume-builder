@@ -8,6 +8,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { SkillsPage } from "./pages/SkillsPage";
 import type { OnboardingStatus } from "./types";
 import { UpdateNotice, UpdateProvider } from "./updates";
+import { AssistantProvider } from "./assistant/AssistantProvider";
 
 type Route = "jobs" | "applications" | "resumes" | "skills" | "settings";
 const ROUTES: Route[] = ["jobs", "applications", "resumes", "skills", "settings"];
@@ -58,7 +59,7 @@ export function App() {
   }
 
   return (
-    <UpdateProvider><div className="app-shell">
+    <UpdateProvider><AssistantProvider><div className="app-shell">
       <header className="topbar">
         <button className="brand" onClick={() => navigate("jobs")} aria-label="Go to jobs">
           <span className="brand-mark" aria-hidden="true">RB</span>
@@ -84,6 +85,6 @@ export function App() {
         {route === "skills" && <SkillsPage />}
         {route === "settings" && <SettingsPage />}
       </main>
-    </div></UpdateProvider>
+    </div></AssistantProvider></UpdateProvider>
   );
 }

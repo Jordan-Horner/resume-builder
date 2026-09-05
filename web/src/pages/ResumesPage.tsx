@@ -3,6 +3,7 @@ import { getResumes } from "../api";
 import { EmptyState, ErrorMessage } from "../components";
 import { CareerMaterialUploader } from "../components/CareerMaterialUploader";
 import type { CareerResume, ResumeLibrary } from "../types";
+import { useAssistant } from "../assistant/AssistantProvider";
 
 function ResumeRow({ resume, open }: { resume: CareerResume; open: (resume: CareerResume) => void }) {
   return <button className="career-row resume-library-row resume-row-button" disabled={!resume.preview_url} onClick={() => open(resume)} aria-label={resume.preview_url ? `Open ${resume.name}` : undefined}>
@@ -17,6 +18,7 @@ function ResumeRow({ resume, open }: { resume: CareerResume; open: (resume: Care
 }
 
 export function ResumesPage() {
+  const assistant = useAssistant();
   const [library, setLibrary] = useState<ResumeLibrary | null>(null);
   const [selected, setSelected] = useState<CareerResume | null>(null);
   const [showImporter, setShowImporter] = useState(false);
@@ -34,6 +36,7 @@ export function ResumesPage() {
       <button className="text-button" onClick={() => setSelected(null)}>← Back to resumes</button>
       <div className="resume-reader-title"><strong>{selected.name}</strong><span>{selected.detail}</span></div>
       <div className="resume-reader-actions">
+        {selected.kind === "directional" && <button className="secondary-button" onClick={() => assistant.discuss(selected.id, selected.name)}>Discuss résumé</button>}
         <a className="secondary-button" href={selected.preview_url} target="_blank" rel="noreferrer">Open in new tab</a>
       </div>
     </header>

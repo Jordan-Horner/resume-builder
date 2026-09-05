@@ -246,9 +246,7 @@ def test_portal_reader_renders_current_markdown_instead_of_old_preview(
     assert resolved["path"] == current_draft
 
 
-def test_resume_library_only_shows_minted_tailored_resumes(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_resume_library_only_shows_minted_tailored_resumes(tmp_path: Path, monkeypatch) -> None:
     root = _workspace(tmp_path)
     source = """---
 version: 1
