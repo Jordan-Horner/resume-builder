@@ -12,6 +12,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from .atomic import atomic_write_json
+from .integrations import interactive_integration_setup
 from .job_setup_defaults import scaffold_job_search
 from .resume_templates import scaffold_template, select_catalog_item, template_catalog
 from .workspace_state import (
@@ -504,4 +505,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("Backup: remote privacy unverified. Resume Builder will not push automatically.")
     else:
         print("Backup: local only. A private remote is recommended to prevent data loss.")
+    if interactive:
+        print(interactive_integration_setup(result.root))
     return 0

@@ -52,6 +52,7 @@ def inactive_search_config() -> dict[str, Any]:
     return {
         "schema_version": 1,
         "enabled": False,
+        "use_bundled_boards": True,
         "database_path": "data/inventory.db",
         "raw_payload_retention_days": 30,
         "initial_lookback_days": 7,
@@ -64,6 +65,17 @@ def inactive_search_config() -> dict[str, Any]:
         },
         "providers": {},
     }
+
+
+def enable_bundled_board_catalog(root: Path) -> None:
+    """Explicitly opt an existing workspace into packaged public boards."""
+    from job_puller.config import InventoryConfig
+
+    path = root / SEARCH_CONFIG_PATH
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    raw["use_bundled_boards"] = True
+    InventoryConfig.model_validate(raw)
+    atomic_write_text(path, yaml.safe_dump(raw, sort_keys=False))
 
 
 def scaffold_job_search(root: Path) -> list[str]:

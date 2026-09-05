@@ -403,6 +403,35 @@ def build_record(args: argparse.Namespace, workspace: Path) -> dict[str, Any]:
     return record
 
 
+def record_application(
+    root: Path,
+    workspace: Path,
+    *,
+    company: str,
+    role: str,
+    job_id: str | None = None,
+    application_url: str | None = None,
+    applied_on: str | None = None,
+    note: str | None = None,
+) -> dict[str, Any]:
+    """Create one durable, manually confirmed application record."""
+    args = argparse.Namespace(
+        company=company,
+        role=role,
+        on=applied_on,
+        job_id=job_id,
+        url=application_url,
+        role_family=None,
+        screen_category=None,
+        match_classification=None,
+        match_report=None,
+        target=None,
+        resume=None,
+        note=note,
+    )
+    return _write_or_preview(root, build_record(args, workspace), apply=True)["record"]
+
+
 def build_automated_record(
     *,
     company: str,

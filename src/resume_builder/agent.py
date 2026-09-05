@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from .agent_config import (
     DEFAULT_AGENT_CONFIG,
@@ -27,6 +28,7 @@ from .agent_contracts import (
     StructuredModelRequest,
 )
 from .agent_openrouter import AgentProviderError, OpenRouterAdapter
+from .agent_state import AgentState, default_agent_state_path
 from .agent_tools import build_read_only_tools
 from .atomic import atomic_write_text
 from .automation import default_state_path
@@ -40,7 +42,12 @@ from .discovery_activation import (
     rollback_confirmation,
     save_portfolio,
 )
-from .discovery_evidence import ResumeDocument, extract_query_expansion, extract_title_seed
+from .discovery_evidence import (
+    ResumeDocument,
+    extract_query_expansion,
+    extract_title_seed,
+    interpret_resume_evidence,
+)
 from .discovery_portfolio import (
     TITLE_GENERATION_INSTRUCTIONS,
     ColdStartLane,
@@ -97,10 +104,58 @@ class _LocalOnlyModelAdapter(ModelAdapter):
 class AgentService:
     """Coordinate one channel-neutral turn with a bounded model adapter."""
 
-    def __init__(self, config: AgentConfig, model_adapter: ModelAdapter, state_path: Path):
+    def __init__(
+        self,
+        config: AgentConfig,
+        model_adapter: ModelAdapter,
+        state_path: Path,
+        *,
+        conversation_state: AgentState | None = None,
+    ):
         self.config = config
         self.model_adapter = model_adapter
         self.tools = build_read_only_tools(state_path)
+        self.conversation_state = conversation_state
+
+    def respond(
+        self,
+        inbound: InboundMessage,
+        *,
+        channel_name: str,
+        model_tier: str = "fast",
+        history_max_turns: int = 20,
+        retain_history: bool = True,
+    ) -> OutboundMessage:
+        """Run one bounded turn and optionally retain it after generation succeeds."""
+        history = (
+            self.conversation_state.load_history(
+                channel_name,
+                inbound.conversation_id,
+                max_turns=history_max_turns,
+            )
+            if self.conversation_state is not None
+            else ()
+        )
+        model = getattr(self.config.models, model_tier)
+        reply = self.model_adapter.run(
+            ModelRequest(
+                prompt=inbound.text,
+                instructions=AGENT_INSTRUCTIONS,
+                model=model,
+                tools=self.tools,
+                history=history,
+                conversation_id=inbound.conversation_id,
+            )
+        )
+        if self.conversation_state is not None and retain_history:
+            self.conversation_state.append_exchange(
+                channel_name,
+                inbound.conversation_id,
+                inbound.text,
+                reply.text,
+                max_turns=history_max_turns,
+            )
+        return OutboundMessage(inbound.conversation_id, reply.text)
 
     def handle(
         self,
@@ -109,16 +164,13 @@ class AgentService:
         *,
         model_tier: str = "fast",
     ) -> None:
-        model = getattr(self.config.models, model_tier)
-        reply = self.model_adapter.run(
-            ModelRequest(
-                prompt=inbound.text,
-                instructions=AGENT_INSTRUCTIONS,
-                model=model,
-                tools=self.tools,
+        channel.send(
+            self.respond(
+                inbound,
+                channel_name=channel.name,
+                model_tier=model_tier,
             )
         )
-        channel.send(OutboundMessage(inbound.conversation_id, reply.text))
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -127,10 +179,34 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--state", type=Path, default=default_state_path())
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("init", help="Create a private, secret-free agent configuration")
-    commands.add_parser("doctor", help="Check dependencies, privacy settings, and credentials")
+    doctor = commands.add_parser(
+        "doctor", help="Check dependencies, privacy settings, and credentials"
+    )
+    doctor.add_argument("--channel", choices=("telegram",))
     ask = commands.add_parser("ask", help="Run one bounded console conversation turn")
     ask.add_argument("message")
     ask.add_argument("--model-tier", choices=("fast", "reasoning", "writing"), default="fast")
+    serve = commands.add_parser("serve", help="Run a configured communication channel")
+    serve.add_argument("--channel", choices=("telegram",), required=True)
+    serve.add_argument("--agent-state", type=Path, default=default_agent_state_path())
+    serve.add_argument("--model-tier", choices=("fast", "reasoning", "writing"), default="fast")
+    telegram_ids = commands.add_parser(
+        "telegram-ids",
+        help="Show sender and chat IDs from pending Telegram messages without message content",
+    )
+    telegram_ids.add_argument("--agent-state", type=Path, default=default_agent_state_path())
+    telegram_setup = commands.add_parser(
+        "telegram-setup",
+        help="Create and pair a personal Telegram bot without copying numeric IDs",
+    )
+    telegram_setup.add_argument("--agent-state", type=Path, default=default_agent_state_path())
+    telegram_setup.add_argument("--token-file", type=Path)
+    telegram_setup.add_argument("--wait-seconds", type=int, default=120)
+    telegram_setup.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Print Telegram Web links without opening the browser",
+    )
     screen = commands.add_parser("screen", help="Run one structured, read-only job screen")
     screen.add_argument("job_id")
     screen.add_argument("--jobs-config", type=Path, default=DEFAULT_JOBS_CONFIG)
@@ -238,7 +314,7 @@ def _dependency_available() -> bool:
     return True
 
 
-def _doctor(config: AgentConfig) -> dict[str, object]:
+def _doctor(config: AgentConfig) -> dict[str, Any]:
     checks = {
         "provider_supported": config.provider == "openrouter",
         "agent_dependency": _dependency_available(),
@@ -320,6 +396,20 @@ def _run_discovery_plan(args: argparse.Namespace) -> int:
     if not args.local_only:
         config = load_agent_config(args.config)
         model = getattr(config.models, args.model_tier)
+        # Canonical resume Markdown already has role structure; arbitrary ingested
+        # layouts use the same interpretation path as the portal after consent.
+        try:
+            extract_title_seed([document])
+        except ValueError:
+            if not args.confirm_send_private_data:
+                raise ValueError(
+                    "Interpreting this resume layout requires --confirm-send-private-data."
+                ) from None
+            document = interpret_resume_evidence(
+                document,
+                OpenRouterAdapter(config),
+                model=model,
+            )
         cache_path = args.generation_cache.expanduser()
         generation = (
             None if args.refresh else load_cached_title_generation(cache_path, document, model)
@@ -448,6 +538,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run_discovery_activate(args)
         if args.command == "discovery-rollback":
             return _run_discovery_rollback(args)
+        if args.command == "telegram-setup":
+            from .agent_telegram_setup import run_personal_telegram_setup
+
+            return run_personal_telegram_setup(
+                config_path=args.config,
+                state_path=args.agent_state,
+                token_path=args.token_file,
+                timeout_seconds=args.wait_seconds,
+                open_browser=not args.no_browser,
+            )
         if args.command == "screen-new" and not args.confirm_send_private_data:
             try:
                 local_config = load_agent_config(args.config)
@@ -493,8 +593,55 @@ def main(argv: Sequence[str] | None = None) -> int:
         config = load_agent_config(args.config)
         if args.command == "doctor":
             doctor_result = _doctor(config)
+            if args.channel == "telegram":
+                from .agent_telegram import (
+                    validate_telegram_configuration,
+                    verify_telegram_identity,
+                )
+
+                telegram_checks = validate_telegram_configuration(config.channels.telegram)
+                doctor_result["checks"].update(telegram_checks)
+                if all(telegram_checks.values()):
+                    try:
+                        doctor_result["telegram_bot"] = asyncio.run(
+                            verify_telegram_identity(config.channels.telegram)
+                        )
+                        doctor_result["checks"]["telegram_identity"] = True
+                    except (OSError, ValueError) as exc:
+                        doctor_result["checks"]["telegram_identity"] = False
+                        doctor_result["telegram_error"] = exc.__class__.__name__
+                doctor_result["healthy"] = all(doctor_result["checks"].values())
             print(json.dumps(doctor_result, indent=2, default=str))
             return 0 if doctor_result["healthy"] else 2
+        if args.command == "serve":
+            from .agent_telegram import TelegramAdapter, run_telegram_service
+
+            conversation_state = AgentState(args.agent_state)
+            service = AgentService(
+                config,
+                OpenRouterAdapter(config),
+                args.state,
+                conversation_state=conversation_state,
+            )
+            return run_telegram_service(
+                TelegramAdapter(
+                    config,
+                    service,
+                    conversation_state,
+                    model_tier=args.model_tier,
+                )
+            )
+        if args.command == "telegram-ids":
+            from .agent_telegram import discover_telegram_ids
+
+            identities = asyncio.run(
+                discover_telegram_ids(
+                    config.channels.telegram,
+                    AgentState(args.agent_state),
+                )
+            )
+            print(json.dumps({"identities": identities}, indent=2))
+            return 0
         if args.command == "screen":
             packet = get_job_screening_packet(
                 args.job_id,

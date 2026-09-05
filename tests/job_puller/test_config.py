@@ -7,6 +7,30 @@ from job_puller.config import SearchFamily, load_config, resolve_database_path
 from job_puller.work_modes import WorkMode
 
 
+def test_bundled_boards_are_optional_and_local_disables_win(tmp_path):
+    import yaml
+
+    from resume_builder.job_setup_defaults import scaffold_job_search
+
+    scaffold_job_search(tmp_path)
+    path = tmp_path / "job-search/config/search.yml"
+    config = load_config(path)
+    assert len(config.providers.greenhouse.boards) == 17
+    assert len(config.providers.ashby.boards) == 14
+    assert len(config.providers.lever.boards) == 3
+    raw = yaml.safe_load(path.read_text())
+    raw["providers"] = {
+        "ashby": {"boards": [{"id": "openai", "name": "Local override", "enabled": False}]}
+    }
+    path.write_text(yaml.safe_dump(raw))
+    boards = load_config(path).providers.ashby.boards
+    assert len(boards) == 14
+    assert next(board for board in boards if board.id == "openai").enabled is False
+    raw["use_bundled_boards"] = False
+    path.write_text(yaml.safe_dump(raw))
+    assert len(load_config(path).providers.ashby.boards) == 1
+
+
 def test_example_config_is_valid():
     path = Path(__file__).parents[2] / "config" / "job-puller" / "search.example.yml"
     config = load_config(path)

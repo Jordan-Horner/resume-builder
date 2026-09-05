@@ -29,6 +29,11 @@ Shared recruiting platforms such as Workday, Greenhouse, Lever, Ashby, iCIMS,
 and SmartRecruiters are never treated as company-domain identity. Their domains
 are not hashed or retained for matching.
 
+A matching job title alone never authorizes an application update. Explicit
+company evidence must match the application's employer, including when a thread
+or requisition matches. Unresolved messages remain in the existing ambiguity
+review path rather than changing application history.
+
 ## Install and authorize
 
 Install the optional official Google client dependencies:
@@ -183,6 +188,10 @@ hard maximum is 25. Rejections are the only enabled semantic event by default; r
 `--semantic-event EVENT` to trial interviews, assessments, offers, or recruiter contact.
 Provider failures are recorded content-free and remain retryable on a later bounded scan.
 Raw message content and model evidence are never retained.
+
+Weak language such as `unfortunately` and `another candidate` broadens message
+discovery but never proves a rejection by itself. Automatic rejection updates
+still require explicit body context describing the employer's decision.
 
 The job inventory reflects the application's current status, so a linked job
 changes from `applied` to `rejected` when the rejection event becomes current.

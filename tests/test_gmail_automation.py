@@ -327,6 +327,97 @@ def test_move_forward_requires_negative_context():
     assert _classify_confirmation(not_moving) == (None, "rejection-signal")
 
 
+def test_another_candidate_requires_decision_context():
+    rejected = parse_message(
+        gmail_payload(
+            subject="Application update",
+            body=(
+                "Thank you for submitting an application for Systems Engineer I. "
+                "Unfortunately, we have decided to continue with another candidate."
+            ),
+            sender="Example Recruiting <recruiting@example.com>",
+        )
+    )
+    unrelated = parse_message(
+        gmail_payload(
+            subject="Application update",
+            body=(
+                "Unfortunately, another candidate withdrew from the process. "
+                "We would like to continue with your application."
+            ),
+            sender="Example Recruiting <recruiting@example.com>",
+        )
+    )
+
+    event, reason = classify_lifecycle_event(rejected)
+
+    assert reason == "rejected"
+    assert event is not None
+    assert event.event_type == "rejected"
+    assert classify_lifecycle_event(unrelated) == (None, "missing-confirmation-phrase")
+
+
+def test_candidate_comparison_rejection_is_detected():
+    message = parse_message(
+        gmail_payload(
+            subject="Cloudbeds: An update on your application",
+            body=(
+                "Thank you for applying for the DevOps Engineer role. "
+                "After carefully reviewing your background, we've decided to move forward "
+                "with candidates whose experience aligns more directly to what this role needs."
+            ),
+            sender="Cloudbeds Recruiting <recruitment@talent.cloudbeds.com>",
+        )
+    )
+
+    event, reason = classify_lifecycle_event(message)
+
+    assert reason == "rejected"
+    assert event is not None
+    assert event.event_type == "rejected"
+
+
+@pytest.mark.parametrize(
+    "body",
+    (
+        "We are pursuing candidates with skills and experience which more closely match the position.",
+        "We've decided to pursue discussions with other candidates at this time.",
+        "Unfortunately, we won't be proceeding with your application at this time.",
+        "Unfortunately, your profile was not selected for the next step.",
+        "We decided that we will not move you forward in the hiring process.",
+        "We have decided not to proceed with your candidacy for the current opening.",
+    ),
+)
+def test_common_employer_rejection_wording_is_detected(body: str):
+    message = parse_message(
+        gmail_payload(
+            subject="Application update",
+            body=body,
+            sender="Example Recruiting <recruiting@example.com>",
+        )
+    )
+
+    event, reason = classify_lifecycle_event(message)
+
+    assert reason == "rejected"
+    assert event is not None
+    assert event.event_type == "rejected"
+
+
+def test_unfortunately_is_a_discovery_signal_not_standalone_rejection_evidence():
+    assert '"unfortunately"' in DEFAULT_SCAN_QUERY
+
+    message = parse_message(
+        gmail_payload(
+            subject="Application update",
+            body="Unfortunately, the interview must be rescheduled.",
+            sender="Example Recruiting <recruiting@example.com>",
+        )
+    )
+
+    assert classify_lifecycle_event(message) == (None, "missing-confirmation-phrase")
+
+
 def test_semantic_fallback_minimizes_message_and_requires_exact_evidence():
     evidence = "we have chosen to continue discussions with other applicants"
     adapter = FakeSemanticAdapter(
@@ -971,6 +1062,97 @@ def test_confirmation_then_rejection_updates_one_application_chronologically(tmp
     serialized = json.dumps(stored)
     assert "unable to move forward" not in serialized
     assert "rejection" not in rejection_event["source"]["reference"]
+
+
+@pytest.mark.parametrize("company_suffix", ["", " for Other Corporation"])
+def test_title_only_or_conflicting_company_rejection_preserves_history(
+    tmp_path: Path, company_suffix
+):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / ".resume-builder.json").write_text("{}\n", encoding="utf-8")
+    state = GmailRuntimeState(tmp_path / "runtime" / "gmail.sqlite")
+    confirmation = gmail_payload(
+        message_id="confirmation",
+        subject=("JR12345 Systems Engineer I at C1400 Example Corporation - United States"),
+        body=(
+            "We have received your application for the position of JR12345 "
+            "Systems Engineer I and sent it to our recruiting team."
+        ),
+        sender="Example Recruiting <updates@myworkday.com>",
+        received_at=datetime(2026, 8, 20, 14, 30, tzinfo=UTC),
+    )
+    rejection = gmail_payload(
+        message_id="rejection",
+        subject="Application update" + company_suffix,
+        body=(
+            "Thank you for submitting an application for Systems Engineer I. "
+            "Unfortunately, we decided to continue with another candidate."
+        ),
+        sender="Example Recruiting <updates@myworkday.com>",
+        received_at=datetime(2026, 8, 25, 14, 30, tzinfo=UTC),
+    )
+
+    result = process_messages(
+        gateway=FakeGateway({"rejection": rejection, "confirmation": confirmation}),
+        state=state,
+        workspace=workspace,
+        message_ids=["rejection", "confirmation"],
+        apply=True,
+    )
+
+    assert result["created"] == 1
+    assert result["rejected"] == 0
+    assert result["ambiguous"] == 1
+    stored = load_record(next((workspace / "applications").glob("APP-*.json")))
+    assert stored["application"]["company"] == "Example Corporation"
+    assert stored["application"]["role"] == "Systems Engineer I"
+    assert [event["status"] for event in stored["events"]] == ["applied"]
+
+
+@pytest.mark.parametrize(
+    "company,req,thread,sender,expected",
+    [
+        ("Other Corporation", None, None, None, "unresolved"),
+        ("Other Corporation", "REQ-1", "APP-1", "APP-1", "unresolved"),
+        (None, None, "APP-1", None, "thread"),
+        (None, "REQ-1", None, None, "requisition"),
+        (None, None, None, "APP-1", "sender-domain"),
+        ("Example Corporation", None, None, None, "company-role"),
+        (None, None, None, None, "unresolved"),
+    ],
+)
+def test_lifecycle_identity_evidence(company, req, thread, sender, expected):
+    from resume_builder.gmail_automation import GmailLifecycleEvent, _resolve_existing_application
+
+    records = [
+        {
+            "application": {
+                "id": "APP-1",
+                "company": "Example Corporation",
+                "role": "Systems Engineer",
+                "requisition_id": "REQ-1",
+            }
+        },
+        {
+            "application": {
+                "id": "APP-2",
+                "company": "Second Corporation",
+                "role": "Systems Engineer",
+            }
+        },
+    ]
+    event = GmailLifecycleEvent(
+        "rejection", company, "Systems Engineer", req, datetime.now(UTC), 1.0
+    )
+    match, confidence, method = _resolve_existing_application(
+        event, records, thread_application_id=thread, sender_application_id=sender
+    )
+    assert method == expected
+    if expected == "unresolved":
+        assert match is None and confidence == 0
+    else:
+        assert match == records[0] and confidence >= 0.92
 
 
 def test_unmatched_rejection_never_creates_an_application(tmp_path: Path):

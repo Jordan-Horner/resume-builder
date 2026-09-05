@@ -1,6 +1,7 @@
 .git
 .github
 .venv
+web/node_modules
 .mypy_cache
 .pytest_cache
 .ruff_cache

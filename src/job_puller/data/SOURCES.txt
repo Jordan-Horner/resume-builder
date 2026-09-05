@@ -1,0 +1,34 @@
+Public starter board catalog, reviewed 2026-09-05.
+
+Selected from https://github.com/Feashliaa/job-board-aggregator
+Dataset commit: ecb67960f3e3f87b832efab823a479d4d64a2c07
+Files: data/greenhouse_companies.json, data/ashby_companies.json,
+data/lever_companies.json.
+Discovery reference: https://github.com/santifer/career-ops/blob/a61c9762600b2a08396be6cd40a5a8ef2ea278eb/scan-ats-full.mjs
+
+This is a bounded starter selection, not the full upstream catalog.
+Greenhouse and Lever entries returned non-empty public job APIs during review.
+Ashby entries are catalog-sourced; live reachability is environment-dependent.
+No candidate or private workspace information is included.
+
+MIT License
+
+Copyright (c) 2026 Riley Dorrington
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

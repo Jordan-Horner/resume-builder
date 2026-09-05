@@ -8,6 +8,13 @@ changes.
 
 ### Added
 
+- Optional Telegram, Gmail, and Discord guidance in the private-workspace setup
+  wizard, with a reusable `resume-builder onboard integrations` entry point and
+  concealed, one-time QR pairing for a personal Telegram bot
+- A private, deny-by-default Telegram channel for the PydanticAI career agent,
+  with sender/chat allowlists, bounded external conversation history, update
+  deduplication, durable restart recovery, resumable reply delivery,
+  long-polling deployment, and content-free operational logs
 - An adapter-first private career-agent foundation using PydanticAI and
   OpenRouter, with separate model, communication-channel, and tool contracts,
   conservative privacy routing, bounded usage, and an initial read-only CLI

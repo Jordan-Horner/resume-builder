@@ -142,6 +142,27 @@ docker compose up -d
 docker compose logs -f automation
 ```
 
+### Run the isolated onboarding portal
+
+The onboarding portal has a separate Compose project and persistent workspace.
+It does not mount or modify the automation workspace:
+
+```bash
+docker compose -f compose.onboarding.yaml up -d --build
+```
+
+Open `http://127.0.0.1:8767`. The container creates a private local workspace
+inside the `resume-builder-onboarding-workspace` Docker volume on first start.
+Uploaded resumes are registered in that workspace and temporary upload files
+are removed. Stop the portal without deleting its saved onboarding state with:
+
+```bash
+docker compose -f compose.onboarding.yaml down
+```
+
+Add `--volumes` only when intentionally deleting the isolated onboarding
+workspace and starting over.
+
 The container writes concise, human-readable events directly to standard output
 and standard error. It immediately confirms that the scheduler started, groups
 the previous and next job and Gmail scan times, and emits a quiet heartbeat every

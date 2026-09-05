@@ -38,12 +38,28 @@ class AgentLimits:
 
 
 @dataclass(frozen=True)
+class TelegramChannel:
+    enabled: bool
+    token_env: str
+    allowed_user_ids: tuple[int, ...]
+    allowed_chat_ids: tuple[int, ...]
+    private_chats_only: bool
+    history_max_turns: int
+
+
+@dataclass(frozen=True)
+class AgentChannels:
+    telegram: TelegramChannel
+
+
+@dataclass(frozen=True)
 class AgentConfig:
     provider: str
     api_key_env: str
     models: AgentModels
     routing: AgentRouting
     limits: AgentLimits
+    channels: AgentChannels
 
 
 def _mapping(value: object, label: str) -> dict[str, Any]:
@@ -72,11 +88,30 @@ def _boolean(payload: dict[str, Any], key: str, default: bool) -> bool:
     return value
 
 
-def _positive_int(payload: dict[str, Any], key: str, default: int, maximum: int) -> int:
+def _positive_int(
+    payload: dict[str, Any],
+    key: str,
+    default: int,
+    maximum: int,
+    *,
+    section: str = "limits",
+) -> int:
     value = payload.get(key, default)
     if not isinstance(value, int) or isinstance(value, bool) or not 1 <= value <= maximum:
-        raise ValueError(f"limits.{key} must be an integer from 1 to {maximum}")
+        raise ValueError(f"{section}.{key} must be an integer from 1 to {maximum}")
     return value
+
+
+def _integer_list(value: object, label: str, *, positive: bool) -> tuple[int, ...]:
+    if not isinstance(value, list) or not all(
+        isinstance(item, int)
+        and not isinstance(item, bool)
+        and (item > 0 if positive else item != 0)
+        for item in value
+    ):
+        qualifier = "positive " if positive else "non-zero "
+        raise ValueError(f"{label} must be a list of {qualifier}integer IDs")
+    return tuple(dict.fromkeys(value))
 
 
 def load_agent_config(path: Path) -> AgentConfig:
@@ -92,11 +127,20 @@ def load_agent_config(path: Path) -> AgentConfig:
     payload = _mapping(raw, "agent configuration")
     _strict_keys(
         payload,
-        {"schema_version", "provider", "api_key_env", "models", "routing", "limits"},
+        {
+            "schema_version",
+            "provider",
+            "api_key_env",
+            "models",
+            "routing",
+            "limits",
+            "channels",
+        },
         "agent",
     )
-    if payload.get("schema_version") != 1:
-        raise ValueError("agent schema_version must be 1")
+    schema_version = payload.get("schema_version")
+    if schema_version not in {1, 2}:
+        raise ValueError("agent schema_version must be 1 or 2")
     provider = _required_string(payload, "provider", "agent")
     if provider != "openrouter":
         raise ValueError("agent.provider must currently be openrouter")
@@ -163,13 +207,60 @@ def load_agent_config(path: Path) -> AgentConfig:
         max_output_tokens=_positive_int(limits, "max_output_tokens", 4_000, 100_000),
         max_cost_per_turn_usd=max_cost,
     )
-    return AgentConfig(provider, api_key_env, parsed_models, parsed_routing, parsed_limits)
+
+    channels = _mapping(payload.get("channels", {}), "channels")
+    _strict_keys(channels, {"telegram"}, "channels")
+    telegram = _mapping(channels.get("telegram", {}), "channels.telegram")
+    _strict_keys(
+        telegram,
+        {
+            "enabled",
+            "token_env",
+            "allowed_user_ids",
+            "allowed_chat_ids",
+            "private_chats_only",
+            "history_max_turns",
+        },
+        "channels.telegram",
+    )
+    parsed_telegram = TelegramChannel(
+        enabled=_boolean(telegram, "enabled", False),
+        token_env=str(telegram.get("token_env", "RESUME_BUILDER_TELEGRAM_BOT_TOKEN")).strip(),
+        allowed_user_ids=_integer_list(
+            telegram.get("allowed_user_ids", []),
+            "channels.telegram.allowed_user_ids",
+            positive=True,
+        ),
+        allowed_chat_ids=_integer_list(
+            telegram.get("allowed_chat_ids", []),
+            "channels.telegram.allowed_chat_ids",
+            positive=False,
+        ),
+        private_chats_only=_boolean(telegram, "private_chats_only", True),
+        history_max_turns=_positive_int(
+            telegram,
+            "history_max_turns",
+            20,
+            100,
+            section="channels.telegram",
+        ),
+    )
+    if not parsed_telegram.token_env:
+        raise ValueError("channels.telegram.token_env must be a non-empty string")
+    return AgentConfig(
+        provider,
+        api_key_env,
+        parsed_models,
+        parsed_routing,
+        parsed_limits,
+        AgentChannels(parsed_telegram),
+    )
 
 
 def render_default_agent_config() -> str:
     """Render conservative OpenRouter defaults without credentials."""
     return """\
-schema_version: 1
+schema_version: 2
 provider: openrouter
 api_key_env: OPENROUTER_API_KEY
 
@@ -192,4 +283,13 @@ limits:
   max_input_tokens: 100000
   max_output_tokens: 4000
   max_cost_per_turn_usd: 0.25
+
+channels:
+  telegram:
+    enabled: false
+    token_env: RESUME_BUILDER_TELEGRAM_BOT_TOKEN
+    allowed_user_ids: []
+    allowed_chat_ids: []
+    private_chats_only: true
+    history_max_turns: 20
 """

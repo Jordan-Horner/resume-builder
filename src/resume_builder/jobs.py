@@ -21,6 +21,7 @@ from job_puller.cli import main as puller_main
 from job_puller.config import load_config, resolve_database_path
 from job_puller.database import InventoryDatabase
 from job_puller.liveness import verify_job_liveness
+from job_puller.locations import matching_location_terms
 
 from .applications import DEFAULT_ROOT as DEFAULT_APPLICATIONS_ROOT
 from .applications import application_job_dispositions
@@ -365,8 +366,12 @@ def _prescreen(
         dispositions.get(str(job.get("id") or "")) if isinstance(dispositions, dict) else None
     )
     location = str(job.get("location") or "")
-    accepted_location = _contains_phrases(location, preferences.get("accepted_location_terms", []))
-    excluded_location = _contains_phrases(location, preferences.get("excluded_location_terms", []))
+    accepted_location = matching_location_terms(
+        location, preferences.get("accepted_location_terms", [])
+    )
+    excluded_location = matching_location_terms(
+        location, preferences.get("excluded_location_terms", [])
+    )
     location_match = bool(accepted_location) or (
         not excluded_location and preferences.get("include_unknown_locations", True)
     )

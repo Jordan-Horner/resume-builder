@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Literal, Protocol
 
 from pydantic import BaseModel
 
@@ -25,6 +25,14 @@ class AgentTool:
 
 
 @dataclass(frozen=True)
+class ConversationTurn:
+    """One provider-neutral conversational message."""
+
+    role: Literal["user", "assistant"]
+    text: str
+
+
+@dataclass(frozen=True)
 class ModelRequest:
     """One model turn independent of a specific inference provider."""
 
@@ -32,6 +40,8 @@ class ModelRequest:
     instructions: str
     model: str
     tools: Sequence[AgentTool] = field(default_factory=tuple)
+    history: Sequence[ConversationTurn] = field(default_factory=tuple)
+    conversation_id: str | None = None
 
 
 @dataclass(frozen=True)

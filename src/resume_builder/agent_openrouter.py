@@ -23,15 +23,30 @@ class AgentProviderError(ModelProviderError):
 class OpenRouterAdapter(ModelAdapter):
     """Run one bounded PydanticAI turn through OpenRouter."""
 
-    def __init__(self, config: AgentConfig):
+    def __init__(self, config: AgentConfig, *, api_key: str | None = None):
         self.config = config
+        self._api_key = api_key.strip() if api_key else None
 
-    def run(self, request: ModelRequest) -> ModelReply:
-        api_key = os.environ.get(self.config.api_key_env, "").strip()
+    def _configured_api_key(self) -> str:
+        api_key = self._api_key or os.environ.get(self.config.api_key_env, "").strip()
         if not api_key:
             raise AgentProviderError(f"{self.config.api_key_env} is not configured")
+        return api_key
+
+    def run(self, request: ModelRequest) -> ModelReply:
+        api_key = self._configured_api_key()
         try:
             from pydantic_ai import Agent, Tool
+            from pydantic_ai.messages import (
+                ModelRequest as PydanticModelRequest,
+            )
+            from pydantic_ai.messages import (
+                ModelResponse as PydanticModelResponse,
+            )
+            from pydantic_ai.messages import (
+                TextPart,
+                UserPromptPart,
+            )
             from pydantic_ai.models.openrouter import OpenRouterModel, OpenRouterModelSettings
             from pydantic_ai.providers.openrouter import OpenRouterProvider
             from pydantic_ai.usage import UsageLimits
@@ -80,8 +95,20 @@ class OpenRouterAdapter(ModelAdapter):
             input_tokens_limit=self.config.limits.max_input_tokens,
             output_tokens_limit=self.config.limits.max_output_tokens,
         )
+        message_history: list[Any] = []
+        for turn in request.history:
+            if turn.role == "user":
+                message_history.append(PydanticModelRequest(parts=[UserPromptPart(turn.text)]))
+            else:
+                message_history.append(PydanticModelResponse(parts=[TextPart(turn.text)]))
         try:
-            result = agent.run_sync(request.prompt, model_settings=settings, usage_limits=limits)
+            result = agent.run_sync(
+                request.prompt,
+                message_history=message_history or None,
+                conversation_id=request.conversation_id,
+                model_settings=settings,
+                usage_limits=limits,
+            )
         except Exception as exc:
             raise AgentProviderError(
                 f"OpenRouter turn failed safely ({exc.__class__.__name__})"
@@ -100,9 +127,7 @@ class OpenRouterAdapter(ModelAdapter):
 
     def run_structured(self, request: StructuredModelRequest) -> StructuredModelReply:
         """Run one schema-validated task without exposing provider response types."""
-        api_key = os.environ.get(self.config.api_key_env, "").strip()
-        if not api_key:
-            raise AgentProviderError(f"{self.config.api_key_env} is not configured")
+        api_key = self._configured_api_key()
         try:
             from pydantic_ai import Agent
             from pydantic_ai.models.openrouter import OpenRouterModel, OpenRouterModelSettings

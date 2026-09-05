@@ -9,12 +9,16 @@ import pytest
 
 from resume_builder.agent_contracts import StructuredModelReply, StructuredModelRequest
 from resume_builder.job_screening import (
+    CandidateScreeningProfile,
     Confidence,
+    ConstraintState,
     EligibilityStatus,
     FitOutcome,
     Recommendation,
     ScreeningCache,
     SemanticScreen,
+    _clearance_constraint,
+    _legacy_constraints,
     build_screening_packet,
     finalize_screen,
     screening_prompt,
@@ -24,6 +28,52 @@ from resume_builder.screening_service import ScreeningService
 CASES = json.loads(
     (Path(__file__).parent / "fixtures" / "job_screening_cases.json").read_text(encoding="utf-8")
 )
+
+
+def test_location_screening_uses_country_aliases_and_boundaries() -> None:
+    profile = CandidateScreeningProfile()
+    preferences = {"accepted_location_terms": ["United States"]}
+    result = _legacy_constraints({"location": "USA"}, preferences, profile)
+    assert (
+        next(item for item in result if item.code == "location").state == ConstraintState.SATISFIED
+    )
+    result = _legacy_constraints(
+        {"location": "Australia"}, {"excluded_location_terms": ["US"]}, profile
+    )
+    assert (
+        next(item for item in result if item.code == "location").state != ConstraintState.VIOLATED
+    )
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Must hold an active Secret clearance.",
+        "Must have Public Trust.",
+        "Active Public Trust status is required.",
+        "Requires a security clearance.",
+    ],
+)
+@pytest.mark.parametrize(
+    "held, expected",
+    [
+        (False, ConstraintState.VIOLATED),
+        (True, ConstraintState.UNKNOWN),
+    ],
+)
+def test_binary_clearance_does_not_claim_a_level(
+    description: str, held: bool, expected: ConstraintState
+) -> None:
+    profile = CandidateScreeningProfile(holds_clearance_or_public_trust=held)
+    assert _clearance_constraint(description, profile).state == expected
+
+
+def test_no_current_clearance_does_not_reject_obtainable_clearance() -> None:
+    profile = CandidateScreeningProfile(holds_clearance_or_public_trust=False)
+    assert (
+        _clearance_constraint("Ability to obtain a Secret clearance.", profile).state
+        == ConstraintState.UNKNOWN
+    )
 
 
 @pytest.mark.parametrize("case", CASES, ids=[case["name"] for case in CASES])

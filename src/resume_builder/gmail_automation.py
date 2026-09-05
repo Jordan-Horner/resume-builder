@@ -40,7 +40,7 @@ from .gmail_semantic import SemanticEmailClassifier, SemanticLifecycleOutcome
 from .jobs import DEFAULT_CONFIG
 
 GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
-CLASSIFIER_VERSION = "application-lifecycle-rules-v4"
+CLASSIFIER_VERSION = "application-lifecycle-rules-v7"
 AUTOMATION_POLICY = "high-confidence-application-lifecycle-v2"
 AUTO_APPLY_THRESHOLD = 0.92
 SEMANTIC_CLASSIFIER_VERSION = f"{CLASSIFIER_VERSION}+semantic-v1"
@@ -61,7 +61,9 @@ CONFIRMATION_QUERY = (
 )
 REJECTION_QUERY_TERMS = (
     '"unable to move forward" "not moving forward" "not be moving forward" '
-    '"other candidates" "another candidate" "position has been filled" "not selected"'
+    '"other candidates" "another candidate" "position has been filled" "not selected" '
+    '"unfortunately" "pursuing candidates" "pursue discussions" '
+    '"not be proceeding" "not to proceed" "not move you forward"'
 )
 FOLLOW_UP_QUERY_TERMS = (
     '"schedule an interview" "invite you to interview" "interview availability" '
@@ -104,10 +106,46 @@ REJECTION_PATTERNS = (
     re.compile(r"\b(?:decided|chosen|elected) not to move forward\b", re.IGNORECASE),
     re.compile(r"\b(?:unable|cannot|can't) to move forward\b", re.IGNORECASE),
     re.compile(r"\b(?:will|would) not be moving forward\b", re.IGNORECASE),
-    re.compile(r"\b(?:you|your application) (?:are|is|were|was) not selected\b", re.IGNORECASE),
+    re.compile(
+        r"\b(?:you|your application|your profile) (?:are|is|were|was) not selected\b",
+        re.IGNORECASE,
+    ),
     re.compile(r"\b(?:position|role|opening) (?:has been|was) filled\b", re.IGNORECASE),
     re.compile(
         r"\bmove forward with (?:another|other|different|more qualified) candidates?\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:decided|chosen|elected) to move forward with candidates? whose "
+        r"(?:experience|background|qualifications|skills)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:decided|chosen|elected|selected) to (?:continue|proceed) "
+        r"with (?:another|other|different|more qualified) candidates?\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:decided|chosen|elected) to pursue (?:discussions|conversations) "
+        r"with (?:another|other|different|more qualified) candidates?\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:are|were) pursuing candidates with .*?\b(?:more closely|better) match\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:will|would|do) not move (?:you|your application) forward\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:won't|will not|would not) be proceeding with "
+        r"(?:you|your application|your candidacy)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:decided|chosen|elected) not to proceed with "
+        r"(?:you|your application|your candidacy)\b",
         re.IGNORECASE,
     ),
     re.compile(r"\bnot moving forward (?:with|in)\b", re.IGNORECASE),
@@ -151,6 +189,11 @@ CONDITIONAL_REJECTION = re.compile(
 )
 SUBJECT_IDENTITY_PATTERNS = (
     re.compile(
+        r"^[A-Z]{1,5}\d+\s+(?P<role>.+?)\s+at\s+"
+        r"(?:[A-Z]\d+\s+)?(?P<company>.+?)(?:\s+-\s+[^|]+)?$",
+        re.IGNORECASE,
+    ),
+    re.compile(
         r"(?:thank you|thanks) for applying (?:to|for) "
         r"(?P<role>.+?) (?:at|with) (?P<company>.+)$",
         re.IGNORECASE,
@@ -183,6 +226,10 @@ COMPANY_PATTERNS = (
 )
 ROLE_PATTERNS = (
     re.compile(r"(?:job title|position|role)\s*[:|-]\s*(?P<role>[^\n|]{3,100})", re.IGNORECASE),
+    re.compile(
+        r"submitting an application for (?:the )?(?P<role>[^\n.!]{3,100})",
+        re.IGNORECASE,
+    ),
     re.compile(
         r"application (?:for|to) (?:the )?(?P<role>[^\n.!]{3,100}?) (?:position|role)\b",
         re.IGNORECASE,
@@ -1188,6 +1235,14 @@ def _resolve_existing_application(
     sender_application_id: str | None,
 ) -> tuple[dict[str, Any] | None, float, str]:
     """Resolve a lifecycle event only when it identifies one existing application."""
+    # Explicit employer evidence must not be overridden by a thread, sender,
+    # requisition collision, or a common role title at a different employer.
+    if event.company:
+        records = [
+            record
+            for record in records
+            if _identity(record["application"]["company"]) == _identity(event.company)
+        ]
     if event.requisition_id:
         matches = [
             record

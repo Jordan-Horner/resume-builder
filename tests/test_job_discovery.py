@@ -4,9 +4,11 @@ from resume_builder.agent_contracts import StructuredModelReply
 from resume_builder.discovery_evidence import (
     HistoricalTitleState,
     ResumeDocument,
+    ResumeInterpretation,
     TitlePosture,
     extract_query_expansion,
     extract_title_seed,
+    interpret_resume_evidence,
 )
 from resume_builder.discovery_portfolio import (
     MAX_TOTAL_QUERIES,
@@ -50,6 +52,151 @@ Operations engineer who enjoys reliable systems.
 - AWS, Linux, Docker, Kubernetes, Terraform, Python, Bash, FastAPI, Postgres
 """,
     )
+
+
+def test_ingested_pdf_markdown_is_read_by_shared_role_pipeline():
+    document = ResumeDocument(
+        source_id="uploaded-pdf",
+        content="""---
+source_format: pdf
+---
+# Normalized source snapshot
+EXPERIENCE
+Example Cloud
+Production Services Lead Oct 2025 - Jul 2026
+Built a FastAPI troubleshooting portal on Kubernetes.
+Investigated customer incidents.
+Example Data
+Technical Support Engineer 2021 - 2023
+Automated Terraform deployments.
+EDUCATION
+Example University 2017 - 2020
+Bachelor of Science
+""",
+    )
+    titles = extract_title_seed([document])
+    assert {item.exact_title for item in titles.historical_titles} == {
+        "Production Services Lead",
+        "Technical Support Engineer",
+    }
+    import json
+
+    packet = json.loads(title_generation_prompt(document))
+    roles = packet["historical_roles"]
+    assert "FastAPI" in roles[0]["evidence"]
+    assert "Terraform" not in roles[0]["evidence"]
+    assert "Terraform" in roles[1]["evidence"]
+    assert "Bachelor" not in roles[1]["evidence"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "CAREER HISTORY\nAcme / Support Engineer\n2021 to 2024\nInvestigated API failures.",
+        "2021 to 2024 | Acme\nSupport Engineer\nInvestigated API failures.",
+        "My background: Support Engineer at Acme (2021 to 2024). Investigated API failures.",
+    ],
+)
+def test_shared_semantic_interpretation_accepts_different_layouts(text):
+    class Adapter:
+        def run_structured(self, request):
+            return StructuredModelReply(
+                model="test",
+                output=ResumeInterpretation.model_validate(
+                    {
+                        "roles": [
+                            {"title": "Support Engineer", "dates": "2021 to 2024", "excerpt": text}
+                        ],
+                    }
+                ),
+            )
+
+    original = ResumeDocument(source_id="source", content=text)
+    interpreted = interpret_resume_evidence(original, Adapter(), model="test")
+    assert interpreted.content == original.content
+    assert original.interpretation is None
+    assert extract_title_seed([interpreted]).historical_titles[0].exact_title == "Support Engineer"
+
+
+def test_semantic_interpretation_repairs_non_verbatim_reply():
+    text = "Support Engineer at Acme. Investigated API failures."
+
+    class Adapter:
+        calls = 0
+
+        def run_structured(self, request):
+            self.calls += 1
+            if self.calls == 2:
+                assert "Validation feedback" in request.prompt
+            return StructuredModelReply(
+                model="test",
+                output={
+                    "roles": [
+                        {
+                            "title": "Support Engineer",
+                            "excerpt": text
+                            if self.calls == 2
+                            else "Support Engineer. Investigated API failures.",
+                        }
+                    ]
+                },
+            )
+
+    adapter = Adapter()
+    result = interpret_resume_evidence(
+        ResumeDocument(source_id="source", content=text), adapter, model="test"
+    )
+    assert adapter.calls == 2
+    assert result.interpretation.roles[0].excerpt == text
+
+
+def test_semantic_interpretation_extracts_selected_source_lines():
+    text = "CAREER\nSupport Engineer | 2021\u20132024\nInvestigated API failures.\nEDUCATION"
+
+    class Adapter:
+        def run_structured(self, request):
+            assert "2: Support Engineer" in request.prompt
+            return StructuredModelReply(
+                model="test",
+                output={
+                    "roles": [
+                        {
+                            "title": "Support Engineer",
+                            "dates": "2021\u20132024",
+                            "start_line": 2,
+                            "end_line": 3,
+                        }
+                    ]
+                },
+            )
+
+    result = interpret_resume_evidence(
+        ResumeDocument(source_id="source", content=text), Adapter(), model="test"
+    )
+    assert (
+        result.interpretation.roles[0].excerpt
+        == "Support Engineer | 2021\u20132024\nInvestigated API failures."
+    )
+
+
+def test_semantic_interpretation_rejects_invented_evidence():
+    class Adapter:
+        def run_structured(self, request):
+            return StructuredModelReply(
+                model="test",
+                output=ResumeInterpretation.model_validate(
+                    {
+                        "roles": [{"title": "Engineer", "excerpt": "Engineer who built a rocket."}],
+                    }
+                ),
+            )
+
+    with pytest.raises(ValueError, match="Could not verify"):
+        interpret_resume_evidence(
+            ResumeDocument(source_id="source", content="Supported customers."),
+            Adapter(),
+            model="test",
+        )
 
 
 def fictional_generation(

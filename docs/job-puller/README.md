@@ -25,6 +25,18 @@ uv run job-puller config validate
 
 The personal files live under `workspace/job-search/`. New Resume Builder
 workspaces receive neutral preferences and an inactive collector configuration.
+They also enable an offline bundled starter catalog: 17 Greenhouse, 14 Ashby,
+and 3 Lever boards. These public IDs were selected from the MIT-licensed
+job-board-aggregator datasets used by career-ops. Attribution and pinned source
+revision are packaged in `job_puller/data/SOURCES.txt`. This is not the entire
+upstream dataset. Catalog presence does not guarantee a matching job or future
+availability. Other provider types still require their own board catalog.
+
+`use_bundled_boards: true` opts an existing collector into this catalog. Existing
+inline/registry entries override bundled IDs, so local disabled entries remain
+disabled; provider toggles also remain respected. Existing configurations are not
+automatically opted in. No catalog download or scan occurs at startup. Updates to
+the packaged catalog arrive with application updates, not a new background schedule.
 After career sources have been hydrated, continue the unified setup:
 
 ```bash
@@ -42,6 +54,20 @@ enabled independently. `titles` are sent to providers and also admitted by the l
 match to keep adjacent categories outside the family. All three are phrase rules rather than regular expressions.
 Keep personal choices such as companies, salary, and acceptable seniority in `preferences.yml`; family exclusions
 should describe the reusable role boundary.
+
+Local location matching treats United States, United States of America, US, USA,
+U.S., and U.S.A. as the same explicit country. Prescreening, screening, and portal
+location searches share whole-token matching; US does not match Australia or
+Russia. This is not geocoding: a city without a country is not automatically
+classified as American. Original posting text and saved preference terms remain
+unchanged. Provider search-location parameters are unchanged.
+
+Use `resume-builder preferences show` to inspect those personal settings. Use
+`preferences propose` with a structured `set`, `add`, or `remove` request to
+preview a change against the existing local inventory, then confirm the emitted
+hash with `preferences apply`. This cannot delete inventory, start a provider
+scan, or call an AI model. It updates screening preferences only; future search
+query changes remain behind the separate discovery activation workflow.
 
 A reviewed capability family can set one transport-neutral `provider_query`,
 `commercial_admission: query_result`, and `commercial_only: true`. This allows

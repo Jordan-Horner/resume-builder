@@ -20,7 +20,8 @@ from reaching approved outputs and keeps undispositioned opportunities visible.
 
 **Project status:** Resume workflows, job discovery, Gmail tracking, AI-assisted
 screening, scheduled container automation, and private Telegram conversations
-work today. Automatic job submission remains future work.
+work today. A local dashboard provides unseen-job review, application history,
+and integration setup guidance. Automatic job submission remains future work.
 
 ## What it can do
 
@@ -73,6 +74,24 @@ resume-builder
 ```
 
 </details>
+
+## Local dashboard
+
+The focused web interface shows only jobs awaiting a decision on its main page,
+with search and Remote, Hybrid, and On-site filters. Opening a job is read-only;
+marking it applied moves it into Applications, while Not interested removes it
+from the review list. Applications and integration setup live on their own
+simple pages.
+
+```bash
+python -m pip install -e ".[web]"
+cd web && npm install && npm run build && cd ..
+resume-builder-web
+```
+
+Open `http://127.0.0.1:8765`. The server discovers the private workspace and
+serves the production frontend from `web/dist`. Frontend development uses
+`npm run dev`; its `/api` requests proxy to the same local server.
 
 ## Agent architecture
 

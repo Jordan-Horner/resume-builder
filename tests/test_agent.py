@@ -15,6 +15,7 @@ from resume_builder import agent_tools, jobs
 from resume_builder.agent import AgentService, ConsoleAdapter, main
 from resume_builder.agent_config import load_agent_config, render_default_agent_config
 from resume_builder.agent_contracts import (
+    ConversationTurn,
     InboundMessage,
     ModelReply,
     ModelRequest,
@@ -66,6 +67,8 @@ def test_default_config_enforces_private_bounded_openrouter_routing(tmp_path: Pa
     assert config.routing.data_collection == "deny"
     assert config.routing.require_parameters is True
     assert str(config.limits.max_cost_per_turn_usd) == "0.25"
+    assert config.channels.telegram.enabled is False
+    assert config.channels.telegram.allowed_user_ids == ()
 
 
 def test_config_rejects_unknown_settings(tmp_path: Path) -> None:
@@ -97,17 +100,62 @@ def test_service_uses_model_and_channel_adapters(tmp_path: Path) -> None:
     assert all(not tool.mutates for tool in model.request.tools)
 
 
+def test_service_supplies_bounded_conversation_history(tmp_path: Path) -> None:
+    from resume_builder.agent_state import AgentState
+
+    config = load_agent_config(config_path(tmp_path))
+
+    class HistoryModel(FakeModelAdapter):
+        def __init__(self) -> None:
+            super().__init__()
+            self.requests: list[ModelRequest] = []
+
+        def run(self, request: ModelRequest) -> ModelReply:
+            self.requests.append(request)
+            return ModelReply(f"Reply {len(self.requests)}", request.model)
+
+    model = HistoryModel()
+    state = AgentState(tmp_path / "agent-state.sqlite")
+    service = AgentService(
+        config,
+        model,
+        tmp_path / "automation.sqlite",
+        conversation_state=state,
+    )
+
+    first = service.respond(
+        InboundMessage("user-1", "conversation-1", "First"),
+        channel_name="telegram",
+        history_max_turns=1,
+    )
+    second = service.respond(
+        InboundMessage("user-1", "conversation-1", "Second"),
+        channel_name="telegram",
+        history_max_turns=1,
+    )
+
+    assert first.text == "Reply 1"
+    assert second.text == "Reply 2"
+    assert model.requests[0].history == ()
+    assert model.requests[1].history == (
+        ConversationTurn("user", "First"),
+        ConversationTurn("assistant", "Reply 1"),
+    )
+
+
 def test_openrouter_adapter_does_not_require_parallel_tool_call_support(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     captured_settings: dict[str, object] = {}
     agent_kwargs: list[dict[str, object]] = []
+    run_kwargs: list[dict[str, object]] = []
 
     class FakeAgent:
         def __init__(self, *args: object, **kwargs: object) -> None:
             agent_kwargs.append(kwargs)
 
         def run_sync(self, *args: object, **kwargs: object) -> object:
+            run_kwargs.append(kwargs)
             usage = types.SimpleNamespace(
                 cost=Decimal("0.01"),
                 requests=1,
@@ -134,6 +182,11 @@ def test_openrouter_adapter_does_not_require_parallel_tool_call_support(
     pydantic_ai = types.ModuleType("pydantic_ai")
     pydantic_ai.Agent = FakeAgent
     pydantic_ai.Tool = object
+    messages = types.ModuleType("pydantic_ai.messages")
+    messages.ModelRequest = lambda *args, **kwargs: ("request", args, kwargs)
+    messages.ModelResponse = lambda *args, **kwargs: ("response", args, kwargs)
+    messages.TextPart = lambda *args, **kwargs: ("text", args, kwargs)
+    messages.UserPromptPart = lambda *args, **kwargs: ("user", args, kwargs)
     models = types.ModuleType("pydantic_ai.models.openrouter")
     models.OpenRouterModel = lambda *args, **kwargs: object()
     models.OpenRouterModelSettings = fake_settings
@@ -142,6 +195,7 @@ def test_openrouter_adapter_does_not_require_parallel_tool_call_support(
     usage = types.ModuleType("pydantic_ai.usage")
     usage.UsageLimits = lambda **kwargs: kwargs
     monkeypatch.setitem(sys.modules, "pydantic_ai", pydantic_ai)
+    monkeypatch.setitem(sys.modules, "pydantic_ai.messages", messages)
     monkeypatch.setitem(sys.modules, "pydantic_ai.models.openrouter", models)
     monkeypatch.setitem(sys.modules, "pydantic_ai.providers.openrouter", providers)
     monkeypatch.setitem(sys.modules, "pydantic_ai.usage", usage)
@@ -149,11 +203,19 @@ def test_openrouter_adapter_does_not_require_parallel_tool_call_support(
     config = load_agent_config(config_path(tmp_path))
 
     reply = OpenRouterAdapter(config).run(
-        ModelRequest("Reply READY", "Do not use tools.", config.models.fast)
+        ModelRequest(
+            "Reply READY",
+            "Do not use tools.",
+            config.models.fast,
+            history=(ConversationTurn("user", "Earlier"), ConversationTurn("assistant", "OK")),
+            conversation_id="conversation-1",
+        )
     )
 
     assert reply.text == "READY"
     assert "parallel_tool_calls" not in captured_settings
+    assert run_kwargs[0]["conversation_id"] == "conversation-1"
+    assert len(run_kwargs[0]["message_history"]) == 2
 
     structured = OpenRouterAdapter(config).run_structured(
         StructuredModelRequest(

@@ -1,0 +1,215 @@
+{
+  "schema_version": 1,
+  "providers": {
+    "greenhouse": [
+      {
+        "id": "cloudflare",
+        "name": "cloudflare",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/cloudflare"
+      },
+      {
+        "id": "datadog",
+        "name": "datadog",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/datadog"
+      },
+      {
+        "id": "stripe",
+        "name": "stripe",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/stripe"
+      },
+      {
+        "id": "gitlab",
+        "name": "gitlab",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/gitlab"
+      },
+      {
+        "id": "discord",
+        "name": "discord",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/discord"
+      },
+      {
+        "id": "figma",
+        "name": "figma",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/figma"
+      },
+      {
+        "id": "reddit",
+        "name": "reddit",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/reddit"
+      },
+      {
+        "id": "dropbox",
+        "name": "dropbox",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/dropbox"
+      },
+      {
+        "id": "twilio",
+        "name": "twilio",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/twilio"
+      },
+      {
+        "id": "duolingo",
+        "name": "duolingo",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/duolingo"
+      },
+      {
+        "id": "roblox",
+        "name": "roblox",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/roblox"
+      },
+      {
+        "id": "mongodb",
+        "name": "mongodb",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/mongodb"
+      },
+      {
+        "id": "elastic",
+        "name": "elastic",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/elastic"
+      },
+      {
+        "id": "cockroachlabs",
+        "name": "cockroachlabs",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/cockroachlabs"
+      },
+      {
+        "id": "fastly",
+        "name": "fastly",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/fastly"
+      },
+      {
+        "id": "grafanalabs",
+        "name": "grafanalabs",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/grafanalabs"
+      },
+      {
+        "id": "launchdarkly",
+        "name": "launchdarkly",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/launchdarkly"
+      }
+    ],
+    "ashby": [
+      {
+        "id": "openai",
+        "name": "openai",
+        "enabled": true,
+        "careers_url": "https://jobs.ashbyhq.com/openai"
+      },
+      {
+        "id": "notion",
+        "name": "notion",
+        "enabled": true,
+        "careers_url": "https://jobs.ashbyhq.com/notion"
+      },
+      {
+        "id": "ramp",
+        "name": "ramp",
+        "enabled": true,
+        "careers_url": "https://jobs.ashbyhq.com/ramp"
+      },
+      {
+        "id": "linear",
+        "name": "linear",
+        "enabled": true,
+        "careers_url": "https://jobs.ashbyhq.com/linear"
+      },
+      {
+        "id": "cursor",
+        "name": "cursor",
+        "enabled": true,
+        "careers_url": "https://jobs.ashbyhq.com/cursor"
+      },
+      {
+        "id": "sentry",
+        "name": "sentry",
+        "enabled": true,
+        "careers_url": "https://jobs.ashbyhq.com/sentry"
+      },
+      {
+        "id": "deel",
+        "name": "deel",
+        "enabled": true,
+        "careers_url": "https://jobs.ashbyhq.com/deel"
+      },
+      {
+        "id": "vanta",
+        "name": "vanta",
+        "enabled": true,
+        "careers_url": "https://jobs.ashbyhq.com/vanta"
+      },
+      {
+        "id": "deepgram",
+        "name": "deepgram",
+        "enabled": true,
+        "careers_url": "https://jobs.ashbyhq.com/deepgram"
+      },
+      {
+        "id": "modal",
+        "name": "modal",
+        "enabled": true,
+        "careers_url": "https://jobs.ashbyhq.com/modal"
+      },
+      {
+        "id": "railway",
+        "name": "railway",
+        "enabled": true,
+        "careers_url": "https://jobs.ashbyhq.com/railway"
+      },
+      {
+        "id": "supabase",
+        "name": "supabase",
+        "enabled": true,
+        "careers_url": "https://jobs.ashbyhq.com/supabase"
+      },
+      {
+        "id": "perplexity",
+        "name": "perplexity",
+        "enabled": true,
+        "careers_url": "https://jobs.ashbyhq.com/perplexity"
+      },
+      {
+        "id": "1password",
+        "name": "1password",
+        "enabled": true,
+        "careers_url": "https://jobs.ashbyhq.com/1password"
+      }
+    ],
+    "lever": [
+      {
+        "id": "palantir",
+        "name": "palantir",
+        "enabled": true,
+        "careers_url": "https://jobs.lever.co/palantir"
+      },
+      {
+        "id": "spotify",
+        "name": "spotify",
+        "enabled": true,
+        "careers_url": "https://jobs.lever.co/spotify"
+      },
+      {
+        "id": "zoox",
+        "name": "zoox",
+        "enabled": true,
+        "careers_url": "https://jobs.lever.co/zoox"
+      }
+    ]
+  }
+}

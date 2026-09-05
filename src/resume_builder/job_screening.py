@@ -13,6 +13,8 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
+from job_puller.locations import matching_location_terms
+
 SCREENING_SCHEMA_VERSION = 1
 SCREENING_RUBRIC_VERSION = 1
 MAX_DESCRIPTION_CHARS = 16_000
@@ -72,6 +74,7 @@ class CandidateScreeningProfile(StrictModel):
     intended_work_country: ProfileTerm | None = None
     authorized_to_work: bool | None = None
     held_clearances: list[ProfileTerm] | None = None
+    holds_clearance_or_public_trust: bool | None = None
     willing_to_obtain_clearance: bool | None = None
     licenses: list[ProfileTerm] | None = None
     remote_location_terms: list[ProfileTerm] | None = Field(default=None, max_length=20)
@@ -181,6 +184,13 @@ _ACTIVE_CLEARANCE_REVERSED = re.compile(
     r"(?:security\s+)?clearance\s+(?:is\s+)?required\b",
     re.IGNORECASE,
 )
+_ACTIVE_PUBLIC_TRUST = re.compile(
+    r"\b(?:must (?:have|hold|possess)|requires?)\s+(?:an?\s+)?(?:current\s+|active\s+)?"
+    r"(?P<clearance>public trust|security clearance)\b"
+    r"|\b(?:current|active)\s+(?:public trust|security clearance)\s+"
+    r"(?:(?:status|clearance)\s+)?(?:is\s+)?required\b",
+    re.IGNORECASE,
+)
 _OBTAIN_CLEARANCE = re.compile(
     r"\b(?:ability|able|eligible)\s+to\s+obtain\s+(?:an?\s+)?"
     r"(?:(?P<clearance>TS/SCI|top secret|secret)\s+)?(?:security\s+)?clearance\b",
@@ -281,12 +291,24 @@ def _sponsorship_constraint(
 
 
 def _clearance_constraint(description: str, profile: CandidateScreeningProfile) -> ConstraintResult:
-    active = _ACTIVE_CLEARANCE.search(description) or _ACTIVE_CLEARANCE_REVERSED.search(description)
+    active = (
+        _ACTIVE_CLEARANCE.search(description)
+        or _ACTIVE_CLEARANCE_REVERSED.search(description)
+        or _ACTIVE_PUBLIC_TRUST.search(description)
+    )
     obtainable = _OBTAIN_CLEARANCE.search(description)
     held = profile.held_clearances
     if active:
-        required = active.group("clearance")
-        if held is None:
+        required = active.group("clearance") or "public trust or security clearance"
+        if profile.holds_clearance_or_public_trust is False:
+            state = ConstraintState.VIOLATED
+            explanation = "Candidate reports no current clearance or Public Trust."
+        elif profile.holds_clearance_or_public_trust is True:
+            state = ConstraintState.UNKNOWN
+            explanation = (
+                "Candidate holds clearance or Public Trust; the specific requirement needs review."
+            )
+        elif held is None:
             state = ConstraintState.UNKNOWN
             explanation = (
                 "The posting explicitly requires an active clearance; holdings are unknown."
@@ -302,7 +324,13 @@ def _clearance_constraint(description: str, profile: CandidateScreeningProfile) 
             state=state,
             strength=PreferenceStrength.REQUIRED,
             explanation=explanation,
-            candidate_evidence=None if held is None else f"held_clearances={held!r}",
+            candidate_evidence=(
+                f"holds_clearance_or_public_trust={profile.holds_clearance_or_public_trust}"
+                if profile.holds_clearance_or_public_trust is not None
+                else None
+                if held is None
+                else f"held_clearances={held!r}"
+            ),
             posting_evidence=active.group(0),
         )
     if obtainable:
@@ -415,12 +443,8 @@ def _legacy_constraints(
         profile.remote_location_terms or [] if use_separate_remote_locations else onsite_accepted
     )
     excluded = [str(item) for item in preferences.get("excluded_location_terms", [])]
-    accepted_match = next(
-        (item for item in accepted if item.casefold() in location.casefold()), None
-    )
-    excluded_match = next(
-        (item for item in excluded if item.casefold() in location.casefold()), None
-    )
+    accepted_match = next(iter(matching_location_terms(location, accepted)), None)
+    excluded_match = next(iter(matching_location_terms(location, excluded)), None)
     allow_unknown = bool(preferences.get("include_unknown_locations", True))
     if use_separate_remote_locations and not profile.remote_location_terms:
         location_state = ConstraintState.NOT_CONFIGURED

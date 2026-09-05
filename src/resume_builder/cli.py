@@ -22,6 +22,7 @@ from . import (
     migration,
     minting,
     plans,
+    preferences,
     previewing,
     project_report,
     rendering,
@@ -72,6 +73,7 @@ COMMANDS: dict[str, Command] = {
     "match": (job_matching.main, "Audit a resume against one captured job posting"),
     "jobs": (jobs.main, "Update, inspect, and prescreen the local job inventory"),
     "onboard": (job_onboarding.main, "Continue setup and optionally configure job discovery"),
+    "preferences": (preferences.main, "Review and safely change job-screening preferences"),
     "application": (
         applications.main,
         "Record applications, outcomes, and submitted answers",

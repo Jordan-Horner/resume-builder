@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from importlib.resources import files
 from pathlib import Path
 from typing import Literal
 
@@ -190,6 +191,7 @@ class InventoryConfig(StrictModel):
     enabled: bool = True
     database_path: str = "data/inventory.db"
     board_registry_path: str | None = None
+    use_bundled_boards: bool = False
     raw_payload_retention_days: int = Field(default=30, ge=1)
     initial_lookback_days: int = Field(default=7, ge=1, le=90)
     checkpoint_overlap_hours: int = Field(default=6, ge=0, le=48)
@@ -253,10 +255,20 @@ def load_config(path: Path) -> InventoryConfig:
         config = InventoryConfig.model_validate(data)
     except ValidationError as exc:
         raise ValueError(str(exc)) from exc
-    if not config.board_registry_path:
+    if not config.board_registry_path and not config.use_bundled_boards:
         return config
-    registry_path = resolve_project_path(path, config.board_registry_path)
-    registry = load_board_registry(registry_path)
+    registry = (
+        load_board_registry(resolve_project_path(path, config.board_registry_path))
+        if config.board_registry_path
+        else BoardRegistry()
+    )
+    bundled = (
+        BoardRegistry.model_validate_json(
+            files("job_puller").joinpath("data/boards.json").read_text()
+        )
+        if config.use_bundled_boards
+        else BoardRegistry()
+    )
     provider_updates = {}
     for name in type(registry.providers).model_fields:
         settings = getattr(config.providers, name)
@@ -265,6 +277,12 @@ def load_config(path: Path) -> InventoryConfig:
         identities = [board.id.casefold() for board in combined]
         if len(set(identities)) != len(identities):
             raise ValueError(f"duplicate {name} board id across configuration and registry")
+        # Explicit local entries (including disabled ones) override bundled defaults.
+        combined.extend(
+            board
+            for board in getattr(bundled.providers, name)
+            if board.id.casefold() not in identities
+        )
         provider_updates[name] = settings.model_copy(update={"boards": combined})
     return config.model_copy(
         update={"providers": config.providers.model_copy(update=provider_updates)}

@@ -12,8 +12,8 @@ The agent is separated across three boundaries from its first release:
    uses PydanticAI with OpenRouter; application code does not import OpenRouter
    request or response types.
 2. A `CommunicationAdapter` receives normalized inbound and outbound messages.
-   The console is the first adapter. Telegram and WhatsApp can be added without
-   changing provider or tool code.
+   Console turns and a private, allowlisted Telegram channel use the same agent
+   service without changing provider or tool code.
 3. `AgentTool` exposes one explicitly named application capability. The first
    toolset is read-only and returns only content-limited scheduler status and
    sanitized new-job summaries.
@@ -59,11 +59,15 @@ not a source of career facts, application state, approvals, or schedule state.
 
 ### Cycle 4 — communication adapter and controlled notifications
 
-- a separately chosen text channel behind the existing channel contract
-- signature verification or polling controls, idempotency, and sender allowlist
+- a private Telegram channel behind the existing channel contract
+- long-polling controls, update deduplication, and sender/chat allowlists
 - approved proactive-notification templates
 - narrow application-status and resume-workflow tools
 - approval policy based on consequence, not provider confidence alone
+
+The Telegram channel and bounded conversation history are implemented. Its tool
+surface remains read-only. Proactive templates, application/resume mutation
+tools, and consequence-based approval buttons remain future work.
 
 ### Cycle 5 — application preparation
 
@@ -92,6 +96,88 @@ resume-builder agent ask "What new jobs are ready to review?"
 
 Use `--model-tier reasoning` or `--model-tier writing` only when the task needs
 the stronger configured model. The default `fast` tier minimizes routine cost.
+
+## Configure private Telegram conversations
+
+Install the optional channel dependency, then run the personal setup wizard:
+
+```bash
+python -m pip install -e ".[telegram]"
+resume-builder agent telegram-setup
+```
+
+The wizard opens Telegram Web. Scan Telegram Web's QR code with the Telegram app
+on your phone, create a private bot through the official `@BotFather`, and copy
+the returned token directly into the wizard's concealed prompt. The wizard
+validates the bot without displaying its token and stores it outside both Git
+repositories in an owner-only credential file. Setting
+`RESUME_BUILDER_TELEGRAM_BOT_TOKEN` still overrides that file for containers and
+other managed deployments.
+
+The wizard then displays a one-use pairing QR code. Scan it and tap **Start**.
+Telegram returns the random pairing value with the private message, allowing the
+wizard to configure the numeric user and chat allowlists automatically. Stale
+messages, group messages, and messages without the matching value cannot claim
+the pairing. The value expires when setup completes or times out.
+
+Setup and the running service use one exclusive lock, so setup refuses to run
+while polling is active instead of racing with live messages. Advanced users
+can still inspect pending identities without printing message text:
+
+```bash
+resume-builder agent telegram-ids
+```
+
+The resulting secret-free `agent/config.yml` channel resembles:
+
+```yaml
+schema_version: 2
+
+channels:
+  telegram:
+    enabled: true
+    token_env: RESUME_BUILDER_TELEGRAM_BOT_TOKEN
+    allowed_user_ids: [123456789]
+    allowed_chat_ids: [123456789]
+    private_chats_only: true
+    history_max_turns: 20
+```
+
+Keep the existing provider, model, routing, and limit sections unchanged. An
+empty allowlist denies every sender. Usernames are never authorization keys.
+Validate the local settings and remote bot identity, then start long polling:
+
+```bash
+resume-builder agent doctor --channel telegram
+resume-builder agent serve --channel telegram
+```
+
+Telegram conversation history is non-authoritative and stored in an external
+owner-only `agent-state.sqlite`, never in the workspace or engine repository.
+Inbound turns and reply progress are captured there before processing. The
+service resumes unfinished turns and unsent reply chunks at startup and every
+30 seconds; a turn enters model history only after its full reply is delivered.
+`/new` and `/forget` remove both retained history and queued payloads for the
+current chat. `/status` asks the existing read-only agent for automation health.
+Unauthorized messages are ignored before any model request. Operational logs
+contain neither message bodies nor credentials.
+
+For Docker, enable the opt-in Compose profile after setting the token and the
+existing workspace, runtime, and OpenRouter variables:
+
+```bash
+docker compose --profile telegram up -d telegram-agent
+```
+
+The Discord webhook remains a separate one-way notification sink; it does not
+share conversational state with Telegram.
+
+The initial private-workspace wizard now offers optional Telegram, Gmail, and
+Discord setup guidance. Existing users can reopen the same guide with:
+
+```bash
+resume-builder onboard integrations
+```
 
 OpenRouter account-level prompt logging should remain disabled. Its API-key
 budget should also be configured as a second hard boundary outside Resume
@@ -168,6 +254,13 @@ are never learned as negative rules. A configurable exploration fraction
 interleaves lower-ranked jobs so shadow evaluation can reveal useful
 opportunities that personalization would otherwise push down.
 
+Explicit preference changes use the deterministic `resume-builder preferences`
+service. An agent may translate a clear instruction into validated `set`,
+`add`, and `remove` operations, but it must present the returned impact preview
+and confirmation hash instead of editing YAML directly. The service rechecks
+local jobs only: it cannot start collection, call a model, change application
+dispositions, or delete inventory. Ignored jobs remain neutral.
+
 Configure only the safe shadow behavior in `job-search/preferences.yml`:
 
 ```yaml
@@ -192,8 +285,8 @@ provider responses.
 
 ## Continue unified onboarding
 
-Fresh workspaces use the existing workspace and hydration journey first. Once
-canonical career facts exist, `resume-builder onboard` offers optional,
+Fresh workspaces register at least one resume or career source first. Once
+source evidence exists, `resume-builder onboard` offers optional,
 resumable job-search setup. It reads all registered source snapshots, deduplicates
 identical content, proposes recent, related, and earlier search directions, and
 collects only eligibility, location, and optional compensation preferences.

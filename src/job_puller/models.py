@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
+from .compensation import extract_compensation_range
 from .work_modes import WorkArrangement, WorkMode, classify_work_arrangement
 
 
@@ -45,6 +46,13 @@ class JobObservation:
     parser_version: str = "1"
 
     def __post_init__(self) -> None:
+        if self.salary_min is None and self.salary_max is None:
+            compensation = extract_compensation_range(self.description_text)
+            if compensation is not None:
+                self.salary_min = compensation.minimum
+                self.salary_max = compensation.maximum
+                self.salary_currency = self.salary_currency or compensation.currency
+                self.salary_interval = self.salary_interval or compensation.interval
         if self.work_arrangement is None:
             self.work_arrangement = classify_work_arrangement(
                 title=self.title,

@@ -32,6 +32,11 @@ from .discovery_portfolio import (
     ColdStartPortfolio,
     ColdStartQuery,
 )
+from .integrations import (
+    integration_setup_guide,
+    interactive_integration_setup,
+    parse_integration_choices,
+)
 from .job_setup_defaults import (
     ACTIVATION_BACKUP_PATH,
     ACTIVATION_RECORD_PATH,
@@ -103,6 +108,7 @@ class EligibilityAnswers(StrictModel):
     authorized_to_work: bool | None = None
     requires_sponsorship: bool | None = None
     held_clearances: list[str] = Field(default_factory=list, max_length=10)
+    holds_clearance_or_public_trust: bool | None = None
     willing_to_obtain_clearance: bool | None = None
 
     @field_validator("intended_country")
@@ -112,6 +118,7 @@ class EligibilityAnswers(StrictModel):
 
 
 class LocationAnswers(StrictModel):
+    search_country: str | None = Field(default=None, min_length=2, max_length=100)
     accepted_work_modes: list[Literal["remote", "hybrid", "onsite"]] = Field(min_length=1)
     accepted_onsite_locations: list[str] = Field(default_factory=list, max_length=20)
     remote_location_terms: list[str] | None = Field(default=None, max_length=20)
@@ -203,8 +210,6 @@ def _load_evidence(root: Path) -> DiscoveryEvidenceSet:
     report = validate_vault(layout.root, strict=False)
     if _count(report, "registered_sources") == 0:
         raise ValueError("add one or more resumes or career sources before job-search setup")
-    if _count(report, "facts") == 0 or _count(report, "employment_files") == 0:
-        raise ValueError("finish career-vault hydration before job-search setup")
     manifest = load_manifest(layout)
     documents: list[ResumeDocument] = []
     for item in manifest["sources"]:
@@ -221,10 +226,13 @@ def _role_id(title: str, lane: ColdStartLane) -> str:
 
 
 def _role_proposals(evidence: DiscoveryEvidenceSet) -> list[RoleProposal]:
-    titles = extract_title_seed(evidence.documents)
+    try:
+        titles = extract_title_seed(evidence.documents)
+    except ValueError:
+        titles = None
     expansion = extract_query_expansion_set(evidence.documents)
     proposals: list[RoleProposal] = []
-    for title in titles.historical_titles[: MAX_TOTAL_QUERIES - 6]:
+    for title in (titles.historical_titles if titles else [])[: MAX_TOTAL_QUERIES - 6]:
         current = title.state == HistoricalTitleState.ACTIVE
         proposals.append(
             RoleProposal(
@@ -266,7 +274,12 @@ def save_state(root: Path, state: JobSearchSetupState) -> None:
     atomic_write_text(root / SETUP_PATH, state.model_dump_json(indent=2) + "\n")
 
 
-def start_setup(root: Path, *, restart: bool = False) -> JobSearchSetupState:
+def start_setup(
+    root: Path,
+    *,
+    restart: bool = False,
+    additional_roles: Sequence[RoleProposal] = (),
+) -> JobSearchSetupState:
     scaffold_job_search(root)
     existing = load_state(root)
     if existing is not None and existing.status == SetupStatus.ACTIVE and restart:
@@ -282,8 +295,11 @@ def start_setup(root: Path, *, restart: bool = False) -> JobSearchSetupState:
             )
     evidence = _load_evidence(root)
     roles = _role_proposals(evidence)
-    if not roles:
-        raise ValueError("no structured employment titles were found in the registered sources")
+    existing_titles = {item.title.casefold().strip() for item in roles}
+    for role in additional_roles:
+        if role.title.casefold().strip() not in existing_titles:
+            roles.append(role)
+            existing_titles.add(role.title.casefold().strip())
     timestamp = _now()
     state = JobSearchSetupState(
         session_id=str(uuid.uuid4()),
@@ -316,11 +332,17 @@ def _update_roles(state: JobSearchSetupState, answer: dict[str, Any]) -> None:
         )
         for item in state.roles
     ]
-    if not isinstance(additions, list) or any(not isinstance(item, str) for item in additions):
+    if not isinstance(additions, list):
         raise ValueError("roles answer add must be a list of titles")
     existing = {item.title.casefold().strip() for item in state.roles}
     for value in additions:
-        title = value.strip()
+        if isinstance(value, str):
+            title, intent = value.strip(), RoleIntent.SEARCH
+        elif isinstance(value, dict) and isinstance(value.get("title"), str):
+            title = value["title"].strip()
+            intent = RoleIntent(value.get("intent", "search"))
+        else:
+            raise ValueError("each added role must contain a title")
         if len(title) < 2 or title.casefold() in existing:
             continue
         state.roles.append(
@@ -328,7 +350,7 @@ def _update_roles(state: JobSearchSetupState, answer: dict[str, Any]) -> None:
                 role_id=_role_id(title, ColdStartLane.ADJACENT_TITLE),
                 title=title,
                 group=RoleGroup.RELATED,
-                intent=RoleIntent.SEARCH,
+                intent=intent,
                 lane=ColdStartLane.ADJACENT_TITLE,
                 source_ids=["user-confirmed-setup"],
                 reason="Added explicitly during job-search setup.",
@@ -363,6 +385,13 @@ def apply_answer(root: Path, payload: JobSearchSetupAnswer) -> JobSearchSetupSta
         raise ValueError(f"job-search setup is {state.status.value}, not accepting answers")
     if payload.session_id != state.session_id:
         raise ValueError("answer session ID does not match the current setup")
+    if (
+        payload.step == SetupStep.LOCATION
+        and state.step == SetupStep.ELIGIBILITY
+        and payload.answer.get("search_country")
+    ):
+        # The portal combines search country and location; the CLI retains eligibility.
+        state.step = SetupStep.LOCATION
     if payload.step != state.step:
         raise ValueError(f"answer is for {payload.step.value}; current step is {state.step.value}")
 
@@ -372,6 +401,13 @@ def apply_answer(root: Path, payload: JobSearchSetupAnswer) -> JobSearchSetupSta
         state.eligibility = EligibilityAnswers.model_validate(payload.answer)
     elif state.step == SetupStep.LOCATION:
         state.location = LocationAnswers.model_validate(payload.answer)
+        if state.location.search_country is not None:
+            country = EligibilityAnswers(intended_country=state.location.search_country)
+            state.eligibility = (
+                state.eligibility.model_copy(update={"intended_country": country.intended_country})
+                if state.eligibility
+                else country
+            )
     elif state.step == SetupStep.COMPENSATION:
         state.compensation = CompensationAnswers.model_validate(payload.answer)
     elif state.step == SetupStep.REVIEW:
@@ -488,6 +524,7 @@ def _compile_setup(root: Path, state: JobSearchSetupState) -> None:
             "authorized_to_work": state.eligibility.authorized_to_work,
             "requires_sponsorship": state.eligibility.requires_sponsorship,
             "held_clearances": state.eligibility.held_clearances,
+            "holds_clearance_or_public_trust": state.eligibility.holds_clearance_or_public_trust,
             "willing_to_obtain_clearance": state.eligibility.willing_to_obtain_clearance,
             "remote_location_terms": state.location.remote_location_terms,
         }
@@ -871,6 +908,13 @@ def _parser() -> argparse.ArgumentParser:
     actions = parser.add_subparsers(dest="action")
     actions.add_parser("status")
     actions.add_parser("run", help="Walk through setup interactively in a terminal")
+    integrations = actions.add_parser(
+        "integrations", help="Choose and review optional integration setup"
+    )
+    integrations.add_argument(
+        "--select",
+        help="Noninteractive comma-separated selection: telegram, gmail, discord, all, or none",
+    )
     actions.add_parser("start")
     actions.add_parser("restart", help="Rebuild an unfinished setup from current career sources")
     answer = actions.add_parser("answer")
@@ -1009,6 +1053,24 @@ def main(argv: Sequence[str] | None = None) -> int:
             result = onboarding_status(root)
         elif action == "run":
             result = interactive_run(root)
+        elif action == "integrations":
+            if args.json and args.select is None:
+                raise ValueError("--json requires integrations --select")
+            guide = (
+                integration_setup_guide(parse_integration_choices(args.select), root)
+                if args.select is not None
+                else interactive_integration_setup(root)
+            )
+            result = {
+                "schema_version": 1,
+                "kind": "integration_setup",
+                "user_handoff": {
+                    "required": True,
+                    "action": "present-integration-setup",
+                    "presentation_policy": PRESENTATION_POLICY,
+                    "rendered_markdown": guide,
+                },
+            }
         elif action == "start":
             result = structured_output(start_setup(root))
         elif action == "restart":

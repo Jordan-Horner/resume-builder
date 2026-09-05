@@ -147,6 +147,7 @@ def test_job_setup_saves_inactive_configuration_then_activates(tmp_path: Path) -
                 "authorized_to_work": True,
                 "requires_sponsorship": False,
                 "held_clearances": [],
+                "holds_clearance_or_public_trust": True,
                 "willing_to_obtain_clearance": False,
             },
         ),
@@ -173,6 +174,7 @@ def test_job_setup_saves_inactive_configuration_then_activates(tmp_path: Path) -
     preferences = yaml.safe_load((root / "job-search" / "preferences.yml").read_text())
     assert preferences["accepted_work_modes"] == ["remote", "hybrid"]
     assert preferences["screening_profile"]["authorized_to_work"] is True
+    assert preferences["screening_profile"]["holds_clearance_or_public_trust"] is True
 
     preview = activation_preview(root)
     assert preview["scan_started"] is False
