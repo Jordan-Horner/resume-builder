@@ -249,8 +249,24 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
 .detail-close { float: right; border: 0; background: #30363d; border-radius: 50%; width: 30px; height: 30px; cursor: pointer; font-size: 19px; line-height: 1; }
 .job-detail h2 { font-family: "Avenir Next", Avenir, sans-serif; font-size: 23px; line-height: 1.18; letter-spacing: -.025em; margin: 4px 36px 4px 0; }
 .detail-company { font-size: 14px; font-weight: 600; margin: 0; }
-.detail-tags { display: flex; flex-wrap: wrap; gap: 7px; margin: 18px 0; }
-.detail-tags span { padding: 5px 8px; background: #30363d; color: #c9d1d9; border-radius: 5px; font-size: 11px; }
+.detail-tags { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 7px; margin: 18px 0; }
+.detail-tags > span { min-height: 28px; display: inline-flex; align-items: center; padding: 5px 8px; background: #30363d; color: #c9d1d9; border-radius: 5px; font-size: 11px; }
+.salary-request, .salary-result { position: relative; min-width: 0; max-width: 100%; font-size: 11px; }
+.salary-tag-button, .salary-result > summary { min-height: 28px; border: 1px dashed #484f58; border-radius: 5px; background: transparent; color: var(--muted); font: inherit; line-height: 1; }
+.salary-tag-button { display: inline-flex; align-items: center; gap: 7px; padding: 5px 8px; cursor: pointer; }
+.salary-tag-button:hover { border-color: #58a6ff; background: var(--accent-soft); }
+.salary-tag-action { color: #79c0ff; font-weight: 700; }
+.estimate-salary-button:disabled { opacity: .65; cursor: wait; }
+.salary-result > summary { display: flex; align-items: center; gap: 4px; padding: 5px 7px; border-style: solid; border-color: #1f6feb; background: var(--accent-soft); color: #c9d1d9; cursor: pointer; list-style: none; white-space: nowrap; }
+.salary-result > summary::-webkit-details-marker { display: none; }
+.salary-result-prefix { color: #79c0ff; font-weight: 700; }
+.salary-result-confidence { margin-left: 3px; padding-left: 7px; border-left: 1px solid #388bfd66; color: #8b949e; font-size: 10px; }
+.salary-result-popover { position: absolute; z-index: 5; top: calc(100% + 7px); left: 0; width: min(390px, calc(100vw - 52px)); padding: 12px 14px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-raised); box-shadow: 0 12px 30px #01040999; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.salary-result-popover strong { color: #c9d1d9; }
+.salary-result-popover p { margin: 6px 0 0; overflow-wrap: anywhere; }
+.salary-result-popover ul { padding-left: 18px; margin: 6px 0 0; }
+.salary-result-unavailable > summary { border-color: #484f58; background: transparent; color: var(--muted); }
+.salary-request-error { position: absolute; z-index: 5; top: calc(100% + 7px); left: 0; width: min(340px, calc(100vw - 52px)); margin: 0; padding: 9px 11px; border: 1px solid #f8514966; border-radius: 7px; background: #2d1518; color: #ffb3ad; box-shadow: 0 10px 24px #01040980; font-size: 12px; line-height: 1.4; }
 .job-description { color: #c9d1d9; line-height: 1.7; font-size: 15px; padding: 20px 26px 28px; overflow: auto; overscroll-behavior: contain; }
 .job-description p:first-child { margin-top: 0; }
 .job-description p { max-width: 72ch; }

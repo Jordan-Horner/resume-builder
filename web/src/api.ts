@@ -1,4 +1,4 @@
-import type { Application, CareerSkill, Integration, Job, JobFilters, OnboardingStatus, ResumeLibrary, ResumeRecommendation, SearchPreferences } from "./types";
+import type { Application, CareerSkill, Integration, Job, JobFilters, OnboardingStatus, ResumeLibrary, ResumeRecommendation, SalaryEstimateResult, SearchPreferences } from "./types";
 
 export interface UpdateStatus {
   version: string;
@@ -50,6 +50,10 @@ export async function getJobs(filters: JobFilters): Promise<{ jobs: Job[]; count
 
 export function markJobNotInterested(jobId: string): Promise<void> {
   return request(`/api/jobs/${encodeURIComponent(jobId)}/not-interested`, { method: "POST" });
+}
+
+export function estimateJobSalary(jobId: string): Promise<SalaryEstimateResult> {
+  return request(`/api/jobs/${encodeURIComponent(jobId)}/estimate-salary`, { method: "POST" });
 }
 
 export function markJobApplied(jobId: string): Promise<unknown> {

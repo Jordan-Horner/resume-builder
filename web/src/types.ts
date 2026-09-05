@@ -41,6 +41,25 @@ export interface Job {
   url: string | null;
 }
 
+export interface SalaryEstimateResult {
+  status: "posted" | "estimated" | "unavailable";
+  job_id: string;
+  cached: boolean;
+  posted_salary: Pick<Job, "salary_min" | "salary_max" | "salary_currency" | "salary_interval"> | null;
+  estimate: {
+    status: "estimated" | "unavailable";
+    minimum: number | null;
+    maximum: number | null;
+    currency: string | null;
+    period: "year" | "hour" | null;
+    confidence: "low" | "medium" | "none";
+    reasoning: string;
+    company_basis: string;
+    assumptions: string[];
+    related_job_ids: string[];
+  } | null;
+}
+
 export interface ApplicationEvent {
   id: string;
   status: string;

@@ -241,8 +241,12 @@ career-fit judgments. Screening caches containing salary context expire after
 ### Request an estimate from the dashboard API
 
 `POST /api/jobs/{job_id}/estimate-salary` explicitly requests an estimate using
-the configured fast model and provider credentials. No frontend button is wired
-yet. The route requires no request body; `?refresh=true` deliberately bypasses
+the configured fast model and provider credentials. An **Estimate Salary** button
+appears beside location and work mode in the opened job description when both
+posted bounds are missing. It runs only on click, shows progress and retryable
+errors, and labels successful estimates with confidence and expandable reasoning.
+Unavailable results explain the evidence gap. The main job list stays unchanged.
+The route requires no request body; `?refresh=true` deliberately bypasses
 the cache. Its JSON response contains `status` (`posted`, `estimated` or
 `unavailable`), `job_id`, `posted_salary`, `estimate`, `model`, `generated_at`,
 `input_hash`, `method_version`, `related_postings` and `cached`.

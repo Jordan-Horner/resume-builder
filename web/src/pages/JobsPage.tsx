@@ -3,6 +3,7 @@ import { activateJobSearch, getJobs, getResumeRecommendation, markJobApplied, ma
 import { ArrowIcon, EmptyState, ErrorMessage, LoadingRows, SearchIcon } from "../components";
 import { EMPTY_FILTERS, persistView, restoreView } from "../viewPreferences";
 import { JobViewFilters } from "../JobViewFilters";
+import { JobSalary } from "../components/JobSalary";
 import type { Job, JobFilters, ResumeRecommendation, SearchPreferences, ViewFilters } from "../types";
 
 
@@ -352,7 +353,7 @@ export function JobsPage() {
               <div className="detail-tags">
                 <span>{modeLabel(selected.work_modes)}</span>
                 <span>{selected.location}</span>
-                {formatSalary(selected) && <span>{formatSalary(selected)}</span>}
+                {formatSalary(selected) ? <span>{formatSalary(selected)}</span> : <JobSalary key={selected.id} job={selected} />}
               </div>
               {resumeRecommendation?.recommended_resume && <div className="resume-recommendation">
                 <span>Recommended resume</span>

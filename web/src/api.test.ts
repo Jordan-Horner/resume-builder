@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getJobs,
+  estimateJobSalary,
   getOnboardingStatus,
   getSystemStatus,
   getScrapeSchedule,
@@ -37,6 +38,7 @@ describe("dashboard API client", () => {
   it.each([
     ["not interested", markJobNotInterested, "/api/jobs/job-1/not-interested"],
     ["applied", markJobApplied, "/api/jobs/job-1/applied"],
+    ["estimate salary", estimateJobSalary, "/api/jobs/job-1/estimate-salary"],
   ])("posts an explicit %s disposition", async (_label, action, endpoint) => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({}), {

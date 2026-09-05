@@ -11,7 +11,7 @@ vi.mock("./api", () => ({
   getJobFilterDefaults: vi.fn(), getSearchPreferences: vi.fn(), getBlockedCompanies: vi.fn(),
   getJobs: vi.fn(), getResumeRecommendation: vi.fn(), markJobApplied: vi.fn(),
   markJobNotInterested: vi.fn(), setCompanyBlocked: vi.fn(), activateJobSearch: vi.fn(),
-  getJobSources: vi.fn(), startJobScan: vi.fn(),
+  getJobSources: vi.fn(), startJobScan: vi.fn(), estimateJobSalary: vi.fn(),
 }));
 const job: Job = { id: "one", title: "Support Engineer", company: "Example", location: "Remote", employment_type: "fulltime", salary_min: null, salary_max: null, salary_currency: null, salary_interval: null, posted_at: null, first_seen_at: null, description: "Support customers", work_modes: ["remote"], providers: [], url: null };
 let root: Root;
@@ -32,6 +32,9 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); });
 async function click(text: string) {
   await act(async () => [...host.querySelectorAll("button")].find((button) => button.textContent === text)?.click());
+}
+async function clickSalaryEstimate() {
+  await act(async () => (host.querySelector(".estimate-salary-button") as HTMLButtonElement)?.click());
 }
 async function openJob() {
   await act(async () => root.render(<JobsPage />));
@@ -63,4 +66,72 @@ it("retries a failed refresh without repeating the successful mutation", async (
   await click("Try again");
   expect(api.markJobApplied).toHaveBeenCalledTimes(1);
   expect(host.textContent).toContain("Build your job queue");
+});
+
+it("offers salary estimation only inside the opened job description", async () => {
+  await act(async () => root.render(<JobsPage />));
+  expect(host.textContent).not.toContain("Estimate Salary");
+  expect(api.estimateJobSalary).not.toHaveBeenCalled();
+  await act(async () => (host.querySelector(".job-row") as HTMLButtonElement).click());
+  expect(host.querySelector(".job-detail .detail-tags")?.textContent).toContain("Estimate Salary");
+  expect(api.estimateJobSalary).not.toHaveBeenCalled();
+});
+
+it.each([{ salary_min: 80000, salary_max: null }, { salary_min: null, salary_max: 100000 }])("keeps posted partial pay instead of offering an estimate: %j", async (pay) => {
+  vi.mocked(api.getJobs).mockResolvedValue({ jobs: [{ ...job, ...pay }], count: 1, reviewable_count: 1 });
+  await openJob();
+  expect(host.textContent).not.toContain("Estimate Salary");
+  expect(api.estimateJobSalary).not.toHaveBeenCalled();
+});
+
+const estimatedSalary = {
+  status: "estimated" as const, job_id: "one", cached: false, posted_salary: null,
+  estimate: { status: "estimated" as const, minimum: 80000, maximum: 110000, currency: "USD", period: "year" as const, confidence: "low" as const, reasoning: "Based on similar support roles.", company_basis: "Company pay policy unknown.", assumptions: ["Base salary only."], related_job_ids: [] },
+};
+
+it("requests salary on click, prevents duplicates and labels the result as estimated", async () => {
+  let resolve!: (value: typeof estimatedSalary) => void;
+  vi.mocked(api.estimateJobSalary).mockImplementation(() => new Promise((done) => { resolve = done; }));
+  await openJob();
+  await clickSalaryEstimate();
+  expect(api.estimateJobSalary).toHaveBeenCalledWith("one");
+  const pending = host.querySelector(".estimate-salary-button") as HTMLButtonElement;
+  expect(pending.disabled).toBe(true);
+  await act(async () => pending.click());
+  expect(api.estimateJobSalary).toHaveBeenCalledTimes(1);
+  await act(async () => resolve(estimatedSalary));
+  expect(host.querySelector(".job-detail")?.textContent).toContain("Est. $80K–$110K / year");
+  expect(host.textContent).toContain("Not employer-confirmed");
+  expect(host.textContent).toContain("Low confidence");
+  expect(job.salary_min).toBeNull();
+});
+
+it("shows provider errors and supports retry", async () => {
+  vi.mocked(api.estimateJobSalary).mockRejectedValueOnce(new Error("Configure an AI provider in Settings."));
+  await openJob();
+  await clickSalaryEstimate();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain("Configure an AI provider");
+  vi.mocked(api.estimateJobSalary).mockResolvedValue(estimatedSalary);
+  await clickSalaryEstimate();
+  expect(host.textContent).toContain("Est. $80K–$110K / year");
+});
+
+it("explains unavailable estimates", async () => {
+  vi.mocked(api.estimateJobSalary).mockResolvedValue({ status: "unavailable", job_id: "one", cached: false, posted_salary: null, estimate: null });
+  await openJob();
+  await clickSalaryEstimate();
+  expect(host.textContent).toContain("Estimate unavailable");
+  expect(host.textContent).toContain("enough information");
+});
+
+it("does not show a late estimate on a different job", async () => {
+  let resolve!: (value: typeof estimatedSalary) => void;
+  vi.mocked(api.estimateJobSalary).mockImplementation(() => new Promise((done) => { resolve = done; }));
+  vi.mocked(api.getJobs).mockResolvedValue({ jobs: [job, { ...job, id: "two", title: "Another job" }], count: 2, reviewable_count: 2 });
+  await openJob();
+  await clickSalaryEstimate();
+  await act(async () => (host.querySelectorAll(".job-row")[1] as HTMLButtonElement).click());
+  await act(async () => resolve(estimatedSalary));
+  expect(host.querySelector(".job-detail")?.textContent).not.toContain("Est. $");
+  expect(host.querySelector(".job-detail")?.textContent).toContain("Estimate Salary");
 });
