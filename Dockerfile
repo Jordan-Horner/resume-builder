@@ -8,6 +8,16 @@ RUN npm run build
 
 FROM python:3.12-slim
 
+ARG BUILD_REVISION=development
+ARG BUILD_DATE=
+ARG BUILD_CHANNEL=development
+LABEL org.opencontainers.image.source="https://github.com/Jordan-Horner/resume-builder" \
+    org.opencontainers.image.revision=$BUILD_REVISION \
+    org.opencontainers.image.created=$BUILD_DATE
+ENV RESUME_BUILDER_BUILD_REVISION=$BUILD_REVISION \
+    RESUME_BUILDER_BUILD_DATE=$BUILD_DATE \
+    RESUME_BUILDER_BUILD_CHANNEL=$BUILD_CHANNEL
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     RESUME_BUILDER_WORKSPACE=/workspace \

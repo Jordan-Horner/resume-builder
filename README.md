@@ -25,6 +25,9 @@ and integration setup guidance. Automatic job submission remains future work.
 
 ## What it can do
 
+For registry-based Docker deployment, image publication, update notices, and
+host-managed backup/rollback, see [Container deployment](docs/container-deployment.md).
+
 - Import multiple resumes and consolidate durable career evidence.
 - Build directional and job-tailored resumes with source-backed claims.
 - Check ATS readability, keyword retrieval, page limits, and PDF extraction.

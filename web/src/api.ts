@@ -1,5 +1,18 @@
 import type { Application, Integration, Job, JobFilters, OnboardingStatus } from "./types";
 
+export interface UpdateStatus {
+  version: string;
+  revision: string;
+  channel: string;
+  built_at: string;
+  status: "development" | "up_to_date" | "update_available" | "ahead" | "unavailable";
+  latest_revision: string | null;
+  release_url: string;
+  last_success_at: string | null;
+  message: string;
+}
+export function getUpdateStatus(): Promise<UpdateStatus> { return request("/api/system/version"); }
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   if (!response.ok) {

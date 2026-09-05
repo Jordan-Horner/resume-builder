@@ -5,6 +5,7 @@ import { JobsPage } from "./pages/JobsPage";
 import { OnboardingPage } from "./pages/OnboardingPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import type { OnboardingStatus } from "./types";
+import { UpdateNotice, UpdateProvider } from "./updates";
 
 type Route = "jobs" | "applications" | "settings";
 const ROUTES: Route[] = ["jobs", "applications", "settings"];
@@ -55,7 +56,7 @@ export function App() {
   }
 
   return (
-    <div className="app-shell">
+    <UpdateProvider><div className="app-shell">
       <header className="topbar">
         <button className="brand" onClick={() => navigate("jobs")} aria-label="Go to jobs">
           <span className="brand-mark" aria-hidden="true">RB</span>
@@ -71,6 +72,7 @@ export function App() {
               {item === "jobs" ? "Jobs" : item[0].toUpperCase() + item.slice(1)}
             </button>
           ))}
+          <UpdateNotice />
         </nav>
       </header>
       <main>
@@ -78,6 +80,6 @@ export function App() {
         {route === "applications" && <ApplicationsPage />}
         {route === "settings" && <SettingsPage />}
       </main>
-    </div>
+    </div></UpdateProvider>
   );
 }

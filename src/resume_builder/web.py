@@ -19,9 +19,16 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         ) from exc
 
     service = DashboardService(workspace)
+    from .updates import UpdateChecker
+
+    updates = UpdateChecker()
     from .web_job_sources import source_status, start_scan, toggle_source
 
     app = FastAPI(title="Resume Builder", docs_url="/api/docs", redoc_url=None)
+
+    @app.get("/api/system/version")
+    def system_version() -> dict[str, Any]:
+        return updates.status()
 
     @app.get("/api/onboarding")
     def onboarding() -> dict[str, Any]:

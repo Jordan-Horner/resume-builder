@@ -1,0 +1,10 @@
+# Optional read-only GitHub credential, kept on the host outside the repository.
+services:
+  onboarding:
+    environment:
+      RESUME_BUILDER_UPDATE_TOKEN_FILE: /run/secrets/update-token
+    secrets:
+      - update-token
+secrets:
+  update-token:
+    file: ${RESUME_BUILDER_UPDATE_TOKEN_PATH:?Set an absolute path to a read-only GitHub token file}

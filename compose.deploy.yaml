@@ -1,0 +1,29 @@
+# Registry deployment. Local development remains in compose.onboarding.yaml.
+services:
+  onboarding:
+    image: ghcr.io/jordan-horner/resume-builder:${RESUME_BUILDER_IMAGE_TAG:-main}
+    restart: unless-stopped
+    entrypoint: ["onboarding-web-entrypoint"]
+    environment:
+      RESUME_BUILDER_WORKSPACE: /onboarding/workspace
+      RESUME_BUILDER_WEB_PORT: 8765
+      TZ: ${RESUME_BUILDER_TIMEZONE:-America/New_York}
+    ports:
+      - "127.0.0.1:${RESUME_BUILDER_ONBOARDING_PORT:-8767}:8765"
+    volumes:
+      - onboarding-workspace:/onboarding
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/api/onboarding', timeout=5)"]
+      interval: 15s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  onboarding-workspace:
+    name: resume-builder-onboarding-workspace

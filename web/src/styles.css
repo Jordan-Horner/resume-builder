@@ -23,6 +23,22 @@
   --shadow: none;
 }
 
+.update-indicator { display: inline-flex; align-items: center; gap: 7px; color: var(--warning); font-size: 12px; text-decoration: none; min-height: 44px; }
+.update-indicator:hover { color: var(--ink); }
+.update-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warning); flex-shrink: 0; }
+.about-links a { color: var(--accent); }
+.update-dismissal { font-size: 13px; color: var(--muted); margin-top: 24px; }
+.about-details { margin: 24px 0; }
+.about-details > div { display: grid; grid-template-columns: minmax(140px, 1fr) 2fr; gap: 16px; padding: 16px 0; border-top: 1px solid var(--line); }
+.about-details dt, .update-help { color: var(--muted); }
+.about-details dd { margin: 0; overflow-wrap: anywhere; }
+.version-status { display: inline-block; margin-left: 8px; padding: 3px 8px; border-radius: 5px; background: var(--surface-raised); font-size: 12px; }
+.version-status.update_available { color: var(--warning); }
+.version-status.up_to_date { color: var(--success); }
+.about-links { display: flex; gap: 24px; flex-wrap: wrap; }
+@media (max-width: 900px) { .update-label { display: none; } .topbar nav { column-gap: 10px; } .update-indicator { min-width: 28px; justify-content: center; } }
+@media (max-width: 600px) { .about-details > div { grid-template-columns: 1fr; gap: 6px; } }
+
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; min-height: 100vh; }
 button, input, select { font: inherit; }
@@ -246,8 +262,11 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
 .action-notice { margin: 0 0 12px; padding: 10px 13px; border: 1px solid #2ea043; border-radius: 10px; background: var(--success-soft); color: #aff5b4; font-size: 13px; }
 
 @media (min-width: 901px) {
+  .app-shell:has(.jobs-page) { height: 100vh; display: flex; flex-direction: column; }
+  .app-shell:has(.jobs-page) > .topbar { flex-shrink: 0; }
+  .app-shell:has(.jobs-page) > main { flex: 1; min-height: 0; }
   .jobs-page {
-    height: calc(100vh - 64px);
+    height: 100%;
     padding-top: 18px;
     padding-bottom: 14px;
     display: grid;

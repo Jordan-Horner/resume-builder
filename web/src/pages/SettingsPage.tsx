@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getBlockedCompanies, setCompanyBlocked } from "../api";
 import { IntegrationsSection } from "./IntegrationsPage";
 import { JobSources } from "./JobSources";
+import { AboutSection } from "../updates";
 import { SETTINGS_SECTIONS, SETTINGS_SECTION_KEY, resolveSettingsSection } from "../settingsNavigation";
 
 export function SettingsPage() {
@@ -27,6 +28,7 @@ export function SettingsPage() {
       {section === "scrapers" && <JobSources />}
       {section === "integrations" && <IntegrationsSection />}
       {section === "blocked-companies" && <BlockedCompaniesSection />}
+      {section === "about" && <AboutSection />}
     </div>
     </div>
   </div>;

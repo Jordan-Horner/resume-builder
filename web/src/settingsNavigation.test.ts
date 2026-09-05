@@ -7,6 +7,7 @@ describe("Settings section routing", () => {
     expect(resolveSettingsSection("/settings", "blocked-companies")).toBe("blocked-companies");
   });
   it("honors deep links over previous section", () => {
+    expect(resolveSettingsSection("/settings/about", "scrapers")).toBe("about");
     expect(resolveSettingsSection("/settings/integrations", "scrapers")).toBe("integrations");
     expect(resolveSettingsSection("/settings/blocked-companies", null)).toBe("blocked-companies");
   });
