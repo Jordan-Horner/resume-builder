@@ -491,15 +491,21 @@ def test_search_preferences_update_preserves_providers_and_manual_families(tmp_p
     service.answer_preference_step("compensation", {"skipped": True})
     service.answer_preference_step("review", {"action": "save"})
     config_path = root / "job-search/config/search.yml"
-    config = config_path.read_text(encoding="utf-8")
-    config = config.replace(
-        "providers: {}",
-        "providers:\n  linkedin:\n    enabled: false",
-    ).replace(
-        "  families:\n",
-        "  families:\n  - name: manual-sre\n    enabled: true\n    titles:\n    - Site Reliability Engineer\n",
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config.setdefault("providers", {}).setdefault("linkedin", {})["enabled"] = False
+    config["search"]["families"].insert(
+        0,
+        {
+            "name": "manual-sre",
+            "enabled": True,
+            "titles": ["Site Reliability Engineer"],
+        },
     )
-    config_path.write_text(config, encoding="utf-8")
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+    starting_config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    assert starting_config["providers"]["linkedin"]["enabled"] is False
+    assert starting_config["search"]["families"][0]["name"] == "manual-sre"
 
     current = service.job_search_preferences()
     updated = service.update_job_search_preferences(
@@ -579,3 +585,68 @@ def test_skipping_onboarding_is_persistent(tmp_path):
         DashboardService(root, inventory_loader=lambda: []).onboarding_status()["needs_onboarding"]
         is False
     )
+
+
+def test_revisit_suggestion_choice_preserves_session_and_answers(tmp_path):
+    root = _fresh_workspace(tmp_path)
+    service = DashboardService(root, inventory_loader=lambda: [])
+    service.import_resume("resume.md", b"# Experience\n\nSupported production systems.\n")
+    first = service.start_preference_setup(use_ai=False)
+    service.answer_preference_step("roles", {"titles": ["Support Engineer"]})
+    service.answer_preference_step(
+        "location", {"search_country": "Canada", "accepted_work_modes": ["remote"]}
+    )
+    service.answer_preference_step("compensation", {"skipped": True})
+    service.previous_preference_step()
+    service.previous_preference_step()
+    service.previous_preference_step()
+    back = service.previous_preference_step()
+    assert back["step"] == "ai_choice"
+    reloaded = DashboardService(root, inventory_loader=lambda: [])
+    assert reloaded.onboarding_status()["step"] == "ai_choice"
+    resumed = reloaded.start_preference_setup(use_ai=False)
+    assert resumed["step"] == "roles"
+    assert resumed["setup"]["session_id"] == first["setup"]["session_id"]
+    assert resumed["setup"]["eligibility"]["intended_country"] == "Canada"
+    assert resumed["setup"]["compensation"]["skipped"] is True
+    assert any(role["title"] == "Support Engineer" for role in resumed["setup"]["roles"])
+
+
+def test_role_preview_uses_shared_identity_and_live_skill_capacity(tmp_path):
+    from resume_builder.discovery_portfolio import ColdStartPortfolio, ColdStartQuery
+    from resume_builder.job_setup_defaults import PORTFOLIO_PATH
+
+    root = _fresh_workspace(tmp_path)
+    service = DashboardService(root, inventory_loader=lambda: [])
+    portfolio = ColdStartPortfolio(
+        generated_at="2026-09-05T00:00:00+00:00",
+        resume_hash="test",
+        queries=[
+            ColdStartQuery(
+                query_id="skill-one",
+                lane="capability_combination",
+                query="Python",
+                source_ids=["vault:skill-one"],
+                reason="Confirmed skill",
+            )
+        ],
+    )
+    path = root / PORTFOLIO_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(portfolio.model_dump_json(), encoding="utf-8")
+    for scope in ("onboarding", "settings"):
+        result = service.preview_role_titles(
+            {
+                "scope": scope,
+                "titles": [" Support   Engineer ", "support-engineer"],
+            }
+        )
+        assert result["titles"] == ["Support Engineer"]
+        assert result["remaining"] == 20
+        with pytest.raises(ValueError, match="roles and skills"):
+            service.preview_role_titles(
+                {"scope": scope, "titles": [f"Role {n}" for n in range(22)]}
+            )
+        assert (
+            service.preview_role_titles({"scope": scope, "titles": ["Python"]})["remaining"] == 21
+        )

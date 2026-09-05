@@ -31,9 +31,10 @@ function dateLabel(value: string | null, timezone: string): string {
 }
 
 function ScheduleEditor() {
+  const [retry, setRetry] = useState(0);
   const [saved, setSaved] = useState<ScrapeSchedule | null>(null);
-  const [enabled, setEnabled] = useState(true);
-  const [times, setTimes] = useState<string[]>(PRESETS.once);
+  const [enabled, setEnabled] = useState(false);
+  const [times, setTimes] = useState<string[]>([]);
   const [frequency, setFrequency] = useState<Frequency>("once");
   const [newTime, setNewTime] = useState("12:00");
   const [busy, setBusy] = useState(false);
@@ -42,6 +43,7 @@ function ScheduleEditor() {
 
   useEffect(() => {
     let active = true;
+    setError("");
     getScrapeSchedule().then((result) => {
       if (!active) return;
       setSaved(result);
@@ -52,7 +54,7 @@ function ScheduleEditor() {
       if (active) setError(reason instanceof Error ? reason.message : "Could not load scrape schedule");
     });
     return () => { active = false; };
-  }, []);
+  }, [retry]);
 
   function chooseFrequency(next: Frequency) {
     setFrequency(next);
@@ -65,6 +67,7 @@ function ScheduleEditor() {
   }
 
   async function save() {
+    if (!saved || busy) return;
     setBusy(true);
     setError("");
     setNotice("");
@@ -83,6 +86,7 @@ function ScheduleEditor() {
   }
 
   async function toggleAutomation(next: boolean) {
+    if (!saved || busy) return;
     const previous = enabled;
     setEnabled(next);
     setBusy(true);
@@ -103,6 +107,8 @@ function ScheduleEditor() {
     }
   }
 
+  if (!saved) return <section className="scrape-schedule"><h2>Automatic scraping</h2>{error ? <p role="alert">{error} <button onClick={() => setRetry((value) => value + 1)}>Retry schedule</button></p> : <p role="status">Loading schedule…</p>}</section>;
+
   const changed = saved
     ? enabled !== saved.enabled || times.join(",") !== saved.times.join(",")
     : true;
@@ -111,13 +117,13 @@ function ScheduleEditor() {
       <div><h2 id="scrape-schedule-title">Automatic scraping</h2><p>Keep your job queue fresh without starting each search yourself.</p></div>
       <label className="source-toggle"><span>{enabled ? "On" : "Off"}</span><input type="checkbox" role="switch" aria-label="Automatic scraping" checked={enabled} disabled={busy} onChange={(event) => void toggleAutomation(event.target.checked)} /></label>
     </div>
-    <div className={enabled ? "schedule-controls" : "schedule-controls disabled"} aria-disabled={!enabled}>
+    <div className={enabled ? "schedule-controls" : "schedule-controls disabled"} aria-disabled={!enabled || busy}>
       <div><span className="schedule-label">How often</span><div className="schedule-presets" role="group" aria-label="Scrape frequency">
-        {(["once", "twice", "custom"] as Frequency[]).map((item) => <button key={item} type="button" className={frequency === item ? "active" : ""} disabled={!enabled} onClick={() => chooseFrequency(item)}>{item === "once" ? "Once daily" : item === "twice" ? "Twice daily" : "Custom"}</button>)}
+        {(["once", "twice", "custom"] as Frequency[]).map((item) => <button key={item} type="button" className={frequency === item ? "active" : ""} disabled={!enabled || busy} onClick={() => chooseFrequency(item)}>{item === "once" ? "Once daily" : item === "twice" ? "Twice daily" : "Custom"}</button>)}
       </div></div>
       <div><span className="schedule-label">Run at</span><div className="schedule-times">
-        {times.map((value) => <span className="time-chip" key={value}>{clockLabel(value)}{frequency === "custom" && times.length > 1 && <button type="button" aria-label={`Remove ${clockLabel(value)}`} disabled={!enabled} onClick={() => setTimes(times.filter((item) => item !== value))}>×</button>}</span>)}
-        {frequency === "custom" && <span className="add-time"><input aria-label="New scrape time" type="time" value={newTime} disabled={!enabled} onChange={(event) => setNewTime(event.target.value)} /><button type="button" disabled={!enabled || times.includes(newTime)} onClick={addTime}>Add time</button></span>}
+        {times.map((value) => <span className="time-chip" key={value}>{clockLabel(value)}{frequency === "custom" && times.length > 1 && <button type="button" aria-label={`Remove ${clockLabel(value)}`} disabled={!enabled || busy} onClick={() => setTimes(times.filter((item) => item !== value))}>×</button>}</span>)}
+        {frequency === "custom" && <span className="add-time"><input aria-label="New scrape time" type="time" value={newTime} disabled={!enabled || busy} onChange={(event) => setNewTime(event.target.value)} /><button type="button" disabled={!enabled || busy || !newTime || times.includes(newTime)} onClick={addTime}>Add time</button></span>}
       </div></div>
     </div>
     {saved && <div className="schedule-summary">

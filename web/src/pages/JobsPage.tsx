@@ -71,7 +71,9 @@ export function JobsPage() {
   const [resumeRecommendationError, setResumeRecommendationError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [queueError, setQueueError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const [queueRevision, setQueueRevision] = useState(0);
   const [pendingAction, setPendingAction] = useState<"not-interested" | "applied" | null>(null);
   const [notice, setNotice] = useState("");
   const [blockedCompanies, setBlockedCompanies] = useState<string[]>([]);
@@ -130,6 +132,7 @@ export function JobsPage() {
     let active = true;
     if (!defaults) return;
     setLoading(true);
+    setQueueError("");
     getJobs(deferredFilters)
       .then((payload) => {
         if (!active) return;
@@ -138,10 +141,10 @@ export function JobsPage() {
         setReviewableTotal(payload.reviewable_count);
         // Keep the open posting available for review and immediate unblocking.
       })
-      .catch((reason: unknown) => active && setError(reason instanceof Error ? reason.message : "Could not load jobs"))
+      .catch((reason: unknown) => active && setQueueError(reason instanceof Error ? reason.message : "Could not load jobs"))
       .finally(() => active && setLoading(false));
     return () => { active = false; };
-  }, [deferredFilters, defaults, reloadKey]);
+  }, [deferredFilters, defaults, reloadKey, queueRevision]);
 
   function openJob(job: Job) {
     setSelected(job);
@@ -201,8 +204,8 @@ export function JobsPage() {
     try {
       if (disposition === "applied") await markJobApplied(job.id);
       else await markJobNotInterested(job.id);
-      setJobs((current) => current.filter((item) => item.id !== job.id));
-      setTotal((current) => Math.max(0, current - 1));
+      setLoading(true);
+      setQueueRevision((value) => value + 1);
       setSelected(null);
       setNotice(
         disposition === "applied"
@@ -234,7 +237,7 @@ export function JobsPage() {
           actions: <><button className="primary-button" onClick={() => defaults && setFilters({ ...EMPTY_FILTERS, view: defaults })}>Reset filters</button><button className="empty-state-link" onClick={() => setFilters(EMPTY_FILTERS)}>Clear all</button></>,
         };
 
-  const hasNoInventory = !loading && reviewableTotal === 0;
+  const hasNoInventory = !loading && !queueError && reviewableTotal === 0;
   const savedRoles = searchPreferences?.titles || [];
   const savedModes = searchPreferences?.work_modes || [];
   const savedCompensation = searchPreferences?.compensation;
@@ -310,7 +313,8 @@ export function JobsPage() {
           </div>
           {notice && <p className="action-notice" role="status">{notice}</p>}
           {error && <ErrorMessage message={error} retry={() => { setError(""); setReloadKey((key) => key + 1); }} />}
-          {loading ? <LoadingRows /> : jobs.length ? (
+          {queueError && <ErrorMessage message={queueError} retry={() => setQueueRevision((value) => value + 1)} />}
+          {loading ? <LoadingRows /> : queueError ? null : jobs.length ? (
             <div className="job-list">
               {jobs.map((job) => (
                 <button

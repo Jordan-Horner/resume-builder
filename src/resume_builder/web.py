@@ -91,6 +91,13 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    @app.post("/api/job-search/roles/preview")
+    def preview_role_titles(payload: dict[str, Any]) -> dict[str, Any]:
+        try:
+            return service.preview_role_titles(payload)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     @app.get("/api/job-search/preferences")
     def job_search_preferences() -> dict[str, Any]:
         try:

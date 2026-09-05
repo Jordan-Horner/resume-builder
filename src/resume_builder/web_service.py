@@ -36,7 +36,6 @@ from .discovery_evidence import (
     interpret_resume_evidence,
 )
 from .discovery_portfolio import (
-    MAX_TOTAL_QUERIES,
     ColdStartLane,
     ColdStartPortfolio,
     ColdStartQuery,
@@ -72,6 +71,7 @@ from .job_target import parse_target
 from .layout import VaultLayout
 from .preferences import _validated as validate_preferences
 from .project_report import project_report
+from .role_policy import MAX_TITLE_LENGTH, MIN_TITLE_LENGTH, check_query_capacity, clean_titles
 from .source_import import (
     SUPPORTED,
     apply_import_plan,
@@ -194,6 +194,13 @@ class DashboardService:
             step = "activation"
         else:
             step = "complete"
+        if (
+            setup is not None
+            and setup.status == SetupStatus.IN_PROGRESS
+            and setup.step == SetupStep.ROLES
+            and record.get("suggestion_choice_session") == setup.session_id
+        ):
+            step = "ai_choice"
         progress = {
             "resume": 1,
             "ai_choice": 1,
@@ -402,12 +409,22 @@ class DashboardService:
             semantic_roles = self._semantic_roles(key)
             if api_key.strip():
                 self._save_openrouter_key(api_key)
-        existing = load_setup_state(self.workspace)
-        start_setup(
-            self.workspace,
-            restart=existing is not None,
-            additional_roles=semantic_roles,
-        )
+        with self._state_lock:
+            existing = load_setup_state(self.workspace)
+            if existing is not None and existing.status == SetupStatus.IN_PROGRESS:
+                known = {normalized_key(role.title) for role in existing.roles}
+                for role in semantic_roles:
+                    if normalized_key(role.title) not in known:
+                        existing.roles.append(role)
+                        known.add(normalized_key(role.title))
+                existing.step = SetupStep.ROLES
+                save_setup_state(self.workspace, existing)
+            else:
+                start_setup(self.workspace, additional_roles=semantic_roles)
+            record = self._onboarding_record()
+            if "suggestion_choice_session" in record:
+                record.pop("suggestion_choice_session")
+                atomic_write_json(self.workspace / ONBOARDING_STATE_PATH, record)
         return self.onboarding_status()
 
     def answer_preference_step(self, step: str, answer: dict[str, Any]) -> dict[str, Any]:
@@ -418,6 +435,12 @@ class DashboardService:
             setup_step = SetupStep(step)
         except ValueError as exc:
             raise ValueError(f"unsupported onboarding step: {step}") from exc
+        if step == "roles" and "titles" in answer:
+            answer = {
+                "titles": self.preview_role_titles(
+                    {"scope": "onboarding", "titles": answer["titles"]}
+                )["titles"]
+            }
         updated = apply_answer(
             self.workspace,
             JobSearchSetupAnswer(
@@ -493,27 +516,29 @@ class DashboardService:
             },
         }
 
-    @staticmethod
-    def _clean_titles(values: object) -> list[str]:
-        if not isinstance(values, list) or not values:
-            raise ValueError("add at least one job title")
-        titles: list[str] = []
-        seen: set[str] = set()
-        for value in values:
-            if not isinstance(value, str):
-                raise ValueError("job titles must be text")
-            title = " ".join(value.split())
-            if not 2 <= len(title) <= 150:
-                raise ValueError("job titles must be between 2 and 150 characters")
-            key = normalized_key(title)
-            if key and key not in seen:
-                titles.append(title)
-                seen.add(key)
-        if not titles:
-            raise ValueError("add at least one job title")
-        if len(titles) > MAX_TOTAL_QUERIES:
-            raise ValueError(f"you can search at most {MAX_TOTAL_QUERIES} job titles")
-        return titles
+    _clean_titles = staticmethod(clean_titles)
+
+    def preview_role_titles(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Validate an unsaved selection against the current shared search budget."""
+        if payload.get("scope") not in {"onboarding", "settings"}:
+            raise ValueError("role scope must be onboarding or settings")
+        titles = clean_titles(payload.get("titles"), allow_empty=True)
+        queries = list(titles)
+        path = self.workspace / PORTFOLIO_PATH
+        if path.is_file():
+            portfolio = ColdStartPortfolio.model_validate_json(path.read_text(encoding="utf-8"))
+            queries.extend(
+                item.query
+                for item in portfolio.queries
+                if any(source.startswith("vault:") for source in item.source_ids)
+            )
+        remaining = check_query_capacity(queries)
+        return {
+            "titles": titles,
+            "remaining": remaining,
+            "minimum_length": MIN_TITLE_LENGTH,
+            "maximum_length": MAX_TITLE_LENGTH,
+        }
 
     def update_job_search_preferences(self, payload: dict[str, Any]) -> dict[str, Any]:
         with self._state_lock:
@@ -521,6 +546,7 @@ class DashboardService:
             if payload.get("revision") != current["revision"]:
                 raise ValueError("these preferences changed in another tab; reload and try again")
             titles = self._clean_titles(payload.get("titles"))
+            self.preview_role_titles({"scope": "settings", "titles": titles})
             country = str(payload.get("country") or "").strip()
             location = LocationAnswers.model_validate(
                 {
@@ -607,8 +633,7 @@ class DashboardService:
                     if any(source.startswith("vault:") for source in item.source_ids)
                     and normalized_key(item.query) not in existing_queries
                 )
-            if len(queries) > MAX_TOTAL_QUERIES:
-                raise ValueError("remove a role or search skill before adding another title")
+            check_query_capacity(item.query for item in queries)
             portfolio = ColdStartPortfolio(
                 generated_at=datetime.now(UTC).isoformat(),
                 resume_hash=state.evidence_hash,
@@ -631,6 +656,11 @@ class DashboardService:
         state = load_setup_state(self.workspace)
         if state is None or state.status != SetupStatus.IN_PROGRESS:
             raise ValueError("preference setup is not in progress")
+        if state.step == SetupStep.ROLES:
+            record = self._onboarding_record()
+            record["suggestion_choice_session"] = state.session_id
+            atomic_write_json(self.workspace / ONBOARDING_STATE_PATH, record)
+            return self.onboarding_status()
         previous = {
             SetupStep.ELIGIBILITY: SetupStep.ROLES,
             SetupStep.LOCATION: SetupStep.ROLES,

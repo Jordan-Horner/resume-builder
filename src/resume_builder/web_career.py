@@ -19,7 +19,6 @@ from .discovery_activation import (
 )
 from .discovery_portfolio import (
     MAX_CAPABILITY_QUERIES,
-    MAX_TOTAL_QUERIES,
     ColdStartLane,
     ColdStartPortfolio,
     ColdStartQuery,
@@ -28,6 +27,7 @@ from .job_setup_defaults import PORTFOLIO_PATH, PREFERENCES_PATH, scaffold_job_s
 from .layout import VaultLayout
 from .project_report import project_report
 from .resume_parser import compile_markdown
+from .role_policy import check_query_capacity
 from .source_import import is_metadata_name, load_manifest, resume_manifest_sources
 from .validation import parse_frontmatter
 
@@ -366,8 +366,7 @@ def set_skill_search_enabled(root: Path, fact_id: str, enabled: bool) -> dict[st
     )
     if selected_count > MAX_CAPABILITY_QUERIES:
         raise ValueError(f"choose at most {MAX_CAPABILITY_QUERIES} skills for search")
-    if len(portfolio.queries) > MAX_TOTAL_QUERIES:
-        raise ValueError("remove a role or skill before adding another search signal")
+    check_query_capacity(item.query for item in portfolio.queries)
     apply_portfolio_update(
         root / PORTFOLIO_PATH,
         root / SEARCH_CONFIG_PATH,

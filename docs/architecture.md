@@ -187,3 +187,24 @@ their reviewed budgets.
 - PDF minting cannot bypass page-budget or extraction failures.
 - Application events are append-only; corrections supersede rather than rewrite.
 - Outcome reports are deterministic and advisory and never mutate match rules.
+
+## Portal state and role policy
+
+The portal renders authoritative backend state after job dispositions, including
+both queue counts and replacement rows under the current filters. A failed refresh
+can be retried without repeating a successful application or dismissal action.
+The schedule editor cannot mutate configuration until its initial load succeeds,
+and locks its controls while saving.
+
+Revisiting the onboarding suggestion method is a backend-persisted transition
+scoped to the current setup session. Returning to roles preserves the session,
+selected roles, and later answers; additional suggestions merge without restarting
+setup. Browser drafts remain presentation state, not workflow authority.
+
+`role_policy.py` owns title validation, normalized identity, and the shared query
+capacity check. `POST /api/job-search/roles/preview` validates unsaved title lists
+and returns canonical titles, remaining capacity after vault skill queries, and
+title constraints. Both role editors use this read-only preview before adding or
+restoring titles. Save operations validate again against current state. Onboarding
+accepts complete title selections and derives role decisions on the backend;
+legacy decision-based answers remain supported.

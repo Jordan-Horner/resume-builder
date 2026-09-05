@@ -54,3 +54,32 @@ it("uses the toggle immediately while leaving manual searches available", async 
   const manual = [...host.querySelectorAll("button")].find((item) => item.textContent === "Find jobs now") as HTMLButtonElement;
   expect(manual.disabled).toBe(false);
 });
+
+it("cannot mutate a schedule while its saved state is pending or unavailable", async () => {
+  vi.mocked(saveScrapeSchedule).mockClear();
+  let reject!: (error: Error) => void;
+  vi.mocked(getScrapeSchedule).mockReturnValueOnce(new Promise((_resolve, fail) => { reject = fail; }));
+  await act(async () => root.render(<JobSources />));
+  expect(host.textContent).toContain("Loading schedule");
+  expect(host.querySelector('input[aria-label="Automatic scraping"]')).toBeNull();
+  expect([...host.querySelectorAll("button")].some((button) => button.textContent === "Save schedule")).toBe(false);
+  await act(async () => reject(new Error("Schedule unavailable")));
+  expect(host.textContent).toContain("Schedule unavailable");
+  vi.mocked(getScrapeSchedule).mockResolvedValueOnce({ ...schedule, enabled: false, times: ["19:30"] });
+  await act(async () => [...host.querySelectorAll("button")].find((button) => button.textContent === "Retry schedule")?.click());
+  expect((host.querySelector('input[aria-label="Automatic scraping"]') as HTMLInputElement).checked).toBe(false);
+  expect(host.textContent).toContain("7:30 PM");
+  expect(saveScrapeSchedule).not.toHaveBeenCalled();
+});
+
+it("locks schedule inputs until a save completes", async () => {
+  let resolve!: (value: typeof schedule) => void;
+  vi.mocked(saveScrapeSchedule).mockReturnValueOnce(new Promise((done) => { resolve = done; }));
+  await act(async () => root.render(<JobSources />));
+  await act(async () => [...host.querySelectorAll("button")].find((button) => button.textContent === "Twice daily")?.click());
+  await act(async () => [...host.querySelectorAll("button")].find((button) => button.textContent === "Save schedule")?.click());
+  const controls = host.querySelectorAll('.scrape-schedule button, .scrape-schedule input');
+  expect([...controls].every((control) => (control as HTMLButtonElement).disabled)).toBe(true);
+  await act(async () => resolve({ ...schedule, times: ["08:00", "17:00"] }));
+  expect(host.textContent).toContain("5:00 PM");
+});

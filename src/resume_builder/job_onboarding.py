@@ -16,6 +16,8 @@ from typing import Any, Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from job_puller.normalize import normalized_key
+
 from .atomic import atomic_write_text
 from .discovery_activation import activate_portfolio, preview_activation
 from .discovery_evidence import (
@@ -48,6 +50,7 @@ from .job_setup_defaults import (
 )
 from .jobs import _load_preferences
 from .layout import VaultLayout
+from .role_policy import check_query_capacity, clean_titles
 from .source_import import load_manifest
 from .validation import validate_vault
 from .workspace_state import WorkspaceError, discover_workspace
@@ -295,11 +298,11 @@ def start_setup(
             )
     evidence = _load_evidence(root)
     roles = _role_proposals(evidence)
-    existing_titles = {item.title.casefold().strip() for item in roles}
+    existing_titles = {normalized_key(item.title) for item in roles}
     for role in additional_roles:
-        if role.title.casefold().strip() not in existing_titles:
+        if normalized_key(role.title) not in existing_titles:
             roles.append(role)
-            existing_titles.add(role.title.casefold().strip())
+            existing_titles.add(normalized_key(role.title))
     timestamp = _now()
     state = JobSearchSetupState(
         session_id=str(uuid.uuid4()),
@@ -316,6 +319,17 @@ def start_setup(
 
 
 def _update_roles(state: JobSearchSetupState, answer: dict[str, Any]) -> None:
+    if "titles" in answer:
+        titles = clean_titles(answer["titles"])
+        selected = {normalized_key(title) for title in titles}
+        known_titles = {normalized_key(role.title) for role in state.roles}
+        answer = {
+            "decisions": {
+                role.role_id: "search" if normalized_key(role.title) in selected else "dont_seed"
+                for role in state.roles
+            },
+            "add": [title for title in titles if normalized_key(title) not in known_titles],
+        }
     decisions = answer.get("decisions", {})
     additions = answer.get("add", [])
     if not isinstance(decisions, dict):
@@ -334,7 +348,7 @@ def _update_roles(state: JobSearchSetupState, answer: dict[str, Any]) -> None:
     ]
     if not isinstance(additions, list):
         raise ValueError("roles answer add must be a list of titles")
-    existing = {item.title.casefold().strip() for item in state.roles}
+    existing = {normalized_key(item.title) for item in state.roles}
     for value in additions:
         if isinstance(value, str):
             title, intent = value.strip(), RoleIntent.SEARCH
@@ -343,7 +357,8 @@ def _update_roles(state: JobSearchSetupState, answer: dict[str, Any]) -> None:
             intent = RoleIntent(value.get("intent", "search"))
         else:
             raise ValueError("each added role must contain a title")
-        if len(title) < 2 or title.casefold() in existing:
+        title = clean_titles([title])[0]
+        if normalized_key(title) in existing:
             continue
         state.roles.append(
             RoleProposal(
@@ -356,14 +371,12 @@ def _update_roles(state: JobSearchSetupState, answer: dict[str, Any]) -> None:
                 reason="Added explicitly during job-search setup.",
             )
         )
-        existing.add(title.casefold())
+        existing.add(normalized_key(title))
     if not any(item.intent in {RoleIntent.SEARCH, RoleIntent.EXPLORE} for item in state.roles):
         raise ValueError("keep at least one role as search or explore")
-    selected_count = sum(
-        item.intent in {RoleIntent.SEARCH, RoleIntent.EXPLORE} for item in state.roles
+    check_query_capacity(
+        item.title for item in state.roles if item.intent in {RoleIntent.SEARCH, RoleIntent.EXPLORE}
     )
-    if selected_count > MAX_TOTAL_QUERIES:
-        raise ValueError(f"search and explore can contain at most {MAX_TOTAL_QUERIES} roles")
 
 
 def _next_step(step: SetupStep) -> SetupStep:

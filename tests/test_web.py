@@ -177,3 +177,27 @@ def test_resume_upload_route_returns_readable_validation_error(tmp_path: Path) -
 
     assert response.status_code == 400
     assert "unsupported resume type" in response.json()["detail"]
+
+
+def test_role_preview_validates_titles_without_persisting(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    for scope in ("onboarding", "settings"):
+        response = client.post(
+            "/api/job-search/roles/preview",
+            json={
+                "scope": scope,
+                "titles": ["Support Engineer", "support-engineer"],
+            },
+        )
+        assert response.status_code == 200
+        assert response.json()["titles"] == ["Support Engineer"]
+        assert response.json()["remaining"] == 21
+        invalid = client.post(
+            "/api/job-search/roles/preview",
+            json={
+                "scope": scope,
+                "titles": ["x"],
+            },
+        )
+        assert invalid.status_code == 400
+    assert not (tmp_path / "workspace" / "job-search" / "setup.json").exists()

@@ -167,3 +167,11 @@ export function getScrapeSchedule(): Promise<ScrapeSchedule> { return request("/
 export function saveScrapeSchedule(enabled: boolean, times: string[]): Promise<ScrapeSchedule> {
   return request("/api/scrape-schedule", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled, times }) });
 }
+
+export function previewRoleTitles(scope: "onboarding" | "settings", titles: string[]): Promise<{ titles: string[]; remaining: number; minimum_length: number; maximum_length: number }> {
+  return request("/api/job-search/roles/preview", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scope, titles }),
+  });
+}

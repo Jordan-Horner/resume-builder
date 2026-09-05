@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { getSearchPreferences, saveSearchPreferences } from "../api";
+import { getSearchPreferences, saveSearchPreferences, previewRoleTitles } from "../api";
 import { ErrorMessage } from "../components";
 import type { SearchPreferences, WorkMode } from "../types";
 
-const roleKey = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
 const split = (value: string) => value.split(",").map((item) => item.trim()).filter(Boolean);
 
 export function SearchPreferencesSection() {
@@ -37,16 +36,22 @@ export function SearchPreferencesSection() {
     setNotice("");
   }
 
+  async function applyTitles(titles: string[]) {
+    if (busy) return;
+    setBusy(true); setError("");
+    try {
+      const result = await previewRoleTitles("settings", titles);
+      patch({ titles: result.titles });
+      setTitle(""); setRemoved(null);
+      setNotice(`${result.remaining} search slots available.`);
+      input.current?.focus();
+    } catch (reason) {
+      setNotice(reason instanceof Error ? reason.message : "Could not validate job titles.");
+    } finally { setBusy(false); }
+  }
+
   function addTitle() {
-    if (!preferences) return;
-    const cleaned = title.trim().replace(/\s+/g, " ");
-    if (cleaned.length < 2) { setNotice("Enter a complete job title."); return; }
-    if (preferences.titles.some((item) => roleKey(item) === roleKey(cleaned))) {
-      setNotice("That title is already included."); setTitle(""); return;
-    }
-    if (preferences.titles.length >= 22) { setNotice("Remove a title before adding another."); return; }
-    patch({ titles: [...preferences.titles, cleaned] });
-    setTitle(""); setNotice(`${cleaned} added.`); input.current?.focus();
+    if (preferences) void applyTitles([...preferences.titles, title]);
   }
 
   function toggleMode(mode: WorkMode) {
@@ -85,13 +90,13 @@ export function SearchPreferencesSection() {
     <div className="settings-section-heading"><div><h2 id="search-preferences-heading">Search preferences</h2><p>These settings shape every future scrape. Saving does not start one.</p></div><button className="primary-button" disabled={!valid || busy} onClick={() => void save()}>{busy ? "Saving…" : "Save changes"}</button></div>
 
     <div className="settings-group"><div className="settings-group-copy"><h3>Job titles</h3><p>Every title below is searched. Add close alternatives you would genuinely consider.</p></div><div>
-      <ul className="role-bubbles compact" aria-label="Titles included in searches">{preferences.titles.map((item, index) => <li className="role-bubble" key={roleKey(item)}><span>{item}</span><button type="button" aria-label={`Remove ${item}`} onClick={() => { patch({ titles: preferences.titles.filter((_, position) => position !== index) }); setRemoved({ title: item, index }); setNotice(`${item} removed.`); }}>×</button></li>)}</ul>
+      <fieldset disabled={busy} style={{ border: 0, padding: 0, margin: 0 }}><ul className="role-bubbles compact" aria-label="Titles included in searches">{preferences.titles.map((item, index) => <li className="role-bubble" key={item}><span>{item}</span><button type="button" aria-label={`Remove ${item}`} onClick={() => { patch({ titles: preferences.titles.filter((_, position) => position !== index) }); setRemoved({ title: item, index }); setNotice(`${item} removed.`); }}>×</button></li>)}</ul>
       {!preferences.titles.length && <p className="field-hint error-text">Add at least one title.</p>}
-      <div className="role-feedback"><span role="status">{notice}</span>{removed && <button className="text-button" onClick={() => { const next = [...preferences.titles]; next.splice(Math.min(removed.index, next.length), 0, removed.title); patch({ titles: next }); setRemoved(null); setNotice(`${removed.title} restored.`); }}>Undo</button>}</div>
-      <form className="role-add compact" onSubmit={(event) => { event.preventDefault(); addTitle(); }}><label className="field"><span>Add another title</span><div><input ref={input} value={title} maxLength={150} placeholder="e.g. Site Reliability Engineer" onChange={(event) => setTitle(event.target.value)} /><button className="secondary-button" disabled={!title.trim()} type="submit">Add</button></div></label></form>
-    </div></div>
+      <div className="role-feedback"><span role="status">{notice}</span>{removed && <button className="text-button" onClick={() => { const next = [...preferences.titles]; next.splice(Math.min(removed.index, next.length), 0, removed.title); void applyTitles(next); }}>Undo</button>}</div>
+      <form className="role-add compact" onSubmit={(event) => { event.preventDefault(); addTitle(); }}><label className="field"><span>Add another title</span><div><input ref={input} value={title} placeholder="e.g. Site Reliability Engineer" onChange={(event) => setTitle(event.target.value)} /><button className="secondary-button" disabled={busy || !title.trim()} type="submit">Add</button></div></label></form>
+    </fieldset></div></div>
 
-    <div className="settings-group"><div className="settings-group-copy"><h3>Resume skills</h3><p>Confirmed vault skills can broaden provider searches without becoming job-title filters.</p></div><div>{preferences.skill_terms.length ? <ul className="signal-list">{preferences.skill_terms.map((item) => <li key={roleKey(item)}>{item}</li>)}</ul> : <p className="field-hint">No vault skills are currently used for search.</p>}<a className="empty-state-link" href="/skills">Manage search skills</a></div></div>
+    <div className="settings-group"><div className="settings-group-copy"><h3>Resume skills</h3><p>Confirmed vault skills can broaden provider searches without becoming job-title filters.</p></div><div>{preferences.skill_terms.length ? <ul className="signal-list">{preferences.skill_terms.map((item) => <li key={item}>{item}</li>)}</ul> : <p className="field-hint">No vault skills are currently used for search.</p>}<a className="empty-state-link" href="/skills">Manage search skills</a></div></div>
 
     <div className="settings-group"><div className="settings-group-copy"><h3>Where you can work</h3><p>Country scopes the scrape. Cities and regions apply only to hybrid and on-site roles.</p></div><div className="preference-fields"><label className="field"><span>Country</span><input value={preferences.country} maxLength={100} onChange={(event) => patch({ country: event.target.value })} /></label><div><span className="field-label">Work modes</span><div className="mode-grid compact">{(["remote", "hybrid", "onsite"] as WorkMode[]).map((mode) => <button type="button" key={mode} className={preferences.work_modes.includes(mode) ? "mode-card selected" : "mode-card"} aria-pressed={preferences.work_modes.includes(mode)} onClick={() => toggleMode(mode)}><span>{preferences.work_modes.includes(mode) ? "✓" : ""}</span><strong>{mode === "onsite" ? "On-site" : mode[0].toUpperCase() + mode.slice(1)}</strong></button>)}</div></div>{needsPlace && <label className="field"><span>Accepted cities or regions</span><input value={locations} placeholder="New York, Boston" onChange={(event) => setLocations(event.target.value)} /></label>}<label className="field"><span>Remote location terms <em>optional</em></span><input value={remoteTerms} placeholder="USA, East Coast" onChange={(event) => setRemoteTerms(event.target.value)} /></label></div></div>
 

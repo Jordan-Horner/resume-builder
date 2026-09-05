@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
-import { activateJobSearch, answerOnboarding, backOnboarding, getOnboardingStatus, skipOnboarding, startOnboarding, uploadResume } from "../api";
+import { activateJobSearch, answerOnboarding, backOnboarding, getOnboardingStatus, skipOnboarding, startOnboarding, uploadResume, previewRoleTitles } from "../api";
 import type { OnboardingSetup, OnboardingStatus, WorkMode } from "../types";
 
 interface PageProps { initial: OnboardingStatus; onComplete: () => void }
@@ -46,8 +46,10 @@ function AiChoice({ status, busy, error, choose }: { status: OnboardingStatus; b
   </div>;
 }
 
-const roleKey = (title: string) => title.trim().replace(/\s+/g, " ").toLocaleLowerCase();
-function RolesStep({ setup, busy, error, onSubmit, onBack }: StepProps) {
+function RolesStep({ setup, busy: parentBusy, error, onSubmit, onBack }: StepProps) {
+  const [validating, setValidating] = useState(false);
+  const busy = parentBusy || validating;
+  const sourceTitles = setup.roles.filter((role) => role.intent !== "dont_seed").map((role) => role.title);
   const storageKey = `onboarding-roles-v1:${setup.session_id}`;
   const [draft] = useState(() => {
     try {
@@ -55,7 +57,9 @@ function RolesStep({ setup, busy, error, onSubmit, onBack }: StepProps) {
       if (!raw) return { titles: setup.roles.filter((role) => role.intent !== "dont_seed").map((role) => role.title), input: "", error: "" };
       const saved = JSON.parse(raw);
       if (!Array.isArray(saved.titles) || !saved.titles.every((title: unknown) => typeof title === "string") || typeof saved.input !== "string") throw new Error("Invalid saved roles");
-      return { titles: saved.titles as string[], input: saved.input as string, error: "" };
+      const priorSources: string[] = Array.isArray(saved.sourceTitles) ? saved.sourceTitles : sourceTitles;
+      const newSuggestions = sourceTitles.filter((title) => !priorSources.includes(title) && !saved.titles.includes(title));
+      return { titles: [...saved.titles as string[], ...newSuggestions], input: saved.input as string, error: "" };
     } catch {
       return { titles: setup.roles.filter((role) => role.intent !== "dont_seed").map((role) => role.title), input: "", error: "Could not restore your browser draft. Your last submitted roles are shown." };
     }
@@ -68,36 +72,37 @@ function RolesStep({ setup, busy, error, onSubmit, onBack }: StepProps) {
   const [removed, setRemoved] = useState<{ title: string; index: number } | null>(null);
   const input = useRef<HTMLInputElement>(null);
   function persist(next: string[], text: string) {
-    try { localStorage.setItem(storageKey, JSON.stringify({ titles: next, input: text })); setSaveError(""); }
+    try { localStorage.setItem(storageKey, JSON.stringify({ titles: next, input: text, sourceTitles })); setSaveError(""); }
     catch { setSaveError("Could not save in this browser. Retry, or Continue to save your roles to setup."); }
   }
   function update(next: string[], text = add) { setTitles(next); setAdd(text); persist(next, text); }
-  function addRole(): string[] | null {
-    const title = add.trim().replace(/\s+/g, " ");
-    if (!title) return titles;
-    if (title.length < 2) { setNotice("Use at least two characters for a job title."); input.current?.focus(); return null; }
-    const existing = titles.find((item) => roleKey(item) === roleKey(title));
-    if (existing) { setHighlight(roleKey(existing)); setNotice("Already added."); update(titles, ""); input.current?.focus(); return titles; }
-    if (titles.length >= 22) { setNotice("You can include up to 22 roles. Remove one before adding another."); return null; }
-    const next = [...titles, title];
-    update(next, ""); setHighlight(roleKey(title)); setNotice(`${title} added.`); input.current?.focus();
-    return next;
+  async function validateTitles(next: string[]): Promise<string[] | null> {
+    if (busy) return null;
+    setValidating(true);
+    try {
+      const result = await previewRoleTitles("onboarding", next);
+      update(result.titles, "");
+      setHighlight(result.titles[result.titles.length - 1] || "");
+      setNotice(`${result.remaining} search slots available.`);
+      return result.titles;
+    } catch (reason) {
+      setNotice(reason instanceof Error ? reason.message : "Could not validate roles.");
+      return null;
+    } finally { setValidating(false); }
   }
-  function submit() {
-    const next = addRole();
-    if (!next?.length) return;
-    const included = new Set(next.map(roleKey));
-    onSubmit({
-      decisions: Object.fromEntries(setup.roles.map((role) => [role.role_id, included.has(roleKey(role.title)) ? "search" : "dont_seed"])),
-      add: next.filter((title) => !setup.roles.some((role) => roleKey(role.title) === roleKey(title))),
-    });
+  async function addRole() {
+    if (add.trim()) await validateTitles([...titles, add]);
+  }
+  async function submit() {
+    const next = await validateTitles(add.trim() ? [...titles, add] : titles);
+    if (next?.length) onSubmit({ titles: next });
   }
   return <div className="onboarding-content roles-step role-bubbles-step">
     <p className="eyebrow">Your next role</p>
     <h1 id="onboarding-title">Which roles do you want to search for?</h1>
     <p className="onboarding-lede">We suggested these from your resume. Keep the ones you want, remove the rest, or add your own.</p>
     <ul className="role-bubbles" aria-label="Roles included in your job search">{titles.map((title, index) =>
-      <li key={roleKey(title)} className={highlight === roleKey(title) ? "role-bubble highlighted" : "role-bubble"}>
+      <li key={title} className={highlight === title ? "role-bubble highlighted" : "role-bubble"}>
         <span>{title}</span><button type="button" disabled={busy} aria-label={`Remove ${title}`} onClick={() => {
           update(titles.filter((_, position) => position !== index)); setRemoved({ title, index }); setHighlight(""); setNotice(`${title} removed.`);
         }}>×</button>
@@ -105,14 +110,12 @@ function RolesStep({ setup, busy, error, onSubmit, onBack }: StepProps) {
     )}</ul>
     {!titles.length && <p className="role-empty">Add at least one role to find jobs.</p>}
     <div className="role-feedback"><span role="status">{notice}</span>{removed && <button className="text-button" type="button" disabled={busy} onClick={() => {
-      if (!titles.some((title) => roleKey(title) === roleKey(removed.title)) && titles.length < 22) {
-        const next = [...titles]; next.splice(removed.index, 0, removed.title); update(next);
-        setNotice(`${removed.title} restored.`); setHighlight(roleKey(removed.title)); setRemoved(null);
-      } else { setNotice("Role is already included, or the 22-role limit has been reached."); }
+      const next = [...titles]; next.splice(removed.index, 0, removed.title);
+      void validateTitles(next).then((result) => { if (result) setRemoved(null); });
     }}>Undo removal</button>}</div>
     <form className="role-add" onSubmit={(event) => { event.preventDefault(); addRole(); }}>
       <label className="field" htmlFor="new-role"><span>Add a job title</span></label>
-      <div><input ref={input} id="new-role" value={add} maxLength={160} placeholder="e.g. Platform Engineer" disabled={busy} onChange={(event) => { setAdd(event.target.value); persist(titles, event.target.value); }} /><button className="secondary-button" type="submit" disabled={busy || !add.trim()}>Add</button></div>
+      <div><input ref={input} id="new-role" value={add} placeholder="e.g. Platform Engineer" disabled={busy} onChange={(event) => { setAdd(event.target.value); persist(titles, event.target.value); }} /><button className="secondary-button" type="submit" disabled={busy || !add.trim()}>Add</button></div>
     </form>
     <div className="role-draft-status">{saveError ? <p role="alert">{saveError} <button className="text-button" onClick={() => persist(titles, add)}>Retry</button></p> : <small>Draft saved in this browser</small>}</div>
     <Actions busy={busy} error={error} onBack={onBack} disabled={!titles.length && !add.trim()} onContinue={submit} />
@@ -120,7 +123,7 @@ function RolesStep({ setup, busy, error, onSubmit, onBack }: StepProps) {
 }
 
 function Actions({ busy, error, onBack, onContinue, disabled = false, label = "Continue" }: { busy: boolean; error: string; onBack: () => void; onContinue: () => void; disabled?: boolean; label?: string }) {
-  return <>{error && <p className="onboarding-error" role="alert">{error}</p>}<div className="onboarding-footer"><button className="onboarding-back" onClick={onBack}>Back</button><button className="onboarding-primary" disabled={busy || disabled} onClick={onContinue}>{busy ? "Saving…" : label}</button></div></>;
+  return <>{error && <p className="onboarding-error" role="alert">{error}</p>}<div className="onboarding-footer"><button className="onboarding-back" disabled={busy} onClick={onBack}>Back</button><button className="onboarding-primary" disabled={busy || disabled} onClick={onContinue}>{busy ? "Saving…" : label}</button></div></>;
 }
 function Shell({ eyebrow, title, lede, children, ...actions }: { eyebrow: string; title: string; lede: string; children: ReactNode } & Parameters<typeof Actions>[0]) {
   return <div className="onboarding-content"><p className="eyebrow">{eyebrow}</p><h1 id="onboarding-title">{title}</h1><p className="onboarding-lede">{lede}</p>{children}<Actions {...actions} /></div>;
@@ -163,7 +166,7 @@ export function OnboardingPage({ initial, onComplete }: PageProps) {
   return <main className="onboarding-shell"><header className="onboarding-topbar"><span className="onboarding-brand"><span className="brand-mark">RB</span> Resume Builder</span><button className="onboarding-skip" onClick={() => { setBusy(true); skipOnboarding().then(onComplete).catch((reason) => { setError(reason instanceof Error ? reason.message : "Could not leave setup"); setBusy(false); }); }} disabled={busy}>Set up later</button></header><section className={status.step === "roles" ? "onboarding-stage wide" : "onboarding-stage"} aria-labelledby="onboarding-title"><Progress status={status} />
     {status.step === "resume" && <ResumeStep busy={busy} error={error} done={() => run(getOnboardingStatus)} />}
     {status.step === "ai_choice" && <AiChoice status={status} busy={busy} error={error} choose={(ai, key) => run(() => startOnboarding(ai, key))} />}
-    {status.step === "roles" && setup && <RolesStep setup={setup} busy={busy} error={error} onSubmit={(answer) => run(() => answerOnboarding("roles", answer))} onBack={() => setStatus({ ...status, step: "ai_choice", progress: 1 })} />}
+    {status.step === "roles" && setup && <RolesStep setup={setup} busy={busy} error={error} onSubmit={(answer) => run(() => answerOnboarding("roles", answer))} onBack={() => run(backOnboarding)} />}
     {status.step === "location" && setup && <LocationStep setup={setup} busy={busy} error={error} onSubmit={(answer) => run(() => answerOnboarding("location", answer))} onBack={() => run(backOnboarding)} />}
     {status.step === "compensation" && setup && <CompensationStep setup={setup} busy={busy} error={error} onSubmit={(answer) => run(() => answerOnboarding("compensation", answer))} onBack={() => run(backOnboarding)} />}
     {status.step === "review" && setup && <ReviewStep setup={setup} busy={busy} error={error} onSubmit={(answer) => run(() => answerOnboarding("review", answer))} onBack={() => run(backOnboarding)} />}
