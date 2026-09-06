@@ -3,13 +3,16 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 
-from job_puller.models import JobObservation
+import job_puller.source_resolution as resolution_module
+from job_puller.database import InventoryDatabase
+from job_puller.models import JobObservation, ProviderResult
 from job_puller.source_resolution import (
     AtsCatalog,
     CatalogError,
     LinkedInTarget,
     company_slug_candidates,
     match_posting,
+    resolve_linkedin_sources,
 )
 from job_puller.work_modes import WorkMode, explicit_arrangement
 
@@ -49,7 +52,7 @@ def test_company_slug_candidates_are_bounded_and_strip_legal_suffixes():
     )
 
 
-def test_catalog_uses_exact_or_compact_company_board_and_adds_probes():
+def test_catalog_uses_exact_or_compact_company_board_without_extra_probes():
     catalog = AtsCatalog(
         {
             "greenhouse": ("obsidiansecurity",),
@@ -63,7 +66,16 @@ def test_catalog_uses_exact_or_compact_company_board_and_adds_probes():
     assert boards[0].provider == "greenhouse"
     assert boards[0].board_id == "obsidiansecurity"
     assert boards[0].origin == "catalog"
-    assert any(board.origin == "company-slug-probe" for board in boards)
+    assert all(board.origin == "catalog" for board in boards)
+
+
+def test_catalog_adds_bounded_probes_only_when_company_is_missing():
+    catalog = AtsCatalog({"greenhouse": (), "ashby": (), "lever": ()})
+
+    boards = catalog.boards_for("Missing Example, Inc.", include_probes=True)
+
+    assert len(boards) == 6
+    assert all(board.origin == "company-slug-probe" for board in boards)
 
 
 def test_catalog_rejects_unsafe_identifiers():
@@ -112,3 +124,125 @@ def test_catalog_loader_uses_validated_cached_copy_when_refresh_fails(tmp_path):
         )
 
     assert catalog.entries["greenhouse"] == ("example",)
+
+
+def test_resolver_caps_company_slug_fallback_across_the_whole_run(monkeypatch):
+    description = " ".join(f"requirement-{index}" for index in range(120))
+
+    class Database:
+        def unresolved_linkedin_targets(self, *, seen_since=None):
+            assert seen_since is not None
+            return [
+                {
+                    "job_id": f"job-{index}",
+                    "observation_id": f"linkedin-{index}",
+                    "title": "AI Engineer",
+                    "company": company,
+                    "location": "Phoenix, AZ",
+                    "description": description,
+                    "posted_at": None,
+                }
+                for index, company in enumerate(("Alpha Inc.", "Beta Inc."), start=1)
+            ]
+
+        def stored_direct_ats_observations(self, _companies):
+            return []
+
+    class FailedProvider:
+        def fetch(self, _cutoff):
+            return type("Result", (), {"success": False})()
+
+    monkeypatch.setattr(resolution_module, "_provider", lambda _candidate, _timeout: FailedProvider())
+    report = resolve_linkedin_sources(
+        Database(),
+        AtsCatalog({"greenhouse": (), "ashby": (), "lever": ()}),
+        include_probes=True,
+        max_probe_companies=1,
+        seen_since=datetime.now(UTC),
+    )
+
+    assert report.companies == 2
+    assert report.probe_companies == 1
+    assert report.boards_considered == 3
+    assert report.board_requests_submitted == 3
+
+
+def test_resolver_reuses_stored_ats_observation_before_network(tmp_path):
+    description = " ".join(f"requirement-{index}" for index in range(120))
+    now = datetime.now(UTC)
+    linkedin = JobObservation(
+        provider="linkedin",
+        provider_job_id="linkedin-1",
+        title="AI Engineer",
+        company="Example, Inc.",
+        source_url="https://linkedin.com/jobs/view/linkedin-1",
+        location="Phoenix, AZ",
+        description_text=description,
+        work_arrangement=explicit_arrangement(
+            [WorkMode.UNKNOWN], source="linkedin", rule="not_listed"
+        ),
+    )
+    ats = posting("ats-1", f"{description} additional detail", WorkMode.ONSITE)
+    database = InventoryDatabase(tmp_path / "inventory.db")
+    database.migrate()
+    for source_key, observation_item in (("linkedin:test", linkedin), ("ashby:example", ats)):
+        database.record_result(
+            ProviderResult(
+                source_key=source_key,
+                provider=observation_item.provider,
+                observations=[observation_item],
+                started_at=now - timedelta(seconds=1),
+                completed_at=now,
+                success=True,
+            )
+        )
+
+    report = resolve_linkedin_sources(
+        database,
+        AtsCatalog({"greenhouse": (), "ashby": (), "lever": ()}),
+        apply=True,
+    )
+
+    assert report.local_candidates_scanned == 1
+    assert report.local_matches == 1
+    assert report.network_matches == 0
+    assert report.board_requests_submitted == 0
+    assert report.applied == 1
+    assert database.unresolved_linkedin_targets() == []
+
+
+def test_resolver_deduplicates_boards_and_enforces_request_budget(monkeypatch):
+    description = " ".join(f"requirement-{index}" for index in range(120))
+
+    class Database:
+        def unresolved_linkedin_targets(self, *, seen_since=None):
+            return [
+                {
+                    "job_id": f"job-{index}",
+                    "observation_id": f"linkedin-{index}",
+                    "title": "AI Engineer",
+                    "company": company,
+                    "location": "Phoenix, AZ",
+                    "description": description,
+                    "posted_at": None,
+                }
+                for index, company in enumerate(("Acme", "Acme Inc.", "Beta"), start=1)
+            ]
+
+        def stored_direct_ats_observations(self, _companies):
+            return []
+
+    class FailedProvider:
+        def fetch(self, _cutoff):
+            return type("Result", (), {"success": False})()
+
+    monkeypatch.setattr(resolution_module, "_provider", lambda _candidate, _timeout: FailedProvider())
+    report = resolve_linkedin_sources(
+        Database(),
+        AtsCatalog({"greenhouse": ("acme", "beta"), "ashby": (), "lever": ()}),
+        max_board_requests=1,
+    )
+
+    assert report.boards_considered == 2
+    assert report.board_requests_submitted == 1
+    assert report.board_requests_deferred == 1

@@ -143,18 +143,31 @@ def main(argv: list[str] | None = None) -> int:
         if args.limit is not None and args.limit < 1:
             print("--limit must be positive", file=sys.stderr)
             return 2
-        from .source_resolution import DATASET_REVISION, AtsCatalog, resolve_linkedin_sources
-
-        cache_dir = resolve_project_path(config_path, args.catalog_cache)
-        catalog = AtsCatalog.load(cache_dir, timeout=config.request_timeout_seconds)
-        resolution_report = resolve_linkedin_sources(
-            database,
-            catalog,
-            timeout=config.request_timeout_seconds,
-            apply=args.apply,
-            limit=args.limit,
-            include_probes=args.probe_missing,
+        from .source_resolution import (
+            DATASET_REVISION,
+            AtsCatalog,
+            ResolutionReport,
+            linkedin_targets,
+            resolve_linkedin_sources,
         )
+
+        targets = linkedin_targets(database, limit=args.limit)
+        if targets:
+            cache_dir = resolve_project_path(config_path, args.catalog_cache)
+            catalog = AtsCatalog.load(cache_dir, timeout=config.request_timeout_seconds)
+            resolution_report = resolve_linkedin_sources(
+                database,
+                catalog,
+                timeout=config.request_timeout_seconds,
+                apply=args.apply,
+                include_probes=args.probe_missing,
+                max_probe_companies=config.source_resolution.max_probe_companies,
+                max_board_requests=config.source_resolution.max_board_requests_per_refresh,
+                workers=config.source_resolution.workers,
+                targets=targets,
+            )
+        else:
+            resolution_report = ResolutionReport()
         payload = resolution_report.as_dict()
         payload["mode"] = "apply" if args.apply else "dry-run"
         payload["catalog_revision"] = DATASET_REVISION

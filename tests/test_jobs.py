@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -12,6 +13,7 @@ from resume_builder.jobs import (
     _new_jobs,
     _prescreen,
     _prescreen_job_hash,
+    _resolve_sources_after_refresh,
     _with_application_dispositions,
     _write_review_csv,
     get_job_screening_packet,
@@ -482,6 +484,169 @@ def test_new_jobs_shortlists_only_canonical_database_delta(tmp_path: Path, monke
         "indeed",
     ]
     assert captured["shortlist_kwargs"]["included_job_ids"] == {"new"}
+
+
+def test_new_jobs_resolves_linkedin_sources_before_shortlisting(tmp_path: Path, monkeypatch):
+    inventory = FakeInventory()
+    manifest_path = tmp_path / "latest-refresh.json"
+    events = []
+    monkeypatch.setattr(jobs_module, "_database", lambda _path: inventory)
+    monkeypatch.setattr(jobs_module, "DEFAULT_LATEST_REFRESH", manifest_path)
+    monkeypatch.setattr(
+        inventory,
+        "scrape_runs_since",
+        lambda _started_at: [{"provider": "linkedin", "success": True}],
+    )
+
+    def refresh(_args):
+        inventory.refreshed = True
+        events.append("refresh")
+        return 0
+
+    def resolve(*_args):
+        events.append("resolve")
+        return {"status": "complete", "targets": 1, "applied": 1}
+
+    def shortlist(*_args, **_kwargs):
+        events.append("shortlist")
+        return 0
+
+    monkeypatch.setattr(jobs_module, "puller_main", refresh)
+    monkeypatch.setattr(jobs_module, "_resolve_sources_after_refresh", resolve)
+    monkeypatch.setattr(jobs_module, "_shortlist", shortlist)
+
+    assert _new_jobs(Path("search.yml"), Path("preferences.yml"), 25, None) == 0
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert events == ["refresh", "resolve", "shortlist"]
+    assert manifest["source_resolution"] == {"status": "complete", "targets": 1, "applied": 1}
+
+
+def test_automatic_source_resolution_failure_is_visible_but_nonfatal(monkeypatch):
+    monkeypatch.setattr(
+        jobs_module,
+        "load_config",
+        lambda _path: (_ for _ in ()).throw(ValueError("catalog unavailable")),
+    )
+
+    report = _resolve_sources_after_refresh(
+        FakeInventory(),
+        Path("search.yml"),
+        jobs_module.datetime.now(jobs_module.UTC),
+        [{"provider": "linkedin", "success": True}],
+    )
+
+    assert report == {
+        "status": "unavailable",
+        "error_category": "ValueError",
+        "error": "catalog unavailable",
+    }
+
+
+def test_automatic_source_resolution_applies_configured_bounds(tmp_path: Path, monkeypatch):
+    import job_puller.source_resolution as resolution_module
+
+    started_at = jobs_module.datetime.now(jobs_module.UTC)
+    captured = {}
+    settings = SimpleNamespace(
+        enabled=True,
+        max_targets_per_refresh=75,
+        max_board_requests_per_refresh=30,
+        max_probe_companies=8,
+        workers=6,
+        catalog_cache_hours=12,
+    )
+    monkeypatch.setattr(
+        jobs_module,
+        "load_config",
+        lambda _path: SimpleNamespace(
+            source_resolution=settings,
+            request_timeout_seconds=19,
+        ),
+    )
+    monkeypatch.setattr(
+        resolution_module.AtsCatalog,
+        "load",
+        lambda path, **kwargs: captured.update(catalog_path=path, catalog_kwargs=kwargs)
+        or object(),
+    )
+    targets = [object()]
+    monkeypatch.setattr(
+        resolution_module,
+        "linkedin_targets",
+        lambda *_args, **_kwargs: targets,
+    )
+
+    def resolve(database, catalog, **kwargs):
+        captured.update(database=database, catalog=catalog, resolve_kwargs=kwargs)
+        return resolution_module.ResolutionReport(targets=2, applied=1)
+
+    monkeypatch.setattr(resolution_module, "resolve_linkedin_sources", resolve)
+    database = FakeInventory()
+
+    report = _resolve_sources_after_refresh(
+        database,
+        tmp_path / "config" / "search.yml",
+        started_at,
+        [{"provider": "linkedin", "success": True}],
+    )
+
+    assert report["status"] == "complete"
+    assert report["targets"] == 2
+    assert report["applied"] == 1
+    assert captured["database"] is database
+    assert captured["catalog_path"] == tmp_path / "cache" / "ats-source-catalog"
+    assert captured["resolve_kwargs"] == {
+        "timeout": 19,
+        "apply": True,
+        "include_probes": True,
+        "max_probe_companies": 8,
+        "max_board_requests": 30,
+        "workers": 6,
+        "targets": targets,
+    }
+
+
+def test_automatic_source_resolution_skips_catalog_when_no_targets(tmp_path: Path, monkeypatch):
+    import job_puller.source_resolution as resolution_module
+
+    settings = SimpleNamespace(
+        enabled=True,
+        max_targets_per_refresh=100,
+        max_board_requests_per_refresh=40,
+        max_probe_companies=8,
+        workers=12,
+        catalog_cache_hours=24,
+    )
+    monkeypatch.setattr(
+        jobs_module,
+        "load_config",
+        lambda _path: SimpleNamespace(
+            source_resolution=settings,
+            request_timeout_seconds=30,
+        ),
+    )
+    monkeypatch.setattr(
+        resolution_module,
+        "linkedin_targets",
+        lambda *_args, **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        resolution_module.AtsCatalog,
+        "load",
+        lambda *_args, **_kwargs: pytest.fail("catalog should not load without targets"),
+    )
+
+    report = _resolve_sources_after_refresh(
+        FakeInventory(),
+        tmp_path / "config" / "search.yml",
+        jobs_module.datetime.now(jobs_module.UTC),
+        [{"provider": "linkedin", "success": True}],
+    )
+
+    assert report["status"] == "complete"
+    assert report["targets"] == 0
+    assert report["board_requests_submitted"] == 0
 
 
 def test_new_jobs_rejects_an_overlapping_refresh(tmp_path: Path, monkeypatch):

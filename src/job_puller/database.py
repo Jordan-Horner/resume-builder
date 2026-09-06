@@ -631,11 +631,15 @@ class InventoryDatabase:
             )
         return inserted, updated
 
-    def unresolved_linkedin_targets(self) -> list[dict[str, object]]:
+    def unresolved_linkedin_targets(
+        self, *, seen_since: datetime | None = None
+    ) -> list[dict[str, object]]:
         """Return one strong LinkedIn observation for each active unknown-mode job."""
+        recent_clause = " AND o.last_seen_at >= ?" if seen_since is not None else ""
+        parameters = (_iso(seen_since),) if seen_since is not None else ()
         with self.connect() as conn:
             rows = conn.execute(
-                """SELECT j.id AS job_id, o.id AS observation_id, o.title_raw AS title,
+                f"""SELECT j.id AS job_id, o.id AS observation_id, o.title_raw AS title,
                           o.company_raw AS company, o.location_raw AS location,
                           o.description_text AS description, o.posted_at
                    FROM jobs j
@@ -643,7 +647,9 @@ class InventoryDatabase:
                    JOIN observations o ON o.id=l.observation_id
                    WHERE j.status IN ('active','reopened')
                      AND j.work_mode='unknown' AND o.provider='linkedin'
-                   ORDER BY j.id, LENGTH(o.description_text) DESC, o.last_seen_at DESC"""
+                     {recent_clause}
+                   ORDER BY j.id, LENGTH(o.description_text) DESC, o.last_seen_at DESC""",
+                parameters,
             ).fetchall()
         selected: dict[str, dict[str, object]] = {}
         for row in rows:
@@ -660,6 +666,107 @@ class InventoryDatabase:
                 "posted_at": datetime.fromisoformat(str(row[6])) if row[6] else None,
             }
         return list(selected.values())
+
+    def stored_direct_ats_observations(
+        self, normalized_companies: set[str]
+    ) -> list[dict[str, object]]:
+        """Return active first-party observations for local source matching."""
+        if not normalized_companies:
+            return []
+        placeholders = ",".join("?" for _ in normalized_companies)
+        with self.connect() as conn:
+            rows = conn.execute(
+                f"""SELECT o.id, l.job_id, j.normalized_company, o.provider,
+                          o.provider_board_id, o.provider_job_id, o.source_key,
+                          o.source_url, o.direct_apply_url, o.title_raw, o.company_raw,
+                          o.location_raw, o.description_html, o.description_text,
+                          o.posted_at, o.salary_min, o.salary_max, o.salary_currency,
+                          o.salary_interval, o.employment_type, o.remote, o.parser_version,
+                          o.last_seen_at,
+                          (SELECT GROUP_CONCAT(DISTINCT mode)
+                           FROM observation_work_modes wm WHERE wm.observation_id=o.id)
+                   FROM observations o
+                   JOIN job_observation_links l ON l.observation_id=o.id
+                   JOIN jobs j ON j.id=l.job_id
+                   WHERE o.provider IN ('greenhouse','ashby','lever')
+                     AND j.status IN ('active','reopened')
+                     AND j.normalized_company IN ({placeholders})
+                   ORDER BY o.last_seen_at DESC""",
+                tuple(sorted(normalized_companies)),
+            ).fetchall()
+        return [
+            {
+                "observation_id": str(row[0]),
+                "job_id": str(row[1]),
+                "normalized_company": str(row[2]),
+                "provider": str(row[3]),
+                "provider_board_id": str(row[4]),
+                "provider_job_id": str(row[5]),
+                "source_key": str(row[6]),
+                "source_url": str(row[7]),
+                "direct_apply_url": str(row[8]),
+                "title": str(row[9]),
+                "company": str(row[10]),
+                "location": str(row[11]),
+                "description_html": str(row[12]),
+                "description": str(row[13]),
+                "posted_at": datetime.fromisoformat(str(row[14])) if row[14] else None,
+                "salary_min": row[15],
+                "salary_max": row[16],
+                "salary_currency": row[17],
+                "salary_interval": row[18],
+                "employment_type": row[19],
+                "remote": bool(row[20]) if row[20] is not None else None,
+                "parser_version": str(row[21]),
+                "last_seen_at": datetime.fromisoformat(str(row[22])),
+                "work_modes": str(row[23] or "unknown").split(","),
+            }
+            for row in rows
+        ]
+
+    def attach_existing_source_resolution(
+        self,
+        target_job_id: str,
+        linkedin_observation_id: str,
+        ats_observation_id: str,
+        *,
+        confidence: float,
+        reason: str,
+        seen_at: datetime,
+    ) -> None:
+        """Merge an already stored ATS observation into its LinkedIn-backed job."""
+        with self.transaction() as conn:
+            target = conn.execute(
+                """SELECT 1 FROM job_observation_links l
+                   JOIN observations o ON o.id=l.observation_id
+                   WHERE l.job_id=? AND o.id=? AND o.provider='linkedin'""",
+                (target_job_id, linkedin_observation_id),
+            ).fetchone()
+            if target is None:
+                raise ValueError("LinkedIn observation does not belong to the target job")
+            linked = conn.execute(
+                """SELECT l.job_id FROM job_observation_links l
+                   JOIN observations o ON o.id=l.observation_id
+                   WHERE o.id=? AND o.provider IN ('greenhouse','ashby','lever')""",
+                (ats_observation_id,),
+            ).fetchone()
+            if linked is None:
+                raise ValueError("stored source resolution requires a direct ATS observation")
+            if str(linked[0]) != target_job_id:
+                self._merge_job_into(
+                    conn,
+                    target_job_id,
+                    str(linked[0]),
+                    reason,
+                    confidence,
+                    seen_at,
+                )
+            conn.execute(
+                """UPDATE job_observation_links SET merge_reason=?, merge_confidence=?
+                   WHERE job_id=? AND observation_id=?""",
+                (reason, confidence, target_job_id, ats_observation_id),
+            )
+            self._refresh_job(conn, ats_observation_id, seen_at)
 
     def record_source_resolution(
         self,

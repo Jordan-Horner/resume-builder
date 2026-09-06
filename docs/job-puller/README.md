@@ -108,12 +108,15 @@ resume-builder jobs status
 resume-builder jobs shortlist
 resume-builder jobs screen <job-id>
 resume-builder jobs verify <job-id>
+resume-builder jobs resolve-sources
 ```
 
 Use `jobs new` for recurring discovery. It snapshots every canonical job ID in
-the database, refreshes the selected providers, and writes a shortlist containing
-only active canonical jobs that did not exist before that refresh. Existing,
-updated, reopened, and cross-source duplicate jobs are not new. The command
+the database, refreshes the selected providers, then resolves newly seen
+unknown-mode LinkedIn jobs against public first-party ATS APIs before writing
+the shortlist. Only active canonical jobs that did not exist before that
+refresh are included. Existing, updated, reopened, and cross-source duplicate
+jobs are not new. The command
 writes `job-search/latest-refresh.json`, `job-search/new-jobs.json`, and
 `job-search/new-jobs.md`. While the refresh runs, it immediately prints the
 total provider count and a flushed progress line before each provider source is
@@ -236,15 +239,61 @@ LinkedIn job details are cached by job ID and parser version for 24 hours. Searc
 they are the rotating discovery surface. Individual malformed details are reported and skipped without hiding later
 jobs, while the partial run remains unsuccessful so its checkpoint cannot advance.
 
-When a LinkedIn detail exposes an external Apply destination, Job Puller unwraps
-the destination and follows its redirect chain without a browser. Every hop must
-use HTTP or HTTPS and resolve only to public network addresses; private,
-loopback, local, credential-bearing, excessive, and malformed redirects are
-rejected before they are requested. The final URL is stored as the direct
-application identity. When the destination publishes `JobPosting` JSON-LD, its
-first-party description, employment type, structured location, and explicit
-work arrangement enrich the observation. Resolution status, redirect hops, and
-failures remain visible in raw evidence and provider metrics.
+LinkedIn's logged-out detail response usually does not expose the external Apply
+destination. Job Puller therefore does not treat LinkedIn-page parsing as its
+primary source-resolution strategy. If an external destination is present, it
+is still validated hop by hop and may supply `JobPosting` JSON-LD, but normal
+resolution starts from public ATS board catalogs and the employer's ATS API.
+
+Resolve first-party copies of active LinkedIn jobs whose work mode is unknown:
+
+```bash
+resume-builder jobs resolve-sources             # read-only dry run
+resume-builder jobs resolve-sources --apply     # attach verified ATS observations
+resume-builder jobs resolve-sources --limit 50
+```
+
+The resolver first checks direct ATS observations already stored by the normal
+provider refresh. It removes local matches before loading or querying the board
+catalog. Remaining jobs use cached, pinned, MIT-licensed Greenhouse, Ashby, and
+Lever board directories. Candidate requests are prioritized by exact catalog
+identity, then compact-prefix identity, then company-slug probes; duplicate
+provider/board pairs are fetched only once. Requests are bounded and concurrent;
+no browser, account, cookie, or paid proxy service is used. A match must have the
+same normalized title, at least 85% three-word description coverage, a unique
+best candidate, and an explicit ATS work mode. The ATS observation becomes the
+canonical display source while the LinkedIn observation remains as provenance.
+Ambiguous or weak matches do not write anything.
+
+This resolution step runs automatically inside `jobs new` whenever LinkedIn was
+part of the refresh. Automatic runs apply verified matches before shortlist
+generation, inspect only LinkedIn observations seen during that refresh, and
+record their result under `source_resolution` in the latest-refresh manifest.
+The manual command remains useful for read-only audits and historical backfills.
+Resolution failure is visible in the manifest but does not change provider
+refresh success.
+
+`--probe-missing` additionally tries a bounded set of safe company-derived
+Greenhouse, Ashby, and Lever board IDs when the catalog has no useful entry. It
+is opt-in for manual runs. Automatic runs enable this fallback for at most 8
+missing companies per refresh, within a hard 40-request ceiling. Configure the
+bounds with the optional
+`source_resolution` mapping in `search.yml`:
+
+```yaml
+source_resolution:
+  enabled: true
+  max_targets_per_refresh: 100
+  max_board_requests_per_refresh: 40
+  max_probe_companies: 8
+  workers: 12
+  catalog_cache_hours: 24
+```
+
+Catalog lookup remains the efficient bulk path. Workday continues
+to work for explicitly configured boards, but is excluded from reverse matching
+until its list API can provide enough posting text for the same strict identity
+check.
 
 ## Adding direct ATS boards
 

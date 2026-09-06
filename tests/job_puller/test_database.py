@@ -107,6 +107,21 @@ def test_verified_ats_source_replaces_unknown_linkedin_projection(tmp_path):
     assert db.unresolved_linkedin_targets() == []
 
 
+def test_unresolved_linkedin_targets_can_be_limited_to_current_refresh(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    seen_at = datetime.now(UTC) - timedelta(hours=2)
+    linkedin = observation()
+    linkedin.location = "Phoenix, AZ"
+    linkedin.work_arrangement = explicit_arrangement(
+        [WorkMode.UNKNOWN], source="linkedin", rule="not_listed"
+    )
+    db.record_result(result(linkedin, when=seen_at))
+
+    assert len(db.unresolved_linkedin_targets(seen_since=seen_at - timedelta(seconds=1))) == 1
+    assert db.unresolved_linkedin_targets(seen_since=seen_at + timedelta(seconds=1)) == []
+
+
 def test_job_ids_include_inactive_canonical_jobs(tmp_path):
     db = InventoryDatabase(tmp_path / "inventory.db")
     db.migrate()

@@ -10,6 +10,11 @@ Greenhouse and Lever entries returned non-empty public job APIs during review.
 Ashby entries are catalog-sourced; live reachability is environment-dependent.
 No candidate or private workspace information is included.
 
+The optional `resolve-sources` command downloads the three named dataset files
+from the same pinned commit into the private workspace cache. It uses them only
+to narrow first-party Greenhouse, Ashby, and Lever API requests for unresolved
+employers. The catalog is validated as data and is not executable code.
+
 MIT License
 
 Copyright (c) 2026 Riley Dorrington

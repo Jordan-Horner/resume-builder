@@ -11,14 +11,14 @@ import json
 import re
 import sys
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 from job_puller.cli import main as puller_main
-from job_puller.config import load_config, resolve_database_path
+from job_puller.config import load_config, resolve_database_path, resolve_project_path
 from job_puller.database import InventoryDatabase
 from job_puller.liveness import verify_job_liveness
 from job_puller.locations import location_key, matches_search_location, matching_location_terms
@@ -638,6 +638,72 @@ def _new_jobs(
             fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
 
 
+def _resolve_sources_after_refresh(
+    database: InventoryDatabase,
+    config_path: Path,
+    started_at: datetime,
+    provider_runs: list[dict[str, object]],
+) -> dict[str, object]:
+    """Resolve fresh unknown LinkedIn jobs without changing refresh success semantics."""
+    linkedin_ran = any(run.get("provider") == "linkedin" for run in provider_runs)
+    if not linkedin_ran:
+        return {"status": "skipped", "reason": "linkedin_not_refreshed"}
+
+    try:
+        from job_puller.source_resolution import (
+            DATASET_REVISION,
+            AtsCatalog,
+            ResolutionReport,
+            linkedin_targets,
+            resolve_linkedin_sources,
+        )
+
+        config = load_config(config_path)
+        settings = config.source_resolution
+        if not settings.enabled:
+            return {"status": "skipped", "reason": "disabled"}
+        targets = linkedin_targets(
+            database,
+            seen_since=started_at,
+            limit=settings.max_targets_per_refresh,
+        )
+        if not targets:
+            return {
+                "status": "complete",
+                "catalog_revision": DATASET_REVISION,
+                **ResolutionReport().as_dict(),
+            }
+        catalog = AtsCatalog.load(
+            resolve_project_path(config_path, "cache/ats-source-catalog"),
+            timeout=config.request_timeout_seconds,
+            max_age=timedelta(hours=settings.catalog_cache_hours),
+        )
+        report = resolve_linkedin_sources(
+            database,
+            catalog,
+            timeout=config.request_timeout_seconds,
+            apply=True,
+            include_probes=True,
+            max_probe_companies=settings.max_probe_companies,
+            max_board_requests=settings.max_board_requests_per_refresh,
+            workers=settings.workers,
+            targets=targets,
+        )
+        return {
+            "status": "complete",
+            "catalog_revision": DATASET_REVISION,
+            **report.as_dict(),
+        }
+    except Exception as exc:
+        # Source correction is enrichment: expose the failure for operators but
+        # do not discard a successful provider refresh or its new-job delta.
+        return {
+            "status": "unavailable",
+            "error_category": type(exc).__name__,
+            "error": str(exc),
+        }
+
+
 def _new_jobs_unlocked(
     config_path: Path,
     preferences_path: Path,
@@ -681,9 +747,15 @@ def _new_jobs_unlocked(
     atomic_write_json(DEFAULT_LATEST_REFRESH, manifest)
 
     refresh_status = puller_main(_provider_args(config_path, providers))
+    provider_runs = database.scrape_runs_since(started_at)
+    source_resolution = _resolve_sources_after_refresh(
+        database,
+        config_path,
+        started_at,
+        provider_runs,
+    )
     after_ids = database.job_ids()
     active_ids = {str(job["id"]) for job in database.active_inventory()}
-    provider_runs = database.scrape_runs_since(started_at)
     new_job_ids = sorted((((after_ids - before_ids) & active_ids) | recovered_job_ids) & active_ids)
     has_successful_provider = any(
         run.get("outcome") in {"healthy", "healthy-empty", "capped"}
@@ -703,6 +775,7 @@ def _new_jobs_unlocked(
             "completed_at": datetime.now(UTC).isoformat(),
             "refresh_exit_code": refresh_status,
             "provider_runs": provider_runs,
+            "source_resolution": source_resolution,
             "recovered_job_ids": sorted(recovered_job_ids),
             "new_to_database_job_ids": new_job_ids,
         }

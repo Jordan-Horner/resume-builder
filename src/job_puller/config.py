@@ -186,6 +186,17 @@ class BoardRegistry(StrictModel):
     providers: BoardRegistryProviders = Field(default_factory=BoardRegistryProviders)
 
 
+class SourceResolutionSettings(StrictModel):
+    """Bounds for automatic LinkedIn-to-ATS source resolution."""
+
+    enabled: bool = True
+    max_targets_per_refresh: int = Field(default=100, ge=1, le=1000)
+    max_board_requests_per_refresh: int = Field(default=40, ge=1, le=500)
+    max_probe_companies: int = Field(default=8, ge=0, le=100)
+    workers: int = Field(default=12, ge=1, le=32)
+    catalog_cache_hours: int = Field(default=24, ge=1, le=168)
+
+
 class InventoryConfig(StrictModel):
     schema_version: Literal[1] = 1
     enabled: bool = True
@@ -198,6 +209,7 @@ class InventoryConfig(StrictModel):
     request_timeout_seconds: float = Field(default=30, ge=5, le=180)
     provider_retry_attempts: int = Field(default=2, ge=1, le=3)
     provider_retry_backoff_seconds: float = Field(default=1, ge=0, le=30)
+    source_resolution: SourceResolutionSettings = Field(default_factory=SourceResolutionSettings)
     search: SearchSettings
     providers: Providers = Field(default_factory=Providers)
 

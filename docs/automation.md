@@ -8,9 +8,12 @@ required.
 ## What runs automatically
 
 - Job discovery runs at one or more local times each day. Each run refreshes
-  enabled providers, identifies canonical jobs that are genuinely new, records
-  deterministic warnings, and alerts for every new job without a durable
-  application disposition. Alerts and saved review output preserve newest-first
+  enabled providers, resolves newly seen LinkedIn jobs with unknown work mode
+  against public first-party ATS APIs, identifies canonical jobs that are
+  genuinely new, records deterministic warnings, and alerts for every new job
+  without a durable application disposition. Source resolution runs before the
+  shortlist is built, uses no browser or paid service, and is bounded by the job
+  search configuration. Alerts and saved review output preserve newest-first
   order; relevance heuristics do not suppress opportunities.
 - Gmail reconciliation runs on a lower-priority interval. It uses the existing
   read-only Gmail policy and applies only confident lifecycle updates.
@@ -81,6 +84,16 @@ collection run. This prevents the scheduler from repeating provider discovery
 merely because the model provider was unavailable. Notifications report
 recommended, unresolved, additional, and total job counts; every job remains in
 the full queue.
+
+ATS source resolution is also enrichment rather than a discovery gate. Its
+status and counts are recorded under `source_resolution` in
+`job-search/latest-refresh.json`; an unavailable catalog or ATS endpoint does
+not discard a successful provider refresh. By default, each refresh checks at
+most 100 newly seen unresolved LinkedIn jobs, submits at most 40 deduplicated
+board requests, and uses company-derived board IDs for at most 8 companies
+missing from the cached catalog. Stored first-party ATS observations are checked
+before any network request. The manifest records local and network matches,
+submitted and deferred requests, scanned postings, and resolver duration.
 
 The schedule uses the declared IANA timezone, including daylight-saving changes.
 `run_on_start` makes first deployment immediately test the corresponding scanner.

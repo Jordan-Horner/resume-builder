@@ -36,6 +36,9 @@ def test_example_config_is_valid():
     config = load_config(path)
     assert config.schema_version == 1
     assert config.providers.linkedin.enabled
+    assert config.source_resolution.enabled
+    assert config.source_resolution.max_targets_per_refresh == 100
+    assert config.source_resolution.max_board_requests_per_refresh == 40
     assert len(config.search.families) == 5
 
 

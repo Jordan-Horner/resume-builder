@@ -72,7 +72,15 @@ The initial supported providers are:
 - SmartRecruiters;
 - Workday.
 
-Direct ATS scans initially cover boards declared in configuration and boards discovered from commercial-board results. Global reverse scanning across every known ATS tenant is deferred because it is expensive, noisy, and unnecessary for proving inventory quality.
+Direct ATS scans cover boards declared in configuration and boards discovered
+from commercial-board results. Unknown-mode LinkedIn observations can also be
+resolved in a dry-run-first funnel. Existing ATS observations are matched first;
+only unresolved jobs continue to a pinned public board directory that narrows
+Greenhouse, Ashby, and Lever candidates by employer. Board identities are
+deduplicated globally and prioritized before a hard request ceiling is applied.
+Only a unique exact-title match with strong description overlap and explicit ATS
+work-mode evidence may attach automatically. This avoids a global tenant sweep.
+Bounded company-slug probes are available only as the final fallback.
 
 ### Incremental collection
 
@@ -452,7 +460,8 @@ Resume Builder should validate the envelope, verify the description hash, derive
 ### Phase 2 — harden inventory quality
 
 1. Add same-run description enrichment and retryable enrichment failures.
-2. Resolve commercial-board observations to direct ATS postings when available.
+2. Resolve unknown-mode LinkedIn observations to direct ATS postings using
+   employer-narrowed catalogs, strict content identity, and an explicit apply step.
 3. Implement conservative duplicate merging and canonical source preference.
 4. Implement explicit active, possibly-closed, closed, and reopened transitions without destructive deletion.
 5. Enforce 30-day raw-payload retention while preserving normalized provenance.
