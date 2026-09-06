@@ -27,6 +27,7 @@ from resume_builder.job_screening import (
     finalize_screen,
     has_clearance_requirement,
     screening_prompt,
+    semantic_screen_output_type,
     with_screening_evidence,
 )
 from resume_builder.screening_evidence import (
@@ -660,6 +661,51 @@ def _criterion_screen_packet() -> ScreeningPacket:
             ],
         ),
     )
+
+
+def test_semantic_screen_accepts_json_encoded_criterion_assessments() -> None:
+    packet = _criterion_screen_packet()
+    criterion = packet.criterion_evidence[0]
+    parsed = SemanticScreen.model_validate(
+        {
+            "fit": "good_match",
+            "confidence": "medium",
+            "criterion_assessments": json.dumps(
+                [
+                    {
+                        "criterion_id": criterion.criterion_id,
+                        "outcome": "unknown",
+                        "confidence": "low",
+                        "fact_ids": [],
+                        "explanation": "No relevant evidence was retrieved.",
+                        "materially_affects_recommendation": False,
+                    }
+                ]
+            ),
+            "strengths": [],
+            "gaps": [],
+            "unknowns": [],
+            "reasoning_summary": "The supplied evidence does not resolve the criterion.",
+        }
+    )
+
+    assert parsed.criterion_assessments[0].criterion_id == criterion.criterion_id
+
+
+def test_packet_bound_semantic_screen_rejects_missing_criterion_assessments() -> None:
+    packet = _criterion_screen_packet()
+    output_type = semantic_screen_output_type(packet)
+
+    with pytest.raises(ValueError, match="exactly one assessment"):
+        output_type(
+            fit=FitOutcome.GOOD_MATCH,
+            confidence=Confidence.MEDIUM,
+            criterion_assessments=[],
+            strengths=[],
+            gaps=[],
+            unknowns=[],
+            reasoning_summary="The supplied evidence appears relevant.",
+        )
 
 
 def test_criterion_screen_requires_exact_assessment_coverage() -> None:

@@ -29,6 +29,7 @@ from resume_builder.posting_interpretation import (
     SectionReview,
     bound_posting_description,
     build_interpretation_packet,
+    posting_interpretation_output_type,
     section_posting,
     validate_interpretation,
 )
@@ -301,6 +302,23 @@ def test_validation_requires_exact_section_coverage_and_lexically_grounded_excer
         validate_interpretation(packet, missing_review)
 
 
+def test_packet_bound_interpretation_rejects_cross_section_citations() -> None:
+    packet = build_interpretation_packet(
+        _job(
+            "Responsibilities\nOperate the production platform.\n"
+            "Requirements\nFive years of platform operations experience."
+        )
+    )
+    invalid = _interpretation(packet)
+    invalid.criteria[0].source_unit_ids = [
+        packet.sections[0].source_units[0].id,
+        packet.sections[1].source_units[0].id,
+    ]
+
+    with pytest.raises(ValueError, match="must belong to one section"):
+        posting_interpretation_output_type(packet).model_validate(invalid.model_dump())
+
+
 def test_validation_rejects_a_criterion_bound_to_the_wrong_source_sentence() -> None:
     packet = build_interpretation_packet(
         _job("Requirements\nBachelor's degree with two years of experience.")
@@ -497,7 +515,10 @@ def test_interpretation_service_caches_by_posting_hash_model_and_rubric(tmp_path
     assert second.cached is True
     assert different_model.cached is False
     assert len(adapter.requests) == 2
-    assert all(request.output_type is ProposedPostingInterpretation for request in adapter.requests)
+    assert all(
+        issubclass(request.output_type, ProposedPostingInterpretation)
+        for request in adapter.requests
+    )
     assert all("candidate_evidence" not in request.prompt for request in adapter.requests)
 
 
@@ -547,7 +568,7 @@ def test_section_ids_and_packet_hash_are_stable() -> None:
 
 class InvalidShadowAdapter(InterpretationAdapter):
     def run_structured(self, request: StructuredModelRequest) -> StructuredModelReply:
-        if request.output_type is ProposedPostingInterpretation:
+        if issubclass(request.output_type, ProposedPostingInterpretation):
             reply = super().run_structured(request)
             invalid = ProposedPostingInterpretation.model_validate(reply.output).model_copy(
                 deep=True
@@ -625,7 +646,7 @@ class CriterionScreenAdapter:
     def run_structured(self, request: StructuredModelRequest) -> StructuredModelReply:
         self.requests.append(request)
         payload = json.loads(request.prompt.split("\n", 1)[1])
-        if request.output_type is ProposedPostingInterpretation:
+        if issubclass(request.output_type, ProposedPostingInterpretation):
             unit = payload["sections"][0]["source_units"][0]
             return StructuredModelReply(
                 output=ProposedPostingInterpretation(

@@ -616,6 +616,22 @@ def validate_interpretation(
     )
 
 
+def posting_interpretation_output_type(
+    packet: PostingInterpretationPacket,
+) -> type[ProposedPostingInterpretation]:
+    """Bind grounding rules to provider validation so invalid output can be retried."""
+
+    class PacketBoundPostingInterpretation(ProposedPostingInterpretation):
+        @model_validator(mode="after")
+        def validate_packet_contract(self) -> PacketBoundPostingInterpretation:
+            validate_interpretation(packet, self)
+            return self
+
+    PacketBoundPostingInterpretation.__name__ = f"PostingInterpretation_{packet.packet_hash[:12]}"
+    PacketBoundPostingInterpretation.__qualname__ = PacketBoundPostingInterpretation.__name__
+    return PacketBoundPostingInterpretation
+
+
 @dataclass(frozen=True)
 class PostingInterpretationOutcome:
     interpretation: PostingInterpretation
@@ -713,7 +729,7 @@ class PostingInterpretationService:
                 prompt=interpretation_prompt(packet),
                 instructions=INTERPRETATION_INSTRUCTIONS,
                 model=model,
-                output_type=ProposedPostingInterpretation,
+                output_type=posting_interpretation_output_type(packet),
             )
         )
         interpretation = validate_interpretation(

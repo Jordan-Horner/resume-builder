@@ -19,6 +19,7 @@ from .job_screening import (
     deterministic_insufficient_evidence_result,
     finalize_screen,
     screening_prompt,
+    semantic_screen_output_type,
     with_screening_evidence,
 )
 from .posting_interpretation import (
@@ -217,7 +218,7 @@ class ScreeningService:
                 prompt=screening_prompt(packet),
                 instructions=SCREENING_INSTRUCTIONS,
                 model=model,
-                output_type=SemanticScreen,
+                output_type=semantic_screen_output_type(packet),
             )
         )
         semantic = SemanticScreen.model_validate(reply.output)

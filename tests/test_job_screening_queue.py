@@ -38,7 +38,7 @@ class QueueAdapter:
         if self.fail:
             raise AgentProviderError("fictional safe failure")
         packet = json.loads(request.prompt.split("\n", 1)[1])
-        if request.output_type is ProposedPostingInterpretation:
+        if issubclass(request.output_type, ProposedPostingInterpretation):
             first = packet["sections"][0]
             return StructuredModelReply(
                 output=ProposedPostingInterpretation(

@@ -79,6 +79,13 @@ provider-call telemetry counts both structured requests. Jobs with
 hard local conflicts, incomplete listings, or no saved title/skill search signal
 are skipped before any provider call and remain available for a manual screen.
 
+Provider output is validated against both its structural schema and the exact
+posting packet while the provider retry loop is still active. This includes
+source-unit grounding, complete criterion coverage, and evidence-citation
+rules. A JSON-encoded criterion-assessment array is decoded only as a
+compatibility normalization and is then subjected to the same strict typed and
+packet-bound validation.
+
 A screening failure is recorded as unresolved and does not fail the completed
 collection run. This prevents the scheduler from repeating provider discovery
 merely because the model provider was unavailable. Notifications report

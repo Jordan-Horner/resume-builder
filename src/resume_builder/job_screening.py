@@ -12,7 +12,14 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 from job_puller.locations import location_key, matches_search_location, matching_location_terms
 
@@ -201,6 +208,20 @@ class SemanticScreen(StrictModel):
     stretch_case: str | None = Field(default=None, max_length=800)
     reasoning_summary: str = Field(max_length=1_200)
     salary_estimate: SalaryEstimate | None = None
+
+    @field_validator("criterion_assessments", mode="before")
+    @classmethod
+    def decode_json_criterion_assessments(cls, value: Any) -> Any:
+        """Normalize a common structured-output encoding without weakening validation."""
+        if not isinstance(value, str):
+            return value
+        try:
+            decoded = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise ValueError("criterion_assessments must be a JSON array") from exc
+        if not isinstance(decoded, list):
+            raise ValueError("criterion_assessments must be a JSON array")
+        return decoded
 
     @model_validator(mode="after")
     def validate_stretch_explanation(self) -> SemanticScreen:
@@ -997,6 +1018,20 @@ def finalize_screen(
         criterion_evidence=packet.criterion_evidence,
         criterion_assessments=semantic.criterion_assessments,
     )
+
+
+def semantic_screen_output_type(packet: ScreeningPacket) -> type[SemanticScreen]:
+    """Bind final packet rules to provider validation so invalid output can be retried."""
+
+    class PacketBoundSemanticScreen(SemanticScreen):
+        @model_validator(mode="after")
+        def validate_packet_contract(self) -> PacketBoundSemanticScreen:
+            finalize_screen(packet, self, model="provider/schema-validation")
+            return self
+
+    PacketBoundSemanticScreen.__name__ = f"SemanticScreen_{packet.packet_hash[:12]}"
+    PacketBoundSemanticScreen.__qualname__ = PacketBoundSemanticScreen.__name__
+    return PacketBoundSemanticScreen
 
 
 def deterministic_ineligible_result(packet: ScreeningPacket) -> ScreeningResult:
