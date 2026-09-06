@@ -622,6 +622,115 @@ def test_automatic_source_resolution_applies_configured_bounds(tmp_path: Path, m
     ]
 
 
+def test_automatic_source_resolution_uses_enabled_bright_data_after_free_funnel(
+    tmp_path: Path, monkeypatch
+):
+    import job_puller.source_resolution as resolution_module
+    import resume_builder.bright_data as bright_data_module
+
+    started_at = jobs_module.datetime.now(jobs_module.UTC)
+    settings = SimpleNamespace(
+        enabled=True,
+        max_targets_per_refresh=75,
+        max_board_requests_per_refresh=30,
+        max_probe_companies=8,
+        workers=6,
+        catalog_cache_hours=12,
+    )
+    monkeypatch.setattr(
+        jobs_module,
+        "load_config",
+        lambda _path: SimpleNamespace(
+            source_resolution=settings,
+            request_timeout_seconds=19,
+        ),
+    )
+    catalog = SimpleNamespace(boards_for=lambda _company: [])
+    monkeypatch.setattr(
+        resolution_module.AtsCatalog,
+        "load",
+        lambda *_args, **_kwargs: SimpleNamespace(add_configured_boards=lambda _config: catalog),
+    )
+    target = resolution_module.LinkedInTarget(
+        job_id="job-1",
+        observation_id="observation-1",
+        title="Platform Engineer",
+        company="Example",
+        location="",
+        description="",
+        posted_at=None,
+        source_url="https://www.linkedin.com/jobs/view/platform-engineer-1234567890",
+    )
+    captured_target = resolution_module.LinkedInTarget(
+        job_id=target.job_id,
+        observation_id=target.observation_id,
+        title=target.title,
+        company=target.company,
+        location=target.location,
+        description=target.description,
+        posted_at=target.posted_at,
+        direct_apply_url="https://jobs.ashbyhq.com/example/job-1",
+        source_url=target.source_url,
+    )
+    target_calls = 0
+
+    def targets(*_args, **_kwargs):
+        nonlocal target_calls
+        target_calls += 1
+        return [captured_target] if target_calls == 4 else [target]
+
+    monkeypatch.setattr(resolution_module, "linkedin_targets", targets)
+    resolve_calls = []
+
+    def resolve(*_args, **kwargs):
+        resolve_calls.append(kwargs)
+        return resolution_module.ResolutionReport(
+            targets=1,
+            applied=1 if len(resolve_calls) == 2 else 0,
+        )
+
+    monkeypatch.setattr(resolution_module, "resolve_linkedin_sources", resolve)
+    captured = {}
+    monkeypatch.setattr(
+        bright_data_module,
+        "load_bright_data_settings",
+        lambda workspace: (
+            captured.update(workspace=workspace)
+            or bright_data_module.BrightDataSettings(enabled=True, max_records_per_refresh=7)
+        ),
+    )
+    monkeypatch.setattr(bright_data_module, "bright_data_key", lambda _workspace: "token")
+
+    def enrich(database, targets, **kwargs):
+        captured.update(database=database, targets=targets, enrich_kwargs=kwargs)
+        return {"status": "complete", "requested": 1, "received": 1, "applied": 1}
+
+    monkeypatch.setattr(bright_data_module, "enrich_linkedin_targets", enrich)
+    database = FakeInventory()
+    workspace = tmp_path / "workspace"
+
+    report = _resolve_sources_after_refresh(
+        database,
+        workspace / "job-search" / "config" / "search.yml",
+        started_at,
+        [{"provider": "linkedin", "success": True}],
+    )
+
+    assert report["bright_data"]["status"] == "complete"
+    assert report["bright_data"]["requested"] == 1
+    assert report["bright_data"]["received"] == 1
+    assert report["bright_data"]["applied"] == 1
+    assert report["bright_data"]["ats_followup"]["applied"] == 1
+    assert captured["workspace"] == workspace
+    assert captured["database"] is database
+    assert captured["targets"] == [target]
+    assert captured["enrich_kwargs"] == {"api_token": "token", "limit": 7, "timeout": 60}
+    assert len(resolve_calls) == 2
+    assert resolve_calls[1]["targets"] == [captured_target]
+    assert resolve_calls[1]["apply"] is True
+    assert resolve_calls[1]["max_board_requests"] == 7
+
+
 def test_automatic_source_resolution_prioritizes_known_boards_before_target_cap(
     tmp_path: Path, monkeypatch
 ):

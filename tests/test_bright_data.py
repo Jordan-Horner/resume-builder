@@ -1,0 +1,95 @@
+from datetime import UTC, datetime, timedelta
+
+from job_puller.database import InventoryDatabase
+from job_puller.models import JobObservation, ProviderResult
+from job_puller.source_resolution import linkedin_targets
+from job_puller.work_modes import WorkMode, explicit_arrangement
+from resume_builder import bright_data
+
+
+def test_bright_data_enriches_exact_linkedin_job(monkeypatch, tmp_path):
+    database = InventoryDatabase(tmp_path / "inventory.db")
+    database.migrate()
+    observation = JobObservation(
+        provider="linkedin",
+        provider_job_id="4462886742",
+        title="Technical Support Engineer",
+        company="Example",
+        source_url="https://www.linkedin.com/jobs/view/4462886742",
+        location="Austin, TX",
+        description_text="Support customer systems. " * 20,
+        work_arrangement=explicit_arrangement(
+            [WorkMode.UNKNOWN], source="linkedin", rule="not_listed"
+        ),
+    )
+    now = datetime.now(UTC)
+    database.record_result(
+        ProviderResult(
+            "linkedin:test",
+            "linkedin",
+            [observation],
+            now - timedelta(seconds=1),
+            now,
+            True,
+        )
+    )
+
+    class Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "url": "https://www.linkedin.com/jobs/view/4462886742",
+                "job_posting_id": "4462886742",
+                "job_title": "Technical Support Engineer",
+                "company_name": "Example",
+                "job_location": "San Francisco, CA",
+                "job_summary": "This role is hybrid. Support customer systems from our office.",
+                "job_employment_type": "Full-time",
+                "apply_link": "https://example.com/jobs/REQ-1",
+                "base_salary": {
+                    "min_amount": 100000,
+                    "max_amount": 125000,
+                    "currency": "$",
+                    "payment_period": "yr",
+                },
+            }
+
+    class Client:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def post(self, url, **kwargs):
+            assert url == bright_data.BRIGHT_DATA_ENDPOINT
+            assert kwargs["headers"] == {"Authorization": "Bearer fixture-token"}
+            assert kwargs["json"]["input"] == [
+                {"url": "https://www.linkedin.com/jobs/view/4462886742"}
+            ]
+            return Response()
+
+    monkeypatch.setattr(bright_data.httpx, "Client", lambda **_kwargs: Client())
+
+    report = bright_data.enrich_linkedin_targets(
+        database,
+        linkedin_targets(database),
+        api_token="fixture-token",
+        limit=10,
+    )
+
+    assert report == {
+        "status": "complete",
+        "requested": 1,
+        "received": 1,
+        "applied": 1,
+        "failed": 0,
+    }
+    job = database.active_inventory()[0]
+    assert job["location"] == "San Francisco, CA"
+    assert job["work_modes"] == ["hybrid"]
+    assert job["salary_min"] == 100000
+    assert job["salary_max"] == 125000
+    assert job["url"] == "https://example.com/jobs/REQ-1"

@@ -537,6 +537,52 @@ def test_workday_exact_title_fetch_uses_cxs_detail_for_location_and_mode(monkeyp
     assert normal.metrics["detail_requests"] == 1
 
 
+def test_workday_direct_url_fetch_skips_board_search(monkeypatch):
+    board = AtsBoard(
+        id="example-careers",
+        name="Example",
+        api_url="https://example.wd5.myworkdayjobs.com/wday/cxs/example/Careers/jobs",
+        careers_url="https://example.wd5.myworkdayjobs.com/Careers",
+    )
+    detail_payload = {
+        "jobPostingInfo": {
+            "title": "AI Engineer",
+            "jobDescription": "<p>Build reliable AI services for customers.</p>",
+            "location": "Phoenix, AZ",
+            "jobReqId": "REQ-1",
+            "remoteType": "Hybrid",
+        }
+    }
+
+    class Client:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def get(self, url):
+            assert url == (
+                "https://example.wd5.myworkdayjobs.com/wday/cxs/example/Careers/"
+                "job/Phoenix-AZ/AI-Engineer_REQ-1"
+            )
+            return response("GET", url, detail_payload)
+
+    monkeypatch.setattr(ats_module.httpx, "Client", lambda **_kwargs: Client())
+
+    result = WorkdayProvider(board).fetch_direct_urls(
+        [
+            "https://example.wd5.myworkdayjobs.com/Careers/"
+            "job/Phoenix-AZ/AI-Engineer_REQ-1?source=LinkedIn"
+        ]
+    )
+
+    assert result.success is True
+    assert result.metrics == {"detail_requests": 1, "accepted": 1}
+    assert result.observations[0].provider_job_id == "REQ-1"
+    assert result.observations[0].work_modes == {WorkMode.HYBRID}
+
+
 def test_ats_filter_keeps_recent_target_titles_regardless_of_work_mode():
     search = SearchSettings(
         remote_only=True,

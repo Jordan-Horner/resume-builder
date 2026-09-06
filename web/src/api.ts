@@ -82,6 +82,14 @@ export function configureOpenRouter(apiKey: string): Promise<{ connected: boolea
   });
 }
 
+export function configureBrightData(apiToken: string, enabled: boolean, maxRecordsPerRefresh: number): Promise<{ connected: boolean; enabled: boolean; max_records_per_refresh: number; message: string }> {
+  return request("/api/integrations/bright-data", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ api_token: apiToken, enabled, max_records_per_refresh: maxRecordsPerRefresh }),
+  });
+}
+
 export function getGmailSetup(): Promise<GmailSetup> {
   return request("/api/integrations/gmail/setup");
 }

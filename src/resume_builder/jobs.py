@@ -709,11 +709,68 @@ def _resolve_sources_after_refresh(
             workers=settings.workers,
             targets=targets,
         )
-        return {
+        payload: dict[str, object] = {
             "status": "complete",
             "catalog_revision": DATASET_REVISION,
             **report.as_dict(),
         }
+        resolved_config_path = config_path.resolve()
+        workspace = (
+            resolved_config_path.parent.parent.parent
+            if resolved_config_path.parent.name == "config"
+            and resolved_config_path.parent.parent.name == "job-search"
+            else Path.cwd()
+        )
+        from .bright_data import (
+            bright_data_key,
+            enrich_linkedin_targets,
+            load_bright_data_settings,
+        )
+
+        bright_settings = load_bright_data_settings(workspace)
+        if bright_settings.enabled:
+            token = bright_data_key(workspace)
+            if not token:
+                payload["bright_data"] = {
+                    "status": "unavailable",
+                    "error": "API token is not configured",
+                }
+            else:
+                selected_ids = {target.job_id for target in targets}
+                remaining = [
+                    target for target in linkedin_targets(database) if target.job_id in selected_ids
+                ]
+                try:
+                    bright_report = enrich_linkedin_targets(
+                        database,
+                        remaining,
+                        api_token=token,
+                        limit=bright_settings.max_records_per_refresh,
+                        timeout=max(60, config.request_timeout_seconds),
+                    )
+                    payload["bright_data"] = bright_report
+                    captured_targets = [
+                        target
+                        for target in linkedin_targets(database)
+                        if target.job_id in selected_ids and target.direct_apply_url
+                    ]
+                    if bright_report.get("applied") and captured_targets:
+                        bright_report["ats_followup"] = resolve_linkedin_sources(
+                            database,
+                            AtsCatalog({}),
+                            timeout=config.request_timeout_seconds,
+                            apply=True,
+                            max_board_requests=bright_settings.max_records_per_refresh,
+                            workers=settings.workers,
+                            targets=captured_targets,
+                        ).as_dict()
+                except Exception as exc:
+                    payload["bright_data"] = {
+                        "status": "unavailable",
+                        "error_category": type(exc).__name__,
+                        "error": str(exc),
+                    }
+        return payload
     except Exception as exc:
         # Source correction is enrichment: expose the failure for operators but
         # do not discard a successful provider refresh or its new-job delta.

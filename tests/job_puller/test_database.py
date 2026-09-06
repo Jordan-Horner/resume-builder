@@ -91,6 +91,29 @@ def test_browser_capture_attaches_external_apply_url_without_changing_seen_time(
     ]
 
 
+def test_unresolved_target_prefers_captured_link_over_longer_linkedin_observation(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    first = observation()
+    first.work_arrangement = explicit_arrangement(
+        [WorkMode.UNKNOWN], source="linkedin", rule="not_listed"
+    )
+    db.record_result(result(first))
+    job_id = db.active_inventory()[0]["id"]
+    captured_url = "https://jobs.ashbyhq.com/example/ats-1"
+    db.record_captured_application_links([{"job_id": job_id, "captured_url": captured_url}])
+    second = observation(job_id="2", description="A newer and much longer description. " * 5)
+    second.work_arrangement = explicit_arrangement(
+        [WorkMode.UNKNOWN], source="linkedin", rule="not_listed"
+    )
+    db.record_result(result(second, when=datetime.now(UTC) + timedelta(minutes=1)))
+
+    target = db.unresolved_linkedin_targets()[0]
+
+    assert target["job_id"] == job_id
+    assert target["direct_apply_url"] == captured_url
+
+
 def test_reclassify_commercial_work_modes_previews_then_applies_correction(tmp_path):
     db = InventoryDatabase(tmp_path / "inventory.db")
     db.migrate()
@@ -140,6 +163,8 @@ def test_verified_ats_source_replaces_unknown_linkedin_projection(tmp_path):
     ats.provider_board_id = "example"
     ats.location = "Phoenix, AZ"
     ats.remote = False
+    ats.salary_min = 110000
+    ats.salary_max = 130000
     ats.work_arrangement = explicit_arrangement(
         [WorkMode.ONSITE], source="ashby_structured_field", rule="workplace_type"
     )
@@ -217,6 +242,24 @@ def test_unresolved_linkedin_targets_can_be_limited_to_current_refresh(tmp_path)
 
     assert len(db.unresolved_linkedin_targets(seen_since=seen_at - timedelta(seconds=1))) == 1
     assert db.unresolved_linkedin_targets(seen_since=seen_at + timedelta(seconds=1)) == []
+
+
+def test_unresolved_linkedin_targets_include_salary_only_gaps(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    linkedin = observation()
+    linkedin.location = "Phoenix, AZ"
+    linkedin.work_arrangement = explicit_arrangement(
+        [WorkMode.ONSITE], source="linkedin", rule="structured_badge"
+    )
+    db.record_result(result(linkedin))
+
+    assert len(db.unresolved_linkedin_targets()) == 1
+
+    with db.connect() as conn:
+        conn.execute("UPDATE jobs SET salary_min=110000, salary_max=130000")
+
+    assert db.unresolved_linkedin_targets() == []
 
 
 def test_job_ids_include_inactive_canonical_jobs(tmp_path):

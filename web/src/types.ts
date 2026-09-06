@@ -144,6 +144,10 @@ export interface Integration {
   description: string;
   status: "connected" | "configured" | "not_connected";
   detail: string;
+  settings?: {
+    enabled: boolean;
+    max_records_per_refresh: number;
+  };
 }
 
 export interface GmailSetupStep {

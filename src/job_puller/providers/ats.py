@@ -577,6 +577,45 @@ class SmartRecruitersProvider(CandidateDetailProvider):
 class WorkdayProvider(HttpProvider):
     name = "workday"
 
+    def fetch_direct_urls(self, urls: Sequence[str]) -> ProviderResult:
+        """Read exact captured Workday postings without searching the board."""
+        started = datetime.now(UTC)
+        metrics = {"detail_requests": 0, "accepted": 0}
+        observations: list[JobObservation] = []
+        try:
+            if not self.board.api_url:
+                raise ValueError(f"Workday board {self.board.id!r} requires api_url")
+            with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:
+                for url in dict.fromkeys(urls):
+                    path = urlsplit(url).path
+                    job_index = path.find("/job/")
+                    if job_index < 0:
+                        raise ValueError(f"Workday posting URL has no job path: {url}")
+                    metrics["detail_requests"] += 1
+                    observations.append(self._detail(client, {"externalPath": path[job_index:]}))
+            metrics["accepted"] = len(observations)
+            return ProviderResult(
+                self.source_key,
+                self.name,
+                observations,
+                started,
+                datetime.now(UTC),
+                True,
+                suspicious_empty=not observations,
+                metrics=metrics,
+            )
+        except Exception as exc:
+            return ProviderResult(
+                self.source_key,
+                self.name,
+                observations,
+                started,
+                datetime.now(UTC),
+                False,
+                f"{type(exc).__name__}: {exc}",
+                metrics=metrics,
+            )
+
     def fetch(self, since: datetime) -> ProviderResult:
         started = datetime.now(UTC)
         observations: list[JobObservation] = []

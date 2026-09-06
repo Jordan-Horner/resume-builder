@@ -338,6 +338,7 @@ Show one simple row for each supported integration:
 - Telegram — private conversations with the agent.
 - Discord — notifications.
 - OpenRouter — AI screening.
+- Bright Data — optional capped enrichment for unresolved LinkedIn jobs.
 - Job providers — LinkedIn, Indeed, and configured ATS boards.
 
 Each row shows:

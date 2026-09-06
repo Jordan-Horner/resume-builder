@@ -13,7 +13,7 @@ from .boards import recognize_board
 from .config import AtsBoard, InventoryConfig
 from .database import InventoryDatabase
 from .models import JobObservation, ProviderResult
-from .normalize import normalized_key
+from .normalize import canonical_url, normalized_key
 from .providers import (
     AshbyProvider,
     GreenhouseProvider,
@@ -61,6 +61,7 @@ class LinkedInTarget:
     description: str
     posted_at: datetime | None
     direct_apply_url: str = ""
+    source_url: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -319,6 +320,32 @@ def match_posting(
     )
 
 
+def _match_captured_posting(
+    target: LinkedInTarget, observations: list[JobObservation]
+) -> PostingMatch | None:
+    """Trust a browser-captured 1:1 Apply URL after an exact title check."""
+    captured_url = canonical_url(target.direct_apply_url)
+    if not captured_url:
+        return None
+    captured_path = re.sub(r"[^a-z0-9]", "", target.direct_apply_url.casefold())
+    matches = [
+        observation
+        for observation in observations
+        if (
+            canonical_url(observation.source_url) == captured_url
+            or (
+                len(observation.provider_job_id) >= 5
+                and re.sub(r"[^a-z0-9]", "", observation.provider_job_id.casefold())
+                in captured_path
+            )
+        )
+        and normalized_key(observation.title) == normalized_key(target.title)
+    ]
+    if len(matches) != 1:
+        return None
+    return PostingMatch(target, matches[0], 0.99, "exact_captured_apply_url_and_title")
+
+
 def _provider(candidate: BoardCandidate, timeout: float) -> HttpProvider:
     board = AtsBoard(
         id=candidate.board_id,
@@ -334,6 +361,19 @@ def _fetch_candidate(
 ) -> ProviderResult:
     provider = _provider(candidate, timeout)
     if isinstance(provider, WorkdayProvider):
+        direct_urls = []
+        for target in targets:
+            recognized = recognize_board(target.direct_apply_url, target.company)
+            if (
+                recognized is not None
+                and recognized[0] == "workday"
+                and recognized[1].id.casefold() == candidate.board_id.casefold()
+            ):
+                direct_urls.append(target.direct_apply_url)
+        if direct_urls:
+            direct_result = provider.fetch_direct_urls(direct_urls)
+            if direct_result.success and direct_result.observations:
+                return direct_result
         return provider.fetch_exact_titles([target.title for target in targets])
     cutoff = datetime.now(UTC) - timedelta(days=3650)
     result = provider.fetch(cutoff)
@@ -365,6 +405,7 @@ def linkedin_targets(
             description=str(item["description"]),
             posted_at=item["posted_at"] if isinstance(item["posted_at"], datetime) else None,
             direct_apply_url=str(item.get("direct_apply_url") or ""),
+            source_url=str(item.get("source_url") or ""),
         )
         for item in database.unresolved_linkedin_targets(seen_since=seen_since)
     ]
@@ -599,7 +640,11 @@ def resolve_linkedin_sources(
         for target in company_targets:
             if target.job_id in matched_jobs:
                 continue
-            match = match_posting(target, result.observations)
+            match = (
+                _match_captured_posting(target, result.observations)
+                if candidate.origin == "captured-apply-url"
+                else None
+            ) or match_posting(target, result.observations)
             if match is None:
                 continue
             report.matches.append(_match_record(target, match, board_origin=candidate.origin))

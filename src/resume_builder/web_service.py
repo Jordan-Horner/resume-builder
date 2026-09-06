@@ -348,6 +348,48 @@ class DashboardService:
             "message": "OpenRouter connected. Your existing model settings are preserved.",
         }
 
+    def configure_bright_data(
+        self, api_key: Any, enabled: Any, max_records_per_refresh: Any
+    ) -> dict[str, Any]:
+        from .bright_data import (
+            BrightDataSettings,
+            bright_data_key,
+            bright_data_secret_path,
+            save_bright_data_settings,
+        )
+
+        if not isinstance(enabled, bool):
+            raise ValueError("Choose whether Bright Data enrichment is enabled")
+        if (
+            not isinstance(max_records_per_refresh, int)
+            or isinstance(max_records_per_refresh, bool)
+            or not 1 <= max_records_per_refresh <= 1000
+        ):
+            raise ValueError("Bright Data record limit must be from 1 to 1000")
+        key = api_key.strip() if isinstance(api_key, str) else ""
+        if key and (len(key) > 512 or any(character.isspace() for character in key)):
+            raise ValueError("The API token must not contain spaces or line breaks")
+        if enabled and not (key or bright_data_key(self.workspace)):
+            raise ValueError("Enter a Bright Data API token before enabling enrichment")
+        with self._state_lock:
+            if key:
+                secret_path = bright_data_secret_path(self.workspace)
+                atomic_write_text(secret_path, key + "\n")
+                secret_path.chmod(0o600)
+            save_bright_data_settings(
+                self.workspace,
+                BrightDataSettings(
+                    enabled=enabled,
+                    max_records_per_refresh=max_records_per_refresh,
+                ),
+            )
+        return {
+            "connected": bool(key or bright_data_key(self.workspace)),
+            "enabled": enabled,
+            "max_records_per_refresh": max_records_per_refresh,
+            "message": "Bright Data integration saved.",
+        }
+
     def _primary_resume_document(self) -> ResumeDocument:
         layout = VaultLayout.load(self.workspace / "vault")
         manifest = load_manifest(layout)
@@ -1382,6 +1424,10 @@ class DashboardService:
         agent_config_path = self.workspace / "agent/config.yml"
         telegram_configured = False
         openrouter_connected = self._openrouter_configured()
+        from .bright_data import bright_data_key, load_bright_data_settings
+
+        bright_data_settings = load_bright_data_settings(self.workspace)
+        bright_data_connected = bool(bright_data_key(self.workspace))
         if agent_config_path.is_file():
             from .agent_config import load_agent_config
             from .agent_telegram_setup import default_telegram_token_path, resolve_telegram_token
@@ -1447,5 +1493,22 @@ class DashboardService:
                 "description": "Power screening and assistant features with your model provider.",
                 "status": "connected" if openrouter_connected else "not_connected",
                 "detail": "API key available" if openrouter_connected else "API key not available",
+            },
+            {
+                "id": "bright-data",
+                "name": "Bright Data",
+                "description": "Enrich unresolved LinkedIn jobs with location, pay, and Apply links.",
+                "status": "connected"
+                if bright_data_connected and bright_data_settings.enabled
+                else ("configured" if bright_data_connected else "not_connected"),
+                "detail": (
+                    f"On · up to {bright_data_settings.max_records_per_refresh} per refresh"
+                    if bright_data_connected and bright_data_settings.enabled
+                    else ("Connected · Off" if bright_data_connected else "Not connected")
+                ),
+                "settings": {
+                    "enabled": bright_data_settings.enabled,
+                    "max_records_per_refresh": bright_data_settings.max_records_per_refresh,
+                },
             },
         ]

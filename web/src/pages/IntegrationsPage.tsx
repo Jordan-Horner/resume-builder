@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { getIntegrations } from "../api";
 import { EmptyState, ErrorMessage, LoadingRows } from "../components";
 import { GmailSetup } from "../integrations/GmailSetup";
+import { BrightDataSetup } from "../integrations/BrightDataSetup";
 import { OpenRouterSetup } from "../integrations/OpenRouterSetup";
 import { TelegramSetup } from "../integrations/TelegramSetup";
 import { UnavailableSetup } from "../integrations/UnavailableSetup";
@@ -54,6 +55,7 @@ export function IntegrationsSection() {
               </button>
               {open && <div id={`integration-${item.id}`}>
                 {item.id === "openrouter" ? <OpenRouterSetup connected={item.status === "connected"} onSaved={(savedMessage) => { setMessage(savedMessage); refresh(); }} />
+                  : item.id === "bright-data" ? <BrightDataSetup connected={item.status !== "not_connected"} initialEnabled={item.settings?.enabled ?? false} initialLimit={item.settings?.max_records_per_refresh ?? 100} onSaved={(savedMessage) => { setMessage(savedMessage); refresh(); }} />
                   : item.id === "gmail" ? <GmailSetup connected={item.status === "connected"} />
                     : item.id === "telegram" ? <TelegramSetup connected={item.status === "connected"} onConnected={refresh} />
                       : <UnavailableSetup name={item.name} />}

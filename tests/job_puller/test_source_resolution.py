@@ -367,6 +367,8 @@ def test_resolver_reuses_stored_ats_observation_before_network(tmp_path):
         ),
     )
     ats = posting("ats-1", f"{description} additional detail", WorkMode.ONSITE)
+    ats.salary_min = 110000
+    ats.salary_max = 130000
     database = InventoryDatabase(tmp_path / "inventory.db")
     database.migrate()
     for source_key, observation_item in (("linkedin:test", linkedin), ("ashby:example", ats)):
@@ -497,6 +499,31 @@ def test_resolver_prefers_board_from_captured_apply_url(monkeypatch):
     resolve_linkedin_sources(Database(), AtsCatalog({}), targets=[captured_target])
 
     assert requested == [("rippling", "riot-platforms-careers", "captured-apply-url")]
+
+
+def test_captured_apply_url_matches_exact_posting_without_description_overlap():
+    captured_url = (
+        "https://example.wd5.myworkdayjobs.com/Careers/"
+        "job/Phoenix-AZ/AI-Engineer_REQ-1?source=LinkedIn"
+    )
+    captured_target = resolution_module.replace(
+        target("LinkedIn renders substantially different description text."),
+        direct_apply_url=captured_url,
+    )
+    observation = posting(
+        "REQ-1",
+        "The authoritative ATS description has different content.",
+        WorkMode.HYBRID,
+    )
+    observation.source_url = (
+        "https://example.wd5.myworkdayjobs.com/en-US/Careers/job/Phoenix-AZ/AI-Engineer_REQ-1"
+    )
+
+    match = resolution_module._match_captured_posting(captured_target, [observation])
+
+    assert match is not None
+    assert match.reason == "exact_captured_apply_url_and_title"
+    assert match.confidence == 0.99
 
 
 def test_resolver_rejects_partial_board_results_before_unique_matching(monkeypatch):

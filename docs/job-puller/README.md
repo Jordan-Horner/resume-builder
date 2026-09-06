@@ -114,7 +114,7 @@ interview-only, travel-only, or technical uses of hybrid and onsite terms.
 
 Use `jobs new` for recurring discovery. It snapshots every canonical job ID in
 the database, refreshes the selected providers, then resolves newly seen
-unknown-mode LinkedIn jobs against public first-party ATS APIs before writing
+LinkedIn jobs missing work mode, location, or salary against public first-party ATS APIs before writing
 the shortlist. Only active canonical jobs that did not exist before that
 refresh are included. Existing, updated, reopened, and cross-source duplicate
 jobs are not new. The command
@@ -249,7 +249,7 @@ the private inventory and board registry:
 resume-builder jobs boards import-capture linkedin-ats-capture.csv
 ```
 
-Resolve first-party copies of active LinkedIn jobs whose work mode is unknown:
+Resolve first-party copies of active LinkedIn jobs missing work mode, location, or salary:
 
 ```bash
 resume-builder jobs resolve-sources             # read-only dry run
@@ -268,7 +268,9 @@ provider/board endpoints are fetched only once. Workday uses exact employer-tena
 and title searches, then requests job details only for exact-title hits. Its CXS
 detail fields—not the generic posting page—supply the location and work mode.
 Requests are bounded and concurrent; no browser, account, cookie, or paid proxy
-service is used. A match must have the
+service is required. When Bright Data is enabled under **Settings → Integrations**,
+scheduled refreshes send only the still-unresolved LinkedIn URLs through that
+optional provider, subject to its configured per-refresh record cap. A free-path match must have the
 same normalized title, at least 85% three-word description coverage, a unique
 best candidate, and an explicit ATS work mode. The ATS observation becomes the
 canonical display source while the LinkedIn observation remains as provenance.

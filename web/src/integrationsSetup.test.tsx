@@ -7,6 +7,7 @@ import { IntegrationsSection } from "./pages/IntegrationsPage";
 
 vi.mock("./api", () => ({
   beginGmailAuthorization: vi.fn(),
+  configureBrightData: vi.fn(),
   configureOpenRouter: vi.fn(),
   getGmailSetup: vi.fn(),
   getIntegrations: vi.fn(),

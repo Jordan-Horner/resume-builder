@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { configureOpenRouter, getIntegrations } from "./api";
 import { IntegrationsSection } from "./pages/IntegrationsPage";
 
-vi.mock("./api", () => ({ configureOpenRouter: vi.fn(), getIntegrations: vi.fn() }));
+vi.mock("./api", () => ({ configureBrightData: vi.fn(), configureOpenRouter: vi.fn(), getIntegrations: vi.fn() }));
 let host: HTMLDivElement;
 let root: Root;
 beforeEach(() => {

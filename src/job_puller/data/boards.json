@@ -9,6 +9,12 @@
         "careers_url": "https://jobs.ashbyhq.com/baseten"
       },
       {
+        "id": "langchain",
+        "name": "LangChain",
+        "enabled": true,
+        "careers_url": "https://jobs.ashbyhq.com/langchain"
+      },
+      {
         "id": "lumaai",
         "name": "Luma AI",
         "enabled": true,
@@ -79,6 +85,27 @@
         "enabled": true,
         "api_url": "https://crowdstrike.wd5.myworkdayjobs.com/wday/cxs/crowdstrike/crowdstrikecareers/jobs",
         "careers_url": "https://crowdstrike.wd5.myworkdayjobs.com/crowdstrikecareers"
+      },
+      {
+        "id": "nvidia-nvidiaexternalcareersite",
+        "name": "NVIDIA",
+        "enabled": true,
+        "api_url": "https://nvidia.wd5.myworkdayjobs.com/wday/cxs/nvidia/NVIDIAExternalCareerSite/jobs",
+        "careers_url": "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite"
+      },
+      {
+        "id": "prologis-prologis_external_careers",
+        "name": "Prologis",
+        "enabled": true,
+        "api_url": "https://prologis.wd5.myworkdayjobs.com/wday/cxs/prologis/Prologis_External_Careers/jobs",
+        "careers_url": "https://prologis.wd5.myworkdayjobs.com/Prologis_External_Careers"
+      },
+      {
+        "id": "salesforce-external_career_site",
+        "name": "Salesforce",
+        "enabled": true,
+        "api_url": "https://salesforce.wd12.myworkdayjobs.com/wday/cxs/salesforce/External_Career_Site/jobs",
+        "careers_url": "https://salesforce.wd12.myworkdayjobs.com/External_Career_Site"
       }
     ]
   }

@@ -463,7 +463,7 @@ Resume Builder should validate the envelope, verify the description hash, derive
 ### Phase 2 — harden inventory quality
 
 1. Add same-run description enrichment and retryable enrichment failures.
-2. Resolve unknown-mode LinkedIn observations to direct ATS postings using
+2. Resolve LinkedIn observations missing work mode, location, or salary to direct ATS postings using
    employer-narrowed catalogs, strict content identity, and an explicit apply step.
 3. Implement conservative duplicate merging and canonical source preference.
 4. Implement explicit active, possibly-closed, closed, and reopened transitions without destructive deletion.

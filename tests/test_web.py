@@ -50,6 +50,35 @@ def test_openrouter_can_be_configured_without_onboarding(tmp_path: Path, monkeyp
     assert (workspace / DEFAULT_AGENT_CONFIG).read_text() == original_config
 
 
+def test_bright_data_is_configured_from_integrations(tmp_path: Path) -> None:
+    from resume_builder.bright_data import BRIGHT_DATA_SECRET_PATH, BRIGHT_DATA_SETTINGS_PATH
+
+    client = _client(tmp_path)
+    workspace = tmp_path / "workspace"
+    response = client.put(
+        "/api/integrations/bright-data",
+        json={
+            "api_token": "fixture-token",
+            "enabled": True,
+            "max_records_per_refresh": 75,
+        },
+    )
+
+    assert response.status_code == 200
+    assert "fixture-token" not in response.text
+    secret = workspace / BRIGHT_DATA_SECRET_PATH
+    assert secret.read_text(encoding="utf-8").strip() == "fixture-token"
+    assert secret.stat().st_mode & 0o777 == 0o600
+    assert (workspace / BRIGHT_DATA_SETTINGS_PATH).is_file()
+    integration = next(
+        item
+        for item in client.get("/api/integrations").json()["integrations"]
+        if item["id"] == "bright-data"
+    )
+    assert integration["status"] == "connected"
+    assert integration["settings"] == {"enabled": True, "max_records_per_refresh": 75}
+
+
 def test_job_screen_routes_separate_cached_read_from_explicit_run(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

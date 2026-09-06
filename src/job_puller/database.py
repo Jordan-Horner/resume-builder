@@ -728,21 +728,28 @@ class InventoryDatabase:
     def unresolved_linkedin_targets(
         self, *, seen_since: datetime | None = None
     ) -> list[dict[str, object]]:
-        """Return one strong LinkedIn observation for each active unknown-mode job."""
+        """Return one strong LinkedIn observation for each job missing core enrichment."""
         recent_clause = " AND o.last_seen_at >= ?" if seen_since is not None else ""
         parameters = (_iso(seen_since),) if seen_since is not None else ()
         with self.connect() as conn:
             rows = conn.execute(
                 f"""SELECT j.id AS job_id, o.id AS observation_id, o.title_raw AS title,
                           o.company_raw AS company, o.location_raw AS location,
-                          o.description_text AS description, o.posted_at, o.direct_apply_url
+                          o.description_text AS description, o.posted_at, o.direct_apply_url,
+                          o.source_url
                    FROM jobs j
                    JOIN job_observation_links l ON l.job_id=j.id
                    JOIN observations o ON o.id=l.observation_id
                    WHERE j.status IN ('active','reopened')
-                     AND j.work_mode='unknown' AND o.provider='linkedin'
+                     AND (
+                       j.work_mode='unknown'
+                       OR TRIM(j.location)=''
+                       OR (j.salary_min IS NULL AND j.salary_max IS NULL)
+                     )
+                     AND o.provider='linkedin'
                      {recent_clause}
-                   ORDER BY j.id, LENGTH(o.description_text) DESC, o.last_seen_at DESC""",
+                   ORDER BY j.id, (o.direct_apply_url<>'') DESC,
+                            LENGTH(o.description_text) DESC, o.last_seen_at DESC""",
                 parameters,
             ).fetchall()
         selected: dict[str, dict[str, object]] = {}
@@ -759,8 +766,72 @@ class InventoryDatabase:
                 "description": str(row[5]),
                 "posted_at": datetime.fromisoformat(str(row[6])) if row[6] else None,
                 "direct_apply_url": str(row[7]),
+                "source_url": str(row[8]),
             }
         return list(selected.values())
+
+    def apply_linkedin_enrichment(
+        self,
+        target_job_id: str,
+        linkedin_observation_id: str,
+        observation: JobObservation,
+    ) -> None:
+        """Apply normalized paid enrichment without changing LinkedIn liveness provenance."""
+        if observation.provider != "linkedin":
+            raise ValueError("LinkedIn enrichment requires a LinkedIn observation")
+        with self.transaction() as conn:
+            row = conn.execute(
+                """SELECT o.provider_job_id, o.last_seen_at
+                   FROM observations o
+                   JOIN job_observation_links l ON l.observation_id=o.id
+                   WHERE l.job_id=? AND o.id=? AND o.provider='linkedin'""",
+                (target_job_id, linkedin_observation_id),
+            ).fetchone()
+            if row is None:
+                raise ValueError("LinkedIn observation does not belong to the target job")
+            if observation.provider_job_id and str(row[0]) != observation.provider_job_id:
+                raise ValueError("LinkedIn enrichment returned a different posting")
+            direct_url = canonical_url(observation.direct_apply_url)
+            direct_host = (urlsplit(direct_url).hostname or "").casefold()
+            if direct_url and (
+                direct_host == "linkedin.com" or direct_host.endswith(".linkedin.com")
+            ):
+                direct_url = ""
+            conn.execute(
+                """UPDATE observations SET
+                     location_raw=CASE WHEN ?<>'' THEN ? ELSE location_raw END,
+                     direct_apply_url=CASE WHEN ?<>'' THEN ? ELSE direct_apply_url END,
+                     canonical_apply_url=CASE WHEN ?<>'' THEN ? ELSE canonical_apply_url END,
+                     salary_min=COALESCE(?, salary_min), salary_max=COALESCE(?, salary_max),
+                     salary_currency=COALESCE(?, salary_currency),
+                     salary_interval=COALESCE(?, salary_interval),
+                     employment_type=COALESCE(?, employment_type), parser_version=?
+                   WHERE id=?""",
+                (
+                    observation.location,
+                    observation.location,
+                    observation.direct_apply_url,
+                    observation.direct_apply_url,
+                    direct_url,
+                    direct_url,
+                    observation.salary_min,
+                    observation.salary_max,
+                    observation.salary_currency,
+                    observation.salary_interval,
+                    observation.employment_type,
+                    observation.parser_version,
+                    linkedin_observation_id,
+                ),
+            )
+            current_modes = self._observation_work_modes(conn, linkedin_observation_id)
+            if current_modes == frozenset(
+                {WorkMode.UNKNOWN}
+            ) and observation.work_modes != frozenset({WorkMode.UNKNOWN}):
+                assert observation.work_arrangement is not None
+                self._replace_observation_work_modes(
+                    conn, linkedin_observation_id, observation.work_arrangement
+                )
+            self._refresh_job(conn, linkedin_observation_id, datetime.fromisoformat(str(row[1])))
 
     def stored_direct_ats_observations(
         self, normalized_companies: set[str]
