@@ -43,4 +43,21 @@ def test_cross_origin_writes_and_direct_agent_access_are_rejected(client: TestCl
 
 
 def test_missing_configuration_is_honest(client: TestClient) -> None:
-    assert client.get("/api/assistant/status").json()["configured"] is False
+    assert client.get("/api/assistant/status").json() == {"configured": False, "online": True}
+
+
+def test_direct_assistant_runs_validate_messages_and_configuration(client: TestClient) -> None:
+    identity = client.post("/api/assistant/threads", json={}).json()["id"]
+
+    invalid = client.post(
+        f"/api/assistant/threads/{identity}/runs",
+        json={"run_id": "run-one", "prompt": "   "},
+    )
+    unconfigured = client.post(
+        f"/api/assistant/threads/{identity}/runs",
+        json={"run_id": "run-one", "prompt": "Review my search"},
+    )
+
+    assert invalid.status_code == 400
+    assert unconfigured.status_code == 409
+    assert client.get(f"/api/assistant/threads/{identity}").json()["messages"] == []

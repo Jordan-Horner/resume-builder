@@ -11,12 +11,18 @@ import resume_builder.job_screening_queue as queue_module
 from resume_builder.agent_contracts import StructuredModelReply, StructuredModelRequest
 from resume_builder.agent_openrouter import AgentProviderError
 from resume_builder.job_screening import (
+    CitedFinding,
     Confidence,
     FitOutcome,
     SemanticScreen,
     build_screening_packet,
 )
 from resume_builder.job_screening_queue import build_screening_queue, load_notification_jobs
+from resume_builder.posting_interpretation import (
+    ProposedPostingCriterion,
+    ProposedPostingInterpretation,
+    SectionReview,
+)
 
 
 class QueueAdapter:
@@ -31,11 +37,57 @@ class QueueAdapter:
         self.calls += 1
         if self.fail:
             raise AgentProviderError("fictional safe failure")
+        packet = json.loads(request.prompt.split("\n", 1)[1])
+        if request.output_type is ProposedPostingInterpretation:
+            first = packet["sections"][0]
+            return StructuredModelReply(
+                output=ProposedPostingInterpretation(
+                    criteria=[
+                        ProposedPostingCriterion(
+                            id="production-operations",
+                            label="Production operations",
+                            description="Support production operations.",
+                            importance="required",
+                            basis="core_responsibility",
+                            requirement_type="mandatory-role-defining",
+                            resume_evaluable=True,
+                            source_unit_ids=[first["source_units"][0]["id"]],
+                            retrieval_terms=["production operations"],
+                            confidence="high",
+                        )
+                    ],
+                    section_reviews=[
+                        SectionReview(
+                            section_id=section["id"],
+                            disposition=(
+                                "criteria" if section["id"] == first["id"] else "non_evaluative"
+                            ),
+                            reason=(
+                                "Contains the core work."
+                                if section["id"] == first["id"]
+                                else "No additional role criterion."
+                            ),
+                        )
+                        for section in packet["sections"]
+                    ],
+                    criteria_complete=packet["posting_coverage"] == "complete",
+                ),
+                model=request.model,
+                requests=1,
+                input_tokens=100,
+                output_tokens=25,
+                cost_usd="0.01",
+            )
         return StructuredModelReply(
             output=SemanticScreen(
                 fit=FitOutcome.STRONG_MATCH,
                 confidence=Confidence.LOW,
-                strengths=["The fictional evidence supports the central work."],
+                strengths=[
+                    CitedFinding(
+                        statement="The fictional evidence supports the central work.",
+                        fact_ids=[packet["candidate_evidence"][0]["fact_id"]],
+                    )
+                ],
                 gaps=[],
                 unknowns=[],
                 reasoning_summary="Relevant work is supported, but confidence remains limited.",
@@ -133,15 +185,15 @@ def test_queue_keeps_every_job_and_bounds_provider_work(
     assert payload["personalization_policy"]["changes_notifications"] is False
     assert payload["suggested_order"][0] == "recommended"
     assert summary.active == 3
-    assert summary.completed == 2
-    assert summary.provider_calls == 1
+    assert summary.completed == 1
+    assert summary.provider_calls == 2
     assert summary.recommended == 1
     assert summary.needs_review == 1
     assert summary.additional == 1
-    assert summary.input_tokens == 100
-    assert summary.output_tokens == 25
-    assert str(summary.cost_usd) == "0.01"
-    assert adapter.calls == 1
+    assert summary.input_tokens == 200
+    assert summary.output_tokens == 50
+    assert str(summary.cost_usd) == "0.02"
+    assert adapter.calls == 2
     assert len(load_notification_jobs(output)) == 3
 
 
@@ -171,6 +223,54 @@ def test_queue_without_authorization_uses_no_provider_and_marks_all_unknowns(
         item["screening"]["status"] == "unscreened"
         for item in json.loads(output.read_text(encoding="utf-8"))["jobs"]
     )
+
+
+def test_background_queue_skips_obvious_local_misses_without_provider_work(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "new.json"
+    output = tmp_path / "screens.json"
+    _input(source, ["onsite-mismatch", "unrelated", "relevant"])
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    payload["jobs"][0]["prescreen"] = {
+        "queue_state": "hard_conflict",
+        "interest": {"desired_title_terms": ["operations engineer"], "interest_terms": []},
+        "constraints": {"disposition": None, "hard_conflicts": ["work_mode"]},
+    }
+    payload["jobs"][1]["prescreen"] = {
+        "queue_state": "ready",
+        "interest": {"desired_title_terms": [], "interest_terms": []},
+        "constraints": {"disposition": None},
+    }
+    payload["jobs"][2]["prescreen"] = {
+        "queue_state": "ready",
+        "interest": {"desired_title_terms": ["operations engineer"], "interest_terms": []},
+        "constraints": {"disposition": None},
+    }
+    source.write_text(json.dumps(payload), encoding="utf-8")
+    monkeypatch.setattr(
+        queue_module, "get_job_screening_packet", lambda job_id, **_: _packet(job_id)
+    )
+    adapter = QueueAdapter()
+
+    summary = build_screening_queue(
+        adapter=adapter,
+        model="fictional/model",
+        cache_path=tmp_path / "cache.sqlite",
+        input_path=source,
+        output_path=output,
+        max_provider_jobs=6,
+        allow_provider=True,
+    )
+
+    jobs = json.loads(output.read_text(encoding="utf-8"))["jobs"]
+    assert [item["screening"]["status"] for item in jobs] == ["skipped", "skipped", "complete"]
+    assert [item["screening"].get("reason") for item in jobs[:2]] == [
+        "hard_constraint_conflict",
+        "no_saved_search_signal",
+    ]
+    assert summary.provider_calls == 2
+    assert adapter.calls == 2
 
 
 def test_legacy_review_flag_cannot_hide_a_job_without_a_disposition(

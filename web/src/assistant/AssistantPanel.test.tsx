@@ -1,18 +1,11 @@
 // @vitest-environment jsdom
-import { act, type ReactNode } from "react";
+import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import AssistantPanel from "./AssistantPanel";
 import { assistantRequest, type Conversation } from "./api";
 
-const transport = vi.hoisted(() => ({ runAgent: vi.fn() }));
-
 vi.mock("./api", () => ({ assistantRequest: vi.fn() }));
-vi.mock("@copilotkit/react-core/v2", () => ({
-  CopilotKitProvider: ({ children }: { children: ReactNode }) => children,
-  useAgent: () => ({ isReady: true, agent: { setMessages: vi.fn(), addMessage: vi.fn(), abortRun: vi.fn() } }),
-  useCopilotKit: () => ({ copilotkit: transport }),
-}));
 let host: HTMLDivElement;
 let root: Root;
 const thread: Conversation = {
@@ -96,7 +89,10 @@ it("sends on plain HTTP where crypto.randomUUID is unavailable", async () => {
   const getRandomValues = crypto.getRandomValues.bind(crypto);
   vi.stubGlobal("crypto", { getRandomValues });
   await submitMessage();
-  expect(transport.runAgent).toHaveBeenCalledWith(expect.objectContaining({ runId: expect.any(String) }));
+  expect(assistantRequest).toHaveBeenCalledWith("/threads/saved/runs", {
+    method: "POST",
+    body: expect.stringContaining('"prompt":"hi"'),
+  });
 });
 
 it("shows preparation failures and preserves the typed message", async () => {
@@ -104,5 +100,17 @@ it("shows preparation failures and preserves the typed message", async () => {
   await submitMessage();
   expect(host.querySelector('[role="alert"]')?.textContent).toContain("Random generation unavailable");
   expect(host.querySelector("textarea")?.value).toBe("hi");
-  expect(transport.runAgent).not.toHaveBeenCalled();
+  expect(assistantRequest).not.toHaveBeenCalledWith("/threads/saved/runs", expect.anything());
+});
+
+it("does not poll a closed assistant", async () => {
+  vi.useFakeTimers();
+  try {
+    await act(async () => root.render(<AssistantPanel open={false} target={null} onClose={() => undefined} />));
+    vi.mocked(assistantRequest).mockClear();
+    await act(async () => vi.advanceTimersByTimeAsync(12000));
+    expect(assistantRequest).not.toHaveBeenCalledWith("/threads/saved");
+  } finally {
+    vi.useRealTimers();
+  }
 });

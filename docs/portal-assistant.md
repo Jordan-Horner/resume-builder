@@ -1,9 +1,9 @@
 # Portal assistant
 
-The portal uses CopilotKit's local, runtime-backed transport. It does not require
-a CopilotKit account or cloud service. OpenRouter credentials and model choices
-remain in the existing server-side integration configuration; model usage is billed
-by that provider. Telemetry and CopilotKit channels are disabled.
+The portal uses a small same-origin HTTP transport backed directly by FastAPI. It
+does not require a CopilotKit account, browser SDK, or cloud service. OpenRouter
+credentials and model choices remain in the existing server-side integration
+configuration; model usage is billed by that provider.
 
 After onboarding, use **Settings → Integrations → OpenRouter** to add or replace
 the API key. Save and connect verifies the key with OpenRouter's
@@ -14,11 +14,11 @@ Keys are never returned to the browser; a rejected key leaves the old one intact
 
 ## Deployment
 
-The appliance remains one container and one public port. Supervisor starts a local
-Node runtime on loopback port 8768 alongside FastAPI. FastAPI proxies only known
-runtime routes. A random per-start token protects the private Python AG-UI endpoint.
-Do not expose port 8768. Development uses the separate container on localhost:8767.
-Production is not updated by building the development image.
+The browser talks only to the appliance's existing public port. Assistant runs start
+through `/api/assistant/threads/{id}/runs`, while the browser polls the durable thread
+record only while the assistant is open. The older loopback runtime bridge remains
+available for compatibility with existing deployments, but it is no longer loaded
+by the web frontend or required for frontend health.
 
 Conversation history and pending wording proposals live in the existing agent SQLite
 state file (`RESUME_BUILDER_AGENT_STATE`, `/state/agent-state.sqlite` in Docker).
@@ -40,7 +40,10 @@ token-by-token model output.
 
 The assistant can run the existing bounded, deterministic-plus-semantic job screen for
 an explicitly attached job. The same cached result appears in the job detail; screening
-does not submit, dismiss, or otherwise change the job.
+does not submit, dismiss, or otherwise change the job. For a new or changed posting,
+the service also builds a candidate-independent, source-backed interpretation in a
+separate shadow request. This generated interpretation is cached but does not yet
+change the visible fit result or select candidate evidence.
 
 The assistant can propose one wording-only block replacement. A before/after card
 offers Use this wording or Keep current. Accepting claims a durable proposal once,
@@ -64,9 +67,8 @@ revisions must be regenerated. Exploration itself does not record editorial memo
 
 ## Verification
 
-Run the Python suite, frontend tests/typecheck/build, and `npm test` from
-`assistant-runtime`. Runtime tests cover production-mode discovery and AG-UI forwarding
-without vendor credentials. Backend tests cover durable state, isolated proposals,
+Run the Python suite and frontend tests/typecheck/build. The compatibility runtime
+has its own tests under `assistant-runtime`. Backend tests cover durable state, isolated proposals,
 stale revisions, factual-change rejection and reuse of review/preview services.
 Live model quality and costs still depend on the self-hoster's configured provider.
 Message-submission tests explicitly cover HTTP LAN origins where `crypto.randomUUID`

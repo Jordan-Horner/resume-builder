@@ -72,8 +72,9 @@ from .job_screening_queue import (
 )
 from .jobs import DEFAULT_CONFIG as DEFAULT_JOBS_CONFIG
 from .jobs import DEFAULT_PREFERENCES, get_job_screening_packet
+from .posting_interpretation import PostingInterpretationCache, PostingInterpretationService
 from .salary_estimation import format_salary_estimate
-from .screening_service import ScreeningService
+from .screening_service import ScreeningService, enrich_packet_from_cached_interpretation
 
 AGENT_INSTRUCTIONS = """\
 You are the private Resume Builder career agent. Be concise and candid.
@@ -367,7 +368,7 @@ def _render_screen(result: ScreeningResult, *, cached: bool) -> str:
         lines.extend(f"- {item.explanation}" for item in unknown)
     if result.strengths:
         lines.extend(("", "Strengths:"))
-        lines.extend(f"- {item}" for item in result.strengths)
+        lines.extend(f"- {item.statement}" for item in result.strengths)
     if result.gaps:
         lines.extend(("", "Gaps:"))
         lines.extend(f"- {item}" for item in result.gaps)
@@ -586,6 +587,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 preferences_path=args.preferences.expanduser(),
                 max_provider_jobs=maximum,
                 allow_provider=False,
+                workspace=args.preferences.expanduser().resolve().parent,
             )
             print(
                 json.dumps(
@@ -672,6 +674,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                 return 0
             model = getattr(config.models, args.model_tier)
             cache = ScreeningCache(args.state.with_name("screening-cache.sqlite"))
+            packet = enrich_packet_from_cached_interpretation(
+                packet,
+                model=model,
+                interpretation_cache=PostingInterpretationCache(
+                    args.state.with_name("screening-cache.sqlite")
+                ),
+                vault_root=args.preferences.expanduser().resolve().parent / "vault",
+            )
             cached_result = None if args.refresh else cache.get(packet, model)
             if packet.eligibility == EligibilityStatus.INELIGIBLE:
                 screen_result, cached = deterministic_ineligible_result(packet), False
@@ -683,9 +693,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                         "No unchanged cached screen exists. Preview with --preview-payload, then "
                         "rerun with --confirm-send-private-data to contact the provider."
                     )
-                screen_result, cached = ScreeningService(OpenRouterAdapter(config), cache).screen(
-                    packet, model=model, refresh=args.refresh
-                )
+                adapter = OpenRouterAdapter(config)
+                screen_result, cached = ScreeningService(
+                    adapter,
+                    cache,
+                    interpretation_service=PostingInterpretationService(
+                        adapter,
+                        PostingInterpretationCache(args.state.with_name("screening-cache.sqlite")),
+                    ),
+                    vault_root=args.preferences.expanduser().resolve().parent / "vault",
+                ).screen(packet, model=model, refresh=args.refresh)
             print(
                 screen_result.model_dump_json(indent=2)
                 if args.json
@@ -709,6 +726,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 preferences_path=args.preferences.expanduser(),
                 max_provider_jobs=maximum,
                 allow_provider=args.confirm_send_private_data,
+                workspace=args.preferences.expanduser().resolve().parent,
             )
             print(
                 json.dumps(

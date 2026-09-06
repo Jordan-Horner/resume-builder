@@ -595,8 +595,8 @@ def test_semantic_screening_failure_does_not_turn_collection_into_a_retry(
     monkeypatch.setattr(jobs_module, "DEFAULT_NEW_OUTPUT", new_jobs)
     monkeypatch.setattr(jobs_module, "main", collect)
     monkeypatch.setattr(
-        "resume_builder.automation.load_agent_config",
-        lambda _path: (_ for _ in ()).throw(ValueError("fictional invalid config")),
+        "resume_builder.automation.run_background_quick_screening",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("fictional invalid config")),
     )
 
     result = _run_jobs(load_config(config_path))

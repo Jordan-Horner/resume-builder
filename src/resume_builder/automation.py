@@ -31,12 +31,13 @@ import yaml
 from job_puller.config import load_config as load_job_config
 
 from . import gmail_automation, jobs
-from .agent_config import DEFAULT_AGENT_CONFIG, load_agent_config
-from .agent_openrouter import OpenRouterAdapter
 from .atomic import atomic_write_text
+from .background_screening import (
+    background_screening_configured,
+    run_background_quick_screening,
+)
 from .job_screening_queue import (
     DEFAULT_SCREENING_OUTPUT,
-    build_screening_queue,
     load_notification_jobs,
 )
 
@@ -514,6 +515,8 @@ def configure(
     notification_sink: str | None,
     privacy: str | None,
     job_enabled: bool | None = None,
+    semantic_screening_enabled: bool | None = None,
+    semantic_screening_max_jobs: int | None = None,
 ) -> AutomationConfig:
     """Apply explicit schedule changes and revalidate the resulting file."""
     payload = config_payload(config)
@@ -524,6 +527,11 @@ def configure(
         job_payload["enabled"] = job_enabled
     if job_times:
         job_payload["times"] = job_times
+    screening_payload = _mapping(job_payload["semantic_screening"], "jobs.semantic_screening")
+    if semantic_screening_enabled is not None:
+        screening_payload["enabled"] = semantic_screening_enabled
+    if semantic_screening_max_jobs is not None:
+        screening_payload["max_jobs_per_run"] = semantic_screening_max_jobs
     gmail_payload = _mapping(payload["gmail"], "gmail")
     if gmail_hours is not None:
         gmail_payload["every_hours"] = gmail_hours
@@ -820,7 +828,10 @@ def job_notification(
     recommended = sum(
         str(result.get("recommendation")) in {"pursue", "pursue_as_stretch"} for result in completed
     )
-    verify = sum(str(result.get("recommendation")) == "verify_eligibility" for result in completed)
+    verify = sum(
+        str(result.get("recommendation")) in {"verify_eligibility", "needs_more_evidence"}
+        for result in completed
+    )
     needs_review = unresolved + verify
     additional = max(0, len(matches) - recommended - needs_review)
     overview = (
@@ -984,17 +995,9 @@ def _run_jobs(config: AutomationConfig) -> dict[str, object]:
         matches = _reviewable_jobs(jobs.DEFAULT_NEW_OUTPUT)
         if config.jobs.semantic_screening_enabled:
             try:
-                agent_config = load_agent_config(DEFAULT_AGENT_CONFIG)
-                screening_limit = min(
-                    config.jobs.semantic_screening_max_jobs,
-                    agent_config.limits.max_requests,
-                )
-                queue_summary = build_screening_queue(
-                    adapter=OpenRouterAdapter(agent_config),
-                    model=agent_config.models.fast,
-                    cache_path=default_state_path().with_name("screening-cache.sqlite"),
-                    max_provider_jobs=screening_limit,
-                    allow_provider=True,
+                queue_summary = run_background_quick_screening(
+                    jobs.DEFAULT_NEW_OUTPUT.expanduser().resolve().parent.parent,
+                    max_jobs=config.jobs.semantic_screening_max_jobs,
                 )
                 matches = load_notification_jobs(DEFAULT_SCREENING_OUTPUT)
                 screening_status = "complete" if queue_summary.failed == 0 else "partial"
@@ -1455,16 +1458,9 @@ def _doctor(
         not config.gmail.enabled or not gmail_state.resolve().is_relative_to(workspace)
     )
     if config.jobs.semantic_screening_enabled:
-        try:
-            agent_config = load_agent_config(DEFAULT_AGENT_CONFIG)
-        except (OSError, ValueError):
-            checks["semantic_screening_config"] = False
-            checks["semantic_screening_key"] = False
-        else:
-            checks["semantic_screening_config"] = True
-            checks["semantic_screening_key"] = bool(
-                os.environ.get(agent_config.api_key_env, "").strip()
-            )
+        configured = background_screening_configured(workspace)
+        checks["semantic_screening_config"] = configured
+        checks["semantic_screening_key"] = configured
     try:
         if config.notifications.sink == "discord":
             _discord_url(config.notifications)

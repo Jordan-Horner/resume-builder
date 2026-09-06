@@ -148,9 +148,59 @@ cannot establish career facts, application state, or approvals.
 Structured job screening follows an additional split: local deterministic
 constraints own eligibility, while a provider-neutral structured model request
 owns only career-fit judgment. A model cannot override a confirmed eligibility
-conflict. Screening packets and results are hash-pinned, provider calls require
-an explicit private-data confirmation, and generated cache records remain
-outside Git and outside authoritative inventory state.
+conflict. Before that career-fit request, a candidate-independent shadow
+interpreter divides the bounded posting into stable sections and local
+sentence-or-list-item source units, then extracts a source-backed criterion set.
+It receives public posting data only. The model cites one to three stable source
+unit IDs from one section; it never supplies the displayed quote. Local validation
+rejects unknown and cross-section unit references, derives the exact source text,
+and requires the criterion or its retrieval terms to retain a meaningful lexical
+anchor to that text. Every supplied section must be acknowledged; its criteria-bearing
+disposition is derived from validated citations, and partial input is always
+marked incomplete locally. Invalid interpretations cannot change the current
+quick-screen result, job visibility, or inventory ordering. The cache is pinned
+to posting content, schema, rubric, and model and remains outside Git; bulk
+screening does not create canonical target records.
+
+For the quick screen, a validated posting interpretation drives local retrieval
+against confirmed canonical vault facts. Each resume-evaluable criterion gets
+its own ranked lane, and round-robin selection prevents a broad first criterion
+from consuming the evidence budget. The selector sends at most twelve short
+evidence cards, records exactly which fact IDs were retrieved for each criterion,
+and does not pad an empty lane with unrelated role history. Lifestyle and other
+non-resume-evaluable criteria are acknowledged but never search the vault.
+Search terms help discovery but never serve as candidate evidence. Positive
+model findings must cite both a supplied criterion ID and fact IDs retrieved for
+that criterion; unknown and cross-criterion citations are rejected. Missing
+retrieval evidence remains an unknown rather than a claim that the candidate
+lacks a capability. The fit response also returns exactly one structured
+assessment for every resume-evaluable criterion: supported, partially supported,
+transferable, unknown, or apparent gap. The server validates assessment coverage,
+keeps citations inside each criterion's retrieval lane, and permits a supported
+judgment only when demonstrated evidence was supplied. A required criterion with
+only transferable, unknown, or apparent-gap evidence prevents a strong-fit label;
+if every required criterion is unknown, the server abstains. When no required or
+core criterion has a useful evidence
+candidate, the service abstains locally instead of paying for the private fit
+call. Screening packets and results are hash-pinned, and a cache-only local
+reconstruction keeps completed criterion-driven screens addressable after the
+job is reopened. Provider calls require explicit private-data confirmation, and
+generated cache records remain outside Git and outside authoritative inventory
+state. The portal may display this metadata, but quick screening never filters,
+hides, or reorders job inventory.
+
+Quick-screen calibration is a separate offline boundary. Human-reviewed JSON
+cases refer to the stable criterion IDs created by posting interpretation and
+identify the canonical facts that are relevant to each criterion. The
+`resume-builder screen-eval prepare` command deterministically samples current
+screens across provider and fit into a review worksheet. Current retrieval and
+model judgments are visible only as context; every human truth field begins
+blank, stale schemas are excluded, and incomplete worksheets cannot be finalized.
+`screen-eval finalize` emits the context-free reviewed cases, and `screen-eval`
+compares saved results with those cases to report retrieval recall and precision,
+assessment coverage and outcome agreement, abstention accuracy, and optional
+overall-fit agreement. None of these commands calls a model, changes a screen,
+or influences inventory ordering.
 Project reporting uses typed artifact-status records and shared freshness
 helpers while preserving its stable JSON-facing report contract.
 The same compiled-build freshness check is shared by language review, career

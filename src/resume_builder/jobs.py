@@ -21,7 +21,7 @@ from job_puller.cli import main as puller_main
 from job_puller.config import load_config, resolve_database_path
 from job_puller.database import InventoryDatabase
 from job_puller.liveness import verify_job_liveness
-from job_puller.locations import matching_location_terms
+from job_puller.locations import location_key, matches_search_location, matching_location_terms
 
 from .applications import DEFAULT_ROOT as DEFAULT_APPLICATIONS_ROOT
 from .applications import application_job_dispositions
@@ -32,6 +32,7 @@ from .job_screening import (
     has_clearance_requirement,
     profile_from_preferences,
 )
+from .screening_evidence import select_screening_evidence
 
 DEFAULT_CONFIG = Path("job-search/config/search.yml")
 DEFAULT_PREFERENCES = Path("job-search/preferences.yml")
@@ -77,6 +78,14 @@ def parser() -> argparse.ArgumentParser:
     commands = command_parser.add_subparsers(dest="command", required=True)
     update = commands.add_parser("update", help="Run enabled inventory providers")
     update.add_argument("--provider", action="append")
+    resolve = commands.add_parser(
+        "resolve-sources",
+        help="Find first-party ATS copies of LinkedIn jobs with unknown work mode",
+    )
+    resolve.add_argument("--apply", action="store_true")
+    resolve.add_argument("--limit", type=int)
+    resolve.add_argument("--probe-missing", action="store_true")
+    resolve.add_argument("--catalog-cache", default="cache/ats-source-catalog")
     new = commands.add_parser(
         "new", help="Refresh providers and shortlist only jobs new to the canonical database"
     )
@@ -400,10 +409,22 @@ def _prescreen(
     location_required = screening_profile.get("location_strength", "required") == "required"
     salary_required = screening_profile.get("minimum_salary_strength", "required") == "required"
     remote_only = "remote" in modes and not {"hybrid", "onsite"} & modes
+    legacy_remote_country = screening_profile.get("intended_work_country")
+    if not legacy_remote_country and any(
+        location_key(str(item)) == "united states"
+        for item in preferences.get("accepted_location_terms", [])
+    ):
+        legacy_remote_country = "United States"
     if remote_only and "remote_location_terms" in screening_profile:
         # Inventory location often names an office rather than a remote-work
         # residency restriction. Preserve it for semantic review, but do not
         # turn a non-match into a deterministic rejection.
+        hard_location_match = True
+    elif remote_only and legacy_remote_country:
+        hard_location_match = (
+            matches_search_location(location, str(legacy_remote_country)) is not False
+        )
+    elif remote_only:
         hard_location_match = True
     else:
         hard_location_match = location_match or not location_required
@@ -553,7 +574,19 @@ def get_job_screening_packet(
         raise ValueError(f"active job not found: {job_id}")
     resume_text, _ = _resume_corpus(preferences, workspace)
     prescreen = _prescreen(job, preferences, _terms(resume_text))
-    return build_screening_packet(job, preferences, prescreen, inventory=list(inventory.values()))
+    vault_root = workspace / "vault"
+    evidence = (
+        select_screening_evidence(vault_root, job)
+        if (vault_root / "vault.json").is_file()
+        else None
+    )
+    return build_screening_packet(
+        job,
+        preferences,
+        prescreen,
+        inventory=list(inventory.values()),
+        evidence=evidence,
+    )
 
 
 def _provider_args(config_path: Path, providers: list[str] | None) -> list[str]:
@@ -711,6 +744,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.command == "update":
             return puller_main(_provider_args(config_path, args.provider))
+        if args.command == "resolve-sources":
+            forwarded = ["--config", str(config_path), "resolve-sources"]
+            if args.apply:
+                forwarded.append("--apply")
+            if args.limit is not None:
+                forwarded.extend(("--limit", str(args.limit)))
+            if args.probe_missing:
+                forwarded.append("--probe-missing")
+            forwarded.extend(("--catalog-cache", args.catalog_cache))
+            return puller_main(forwarded)
         if args.command == "new":
             return _new_jobs(
                 config_path,

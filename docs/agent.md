@@ -217,6 +217,76 @@ Missing salary or sponsorship language stays unknown. Skill, tooling, domain,
 title, and years-of-experience gaps belong to career fit and may produce a
 positive `worthwhile_stretch` result.
 
+For an authorized new or refreshed screen, the service first runs a separate
+posting-only shadow interpretation. It sections the bounded posting into stable
+sentence-or-list-item source units, extracts four to eight source-backed criteria
+when supported, and requires every section to be accounted for. This request
+contains no candidate profile or vault facts. Its versioned SQLite cache shares
+the screening database file but a separate table and cache key. The model returns
+source-unit IDs rather than copied quotations. The server rejects unknown or
+cross-section IDs, derives the exact source text locally, and requires a lexical
+anchor to the criterion label or retrieval terms. Section
+dispositions and partial-posting completeness are derived locally rather than
+trusted as model judgments. Preference and lifestyle cross-fields are also
+normalized locally in the conservative direction. After local validation, each
+resume-evaluable criterion independently retrieves up to three candidate facts
+from the canonical vault. Required and role-defining criteria are processed
+first, but selection is round-robin and globally capped at twelve cards so one
+broad criterion cannot crowd out the rest. The fit model receives the
+criterion-to-fact mapping and every positive finding must cite a fact under the
+criterion that retrieved it. The server rejects unknown or cross-criterion
+citations. The fit model must assess every resume-evaluable criterion as
+supported, partially supported, transferable, unknown, or an apparent gap. The
+server rejects missing assessments, facts borrowed across criteria, and gap claims
+based only on retrieval silence. Required uncertainty caps an otherwise strong
+result, while preferred uncertainty never becomes an eligibility blocker. An
+empty required/core retrieval set produces a local
+`needs_more_evidence` result without paying for the private fit request; it does
+not mean the candidate lacks the skill. Invalid shadow output is logged by
+category and falls back to the existing posting-wide evidence screen. A
+provider transport failure still surfaces normally rather than immediately
+repeating the same failing provider call. Cached interpretations can recreate
+the criterion-driven packet locally, so reopening a job finds its saved screen
+without another provider request.
+
+Before using quick screens to change ordering, build a reviewed calibration set
+from real saved postings and stable interpreted criterion IDs. First create a
+balanced review worksheet from current structured screens:
+
+```bash
+resume-builder screen-eval prepare job-search/new-job-screens.json \
+  build/evals/screening-review.json --limit 30
+```
+
+Preparation samples across provider and current fit, while also exposing evidence
+and posting coverage. It copies the current retrieval and judgment only as review
+context. Human truth fields remain blank: the command never promotes a model
+answer into its own expected result. Old screen schemas and incomplete
+criterion-level results are excluded; preparation fails clearly when no current
+screen can support an honest review.
+
+For each case, review the posting criterion and confirmed vault facts, then fill
+the relevant fact IDs, acceptable criterion outcomes, whether the screen should
+abstain, and optionally the expected overall fit. Validate and strip the model
+context into a stable case file:
+
+```bash
+resume-builder screen-eval finalize build/evals/screening-review.json \
+  build/evals/screening-cases.json
+```
+
+Finalization refuses partial reviews. Then run the provider-free comparison:
+
+```bash
+resume-builder screen-eval build/evals/screening-cases.json \
+  job-search/new-job-screens.json
+```
+
+The results input may be the existing `screen-new` queue artifact or a JSON list
+of saved result objects. The report measures criterion coverage, outcome agreement, retrieval recall and
+precision, abstention accuracy, and overall-fit agreement. Generated results and
+evaluation files stay outside the authoritative vault.
+
 When a posting has neither salary bound, semantic screening also requests an
 advisory base-pay estimate in the **same structured model call**. This applies
 to authorized individual and batch screening, including scheduled screening
@@ -229,7 +299,7 @@ up to 8,000 description characters. It adds up to twelve salary-bearing active
 inventory postings, prioritizing the same company and title, then the same
 title elsewhere, then other roles at the company. Related postings retain their
 URLs, dates, currencies and pay periods; they are context, not automatically
-comparable roles. No CareerPulse data or database is read at runtime.
+comparable roles. No external job-search database is read at runtime.
 
 Results include a range, currency, year/hour period, low/medium confidence,
 reasoning, company-data basis, assumptions and cited inventory IDs. The model

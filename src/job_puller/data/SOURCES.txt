@@ -4,7 +4,6 @@ Selected from https://github.com/Feashliaa/job-board-aggregator
 Dataset commit: ecb67960f3e3f87b832efab823a479d4d64a2c07
 Files: data/greenhouse_companies.json, data/ashby_companies.json,
 data/lever_companies.json.
-Discovery reference: https://github.com/santifer/career-ops/blob/a61c9762600b2a08396be6cd40a5a8ef2ea278eb/scan-ats-full.mjs
 
 This is a bounded starter selection, not the full upstream catalog.
 Greenhouse and Lever entries returned non-empty public job APIs during review.

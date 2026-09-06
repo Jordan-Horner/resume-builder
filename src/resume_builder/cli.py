@@ -28,6 +28,7 @@ from . import (
     rendering,
     review_records,
     schema_upgrade,
+    screening_evaluation,
     service,
     source_import,
     synthesis,
@@ -67,6 +68,10 @@ COMMANDS: dict[str, Command] = {
         "Validate role-shape profiles or audit directional resume coverage",
     ),
     "eval": (evaluations.main, "Validate or grade reproducible resume regression cases"),
+    "screen-eval": (
+        screening_evaluation.main,
+        "Measure quick-screen retrieval, abstention, and fit against reviewed cases",
+    ),
     "feedback": (
         feedback_memory.main,
         "Capture conversational revisions and accepted editorial memory",

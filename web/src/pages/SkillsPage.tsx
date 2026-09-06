@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { getSkills, setSkillSearch } from "../api";
-import { EmptyState, ErrorMessage } from "../components";
+import { EmptyState, ErrorMessage, SearchField } from "../components";
 import type { CareerSkill } from "../types";
 
 export function SkillsPage() {
@@ -25,7 +25,7 @@ export function SkillsPage() {
   return <section className="page career-page">
     <header className="career-heading"><div><p className="eyebrow">Career evidence</p><h1>Skills</h1><p className="page-intro">Confirmed skills come directly from your vault. Select a small set to broaden future job searches.</p></div><div className="career-count"><strong>{skills.length}</strong><span>vault skills</span></div></header>
     {!skills.length ? <EmptyState title="No confirmed skills yet">Importing a resume preserves source evidence. Skills appear here after that evidence is reviewed and added to the vault.</EmptyState> : <>
-      <div className="career-tools"><label className="search-field"><span className="sr-only">Search skills</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search skills and evidence" /></label><p>{skills.filter((item) => item.search.enabled).length} search signals selected</p></div>
+      <div className="career-tools"><SearchField label="Search skills" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search skills and evidence" /><p>{skills.filter((item) => item.search.enabled).length} search signals selected</p></div>
       {error && <ErrorMessage message={error} retry={load} />}
       <div className="career-list" role="list">{visible.map((skill) => <article className="career-row skill-library-row" role="listitem" key={skill.id}>
         <div className="career-row-main"><div className="career-row-title"><h3>{skill.title}</h3><span className={`evidence-state ${skill.status_tone}`}>{skill.status_label}</span></div><p>{skill.description}</p><small>{skill.resumes.length ? `Used by ${skill.resumes.length} resume${skill.resumes.length === 1 ? "" : "s"}` : "Not currently used in a resume"}{skill.themes.length ? ` · ${skill.themes.join(" · ")}` : ""}</small>{skill.search.disabled_reason && <small>{skill.search.disabled_reason}</small>}</div>

@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 from job_puller.config import InventoryConfig
 from job_puller.database import InventoryDatabase
-from job_puller.models import ProviderResult
+from job_puller.models import JobObservation, ProviderResult
 from job_puller.providers.linkedin import LinkedInGuestProvider
 from job_puller.service import InventoryService
 
@@ -121,3 +121,48 @@ def test_scrape_retries_retryable_empty_failure_once(tmp_path, monkeypatch):
     assert attempts == 2
     assert summary.outcome == "healthy-empty"
     assert summary.metrics["fetch_attempts"] == 2
+
+
+def test_scrape_reports_verified_direct_apply_enrichment(tmp_path, monkeypatch):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    service = InventoryService(config(), db)
+
+    class StubProvider:
+        name = "linkedin"
+        source_key = "linkedin:guest"
+
+        def fetch(self, since):
+            now = datetime.now(UTC)
+            return ProviderResult(
+                source_key=self.source_key,
+                provider=self.name,
+                observations=[
+                    JobObservation(
+                        provider="linkedin",
+                        provider_job_id="123",
+                        title="AI Engineer",
+                        company="Example",
+                        source_url="https://www.linkedin.com/jobs/view/123",
+                        direct_apply_url="https://apply.example.com/123",
+                    )
+                ],
+                started_at=now,
+                completed_at=now,
+                success=True,
+            )
+
+    def enrich(observation, _timeout):
+        observation.direct_apply_url = "https://jobs.ashbyhq.com/Example/123"
+        observation.raw_payload["direct_apply_resolution"] = {"status": "resolved"}
+        observation.raw_payload["ats_job_posting"] = {"url": observation.direct_apply_url}
+        return observation
+
+    monkeypatch.setattr(service, "providers", lambda _selected: [StubProvider()])
+    monkeypatch.setattr("job_puller.service.enrich_observation", enrich)
+
+    summary = service.scrape()[0]
+
+    assert summary.metrics["direct_apply_links"] == 1
+    assert summary.metrics["direct_apply_links_verified"] == 1
+    assert summary.metrics["ats_postings_enriched"] == 1

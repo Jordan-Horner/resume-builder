@@ -17,7 +17,8 @@ shortlisted postings to Resume Builder through stable inventory and target
 contracts. Ship both packages in one distribution while keeping mutable job data
 in the private workspace.
 
-CareerPulse is frozen for this effort. It is neither the inventory host nor a runtime dependency. Its implementation may be consulted for proven retry, enrichment, location, and source-health ideas, but no new inventory work belongs in CareerPulse and the new backend must not read CareerPulse's database.
+The inventory package is self-contained. It does not read another job-search
+application's database or rely on another collector at runtime.
 
 Do not place scraper code, a mutable job database, or bulk job descriptions inside the career vault. Resume Builder continues to own:
 
@@ -144,7 +145,7 @@ SmartRecruiters / Workday / etc.     through a maintained adapter/library
 
 ## Best ideas to combine
 
-### From career-ops
+### Provider and ingestion patterns
 
 Use these as the primary ingestion model:
 
@@ -159,9 +160,11 @@ Use these as the primary ingestion model:
 - Use description fingerprints as an additional duplicate signal.
 - Protect jobs with application history from destructive fuzzy merges.
 
-Do not copy its Markdown/TSV inventory storage or lightweight title/company/URL ranking prompt. Resume Builder has stronger target preservation and criterion-level matching contracts.
+Do not use Markdown/TSV as inventory storage or reduce ranking to a lightweight
+title/company/URL prompt. Resume Builder has stronger target preservation and
+criterion-level matching contracts.
 
-### From CareerPulse
+### Resilient collection patterns
 
 Reuse or preserve these capabilities:
 
@@ -179,7 +182,10 @@ Do not retain URL-heavy deduplication as the primary canonical identity, and do 
 
 Use [speedyapply/JobSpy](https://github.com/speedyapply/JobSpy) as the preferred replaceable adapter for LinkedIn and Indeed. As of the 2026-08-27 review, it is the cleanest maintained GitHub integration found for both sources: one `scrape_jobs()` interface, concurrent source execution, proxy support, and a normalized job schema containing descriptions, compensation, dates, locations, remote state, and direct URLs when available.
 
-This specifically replaces CareerPulse's Indeed HTML/Playwright scraper. JobSpy's Indeed adapter calls Indeed's GraphQL job-search endpoint and returns full posting descriptions, avoiding CareerPulse's repeatedly blocked HTML-card path. Its LinkedIn adapter still uses LinkedIn's public guest endpoints, so it should replace duplicated parsing code but not be mistaken for a block-proof source.
+JobSpy's Indeed adapter calls Indeed's GraphQL job-search endpoint and returns
+full posting descriptions, avoiding a repeatedly blocked HTML-card path. Its
+LinkedIn adapter still uses LinkedIn's public guest endpoints, so it should not
+be mistaken for a block-proof source.
 
 Recommended commercial-board acquisition shape:
 
@@ -245,6 +251,13 @@ Adopt:
 - saved inventory queries and filter presets;
 - full-text search over normalized job fields;
 - versioned match analyses rather than overwriting the only score.
+
+The Jobs-page clearance filter is a temporary three-state inventory view: all
+jobs, jobs without a detected clearance requirement, or clearance-required jobs
+only. It never deletes inventory or changes the saved clearance preference.
+Neutral and prefer-clearance preferences default to all jobs; an exclude
+preference defaults to the no-clearance view. Preferring clearance work remains
+a fit-scoring signal rather than an automatic inventory restriction.
 
 ## Inventory data model
 
@@ -476,9 +489,14 @@ For version one, the primary product metric is **fresh, complete, canonical jobs
 
 ## Final recommendation
 
-Build **Job Puller**, a new standalone local Python inventory backend at `/Users/jordan/Projects/job-puller`. Keep it private and local-only. Use **career-ops only as the provider and ingestion blueprint**, **JobSpy as the LinkedIn/Indeed commercial-board adapter**, **freehire and Job Seek as canonical lifecycle/search references**, and **CareerPulse only as a read-only reference for resilient fetch/enrichment patterns**.
+Build **Job Puller**, a standalone local Python inventory backend. Keep mutable
+inventory private and local. Use **JobSpy as the replaceable LinkedIn/Indeed
+commercial-board adapter** and retain backend-owned provider, lifecycle,
+enrichment, and reconciliation interfaces.
 
-Do not extend CareerPulse, link to its database, or make the new backend depend on either CareerPulse or career-ops at runtime. Port or adapt only the narrowly selected behavior into backend-owned interfaces and tests.
+Do not link to another job-search database or make the backend depend on another
+collector at runtime. Implement required behavior behind backend-owned
+interfaces and tests.
 
 Keep **Resume Builder as the sole owner of candidate-aware screening, target preservation, evidence matching, and resume tailoring**.
 

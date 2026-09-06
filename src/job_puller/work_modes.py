@@ -47,6 +47,7 @@ HYBRID_PATTERNS = (
 )
 ONSITE_PATTERNS = (
     re.compile(r"\brequir(?:e|es|ed|ing)\b.{0,60}\b(?:on[ -]?site|in[ -]?office)\b", re.I | re.S),
+    re.compile(r"\b(?:on[ -]?site|in[ -]?office)\s+(?:role|position|job)\b", re.I),
     re.compile(r"\b(?:on[ -]?site|in[ -]?office)\s+(?:presence|work|schedule|days?)\b", re.I),
     re.compile(r"\boffice[- ]based\s+(?:role|position|job|work)\b", re.I),
 )

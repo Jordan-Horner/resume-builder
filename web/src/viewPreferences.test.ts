@@ -50,10 +50,17 @@ describe("onboarding filter defaults", () => {
     expect(restored?.country).toBe("United States");
     expect(restored?.locations).toEqual(["Boston"]);
   });
-  it("migrates v5 views to showing both job types unless excluded by saved preferences", () => {
+  it("migrates views without a clearance filter to showing all jobs", () => {
     const oldView = { ...EMPTY_VIEW } as Partial<typeof EMPTY_VIEW>;
-    delete oldView.includeClearanceJobs;
+    delete oldView.clearanceMode;
     localStorage.setItem("resume-builder.job-view.v5", JSON.stringify({ filters: { ...EMPTY_FILTERS, view: oldView }, previous: oldView }));
-    expect(restoreView(defaults).filters.view?.includeClearanceJobs).toBe(true);
+    expect(restoreView(defaults).filters.view?.clearanceMode).toBe("all");
+  });
+  it("migrates the previous boolean clearance filter", () => {
+    const oldDefault = { ...EMPTY_VIEW, includeClearanceJobs: true } as Partial<typeof EMPTY_VIEW> & { includeClearanceJobs: boolean };
+    delete oldDefault.clearanceMode;
+    const oldView = { ...oldDefault, includeClearanceJobs: false };
+    localStorage.setItem("resume-builder.job-view.v6", JSON.stringify({ filters: { ...EMPTY_FILTERS, view: oldView }, previous: oldDefault }));
+    expect(restoreView(defaults).filters.view?.clearanceMode).toBe("exclude");
   });
 });

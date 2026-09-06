@@ -130,9 +130,31 @@ class InventoryService:
             if result.observations:
                 enriched = []
                 for observation in result.observations:
+                    tracks_direct_apply = observation.provider in {"linkedin", "indeed"} and bool(
+                        observation.direct_apply_url
+                    )
                     enriched.append(
                         enrich_observation(observation, self.config.request_timeout_seconds)
                     )
+                    if tracks_direct_apply:
+                        result.metrics["direct_apply_links"] = (
+                            result.metrics.get("direct_apply_links", 0) + 1
+                        )
+                        resolution = observation.raw_payload.get("direct_apply_resolution", {})
+                        status = resolution.get("status") if isinstance(resolution, dict) else None
+                        if status in {"resolved", "verified"}:
+                            result.metrics["direct_apply_links_verified"] = (
+                                result.metrics.get("direct_apply_links_verified", 0) + 1
+                            )
+                        elif status == "failed":
+                            result.metrics["direct_apply_resolution_failed"] = (
+                                result.metrics.get("direct_apply_resolution_failed", 0) + 1
+                            )
+                    ats_posting = observation.raw_payload.get("ats_job_posting")
+                    if isinstance(ats_posting, dict):
+                        result.metrics["ats_postings_enriched"] = (
+                            result.metrics.get("ats_postings_enriched", 0) + 1
+                        )
                 result.observations = enriched
             inserted, updated = self.database.record_result(result)
             summaries.append(

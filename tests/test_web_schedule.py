@@ -22,6 +22,8 @@ def test_missing_schedule_is_reported_without_creating_configuration(tmp_path: P
     assert result["timezone"] == "America/New_York"
     assert result["next_run"] is None
     assert result["service_status"] == "offline"
+    assert result["screening_enabled"] is False
+    assert result["screening_max_jobs"] == 6
     assert not (tmp_path / DEFAULT_CONFIG).exists()
 
 
@@ -68,6 +70,29 @@ def test_enabling_schedule_starts_managed_scheduler(
     assert load_config(tmp_path / DEFAULT_CONFIG).jobs.enabled is True
 
 
+def test_save_schedule_persists_bounded_background_screening(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(web_schedule, "set_scheduler_enabled", lambda _enabled: None)
+
+    result = web_schedule.save_schedule(
+        tmp_path,
+        {
+            "enabled": True,
+            "times": ["08:00"],
+            "screening_enabled": True,
+            "screening_max_jobs": 10,
+        },
+        state_path=tmp_path / "state.sqlite",
+    )
+
+    saved = load_config(tmp_path / DEFAULT_CONFIG)
+    assert saved.jobs.semantic_screening_enabled is True
+    assert saved.jobs.semantic_screening_max_jobs == 10
+    assert result["screening_enabled"] is True
+    assert result["screening_max_jobs"] == 10
+
+
 def test_service_control_failure_restores_previous_schedule(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -97,6 +122,14 @@ def test_service_control_failure_restores_previous_schedule(
         ({"enabled": "yes", "times": ["08:00"]}, "enabled must be a boolean"),
         ({"enabled": True, "times": []}, "at least one"),
         ({"enabled": True, "times": ["8am"]}, "HH:MM"),
+        (
+            {"enabled": True, "times": ["08:00"], "screening_enabled": "yes"},
+            "screening_enabled must be a boolean",
+        ),
+        (
+            {"enabled": True, "times": ["08:00"], "screening_max_jobs": 26},
+            "screening_max_jobs must be from 1 to 25",
+        ),
     ],
 )
 def test_save_schedule_rejects_invalid_values_without_writing(

@@ -21,6 +21,7 @@ from .automation import (
     next_job_run,
     render_default_config,
 )
+from .background_screening import background_screening_configured
 from .service import managed_service_status, set_scheduler_enabled
 
 
@@ -91,6 +92,9 @@ def schedule_status(
         else None,
         "last_run": last_run.get("finished_at") if last_run else None,
         "service_status": service_status,
+        "screening_enabled": config.jobs.semantic_screening_enabled,
+        "screening_max_jobs": config.jobs.semantic_screening_max_jobs,
+        "screening_available": background_screening_configured(root),
     }
 
 
@@ -104,7 +108,9 @@ def save_schedule(
     """Validate and persist portal changes through the native scheduler config."""
     enabled = payload.get("enabled")
     times = payload.get("times")
-    unknown = sorted(set(payload) - {"enabled", "times"})
+    screening_enabled_value = payload.get("screening_enabled")
+    screening_max_jobs_value = payload.get("screening_max_jobs")
+    unknown = sorted(set(payload) - {"enabled", "times", "screening_enabled", "screening_max_jobs"})
     if unknown:
         raise ValueError(f"Unknown schedule settings: {', '.join(unknown)}")
     if not isinstance(enabled, bool):
@@ -113,8 +119,26 @@ def save_schedule(
         raise ValueError("Choose at least one time for automatic scraping.")
     if not all(isinstance(value, str) for value in times):
         raise ValueError("Run times must use HH:MM.")
+    if "screening_enabled" in payload and not isinstance(screening_enabled_value, bool):
+        raise ValueError("screening_enabled must be a boolean")
+    if "screening_max_jobs" in payload and (
+        not isinstance(screening_max_jobs_value, int)
+        or isinstance(screening_max_jobs_value, bool)
+        or not 1 <= screening_max_jobs_value <= 25
+    ):
+        raise ValueError("screening_max_jobs must be from 1 to 25")
 
     config, _ = _load(root)
+    screening_enabled = (
+        screening_enabled_value
+        if isinstance(screening_enabled_value, bool)
+        else config.jobs.semantic_screening_enabled
+    )
+    screening_max_jobs = (
+        screening_max_jobs_value
+        if isinstance(screening_max_jobs_value, int)
+        else config.jobs.semantic_screening_max_jobs
+    )
     path = root / DEFAULT_CONFIG
     path.parent.mkdir(parents=True, exist_ok=True)
     existed = path.is_file()
@@ -129,6 +153,8 @@ def save_schedule(
             notification_sink=None,
             privacy=None,
             job_enabled=enabled,
+            semantic_screening_enabled=screening_enabled,
+            semantic_screening_max_jobs=screening_max_jobs,
         )
         set_scheduler_enabled(enabled)
     except (OSError, RuntimeError, ValueError):

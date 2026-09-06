@@ -35,10 +35,17 @@ export function JobViewFilters({ value, onChange, reset, clear }: { value: ViewF
       <label><input type="checkbox" checked={value.includeUnknownPay} onChange={(event) => update({ includeUnknownPay: event.target.checked })} />Include jobs without comparable pay</label>
       <button className="text-button" onClick={reset}>Reset to my preferences</button>
     </div></details>
-    <details className="view-filter clearance-filter"><summary>{value.includeClearanceJobs ? "Clearance jobs shown" : "Clearance jobs hidden"}</summary><div className="view-filter-options">
-      <label><input type="checkbox" checked={value.includeClearanceJobs} onChange={(event) => update({ includeClearanceJobs: event.target.checked })} />Show jobs that mention a required security clearance or Public Trust</label>
-      <p>This changes only your job queue. It does not delete jobs from inventory.</p>
-    </div></details>
+    <select
+      className="clearance-filter"
+      aria-label="Clearance requirement"
+      title="Filter by jobs that require a security clearance or Public Trust"
+      value={value.clearanceMode}
+      onChange={(event) => update({ clearanceMode: event.target.value as ViewFilters["clearanceMode"] })}
+    >
+      <option value="all">All jobs</option>
+      <option value="exclude">No clearance</option>
+      <option value="only">Clearance only</option>
+    </select>
     <button className="text-button clear-job-filters" onClick={clear}>Clear</button>
   </div>;
 }

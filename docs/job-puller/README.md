@@ -26,8 +26,8 @@ uv run job-puller config validate
 The personal files live under `workspace/job-search/`. New Resume Builder
 workspaces receive neutral preferences and an inactive collector configuration.
 They also enable an offline bundled starter catalog: 17 Greenhouse, 14 Ashby,
-and 3 Lever boards. These public IDs were selected from the MIT-licensed
-job-board-aggregator datasets used by career-ops. Attribution and pinned source
+and 3 Lever boards. These public IDs were selected directly from the MIT-licensed
+job-board-aggregator datasets. Attribution and the pinned source
 revision are packaged in `job_puller/data/SOURCES.txt`. This is not the entire
 upstream dataset. Catalog presence does not guarantee a matching job or future
 availability. Other provider types still require their own board catalog.
@@ -235,6 +235,16 @@ evidence rule, source, and matching text regardless of profile match.
 LinkedIn job details are cached by job ID and parser version for 24 hours. Search pages are never cached because
 they are the rotating discovery surface. Individual malformed details are reported and skipped without hiding later
 jobs, while the partial run remains unsuccessful so its checkpoint cannot advance.
+
+When a LinkedIn detail exposes an external Apply destination, Job Puller unwraps
+the destination and follows its redirect chain without a browser. Every hop must
+use HTTP or HTTPS and resolve only to public network addresses; private,
+loopback, local, credential-bearing, excessive, and malformed redirects are
+rejected before they are requested. The final URL is stored as the direct
+application identity. When the destination publishes `JobPosting` JSON-LD, its
+first-party description, employment type, structured location, and explicit
+work arrangement enrich the observation. Resolution status, redirect hops, and
+failures remain visible in raw evidence and provider metrics.
 
 ## Adding direct ATS boards
 

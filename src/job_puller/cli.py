@@ -53,6 +53,26 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser(
         "reconcile", help="Consolidate exact provider identities while retaining observations"
     )
+    resolve = commands.add_parser(
+        "resolve-sources",
+        help="Find first-party ATS copies of LinkedIn jobs with unknown work mode",
+    )
+    resolve.add_argument(
+        "--apply",
+        action="store_true",
+        help="Attach verified ATS observations; the default is a read-only dry run",
+    )
+    resolve.add_argument("--limit", type=int, help="Limit the number of LinkedIn jobs inspected")
+    resolve.add_argument(
+        "--catalog-cache",
+        default="cache/ats-source-catalog",
+        help="Catalog cache path relative to the job-search directory",
+    )
+    resolve.add_argument(
+        "--probe-missing",
+        action="store_true",
+        help="Also try safe company-derived board identifiers after catalog lookup",
+    )
     boards = commands.add_parser("boards", help="Discover and manage direct ATS boards")
     board_commands = boards.add_subparsers(dest="boards_action", required=True)
     discover = board_commands.add_parser(
@@ -119,6 +139,28 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Observations retained: {database.stats()['observations']}")
         return 0
 
+    if args.command == "resolve-sources":
+        if args.limit is not None and args.limit < 1:
+            print("--limit must be positive", file=sys.stderr)
+            return 2
+        from .source_resolution import DATASET_REVISION, AtsCatalog, resolve_linkedin_sources
+
+        cache_dir = resolve_project_path(config_path, args.catalog_cache)
+        catalog = AtsCatalog.load(cache_dir, timeout=config.request_timeout_seconds)
+        resolution_report = resolve_linkedin_sources(
+            database,
+            catalog,
+            timeout=config.request_timeout_seconds,
+            apply=args.apply,
+            limit=args.limit,
+            include_probes=args.probe_missing,
+        )
+        payload = resolution_report.as_dict()
+        payload["mode"] = "apply" if args.apply else "dry-run"
+        payload["catalog_revision"] = DATASET_REVISION
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return 0
+
     if args.command == "scrape" and not config.enabled:
         print(
             "Job discovery setup is not active. Finish onboarding and activate a search plan.",
@@ -148,7 +190,7 @@ def main(argv: list[str] | None = None) -> int:
                 failed += int(result.outcome.value in {"failed", "blocked", "partial"})
             return 1 if failed else 0
         output_path = resolve_project_path(config_path, args.output)
-        discovered, report = discover_boards(
+        discovered, discovery_report = discover_boards(
             database.active_application_links(),
             providers=set(args.board_providers or SUPPORTED_PROVIDERS),
             timeout=config.request_timeout_seconds,
@@ -156,15 +198,15 @@ def main(argv: list[str] | None = None) -> int:
         registry = merge_registries(load_or_empty_registry(output_path), discovered)
         write_board_registry(output_path, registry)
         aliases, canonicalized, merged = database.record_verified_redirects(
-            report.verified_redirects
+            discovery_report.verified_redirects
         )
         provider_counts = {
             name: len(getattr(discovered.providers, name)) for name in SUPPORTED_PROVIDERS
         }
         print(f"Board registry updated: {output_path}")
         print(
-            f"Scanned {report.scanned_links} application links; "
-            f"recognized {report.recognized_links} observations."
+            f"Scanned {discovery_report.scanned_links} application links; "
+            f"recognized {discovery_report.recognized_links} observations."
         )
         print(
             "Discovered boards: "
@@ -174,11 +216,14 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"Verified redirects: {aliases}; canonicalized={canonicalized}; merged_jobs={merged}."
         )
-        if report.redirect_failures:
-            print(f"Greenhouse redirect failures: {len(report.redirect_failures)}", file=sys.stderr)
-            for failure in report.redirect_failures[:10]:
+        if discovery_report.redirect_failures:
+            print(
+                f"Greenhouse redirect failures: {len(discovery_report.redirect_failures)}",
+                file=sys.stderr,
+            )
+            for failure in discovery_report.redirect_failures[:10]:
                 print(f"  {failure}", file=sys.stderr)
-        return 1 if report.redirect_failures else 0
+        return 1 if discovery_report.redirect_failures else 0
 
     service = InventoryService(config, database)
     selected = set(args.scrape_providers) if args.scrape_providers else None

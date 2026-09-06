@@ -149,14 +149,9 @@ def install_assistant(app: FastAPI, workspace: Path) -> None:
 
     @router.get("/status")
     async def status() -> dict[str, Any]:
-        online = False
-        try:
-            async with httpx.AsyncClient(timeout=2, trust_env=False) as client:
-                response = await client.get("http://127.0.0.1:8768/health")
-                online = response.status_code == 200
-        except httpx.HTTPError:
-            online = False
-        return {"configured": configured(), "online": online}
+        # Runs now start on this same-origin FastAPI service. The legacy runtime
+        # bridge may be present for older clients, but it is not a health dependency.
+        return {"configured": configured(), "online": True}
 
     @router.get("/threads")
     def threads() -> dict[str, Any]:
@@ -185,6 +180,28 @@ def install_assistant(app: FastAPI, workspace: Path) -> None:
 
     @router.get("/threads/{identity}")
     def get_thread(identity: str) -> dict[str, Any]:
+        return thread(identity)
+
+    @router.post("/threads/{identity}/runs", status_code=202)
+    def start_turn(identity: str, payload: dict[str, Any]) -> dict[str, Any]:
+        run_id = payload.get("run_id")
+        prompt = payload.get("prompt")
+        if (
+            not isinstance(run_id, str)
+            or not 1 <= len(run_id) <= 100
+            or not isinstance(prompt, str)
+            or not 1 <= len(prompt.strip()) <= 12000
+        ):
+            raise HTTPException(400, "Send one text message")
+        thread(identity)
+        if not configured():
+            raise HTTPException(409, "Configure AI in Settings to start the assistant")
+        try:
+            started = store().begin_turn(identity, run_id, prompt)
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        if started:
+            launch(identity, run_id)
         return thread(identity)
 
     @router.post("/threads/{identity}/stop", status_code=204)

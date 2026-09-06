@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from job_puller.locations import matches_local_location, matches_search_location
 
@@ -28,15 +28,31 @@ class ViewFilters(BaseModel):
     includeUnknownPay: bool = True
     includeUnknownMode: bool = True
     includeUnmatchedLocation: bool = False
-    includeClearanceJobs: bool = True
+    clearanceMode: Literal["all", "exclude", "only"] = "all"
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_clearance_boolean(cls, value: Any) -> Any:
+        if not isinstance(value, dict) or "includeClearanceJobs" not in value:
+            return value
+        migrated = dict(value)
+        legacy = migrated.pop("includeClearanceJobs")
+        if type(legacy) is not bool:
+            raise ValueError("includeClearanceJobs must be true or false")
+        migrated.setdefault("clearanceMode", "all" if legacy else "exclude")
+        return migrated
 
 
 def matches_view(job: dict[str, Any], filters: ViewFilters) -> bool:
     # Legacy clients may still send roles. Discovery owns roles, not this view.
-    if not filters.includeClearanceJobs and has_clearance_requirement(
-        str(job.get("title") or ""), str(job.get("description") or "")
-    ):
-        return False
+    if filters.clearanceMode != "all":
+        requires_clearance = has_clearance_requirement(
+            str(job.get("title") or ""), str(job.get("description") or "")
+        )
+        if filters.clearanceMode == "exclude" and requires_clearance:
+            return False
+        if filters.clearanceMode == "only" and not requires_clearance:
+            return False
     modes = set(job["work_modes"]) & {"remote", "hybrid", "onsite"}
     if filters.workModes and not modes.intersection(filters.workModes):
         if modes or not filters.includeUnknownMode:

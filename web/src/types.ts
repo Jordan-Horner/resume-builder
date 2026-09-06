@@ -1,5 +1,6 @@
 export type WorkMode = "remote" | "hybrid" | "onsite";
 export type EmploymentType = "fulltime" | "parttime" | "contract" | "temporary";
+export type ClearanceMode = "all" | "exclude" | "only";
 
 export interface JobFilters {
   view?: ViewFilters;
@@ -21,7 +22,7 @@ export interface ViewFilters {
   includeUnknownPay: boolean;
   includeUnknownMode: boolean;
   includeUnmatchedLocation: boolean;
-  includeClearanceJobs: boolean;
+  clearanceMode: ClearanceMode;
 }
 
 export interface Job {
@@ -49,6 +50,7 @@ export interface JobScreenResult {
     job_id: string;
     fit: string;
     fit_label: string;
+    screening_label: "Preference check" | "Quick screen";
     eligibility: string;
     eligibility_label: string;
     recommendation: string;
@@ -59,6 +61,30 @@ export interface JobScreenResult {
     unknowns: string[];
     stretch_case: string | null;
     reasoning_summary: string;
+    evidence_coverage: "good" | "partial" | "low";
+    evidence_strategy?: "posting-wide" | "criterion-driven";
+    criterion_evidence?: Array<{
+      criterion_id: string;
+      label: string;
+      importance: "required" | "preferred";
+      status: "demonstrated-candidate" | "supporting-candidate" | "no-candidate-evidence" | "not-resume-evaluable";
+      fact_ids: string[];
+    }>;
+    criterion_assessments?: Array<{
+      criterion_id: string;
+      outcome: "supported" | "partially_supported" | "transferable" | "unknown" | "apparent_gap";
+      confidence: "high" | "medium" | "low";
+      fact_ids: string[];
+      explanation: string;
+      materially_affects_recommendation: boolean;
+    }>;
+    posting_coverage: "complete" | "partial";
+    evidence_used: Array<{
+      fact_id: string;
+      title: string;
+      category: "employment" | "projects" | "skills" | "education" | "certifications";
+      strength: "demonstrated" | "supporting" | "credential";
+    }>;
   };
 }
 

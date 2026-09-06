@@ -1,0 +1,50 @@
+:root {
+  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+  color: #e6edf3;
+  background: #0d1117;
+  color-scheme: dark;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+
+  --ink: #e6edf3;
+  --muted: #8b949e;
+  --text-secondary: #b1bac4;
+  --text-subtle: #7d8590;
+  --text-disabled: #6e7681;
+  --text-inverse: #f0f6fc;
+
+  --page-background: #0d1117;
+  --header-background: #010409;
+  --surface: #161b22;
+  --surface-raised: #21262d;
+  --surface-hover: #1f2630;
+  --surface-control: #30363d;
+  --line: #30363d;
+  --line-strong: #484f58;
+
+  --accent: #58a6ff;
+  --accent-strong: #79c0ff;
+  --accent-emphasis: #1f6feb;
+  --accent-hover: #388bfd;
+  --accent-soft: #1f3a5f;
+  --focus-ring: rgb(88 166 255 / .4);
+
+  --success: #3fb950;
+  --success-emphasis: #238636;
+  --success-hover: #2ea043;
+  --success-soft: #193d28;
+  --success-text: #7ee787;
+  --success-text-strong: #aff5b4;
+  --warning: #d29922;
+  --warning-soft: #3b2e16;
+  --warning-text: #e3b341;
+  --danger: #f85149;
+  --danger-soft: #3d1f24;
+  --danger-text: #ff7b72;
+  --danger-text-strong: #ffb3ad;
+
+  --control-height: 44px;
+  --radius-control: 7px;
+  --shadow: none;
+  --shadow-overlay: 0 12px 30px #01040999;
+}

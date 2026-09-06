@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from html import unescape
 from typing import Any
-from urllib.parse import unquote, urlsplit, urlunsplit
+from urllib.parse import parse_qs, unquote, urlsplit, urlunsplit
 
 import httpx
 from bs4 import BeautifulSoup, Tag
@@ -28,7 +28,7 @@ _DETAIL_URL = f"{_BASE_URL}/jobs-guest/jobs/api/jobPosting"
 _PAGE_SIZE = 10
 _MAX_START = 999
 _JOB_ID_RE = re.compile(r"(?:urn:li:jobPosting:|/jobs/view/(?:[^/?#]*-)?)(\d+)")
-_PARSER_VERSION = "linkedin-guest-v2"
+_PARSER_VERSION = "linkedin-guest-v3"
 
 
 class LinkedInError(RuntimeError):
@@ -206,18 +206,17 @@ def parse_job_detail(html: str) -> LinkedInDetail | None:
     )
     direct_apply_url = ""
     apply_node = soup.select_one("code#applyUrl")
+    candidates = []
     if apply_node:
-        encoded = unescape(apply_node.decode_contents()).replace("\\u0026", "&")
-        encoded = re.sub(r"\s+", "", encoded)
-        match = re.search(r"[?&]url=([^\"&<]+)", encoded)
-        if match:
-            candidate = unquote(match.group(1)).strip()
-            try:
-                parts = urlsplit(candidate)
-            except ValueError:
-                parts = None
-            if parts and parts.scheme in {"http", "https"} and parts.netloc:
-                direct_apply_url = candidate
+        candidates.append(apply_node.decode_contents())
+    for link in soup.select(
+        'a[data-tracking-control-name*="apply-link-offsite"], a[href*="/externalApply/"]'
+    ):
+        candidates.append(str(link.get("href") or ""))
+    for value in candidates:
+        direct_apply_url = _external_apply_target(value)
+        if direct_apply_url:
+            break
     return LinkedInDetail(
         description_html=description_html,
         description_text=html_to_text(description_html),
@@ -226,6 +225,30 @@ def parse_job_detail(html: str) -> LinkedInDetail | None:
         criteria=criteria,
         raw_html=html,
     )
+
+
+def _external_apply_target(value: str) -> str:
+    candidate = unescape(value).replace("\\u0026", "&").replace("\\/", "/")
+    candidate = re.sub(r"\s+", "", candidate).strip().strip("\"'")
+    for _ in range(3):
+        try:
+            parts = urlsplit(candidate)
+        except ValueError:
+            return ""
+        if parts.scheme not in {"http", "https"} or not parts.netloc:
+            return ""
+        wrapped = parse_qs(parts.query).get("url", [])
+        host = (parts.hostname or "").casefold()
+        is_linkedin = host == "linkedin.com" or host.endswith(".linkedin.com")
+        if not is_linkedin:
+            return candidate
+        if not wrapped:
+            return ""
+        unwrapped = unquote(wrapped[0]).strip()
+        if not unwrapped or unwrapped == candidate:
+            return candidate
+        candidate = unwrapped
+    return candidate
 
 
 def _node_text(node: Tag | None) -> str:

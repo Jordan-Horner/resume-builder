@@ -164,6 +164,27 @@ def run_worker(root: Path, snapshot: Path) -> None:
         if after is None or after == before:
             raise ValueError("The collector did not produce a new scan result.")
         manifest = json.loads(after)
+        screening_status = "disabled"
+        screened_jobs = 0
+        try:
+            from .automation import DEFAULT_CONFIG as AUTOMATION_CONFIG
+            from .automation import load_config as load_automation
+            from .background_screening import run_background_quick_screening
+
+            schedule_path = root / AUTOMATION_CONFIG
+            if schedule_path.is_file():
+                schedule = load_automation(schedule_path)
+                if schedule.jobs.semantic_screening_enabled:
+                    summary = run_background_quick_screening(
+                        root,
+                        max_jobs=schedule.jobs.semantic_screening_max_jobs,
+                        input_path=root / "job-search/new-jobs.json",
+                    )
+                    screening_status = "complete" if summary.failed == 0 else "partial"
+                    screened_jobs = summary.completed
+        except (OSError, RuntimeError, ValueError, json.JSONDecodeError):
+            # Discovery remains successful when optional provider screening is unavailable.
+            screening_status = "unavailable"
         errors = [
             {
                 "provider": run.get("provider"),
@@ -179,6 +200,8 @@ def run_worker(root: Path, snapshot: Path) -> None:
             {
                 "status": manifest.get("status", "failed"),
                 "new_jobs": len(manifest.get("new_to_database_job_ids", [])),
+                "screening_status": screening_status,
+                "screened_jobs": screened_jobs,
                 "errors": errors,
                 "message": "Scan complete"
                 if code == 0

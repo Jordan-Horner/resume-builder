@@ -29,8 +29,9 @@ from .jobs import (
     _with_application_dispositions,
     get_job_screening_packet,
 )
+from .posting_interpretation import PostingInterpretationCache, PostingInterpretationService
 from .salary_estimation import SalaryEstimate, format_salary_estimate
-from .screening_service import ScreeningService
+from .screening_service import ScreeningService, enrich_packet_from_cached_interpretation
 
 DEFAULT_SCREENING_OUTPUT = Path("job-search/new-job-screens.json")
 SCREENING_QUEUE_SCHEMA_VERSION = 1
@@ -83,6 +84,24 @@ def _job_view(job: dict[str, Any], *, source_order: int, active: bool) -> dict[s
     return {**view, "source_order": source_order, "active": active}
 
 
+def _automatic_skip_reason(job: dict[str, Any]) -> str | None:
+    """Use only local prescreen evidence to avoid spending on obvious misses."""
+    prescreen = job.get("prescreen")
+    if not isinstance(prescreen, dict):
+        return None
+    queue_state = prescreen.get("queue_state")
+    if queue_state == "hard_conflict":
+        return "hard_constraint_conflict"
+    if queue_state == "needs_description":
+        return "incomplete_listing"
+    interest = prescreen.get("interest")
+    if isinstance(interest, dict) and not any(
+        bool(interest.get(key)) for key in ("desired_title_terms", "interest_terms")
+    ):
+        return "no_saved_search_signal"
+    return None
+
+
 def _priority(item: dict[str, Any]) -> tuple[int, int, int]:
     screen = item.get("screening")
     if not isinstance(screen, dict) or screen.get("status") != "complete":
@@ -104,6 +123,7 @@ def _priority(item: dict[str, Any]) -> tuple[int, int, int]:
         fit_rank = {
             Recommendation.PURSUE_AS_STRETCH.value: 2,
             Recommendation.VERIFY_ELIGIBILITY.value: 3,
+            Recommendation.NEEDS_MORE_EVIDENCE.value: 4,
             Recommendation.DEPRIORITIZE.value: 6,
             Recommendation.DO_NOT_APPLY.value: 7,
         }.get(recommendation, 5)
@@ -137,6 +157,7 @@ def _summary(
         statuses["unscreened"]
         + statuses["failed"]
         + recommendations[Recommendation.VERIFY_ELIGIBILITY.value]
+        + recommendations[Recommendation.NEEDS_MORE_EVIDENCE.value]
     )
     return ScreeningQueueSummary(
         total=len(items),
@@ -165,6 +186,7 @@ def build_screening_queue(
     preferences_path: Path = DEFAULT_PREFERENCES,
     max_provider_jobs: int = 6,
     allow_provider: bool = False,
+    workspace: Path = Path("."),
 ) -> ScreeningQueueSummary:
     """Screen a complete new-job set without allowing any result to hide a job."""
     if not 1 <= max_provider_jobs <= 25:
@@ -175,8 +197,16 @@ def build_screening_queue(
         raise ValueError("new-job artifact must contain a jobs list")
 
     cache = ScreeningCache(cache_path)
-    service = ScreeningService(adapter, cache)
+    service = ScreeningService(
+        adapter,
+        cache,
+        interpretation_service=PostingInterpretationService(
+            adapter, PostingInterpretationCache(cache_path)
+        ),
+        vault_root=workspace / "vault",
+    )
     items: list[dict[str, Any]] = []
+    provider_jobs = 0
     provider_calls = 0
     input_tokens = 0
     output_tokens = 0
@@ -194,11 +224,23 @@ def build_screening_queue(
             item["screening"] = {"status": "not_active", "reason": "durable_disposition"}
             items.append(item)
             continue
+        skip_reason = _automatic_skip_reason(job)
+        if skip_reason:
+            item["screening"] = {"status": "skipped", "reason": skip_reason}
+            items.append(item)
+            continue
 
         packet = get_job_screening_packet(
             str(job.get("id") or ""),
             config_path=config_path,
             preferences_path=preferences_path,
+            workspace=workspace,
+        )
+        packet = enrich_packet_from_cached_interpretation(
+            packet,
+            model=model,
+            interpretation_cache=PostingInterpretationCache(cache_path),
+            vault_root=workspace / "vault",
         )
         cached = cache.get(packet, model)
         if cached is not None:
@@ -206,8 +248,10 @@ def build_screening_queue(
             items.append(item)
             continue
         if packet.eligibility.value == "ineligible":
-            outcome = service.screen_detailed(packet, model=model)
-            item["screening"] = _result_payload(outcome.result, cached=False)
+            item["screening"] = {
+                "status": "skipped",
+                "reason": "hard_constraint_conflict",
+            }
             items.append(item)
             continue
         if not allow_provider:
@@ -217,20 +261,22 @@ def build_screening_queue(
             }
             items.append(item)
             continue
-        if provider_calls >= max_provider_jobs:
+        if provider_jobs >= max_provider_jobs:
             item["screening"] = {"status": "unscreened", "reason": "run_budget_exhausted"}
             items.append(item)
             continue
-        provider_calls += 1
+        provider_jobs += 1
         try:
             outcome = service.screen_detailed(packet, model=model)
         except (ModelProviderError, ValueError) as exc:
+            provider_calls += 1
             item["screening"] = {
                 "status": "failed",
                 "reason": "provider_error",
                 "error_category": exc.__class__.__name__,
             }
         else:
+            provider_calls += outcome.requests
             input_tokens += outcome.input_tokens
             output_tokens += outcome.output_tokens
             total_cost += outcome.cost_usd

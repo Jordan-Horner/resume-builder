@@ -37,6 +37,8 @@ function ScheduleEditor() {
   const [times, setTimes] = useState<string[]>([]);
   const [frequency, setFrequency] = useState<Frequency>("once");
   const [newTime, setNewTime] = useState("12:00");
+  const [screeningEnabled, setScreeningEnabled] = useState(false);
+  const [screeningMaxJobs, setScreeningMaxJobs] = useState(6);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -50,6 +52,8 @@ function ScheduleEditor() {
       setEnabled(result.enabled);
       setTimes(result.times);
       setFrequency(frequencyFor(result.times));
+      setScreeningEnabled(result.screening_enabled);
+      setScreeningMaxJobs(result.screening_max_jobs);
     }).catch((reason: unknown) => {
       if (active) setError(reason instanceof Error ? reason.message : "Could not load scrape schedule");
     });
@@ -72,11 +76,13 @@ function ScheduleEditor() {
     setError("");
     setNotice("");
     try {
-      const result = await saveScrapeSchedule(enabled, times);
+      const result = await saveScrapeSchedule(enabled, times, screeningEnabled, screeningMaxJobs);
       setSaved(result);
       setEnabled(result.enabled);
       setTimes(result.times);
       setFrequency(frequencyFor(result.times));
+      setScreeningEnabled(result.screening_enabled);
+      setScreeningMaxJobs(result.screening_max_jobs);
       setNotice(result.enabled ? "Schedule saved." : "Automatic scraping is off. Your times are saved.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not save scrape schedule");
@@ -93,11 +99,13 @@ function ScheduleEditor() {
     setError("");
     setNotice("");
     try {
-      const result = await saveScrapeSchedule(next, times);
+      const result = await saveScrapeSchedule(next, times, screeningEnabled, screeningMaxJobs);
       setSaved(result);
       setEnabled(result.enabled);
       setTimes(result.times);
       setFrequency(frequencyFor(result.times));
+      setScreeningEnabled(result.screening_enabled);
+      setScreeningMaxJobs(result.screening_max_jobs);
       setNotice(result.enabled ? "Automatic scraping started." : "Automatic scraping stopped. Manual searches are still available.");
     } catch (reason) {
       setEnabled(previous);
@@ -110,7 +118,10 @@ function ScheduleEditor() {
   if (!saved) return <section className="scrape-schedule"><h2>Automatic scraping</h2>{error ? <p role="alert">{error} <button onClick={() => setRetry((value) => value + 1)}>Retry schedule</button></p> : <p role="status">Loading schedule…</p>}</section>;
 
   const changed = saved
-    ? enabled !== saved.enabled || times.join(",") !== saved.times.join(",")
+    ? enabled !== saved.enabled
+      || times.join(",") !== saved.times.join(",")
+      || screeningEnabled !== saved.screening_enabled
+      || screeningMaxJobs !== saved.screening_max_jobs
     : true;
   return <section className="scrape-schedule" aria-labelledby="scrape-schedule-title">
     <div className="schedule-heading">
@@ -132,6 +143,17 @@ function ScheduleEditor() {
       <span className={`scheduler-state ${saved.service_status}`}><small>Service</small>{saved.enabled ? `Scheduler ${saved.service_status}` : "Scheduler stopped"}</span>
     </div>}
     {saved?.enabled && saved.service_status === "offline" && <p className="schedule-warning">Automatic scraping could not start. Check Settings → About for service status.</p>}
+    <div className="background-screening">
+      <div>
+        <strong>Background quick screening</strong>
+        <p>Use the inexpensive first pass on up to {screeningMaxJobs} eligible new jobs after each search. Obvious conflicts and jobs with no saved search signal are skipped. This never hides or reorders jobs.</p>
+        {!saved.screening_available && <p className="screening-setup-note"><a href="/settings/integrations">Connect OpenRouter</a> to turn this on.</p>}
+      </div>
+      <div className="background-screening-controls">
+        <label><span>Per scrape</span><select aria-label="Quick screens per scrape" value={screeningMaxJobs} disabled={busy || !screeningEnabled} onChange={(event) => setScreeningMaxJobs(Number(event.target.value))}>{[3, 6, 10, 15].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+        <label className="source-toggle"><span>{screeningEnabled ? "On" : "Off"}</span><input type="checkbox" role="switch" aria-label="Background quick screening" checked={screeningEnabled} disabled={busy || !saved.screening_available} onChange={(event) => { setScreeningEnabled(event.target.checked); setNotice(""); }} /></label>
+      </div>
+    </div>
     {error && <p role="alert" className="onboarding-error">{error}</p>}
     {notice && <p role="status" className="schedule-notice">{notice}</p>}
     <button className="onboarding-primary schedule-save" disabled={busy || !changed || !times.length} onClick={() => void save()}>{busy ? "Saving…" : "Save schedule"}</button>

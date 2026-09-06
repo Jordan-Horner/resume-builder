@@ -58,16 +58,32 @@ it("refills the page from the backend after removing a result", async () => {
   await click("Not interested");
   expect(host.textContent).toContain("Platform Engineer");
   expect(host.textContent).toContain("101 jobs to review");
+  expect(document.activeElement).toBe(host.querySelector(".job-row"));
 });
-it("temporarily hides clearance jobs without changing saved preferences", async () => {
-  await act(async () => root.render(<JobsPage />));
-  const toggle = host.querySelector(".clearance-filter input") as HTMLInputElement;
 
-  await act(async () => toggle.click());
+it("returns focus to the selected job when details close", async () => {
+  await openJob();
+  const row = host.querySelector(".job-row");
+
+  await act(async () => (host.querySelector('[aria-label="Close job details"]') as HTMLButtonElement).click());
+  await act(async () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+
+  expect(document.activeElement).toBe(row);
+});
+it("temporarily filters clearance jobs without changing saved preferences", async () => {
+  await act(async () => root.render(<JobsPage />));
+  const filter = host.querySelector(".clearance-filter") as HTMLSelectElement;
+
+  expect(filter.value).toBe("all");
+
+  await act(async () => {
+    filter.value = "only";
+    filter.dispatchEvent(new Event("change", { bubbles: true }));
+  });
 
   expect(api.getJobs).toHaveBeenLastCalledWith(
     expect.objectContaining({
-      view: expect.objectContaining({ includeClearanceJobs: false }),
+      view: expect.objectContaining({ clearanceMode: "only" }),
     }),
   );
 });
@@ -95,10 +111,16 @@ it("offers salary estimation only inside the opened job description", async () =
 
 it("screens a job only after the user requests it", async () => {
   const result = { status: "complete" as const, cached: false, result: {
-    job_id: "one", fit: "good_match", fit_label: "Good fit", eligibility: "eligible",
+    job_id: "one", fit: "good_match", fit_label: "Good fit", screening_label: "Quick screen" as const, eligibility: "eligible",
     eligibility_label: "Eligible", recommendation: "pursue", recommendation_label: "Pursue",
     confidence: "medium" as const, strengths: [], gaps: [], unknowns: [], stretch_case: null,
     reasoning_summary: "Strong production support evidence.",
+    evidence_coverage: "good" as const, evidence_strategy: "criterion-driven" as const,
+    criterion_evidence: [{ criterion_id: "incident-response", label: "Incident response", importance: "required" as const, status: "demonstrated-candidate" as const, fact_ids: ["OPS-001"] }],
+    criterion_assessments: [{ criterion_id: "incident-response", outcome: "supported" as const, confidence: "high" as const, fact_ids: ["OPS-001"], explanation: "Verified incident leadership directly supports this requirement.", materially_affects_recommendation: true }],
+    posting_coverage: "complete" as const, evidence_used: [{
+      fact_id: "OPS-001", title: "Production incident response", category: "employment" as const, strength: "demonstrated" as const,
+    }],
   } };
   vi.mocked(api.screenJob).mockResolvedValue(result);
   await openJob();
@@ -109,6 +131,10 @@ it("screens a job only after the user requests it", async () => {
   expect(api.screenJob).toHaveBeenCalledWith("one");
   expect(host.textContent).toContain("Good fit");
   expect(host.textContent).toContain("Strong production support evidence.");
+  expect(host.textContent).toContain("Based on 1 verified career fact.");
+  expect(host.textContent).toContain("Incident response: Supported");
+  expect(host.textContent).toContain("Verified incident leadership directly supports this requirement.");
+  expect(host.textContent).toContain("Evidence used");
 });
 
 it.each([{ salary_min: 80000, salary_max: null }, { salary_min: null, salary_max: 100000 }])("keeps posted partial pay instead of offering an estimate: %j", async (pay) => {

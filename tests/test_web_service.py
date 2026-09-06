@@ -5,6 +5,7 @@ import pytest
 import yaml
 
 from resume_builder import web_service
+from resume_builder.job_screening import build_screening_packet, deterministic_ineligible_result
 from resume_builder.web_service import DashboardService, _clean_description
 from resume_builder.workspace import initialize_workspace
 
@@ -28,6 +29,30 @@ def job(job_id: str, *, title: str, mode: str, company: str = "Example") -> dict
         "providers": ["linkedin"],
         "url": f"https://example.com/{job_id}",
     }
+
+
+def test_local_preference_conflict_does_not_claim_candidate_is_unqualified() -> None:
+    packet = build_screening_packet(
+        {
+            **job("onsite", title="AI Engineer", mode="onsite"),
+            "description_quality": "complete",
+        },
+        {
+            "accepted_work_modes": ["remote"],
+            "accepted_location_terms": [],
+            "include_unknown_locations": True,
+            "screening_profile": {},
+        },
+        {},
+    )
+
+    presented = DashboardService._present_screen(
+        deterministic_ineligible_result(packet), cached=False
+    )["result"]
+
+    assert presented["screening_label"] == "Preference check"
+    assert presented["fit_label"] == "Fit not evaluated"
+    assert presented["eligibility_label"] == "Outside your preferences"
 
 
 @pytest.mark.parametrize("source", ["saved", "environment", "none"])

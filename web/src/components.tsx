@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ComponentPropsWithoutRef, ReactNode, Ref } from "react";
 
 export function SearchIcon() {
   return (
@@ -26,10 +26,13 @@ export function EmptyState({ title, children, actions }: { title: string; childr
   );
 }
 
-export function LoadingRows() {
+export function LoadingRows({ label = "Loading content" }: { label?: string }) {
   return (
-    <div className="loading-rows" aria-label="Loading">
-      {[0, 1, 2].map((row) => <div className="loading-row" key={row} />)}
+    <div className="loading-rows" role="status" aria-live="polite">
+      <span className="sr-only">{label}</span>
+      <div aria-hidden="true">
+        {[0, 1, 2].map((row) => <div className="loading-row" key={row} />)}
+      </div>
     </div>
   );
 }
@@ -40,5 +43,36 @@ export function ErrorMessage({ message, retry }: { message: string; retry: () =>
       <p>{message}</p>
       <button className="text-button" onClick={retry}>Try again</button>
     </div>
+  );
+}
+
+type IconButtonProps = Omit<ComponentPropsWithoutRef<"button">, "aria-label"> & {
+  label: string;
+};
+
+export function IconButton({ label, className = "", ...props }: IconButtonProps) {
+  return <button {...props} aria-label={label} className={`icon-button ${className}`.trim()} />;
+}
+
+type SearchFieldProps = Omit<ComponentPropsWithoutRef<"input">, "type"> & {
+  label: string;
+  icon?: ReactNode;
+  inputRef?: Ref<HTMLInputElement>;
+  wrapperClassName?: string;
+};
+
+export function SearchField({
+  label,
+  icon = <SearchIcon />,
+  inputRef,
+  wrapperClassName = "",
+  ...inputProps
+}: SearchFieldProps) {
+  return (
+    <label className={`search-field ${wrapperClassName}`.trim()}>
+      {icon}
+      <span className="sr-only">{label}</span>
+      <input {...inputProps} ref={inputRef} type="search" />
+    </label>
   );
 }

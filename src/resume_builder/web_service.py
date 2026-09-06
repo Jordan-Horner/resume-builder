@@ -73,6 +73,7 @@ from .job_setup_defaults import PORTFOLIO_PATH, PREFERENCES_PATH, scaffold_job_s
 from .job_target import parse_target
 from .jobs import get_job_screening_packet
 from .layout import VaultLayout
+from .posting_interpretation import PostingInterpretationCache, PostingInterpretationService
 from .preferences import _validated as validate_preferences
 from .project_report import project_report
 from .role_policy import MAX_TITLE_LENGTH, MIN_TITLE_LENGTH, check_query_capacity, clean_titles
@@ -82,7 +83,7 @@ from .salary_estimation import (
     build_salary_packet,
     has_posted_salary,
 )
-from .screening_service import ScreeningService
+from .screening_service import ScreeningService, enrich_packet_from_cached_interpretation
 from .source_import import (
     SUPPORTED,
     apply_import_plan,
@@ -1047,7 +1048,11 @@ class DashboardService:
             minimumPay=preferences.get("minimum_salary"),
             currency=preferences.get("salary_currency") or "USD",
             period=preferences.get("salary_period") or "year",
-            includeClearanceJobs=preferences.get("clearance_preference", "neutral") != "exclude",
+            clearanceMode=(
+                "exclude"
+                if preferences.get("clearance_preference", "neutral") == "exclude"
+                else "all"
+            ),
         ).model_dump()
 
     def list_jobs(
@@ -1179,12 +1184,52 @@ class DashboardService:
             "pursue": "Pursue",
             "pursue_as_stretch": "Consider as a stretch",
             "verify_eligibility": "Verify eligibility",
+            "needs_more_evidence": "Needs more evidence",
             "deprioritize": "Deprioritize",
             "do_not_apply": "Do not apply",
         }
         payload = result.model_dump(mode="json")
-        payload["fit_label"] = fit_labels[payload["fit"]]
-        payload["eligibility_label"] = payload["eligibility"].replace("_", " ").title()
+        preference_only = payload.get("model") == "local/deterministic"
+        violated_codes = {
+            str(item.get("code"))
+            for item in payload.get("constraints", [])
+            if item.get("strength") == "required" and item.get("state") == "violated"
+        }
+        qualification_codes = {
+            "sponsorship",
+            "active_clearance",
+            "obtain_clearance",
+            "clearance",
+            "license",
+        }
+        payload["screening_label"] = "Preference check" if preference_only else "Quick screen"
+        payload["fit_label"] = (
+            "Fit not evaluated" if preference_only else fit_labels[payload["fit"]]
+        )
+        structured_strengths = payload.get("strengths", [])
+        payload["strengths"] = [
+            str(item.get("statement"))
+            for item in structured_strengths
+            if isinstance(item, dict) and item.get("statement")
+        ]
+        payload["evidence_used"] = [
+            {
+                "fact_id": item.get("fact_id"),
+                "title": item.get("title"),
+                "category": item.get("category"),
+                "strength": item.get("strength"),
+            }
+            for item in payload.get("evidence_used", [])
+            if isinstance(item, dict)
+        ]
+        if payload["eligibility"] == "ineligible" and not (violated_codes & qualification_codes):
+            payload["eligibility_label"] = "Outside your preferences"
+        elif payload["eligibility"] == "ineligible":
+            payload["eligibility_label"] = "Eligibility requirement not met"
+        elif payload["eligibility"] == "unknown":
+            payload["eligibility_label"] = "Eligibility needs review"
+        else:
+            payload["eligibility_label"] = "Eligible"
         payload["recommendation_label"] = recommendation_labels[payload["recommendation"]]
         return {"status": "complete", "cached": cached, "result": payload}
 
@@ -1197,16 +1242,21 @@ class DashboardService:
         )
 
     def saved_job_screen(self, job_id: str) -> dict[str, Any] | None:
-        """Return deterministic or cached screening without invoking a model."""
+        """Return a cached quick screen without invoking a model."""
         with self._screening_lock:
             packet = self._screening_packet(job_id)
-            if packet.eligibility == EligibilityStatus.INELIGIBLE:
-                return self._present_screen(deterministic_ineligible_result(packet), cached=False)
             config_path = self.workspace / DEFAULT_AGENT_CONFIG
             if not config_path.is_file():
                 return None
             config = load_agent_config(config_path)
-            cache = ScreeningCache(self.workspace / "build/job-search/screening-cache.sqlite")
+            cache_path = self.workspace / "build/job-search/screening-cache.sqlite"
+            cache = ScreeningCache(cache_path)
+            packet = enrich_packet_from_cached_interpretation(
+                packet,
+                model=config.models.fast,
+                interpretation_cache=PostingInterpretationCache(cache_path),
+                vault_root=self.workspace / "vault",
+            )
             result = cache.get(packet, config.models.fast)
             return self._present_screen(result, cached=True) if result else None
 
@@ -1224,6 +1274,13 @@ class DashboardService:
             service = ScreeningService(
                 adapter,
                 ScreeningCache(self.workspace / "build/job-search/screening-cache.sqlite"),
+                interpretation_service=PostingInterpretationService(
+                    adapter,
+                    PostingInterpretationCache(
+                        self.workspace / "build/job-search/screening-cache.sqlite"
+                    ),
+                ),
+                vault_root=self.workspace / "vault",
             )
             result, cached = service.screen(packet, model=config.models.fast, refresh=refresh)
             return self._present_screen(result, cached=cached)

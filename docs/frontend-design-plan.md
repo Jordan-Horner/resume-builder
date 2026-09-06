@@ -263,8 +263,8 @@ Opening a job is read-only. It stays in the review queue until the user chooses
 an application record and moves it to Applications. Store disposition state in
 the backend so it is consistent across browser sessions.
 
-Following CareerPulse's job-detail pattern, keep the disposition and posting
-actions in a persistent action area beside the content. In the split pane, the
+Keep the disposition and posting actions in a persistent action area beside the
+content. In the split pane, the
 job summary and actions remain fixed while only the long description scrolls.
 On desktop, treat the Jobs screen as a fixed-height workspace like LinkedIn:
 the page heading and filters stay in place, the inventory list scrolls in its
@@ -353,9 +353,9 @@ explains what data is shared, asks only for required information, verifies the
 connection, and ends with a clear success state. Secrets are sent only to the
 local backend and are never shown again after saving.
 
-## CareerPulse inspiration
+## Interaction references
 
-Borrow these patterns from the local CareerPulse project:
+Use these established job-inventory interaction patterns:
 
 - Clear top navigation between jobs, applications, and setup.
 - A search-first job feed with work type visible beside search.
@@ -363,10 +363,10 @@ Borrow these patterns from the local CareerPulse project:
 - A separate home for applied jobs and their statuses.
 - Integration forms that verify a connection after it is configured.
 
-Do not carry over CareerPulse's score filters, saved views, alerts, batch tools,
-analytics dashboard, queue, networking area, dense settings tabs, or kanban
-pipeline. The Resume Builder frontend has a smaller job: review inventory jobs,
-check applications, and connect services.
+Avoid score filters, saved views, alerts, batch tools, an analytics dashboard,
+a processing queue, networking features, dense settings tabs, or a kanban
+pipeline. The frontend has a smaller job: review inventory jobs, check
+applications, and connect services.
 
 ## Visual direction
 

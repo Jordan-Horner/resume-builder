@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { getApplications } from "../api";
-import { EmptyState, ErrorMessage, LoadingRows, SearchIcon } from "../components";
+import { EmptyState, ErrorMessage, LoadingRows, SearchField } from "../components";
 import type { Application } from "../types";
 
 function label(value: string) {
@@ -40,18 +40,14 @@ export function ApplicationsPage() {
         </div>
       </section>
       <section className="search-tools compact" aria-label="Application filters">
-        <label className="search-field">
-          <SearchIcon />
-          <span className="sr-only">Search applications</span>
-          <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search role or company" />
-        </label>
+        <SearchField label="Search applications" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search role or company" />
         <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Filter by application status">
           <option value="">All statuses</option>
           {statuses.map((item) => <option key={item} value={item}>{label(item)}</option>)}
         </select>
       </section>
       {error && <ErrorMessage message={error} retry={() => { setError(""); setReloadKey((key) => key + 1); }} />}
-      {loading ? <LoadingRows /> : filtered.length ? (
+      {loading ? <LoadingRows label="Loading applications" /> : filtered.length ? (
         <section className="application-list">
           <div className="table-heading"><span>{filtered.length} applications</span><span>Latest status</span></div>
           {filtered.map((item) => (

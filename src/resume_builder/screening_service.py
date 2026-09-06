@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from decimal import Decimal
+from pathlib import Path
 
 from .agent_contracts import ModelAdapter, StructuredModelRequest
 from .job_screening import (
@@ -14,9 +16,20 @@ from .job_screening import (
     ScreeningResult,
     SemanticScreen,
     deterministic_ineligible_result,
+    deterministic_insufficient_evidence_result,
     finalize_screen,
     screening_prompt,
+    with_screening_evidence,
 )
+from .posting_interpretation import (
+    PostingInterpretation,
+    PostingInterpretationCache,
+    PostingInterpretationService,
+    build_interpretation_packet,
+)
+from .screening_evidence import select_criterion_screening_evidence
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -27,12 +40,64 @@ class ScreeningOutcome:
     input_tokens: int = 0
     output_tokens: int = 0
     cost_usd: Decimal = Decimal("0")
+    posting_interpretation: PostingInterpretation | None = None
+    posting_interpretation_cached: bool = False
+    posting_interpretation_error: str | None = None
+
+
+def enrich_packet_from_cached_interpretation(
+    packet: ScreeningPacket,
+    *,
+    model: str,
+    interpretation_cache: PostingInterpretationCache,
+    vault_root: Path,
+) -> ScreeningPacket:
+    """Recreate a criterion-driven packet locally so its screen cache remains addressable."""
+    resolved_vault = vault_root.expanduser().resolve()
+    if not (resolved_vault / "vault.json").is_file():
+        return packet
+    try:
+        description = packet.interpretation_description or None
+        interpretation_packet = build_interpretation_packet(
+            packet.job,
+            description=description,
+            description_truncated=(
+                packet.interpretation_description_truncated
+                if description is not None
+                else packet.job.description_truncated
+            ),
+        )
+        interpretation = interpretation_cache.get(interpretation_packet, model)
+        if interpretation is None:
+            return packet
+        evidence = select_criterion_screening_evidence(
+            resolved_vault,
+            packet.job.model_dump(mode="python"),
+            interpretation,
+        )
+        return with_screening_evidence(packet, evidence)
+    except (OSError, ValueError) as exc:
+        LOGGER.warning(
+            "cached_criterion_evidence_retrieval_failed job_id=%s error_category=%s",
+            packet.job.id,
+            exc.__class__.__name__,
+        )
+        return packet
 
 
 class ScreeningService:
-    def __init__(self, adapter: ModelAdapter, cache: ScreeningCache):
+    def __init__(
+        self,
+        adapter: ModelAdapter,
+        cache: ScreeningCache,
+        *,
+        interpretation_service: PostingInterpretationService | None = None,
+        vault_root: Path | None = None,
+    ):
         self.adapter = adapter
         self.cache = cache
+        self.interpretation_service = interpretation_service
+        self.vault_root = vault_root
 
     def screen(
         self,
@@ -55,10 +120,98 @@ class ScreeningService:
         """Return a screen plus content-free usage data for bounded batch accounting."""
         if packet.eligibility == EligibilityStatus.INELIGIBLE:
             return ScreeningOutcome(deterministic_ineligible_result(packet), False)
+        interpretation = None
+        interpretation_cached = False
+        interpretation_error = None
+        interpretation_requests = 0
+        interpretation_input_tokens = 0
+        interpretation_output_tokens = 0
+        interpretation_cost = Decimal("0")
+        if self.interpretation_service is not None:
+            try:
+                interpretation_description = packet.interpretation_description or None
+                interpretation_packet = build_interpretation_packet(
+                    packet.job,
+                    description=interpretation_description,
+                    description_truncated=(
+                        packet.interpretation_description_truncated
+                        if interpretation_description is not None
+                        else packet.job.description_truncated
+                    ),
+                )
+            except ValueError as exc:
+                interpretation_error = exc.__class__.__name__
+                LOGGER.warning(
+                    "posting_interpretation_failed job_id=%s error_category=%s",
+                    packet.job.id,
+                    interpretation_error,
+                )
+            else:
+                try:
+                    shadow = self.interpretation_service.interpret(
+                        interpretation_packet,
+                        model=model,
+                        refresh=refresh,
+                    )
+                except ValueError as exc:
+                    interpretation_error = exc.__class__.__name__
+                    interpretation_requests = 1
+                    LOGGER.warning(
+                        "posting_interpretation_failed job_id=%s error_category=%s",
+                        packet.job.id,
+                        interpretation_error,
+                    )
+                else:
+                    interpretation = shadow.interpretation
+                    interpretation_cached = shadow.cached
+                    interpretation_requests = shadow.requests
+                    interpretation_input_tokens = shadow.input_tokens
+                    interpretation_output_tokens = shadow.output_tokens
+                    interpretation_cost = Decimal(shadow.cost_usd or "0")
+                    if (
+                        self.vault_root is not None
+                        and (self.vault_root.expanduser().resolve() / "vault.json").is_file()
+                    ):
+                        try:
+                            evidence = select_criterion_screening_evidence(
+                                self.vault_root,
+                                packet.job.model_dump(mode="python"),
+                                interpretation,
+                            )
+                            packet = with_screening_evidence(packet, evidence)
+                        except (OSError, ValueError) as exc:
+                            interpretation_error = exc.__class__.__name__
+                            LOGGER.warning(
+                                "criterion_evidence_retrieval_failed job_id=%s error_category=%s",
+                                packet.job.id,
+                                interpretation_error,
+                            )
+        if not packet.candidate_evidence:
+            return ScreeningOutcome(
+                deterministic_insufficient_evidence_result(packet),
+                False,
+                requests=interpretation_requests,
+                input_tokens=interpretation_input_tokens,
+                output_tokens=interpretation_output_tokens,
+                cost_usd=interpretation_cost,
+                posting_interpretation=interpretation,
+                posting_interpretation_cached=interpretation_cached,
+                posting_interpretation_error=interpretation_error,
+            )
         if not refresh:
             cached = self.cache.get(packet, model)
             if cached is not None:
-                return ScreeningOutcome(cached, True)
+                return ScreeningOutcome(
+                    cached,
+                    True,
+                    requests=interpretation_requests,
+                    input_tokens=interpretation_input_tokens,
+                    output_tokens=interpretation_output_tokens,
+                    cost_usd=interpretation_cost,
+                    posting_interpretation=interpretation,
+                    posting_interpretation_cached=interpretation_cached,
+                    posting_interpretation_error=interpretation_error,
+                )
         reply = self.adapter.run_structured(
             StructuredModelRequest(
                 prompt=screening_prompt(packet),
@@ -73,8 +226,11 @@ class ScreeningService:
         return ScreeningOutcome(
             result=result,
             cached=False,
-            requests=reply.requests,
-            input_tokens=reply.input_tokens,
-            output_tokens=reply.output_tokens,
-            cost_usd=Decimal(reply.cost_usd or "0"),
+            requests=interpretation_requests + reply.requests,
+            input_tokens=interpretation_input_tokens + reply.input_tokens,
+            output_tokens=interpretation_output_tokens + reply.output_tokens,
+            cost_usd=interpretation_cost + Decimal(reply.cost_usd or "0"),
+            posting_interpretation=interpretation,
+            posting_interpretation_cached=interpretation_cached,
+            posting_interpretation_error=interpretation_error,
         )

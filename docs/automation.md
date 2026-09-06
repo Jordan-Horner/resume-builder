@@ -47,16 +47,34 @@ jobs:
   run_on_start: true
   limit: 50
   semantic_screening:
-    # Enabling this authorizes scheduled bounded posting/profile provider calls.
+    # Enabling this authorizes bounded quick-screen provider calls after searches.
     enabled: false
     max_jobs_per_run: 6
 ```
 
 Semantic screening is disabled by default. Enabling it is explicit ongoing
-authorization for scheduled runs to send bounded posting and candidate-profile
-packets to the provider configured in `agent/config.yml`. The per-run maximum is
-also capped by the agent request limit. Cached and deterministically ineligible
-results do not consume that allowance.
+authorization for scheduled and portal-started searches to send bounded posting
+and candidate-evidence packets to the provider configured in `agent/config.yml`.
+For a new or changed posting, the service first makes a separate
+candidate-independent shadow interpretation request containing public job data
+only. It extracts source-backed criteria and accounts for every bounded posting
+section. The interpretation is cached by posting content, schema, rubric, and
+model. Its output is diagnostic in this phase: it cannot change the visible
+quick screen, hide or reorder a job, or create a durable target. An uncached job
+therefore normally uses two structured provider requests: one posting-only
+interpretation and one bounded candidate-evidence screen. Either cache can be
+reused independently.
+Candidate evidence is selected locally from confirmed canonical vault facts,
+with no more than 20 privacy-scrubbed cards and 6,000 candidate-evidence
+characters sent per job. Interest terms remain search hints rather than proof.
+The model must cite the fact IDs behind positive findings, and a job is not sent
+to the provider when no relevant confirmed evidence can be retrieved.
+This is the inexpensive first-pass screen only; it does not run deeper company,
+compensation, or quality-of-life research. The per-run maximum bounds jobs that
+may contact the provider. Cached results do not consume that job allowance, and
+provider-call telemetry counts both structured requests. Jobs with
+hard local conflicts, incomplete listings, or no saved title/skill search signal
+are skipped before any provider call and remain available for a manual screen.
 
 A screening failure is recorded as unresolved and does not fail the completed
 collection run. This prevents the scheduler from repeating provider discovery
@@ -84,7 +102,9 @@ there is no second web-only scheduler. The On/Off switch acts immediately: On
 starts the managed job scheduler and Off stops it. Manual **Find jobs now** runs
 remain available while the scheduler is off. Gmail monitoring is managed by a
 separate worker, so pausing scheduled job discovery does not pause application
-reconciliation.
+reconciliation. The **Background quick screening** control applies the bounded
+first pass after either scheduled or manual searches. Its cached metadata appears
+only after opening a job; it never filters, hides, or reorders the Jobs page.
 
 Test exactly one task without starting the service:
 

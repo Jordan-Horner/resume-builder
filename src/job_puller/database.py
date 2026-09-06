@@ -631,6 +631,85 @@ class InventoryDatabase:
             )
         return inserted, updated
 
+    def unresolved_linkedin_targets(self) -> list[dict[str, object]]:
+        """Return one strong LinkedIn observation for each active unknown-mode job."""
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT j.id AS job_id, o.id AS observation_id, o.title_raw AS title,
+                          o.company_raw AS company, o.location_raw AS location,
+                          o.description_text AS description, o.posted_at
+                   FROM jobs j
+                   JOIN job_observation_links l ON l.job_id=j.id
+                   JOIN observations o ON o.id=l.observation_id
+                   WHERE j.status IN ('active','reopened')
+                     AND j.work_mode='unknown' AND o.provider='linkedin'
+                   ORDER BY j.id, LENGTH(o.description_text) DESC, o.last_seen_at DESC"""
+            ).fetchall()
+        selected: dict[str, dict[str, object]] = {}
+        for row in rows:
+            job_id = str(row[0])
+            if job_id in selected:
+                continue
+            selected[job_id] = {
+                "job_id": job_id,
+                "observation_id": str(row[1]),
+                "title": str(row[2]),
+                "company": str(row[3]),
+                "location": str(row[4]),
+                "description": str(row[5]),
+                "posted_at": datetime.fromisoformat(str(row[6])) if row[6] else None,
+            }
+        return list(selected.values())
+
+    def record_source_resolution(
+        self,
+        target_job_id: str,
+        linkedin_observation_id: str,
+        observation: JobObservation,
+        source_key: str,
+        *,
+        confidence: float,
+        reason: str,
+        seen_at: datetime,
+    ) -> bool:
+        """Attach one independently verified ATS observation to a LinkedIn-backed job."""
+        if observation.provider in {"linkedin", "indeed"}:
+            raise ValueError("source resolution requires a direct ATS observation")
+        with self.transaction() as conn:
+            target = conn.execute(
+                """SELECT 1 FROM job_observation_links l
+                   JOIN observations o ON o.id=l.observation_id
+                   WHERE l.job_id=? AND o.id=? AND o.provider='linkedin'""",
+                (target_job_id, linkedin_observation_id),
+            ).fetchone()
+            if target is None:
+                raise ValueError("LinkedIn observation does not belong to the target job")
+            inserted = self._upsert_observation(conn, observation, source_key, seen_at)
+            observation_key = self._observation_key(observation)
+            linked = conn.execute(
+                """SELECT o.id, l.job_id FROM observations o
+                   JOIN job_observation_links l ON l.observation_id=o.id
+                   WHERE o.observation_key=?""",
+                (observation_key,),
+            ).fetchone()
+            assert linked is not None
+            if linked[1] != target_job_id:
+                self._merge_job_into(
+                    conn,
+                    target_job_id,
+                    str(linked[1]),
+                    reason,
+                    confidence,
+                    seen_at,
+                )
+            conn.execute(
+                """UPDATE job_observation_links SET merge_reason=?, merge_confidence=?
+                   WHERE job_id=? AND observation_id=?""",
+                (reason, confidence, target_job_id, str(linked[0])),
+            )
+            self._refresh_job(conn, str(linked[0]), seen_at)
+        return inserted
+
     def _observation_key(self, observation: JobObservation) -> str:
         identity = observation.provider_job_id or canonical_url(observation.source_url)
         stable = "|".join([observation.provider, observation.provider_board_id, identity])

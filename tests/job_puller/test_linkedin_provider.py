@@ -139,6 +139,31 @@ def test_detail_parser_extracts_external_apply_url():
     assert parsed.direct_apply_url == "https://careers.example.com/apply?job=123"
 
 
+def test_detail_parser_extracts_external_apply_anchor():
+    parsed = parse_job_detail(
+        detail()
+        + """
+        <a data-tracking-control-name="public_jobs_apply-link-offsite"
+           href="https://www.linkedin.com/jobs/view/externalApply/123?url=https%3A%2F%2Fjobs.ashbyhq.com%2FExample%2Fjob-123">
+          Apply
+        </a>
+        """
+    )
+    assert parsed is not None
+    assert parsed.direct_apply_url == "https://jobs.ashbyhq.com/Example/job-123"
+
+
+def test_detail_parser_preserves_destination_url_query_parameter():
+    parsed = parse_job_detail(
+        detail()
+        + """
+        <code id="applyUrl">https://careers.example.com/apply?url=job-123</code>
+        """
+    )
+    assert parsed is not None
+    assert parsed.direct_apply_url == "https://careers.example.com/apply?url=job-123"
+
+
 def test_provider_uses_fixed_offsets_and_filters_before_details():
     first_page = card(1, "Senior SRE") + "".join(
         card(job_id, "Sales Representative") for job_id in range(2, 11)
@@ -160,7 +185,7 @@ def test_provider_uses_fixed_offsets_and_filters_before_details():
     assert {item.provider_job_id for item in result.observations} == {"1", "11"}
     assert all(item.provider == "linkedin" for item in result.observations)
     assert all(item.remote is True for item in result.observations)
-    assert all(item.parser_version == "linkedin-guest-v2" for item in result.observations)
+    assert all(item.parser_version == "linkedin-guest-v3" for item in result.observations)
     assert result.metrics["raw_results"] == 12
     assert result.metrics["title_rejected"] == 9
     assert result.metrics["card_duplicates"] == 1
@@ -340,7 +365,7 @@ def test_expired_detail_cache_is_refreshed(tmp_path):
     database.put_provider_detail(
         "linkedin",
         "1",
-        "linkedin-guest-v2",
+        "linkedin-guest-v3",
         detail("Old remote description."),
         old,
         old + timedelta(hours=1),

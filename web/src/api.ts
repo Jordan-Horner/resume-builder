@@ -213,10 +213,13 @@ export interface ScrapeSchedule {
   next_run: string | null;
   last_run: string | null;
   service_status: "online" | "offline" | "unknown";
+  screening_enabled: boolean;
+  screening_max_jobs: number;
+  screening_available: boolean;
 }
 export function getScrapeSchedule(): Promise<ScrapeSchedule> { return request("/api/scrape-schedule"); }
-export function saveScrapeSchedule(enabled: boolean, times: string[]): Promise<ScrapeSchedule> {
-  return request("/api/scrape-schedule", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled, times }) });
+export function saveScrapeSchedule(enabled: boolean, times: string[], screeningEnabled = false, screeningMaxJobs = 6): Promise<ScrapeSchedule> {
+  return request("/api/scrape-schedule", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled, times, screening_enabled: screeningEnabled, screening_max_jobs: screeningMaxJobs }) });
 }
 
 export function previewRoleTitles(scope: "onboarding" | "settings", titles: string[]): Promise<{ titles: string[]; remaining: number; minimum_length: number; maximum_length: number }> {

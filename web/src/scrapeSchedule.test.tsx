@@ -10,7 +10,7 @@ vi.mock("./api", () => ({
   getScrapeSchedule: vi.fn(), saveScrapeSchedule: vi.fn(),
 }));
 
-const schedule = { configured: true, enabled: true, times: ["08:00"], timezone: "America/New_York", next_run: "2026-09-06T08:00:00-04:00", last_run: null, service_status: "online" as const };
+const schedule = { configured: true, enabled: true, times: ["08:00"], timezone: "America/New_York", next_run: "2026-09-06T08:00:00-04:00", last_run: null, service_status: "online" as const, screening_enabled: false, screening_max_jobs: 6, screening_available: true };
 let host: HTMLDivElement;
 let root: Root;
 beforeEach(() => {
@@ -39,7 +39,7 @@ it("saves the twice-daily preset as two canonical times", async () => {
   await act(async () => twice.click());
   const save = [...host.querySelectorAll("button")].find((item) => item.textContent === "Save schedule") as HTMLButtonElement;
   await act(async () => save.click());
-  expect(saveScrapeSchedule).toHaveBeenCalledWith(true, ["08:00", "17:00"]);
+  expect(saveScrapeSchedule).toHaveBeenCalledWith(true, ["08:00", "17:00"], false, 6);
 });
 
 it("uses the toggle immediately while leaving manual searches available", async () => {
@@ -50,9 +50,20 @@ it("uses the toggle immediately while leaving manual searches available", async 
   const toggle = host.querySelector('input[aria-label="Automatic scraping"]') as HTMLInputElement;
   await act(async () => toggle.click());
 
-  expect(saveScrapeSchedule).toHaveBeenCalledWith(false, ["08:00"]);
+  expect(saveScrapeSchedule).toHaveBeenCalledWith(false, ["08:00"], false, 6);
   const manual = [...host.querySelectorAll("button")].find((item) => item.textContent === "Find jobs now") as HTMLButtonElement;
   expect(manual.disabled).toBe(false);
+});
+
+it("enables capped quick screening without implying that jobs are filtered", async () => {
+  await act(async () => root.render(<JobSources />));
+  const toggle = host.querySelector('input[aria-label="Background quick screening"]') as HTMLInputElement;
+  await act(async () => toggle.click());
+  await act(async () => [...host.querySelectorAll("button")].find((button) => button.textContent === "Save schedule")?.click());
+
+  expect(host.textContent).toContain("eligible new jobs");
+  expect(host.textContent).toContain("never hides or reorders");
+  expect(saveScrapeSchedule).toHaveBeenCalledWith(true, ["08:00"], true, 6);
 });
 
 it("cannot mutate a schedule while its saved state is pending or unavailable", async () => {

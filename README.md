@@ -33,7 +33,7 @@ behalf.
 | Resume building | Creates directional and job-tailored resumes, checks evidence grounding and ATS readability, publishes a reviewable preview, and mints a PDF only after approval. |
 | Job aggregation | Collects from LinkedIn, Indeed, and direct Greenhouse, Lever, Ashby, SmartRecruiters, and Workday boards; preserves source observations and conservatively deduplicates canonical jobs. |
 | Job review | Provides persistent search, date, location, work-mode, employment-type, compensation, and clearance filters without deleting the underlying inventory. |
-| Screening | Combines deterministic eligibility checks with evidence-cited semantic fit analysis, including explicit support for worthwhile stretch roles. |
+| Screening | Combines deterministic eligibility checks with criterion-by-criterion, evidence-cited semantic fit analysis, including worthwhile stretch roles, local abstention when retrieval is too weak, and an offline human-review calibration workflow. |
 | Applications | Records append-only application history, pins the resume used, and can reconcile confident stage changes through read-only Gmail access. |
 | Automation | Runs scheduled discovery, optional background quick screens, Gmail reconciliation, and low-noise notifications in a self-hosted container. |
 | Career agent | Answers workspace questions, discusses a selected job or resume, runs bounded screens, and proposes review-gated resume wording or lifecycle changes. |
@@ -59,6 +59,8 @@ interface:
 The first-run flow accepts PDF, DOCX, Markdown, HTML, and text sources, suggests
 target roles from verified excerpts when an AI provider is connected, and
 guides the user through location, work mode, and compensation preferences.
+If a draft is weak, the agent checks your saved career evidence and imported sources
+before asking a small number of targeted questions; it does not invent stronger claims.
 
 ## Agent with controlled actions
 

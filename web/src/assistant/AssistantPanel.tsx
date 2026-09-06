@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { CopilotKitProvider, useAgent, useCopilotKit } from "@copilotkit/react-core/v2";
 import ReactMarkdown from "react-markdown";
 import { assistantRequest, type Conversation, type Proposal } from "./api";
 
-interface Props { open: boolean; target: { kind: "resume" | "job"; id: string; name: string; nonce: number } | null; onClose: () => void }
+interface Props { open: boolean; modal?: boolean; target: { kind: "resume" | "job"; id: string; name: string; nonce: number } | null; onClose: () => void }
 
 function ProposalView({ proposal, decide }: { proposal: Proposal; decide: (id: string, action: string) => void }) {
   if (proposal.payload.kind === "resume_removal") {
@@ -37,25 +36,16 @@ function ProposalView({ proposal, decide }: { proposal: Proposal; decide: (id: s
   </section>;
 }
 
-function ConversationView({ initial, changed }: { initial: Conversation; changed: (thread: Conversation) => void }) {
-  const { agent, isReady } = useAgent({ agentId: "default" });
-  const { copilotkit } = useCopilotKit();
+function ConversationView({ initial, changed, open }: { initial: Conversation; changed: (thread: Conversation) => void; open: boolean }) {
   const [thread, setThread] = useState(initial);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
-  const initialized = useRef(false);
   const end = useRef<HTMLDivElement>(null);
   const running = sending || thread.runs.some((run) => run.status === "running");
 
   useEffect(() => {
-    if (!isReady || initialized.current) return;
-    agent.threadId = initial.id;
-    agent.setMessages(initial.messages);
-    initialized.current = true;
-  }, [agent, initial, isReady]);
-
-  useEffect(() => {
+    if (!open || document.hidden) return;
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
@@ -66,27 +56,26 @@ function ConversationView({ initial, changed }: { initial: Conversation; changed
       } catch (reason) {
         if (active) setError(reason instanceof Error ? reason.message : "Could not restore conversation.");
       }
-      if (active) timer = setTimeout(poll, 1500);
+      if (active) timer = setTimeout(poll, running ? 1500 : 10000);
     };
-    timer = setTimeout(poll, 1500);
+    timer = setTimeout(poll, running ? 1500 : 10000);
     return () => { active = false; clearTimeout(timer); };
-  }, [initial.id, changed]);
+  }, [initial.id, changed, open, running]);
 
   useEffect(() => { end.current?.scrollIntoView?.({ block: "nearest" }); }, [thread.messages.length, sending]);
 
   async function send() {
-    if (!input.trim() || running || !isReady) return;
+    if (!input.trim() || running) return;
     const content = input.trim();
     setError(""); setSending(true); setInput("");
     try {
       // getRandomValues also works on self-hosted HTTP LAN origins; randomUUID does not.
       const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
-      agent.threadId = initial.id;
-      agent.setMessages(thread.messages);
-      agent.addMessage({ id, role: "user", content });
       setThread((current) => ({ ...current, messages: [...current.messages, { id, role: "user", content }] }));
-      await copilotkit.runAgent({ agent, runId: id });
-      const next = await assistantRequest<Conversation>(`/threads/${initial.id}`);
+      const next = await assistantRequest<Conversation>(`/threads/${initial.id}/runs`, {
+        method: "POST",
+        body: JSON.stringify({ run_id: id, prompt: content }),
+      });
       setThread(next); changed(next);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not send message.");
@@ -97,7 +86,7 @@ function ConversationView({ initial, changed }: { initial: Conversation; changed
   async function stop() {
     try {
       await assistantRequest(`/threads/${initial.id}/stop`, { method: "POST" });
-      agent.abortRun(); setSending(false);
+      setSending(false);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not stop response."); }
   }
 
@@ -126,18 +115,19 @@ function ConversationView({ initial, changed }: { initial: Conversation; changed
       <textarea id="assistant-message" value={input} maxLength={12000} placeholder="Ask about your résumé…" rows={3} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => {
         if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); }
       }} />
-      <div className="assistant-compose-footer"><small>Changes stay in your control</small>{running ? <button className="secondary-button" type="button" onClick={() => void stop()}>Stop</button> : <button className="primary-button" disabled={!isReady || !input.trim()}>Send</button>}</div>
+      <div className="assistant-compose-footer"><small>Changes stay in your control</small>{running ? <button className="secondary-button" type="button" onClick={() => void stop()}>Stop</button> : <button className="primary-button" disabled={!input.trim()}>Send</button>}</div>
     </form>
   </>;
 }
 
-export default function AssistantPanel({ open, target, onClose }: Props) {
+export default function AssistantPanel({ open, modal = false, target, onClose }: Props) {
   const [thread, setThread] = useState<Conversation | null>(null);
   const [threads, setThreads] = useState<Conversation[]>([]);
   const [history, setHistory] = useState(false);
   const [status, setStatus] = useState<{ configured: boolean; online: boolean } | null>(null);
   const [error, setError] = useState("");
   const header = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLElement>(null);
   const observedTarget = useRef<number | null>(null);
   const active = useRef<Conversation | null>(null);
   const update = useRef((next: Conversation) => { active.current = next; setThread(next); }).current;
@@ -175,7 +165,27 @@ export default function AssistantPanel({ open, target, onClose }: Props) {
   const activeTargetId = target?.kind === "job" ? thread?.job_id : thread?.resume_id;
   const pendingTarget = target && observedTarget.current !== target.nonce && target.id !== activeTargetId;
 
-  return <aside className="assistant-panel" aria-label="Career assistant" onKeyDown={(event) => { if (event.key === "Escape") onClose(); }}>
+  function handlePanelKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onClose();
+      return;
+    }
+    if (!modal || event.key !== "Tab") return;
+    const focusable = Array.from(panel.current?.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ) || []).filter((element) => !element.hidden);
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (!first || !last) return;
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault(); last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault(); first.focus();
+    }
+  }
+
+  return <aside ref={panel} className="assistant-panel" role={modal ? "dialog" : undefined} aria-modal={modal ? true : undefined} aria-label="Career assistant" onKeyDown={handlePanelKeyDown}>
     <header className="assistant-header"><strong>Assistant</strong><div>
       <button className="text-button" disabled={busy} onClick={() => { setHistory(!history); void refresh(); }}>History</button>
       <button className="text-button" disabled={busy} onClick={() => void start()}>New</button>
@@ -189,8 +199,6 @@ export default function AssistantPanel({ open, target, onClose }: Props) {
       : !status ? <p className="assistant-context" role="status">Connecting…</p>
       : !status.configured ? <div className="assistant-intro"><h3>Connect your AI provider</h3><p>The assistant uses your existing model settings.</p><a href="/settings/integrations">Configure AI →</a><button className="text-button" onClick={() => void refresh()}>Check again</button></div>
       : !status.online ? <div className="assistant-intro"><h3>Assistant temporarily unavailable</h3><p>Your workspace is still available. Try reconnecting shortly.</p><button className="secondary-button" onClick={() => void refresh()}>Reconnect</button></div>
-      : thread && <CopilotKitProvider key={thread.id} runtimeUrl="/api/assistant/runtime" useSingleEndpoint={false} enableInspector={false} onError={() => setError("Assistant connection interrupted. Your saved conversation is safe.")}>
-        <ConversationView initial={thread} changed={update} />
-      </CopilotKitProvider>}
+      : thread && <ConversationView key={thread.id} initial={thread} changed={update} open={open} />}
   </aside>;
 }

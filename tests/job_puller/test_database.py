@@ -66,6 +66,47 @@ def test_active_inventory_exposes_stable_consumer_projection(tmp_path):
     assert inventory[0]["url"] == "https://example.com/apply/1"
 
 
+def test_verified_ats_source_replaces_unknown_linkedin_projection(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    linkedin = observation()
+    linkedin.location = "Phoenix, AZ"
+    linkedin.work_arrangement = explicit_arrangement(
+        [WorkMode.UNKNOWN], source="linkedin", rule="not_listed"
+    )
+    db.record_result(result(linkedin))
+    target = db.unresolved_linkedin_targets()[0]
+    ats = observation(
+        provider="ashby",
+        job_id="ats-1",
+        source="https://jobs.ashbyhq.com/example/ats-1",
+        description="Different ATS rendering of the verified role. ",
+    )
+    ats.provider_board_id = "example"
+    ats.location = "Phoenix, AZ"
+    ats.remote = False
+    ats.work_arrangement = explicit_arrangement(
+        [WorkMode.ONSITE], source="ashby_structured_field", rule="workplace_type"
+    )
+
+    db.record_source_resolution(
+        str(target["job_id"]),
+        str(target["observation_id"]),
+        ats,
+        "ashby:example",
+        confidence=0.96,
+        reason="verified_test_match",
+        seen_at=datetime.now(UTC),
+    )
+
+    inventory = db.active_inventory()
+    assert len(inventory) == 1
+    assert inventory[0]["providers"] == ["ashby", "linkedin"]
+    assert inventory[0]["work_modes"] == ["onsite"]
+    assert inventory[0]["url"] == "https://jobs.ashbyhq.com/example/ats-1"
+    assert db.unresolved_linkedin_targets() == []
+
+
 def test_job_ids_include_inactive_canonical_jobs(tmp_path):
     db = InventoryDatabase(tmp_path / "inventory.db")
     db.migrate()

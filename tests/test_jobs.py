@@ -90,6 +90,22 @@ def test_prescreen_does_not_apply_onsite_location_terms_to_remote_jobs():
     assert result["constraints"]["location_match"] is False
 
 
+def test_prescreen_does_not_apply_legacy_onsite_locations_to_remote_jobs():
+    result = _prescreen(
+        job(location="Canton, MA", work_modes=["remote"]),
+        preferences(
+            accepted_work_modes=["remote"],
+            accepted_location_terms=["Florida"],
+            include_unknown_locations=False,
+            screening_profile={},
+        ),
+        {"python", "api", "incident", "cloud"},
+    )
+
+    assert result["queue_state"] == "ready"
+    assert "location" not in result["constraints"]["hard_conflicts"]
+
+
 def test_prescreen_hides_only_jobs_with_terminal_dispositions():
     applied = _prescreen(
         job(id="job-applied"),

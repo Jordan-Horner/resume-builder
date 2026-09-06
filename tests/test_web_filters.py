@@ -64,21 +64,32 @@ def test_minimum_uses_range_ceiling_and_explicit_unknown_policy():
     )
 
 
-def test_clearance_filter_hides_supported_requirements_but_not_explicit_negation():
-    hidden = ViewFilters(includeClearanceJobs=False)
+def test_clearance_filter_can_exclude_or_isolate_supported_requirements():
+    excluded = ViewFilters(clearanceMode="exclude")
+    only = ViewFilters(clearanceMode="only")
     posting = listing(
         description=(
             "An active or rein-statable TS/SCI with Polygraph security clearance is REQUIRED."
         )
     )
     assert matches_view(posting, ViewFilters())
-    assert not matches_view(posting, hidden)
+    assert not matches_view(posting, excluded)
+    assert matches_view(posting, only)
     assert not matches_view(
-        listing(title="Systems Engineer (TS/SCI)", description="Mission systems work."), hidden
+        listing(title="Systems Engineer (TS/SCI)", description="Mission systems work."), excluded
     )
     assert matches_view(
-        listing(description="No security clearance is required for this position."), hidden
+        listing(description="No security clearance is required for this position."), excluded
     )
+    assert not matches_view(
+        listing(description="No security clearance is required for this position."), only
+    )
+    assert not matches_view(listing(description="General support work."), only)
+
+
+def test_legacy_clearance_boolean_is_migrated():
+    assert ViewFilters.model_validate({"includeClearanceJobs": True}).clearanceMode == "all"
+    assert ViewFilters.model_validate({"includeClearanceJobs": False}).clearanceMode == "exclude"
 
 
 def test_multiple_employment_types_filter_inventory(tmp_path):
@@ -165,7 +176,7 @@ def test_defaults_load_preferences_without_mutation(tmp_path):
     assert defaults["country"] == "United States"
     assert defaults["locations"] == []
     assert defaults["minimumPay"] == 100_000
-    assert defaults["includeClearanceJobs"] is True
+    assert defaults["clearanceMode"] == "all"
     assert "preferred_salary" not in defaults
     assert path.read_bytes() == original
 
@@ -182,12 +193,19 @@ def test_excluding_clearance_jobs_changes_only_the_saved_view_default(tmp_path):
     path.write_text(yaml.safe_dump(preferences))
     service = DashboardService(tmp_path, inventory_loader=lambda: [])
 
-    assert service.job_filter_defaults()["includeClearanceJobs"] is False
-    assert ViewFilters().includeClearanceJobs is True
+    assert service.job_filter_defaults()["clearanceMode"] == "exclude"
+    assert ViewFilters().clearanceMode == "all"
 
 
 @pytest.mark.parametrize(
-    "values", [{"minimumPay": -1}, {"workModes": ["invalid"]}, {"period": "fortnight"}]
+    "values",
+    [
+        {"minimumPay": -1},
+        {"workModes": ["invalid"]},
+        {"period": "fortnight"},
+        {"clearanceMode": "sometimes"},
+        {"includeClearanceJobs": "false"},
+    ],
 )
 def test_reject_invalid_filter_payload(tmp_path, values):
     with pytest.raises(ValueError):

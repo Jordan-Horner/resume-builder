@@ -211,7 +211,14 @@ def test_provider_failures_are_not_saved_as_estimates(tmp_path: Path) -> None:
 def test_screening_estimates_in_one_call_without_changing_salary_eligibility(
     tmp_path: Path,
 ) -> None:
-    packet = build_screening_packet(posting(), {"minimum_salary": 200_000}, {})
+    packet = build_screening_packet(
+        posting(),
+        {
+            "minimum_salary": 200_000,
+            "screening_profile": {"supported_capabilities": ["production operations"]},
+        },
+        {},
+    )
     output = SemanticScreen(
         fit="good_match",
         confidence="medium",
