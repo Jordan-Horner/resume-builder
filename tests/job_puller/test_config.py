@@ -7,7 +7,7 @@ from job_puller.config import SearchFamily, load_config, resolve_database_path
 from job_puller.work_modes import WorkMode
 
 
-def test_private_board_registry_is_empty_until_locally_seeded(tmp_path):
+def test_first_party_boards_are_bundled_and_local_entries_override_them(tmp_path):
     import yaml
 
     from resume_builder.job_setup_defaults import scaffold_job_search
@@ -15,17 +15,23 @@ def test_private_board_registry_is_empty_until_locally_seeded(tmp_path):
     scaffold_job_search(tmp_path)
     path = tmp_path / "job-search/config/search.yml"
     config = load_config(path)
-    assert config.providers.greenhouse.boards == []
-    assert config.providers.ashby.boards == []
-    assert config.providers.lever.boards == []
+    assert {board.id for board in config.providers.greenhouse.boards} == {
+        "axon",
+        "blinkhealth",
+        "intercom",
+    }
+    assert {board.id for board in config.providers.ashby.boards} == {"baseten"}
+    assert {board.id for board in config.providers.lever.boards} == {"floqast"}
     raw = yaml.safe_load(path.read_text())
     raw["providers"] = {
-        "ashby": {"boards": [{"id": "openai", "name": "Local override", "enabled": False}]}
+        "ashby": {"boards": [{"id": "baseten", "name": "Local override", "enabled": False}]}
     }
     path.write_text(yaml.safe_dump(raw))
     boards = load_config(path).providers.ashby.boards
     assert len(boards) == 1
-    assert next(board for board in boards if board.id == "openai").enabled is False
+    assert boards[0].id == "baseten"
+    assert boards[0].name == "Local override"
+    assert boards[0].enabled is False
     raw["use_bundled_boards"] = False
     path.write_text(yaml.safe_dump(raw))
     assert len(load_config(path).providers.ashby.boards) == 1

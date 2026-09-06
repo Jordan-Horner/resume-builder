@@ -1,4 +1,71 @@
 {
   "schema_version": 1,
-  "providers": {}
+  "providers": {
+    "ashby": [
+      {
+        "id": "baseten",
+        "name": "Baseten",
+        "enabled": true,
+        "careers_url": "https://jobs.ashbyhq.com/baseten"
+      }
+    ],
+    "greenhouse": [
+      {
+        "id": "axon",
+        "name": "Axon",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/axon"
+      },
+      {
+        "id": "blinkhealth",
+        "name": "BlinkRx",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/blinkhealth"
+      },
+      {
+        "id": "intercom",
+        "name": "Intercom",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/intercom"
+      }
+    ],
+    "lever": [
+      {
+        "id": "floqast",
+        "name": "FloQast",
+        "enabled": true,
+        "careers_url": "https://jobs.lever.co/floqast"
+      }
+    ],
+    "workday": [
+      {
+        "id": "alliantenergy-alliant",
+        "name": "Alliant Energy",
+        "enabled": true,
+        "api_url": "https://alliantenergy.wd1.myworkdayjobs.com/wday/cxs/alliantenergy/alliant/jobs",
+        "careers_url": "https://alliantenergy.wd1.myworkdayjobs.com/alliant"
+      },
+      {
+        "id": "blueorigin-blueorigin",
+        "name": "Blue Origin",
+        "enabled": true,
+        "api_url": "https://blueorigin.wd5.myworkdayjobs.com/wday/cxs/blueorigin/BlueOrigin/jobs",
+        "careers_url": "https://blueorigin.wd5.myworkdayjobs.com/en-US/BlueOrigin"
+      },
+      {
+        "id": "cohesity-cohesity_careers",
+        "name": "Cohesity",
+        "enabled": true,
+        "api_url": "https://cohesity.wd5.myworkdayjobs.com/wday/cxs/cohesity/Cohesity_Careers/jobs",
+        "careers_url": "https://cohesity.wd5.myworkdayjobs.com/Cohesity_Careers"
+      },
+      {
+        "id": "crowdstrike-crowdstrikecareers",
+        "name": "CrowdStrike",
+        "enabled": true,
+        "api_url": "https://crowdstrike.wd5.myworkdayjobs.com/wday/cxs/crowdstrike/crowdstrikecareers/jobs",
+        "careers_url": "https://crowdstrike.wd5.myworkdayjobs.com/crowdstrikecareers"
+      }
+    ]
+  }
 }

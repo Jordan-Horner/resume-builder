@@ -202,7 +202,7 @@ class InventoryConfig(StrictModel):
     enabled: bool = True
     database_path: str = "data/inventory.db"
     board_registry_path: str | None = None
-    use_bundled_boards: bool = False
+    use_bundled_boards: bool = True
     raw_payload_retention_days: int = Field(default=30, ge=1)
     initial_lookback_days: int = Field(default=7, ge=1, le=90)
     checkpoint_overlap_hours: int = Field(default=6, ge=0, le=48)

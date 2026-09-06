@@ -64,7 +64,7 @@ def inactive_search_config() -> dict[str, Any]:
     return {
         "schema_version": 1,
         "enabled": False,
-        "use_bundled_boards": False,
+        "use_bundled_boards": True,
         "database_path": "data/inventory.db",
         "raw_payload_retention_days": 30,
         "initial_lookback_days": 7,

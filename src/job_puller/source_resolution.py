@@ -24,7 +24,7 @@ from .providers import (
 from .providers.ats import HttpProvider
 from .work_modes import WorkMode, explicit_arrangement
 
-DATASET_REVISION = "private-board-registry-v1"
+DATASET_REVISION = "first-party-board-registry-v1"
 CATALOG_PROVIDERS = ("greenhouse", "lever", "ashby", "workday")
 SLUG = re.compile(r"^[A-Za-z0-9._-]+$")
 LEGAL_SUFFIXES = {
