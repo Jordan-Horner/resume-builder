@@ -569,11 +569,15 @@ def test_automatic_source_resolution_applies_configured_bounds(tmp_path: Path, m
         "load",
         lambda path, **kwargs: (
             captured.update(catalog_path=path, catalog_kwargs=kwargs)
-            or SimpleNamespace(add_configured_boards=lambda _config: "catalog")
+            or SimpleNamespace(
+                add_configured_boards=lambda _config: SimpleNamespace(
+                    boards_for=lambda _company: []
+                )
+            )
         ),
     )
-    fresh_target = SimpleNamespace(job_id="fresh")
-    backlog_target = SimpleNamespace(job_id="backlog")
+    fresh_target = SimpleNamespace(job_id="fresh", company="Fresh Co")
+    backlog_target = SimpleNamespace(job_id="backlog", company="Backlog Co")
     targets = [fresh_target, backlog_target]
     target_calls = []
     monkeypatch.setattr(
@@ -616,6 +620,64 @@ def test_automatic_source_resolution_applies_configured_bounds(tmp_path: Path, m
         {"seen_since": started_at, "limit": 75},
         {},
     ]
+
+
+def test_automatic_source_resolution_prioritizes_known_boards_before_target_cap(
+    tmp_path: Path, monkeypatch
+):
+    import job_puller.source_resolution as resolution_module
+
+    started_at = jobs_module.datetime.now(jobs_module.UTC)
+    settings = SimpleNamespace(
+        enabled=True,
+        max_targets_per_refresh=1,
+        max_board_requests_per_refresh=40,
+        max_probe_companies=8,
+        workers=12,
+        catalog_cache_hours=24,
+    )
+    monkeypatch.setattr(
+        jobs_module,
+        "load_config",
+        lambda _path: SimpleNamespace(
+            source_resolution=settings,
+            request_timeout_seconds=30,
+        ),
+    )
+    fresh_target = SimpleNamespace(job_id="fresh", company="Unknown Co")
+    known_backlog_target = SimpleNamespace(job_id="known", company="Known Co")
+    monkeypatch.setattr(
+        resolution_module,
+        "linkedin_targets",
+        lambda *_args, **kwargs: (
+            [fresh_target] if kwargs.get("seen_since") else [fresh_target, known_backlog_target]
+        ),
+    )
+    catalog = SimpleNamespace(
+        boards_for=lambda company: [object()] if company == "Known Co" else []
+    )
+    monkeypatch.setattr(
+        resolution_module.AtsCatalog,
+        "load",
+        lambda *_args, **_kwargs: SimpleNamespace(add_configured_boards=lambda _config: catalog),
+    )
+    captured = {}
+
+    def resolve(_database, _catalog, **kwargs):
+        captured.update(kwargs)
+        return resolution_module.ResolutionReport(targets=1, applied=1)
+
+    monkeypatch.setattr(resolution_module, "resolve_linkedin_sources", resolve)
+
+    report = _resolve_sources_after_refresh(
+        FakeInventory(),
+        tmp_path / "config" / "search.yml",
+        started_at,
+        [{"provider": "linkedin", "success": True}],
+    )
+
+    assert report["applied"] == 1
+    assert captured["targets"] == [known_backlog_target]
 
 
 def test_automatic_source_resolution_skips_catalog_when_no_targets(tmp_path: Path, monkeypatch):

@@ -674,12 +674,13 @@ def _resolve_sources_after_refresh(
             seen_since=started_at,
             limit=settings.max_targets_per_refresh,
         )
-        targets = list(fresh_targets)
-        if len(targets) < settings.max_targets_per_refresh:
-            selected_ids = {target.job_id for target in targets}
-            backlog = linkedin_targets(database)
-            targets.extend(target for target in backlog if target.job_id not in selected_ids)
-            targets = targets[: settings.max_targets_per_refresh]
+        backlog = linkedin_targets(database)
+        targets = []
+        selected_ids: set[str] = set()
+        for target in [*fresh_targets, *backlog]:
+            if target.job_id not in selected_ids:
+                targets.append(target)
+                selected_ids.add(target.job_id)
         if not targets:
             return {
                 "status": "complete",
@@ -689,6 +690,14 @@ def _resolve_sources_after_refresh(
         catalog = AtsCatalog.load(
             resolve_project_path(config_path, "cache/ats-source-catalog"),
         ).add_configured_boards(config)
+        fresh_ids = {target.job_id for target in fresh_targets}
+        targets.sort(
+            key=lambda target: (
+                not bool(catalog.boards_for(target.company)),
+                target.job_id not in fresh_ids,
+            )
+        )
+        targets = targets[: settings.max_targets_per_refresh]
         report = resolve_linkedin_sources(
             database,
             catalog,
