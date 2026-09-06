@@ -50,3 +50,5 @@ Run the Python suite, frontend tests/typecheck/build, and `npm test` from
 without vendor credentials. Backend tests cover durable state, isolated proposals,
 stale revisions, factual-change rejection and reuse of review/preview services.
 Live model quality and costs still depend on the self-hoster's configured provider.
+Message-submission tests explicitly cover HTTP LAN origins where `crypto.randomUUID`
+is unavailable, and verify that preparation failures preserve input and show an error.

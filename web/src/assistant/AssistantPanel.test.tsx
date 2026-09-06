@@ -5,11 +5,13 @@ import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import AssistantPanel from "./AssistantPanel";
 import { assistantRequest, type Conversation } from "./api";
 
+const transport = vi.hoisted(() => ({ runAgent: vi.fn() }));
+
 vi.mock("./api", () => ({ assistantRequest: vi.fn() }));
 vi.mock("@copilotkit/react-core/v2", () => ({
   CopilotKitProvider: ({ children }: { children: ReactNode }) => children,
   useAgent: () => ({ isReady: true, agent: { setMessages: vi.fn(), addMessage: vi.fn(), abortRun: vi.fn() } }),
-  useCopilotKit: () => ({ copilotkit: { runAgent: vi.fn() } }),
+  useCopilotKit: () => ({ copilotkit: transport }),
 }));
 let host: HTMLDivElement;
 let root: Root;
@@ -32,7 +34,7 @@ beforeEach(() => {
     return thread;
   });
 });
-afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.resetAllMocks(); });
+afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.resetAllMocks(); vi.unstubAllGlobals(); });
 it("restores server history and routes approval through the backend", async () => {
   await act(async () => root.render(<AssistantPanel open target={null} onClose={() => undefined} />));
   expect(host.textContent).toContain("Saved conversation");
@@ -45,4 +47,29 @@ it("does not silently switch the attached resume", async () => {
   expect(host.textContent).toContain("Discuss this résumé");
   expect(host.textContent).toContain("support");
   expect(assistantRequest).not.toHaveBeenCalledWith("/threads", expect.objectContaining({ method: "POST" }));
+});
+
+async function submitMessage() {
+  await act(async () => root.render(<AssistantPanel open target={null} onClose={() => undefined} />));
+  const input = host.querySelector("textarea")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(input, "hi");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => Array.from(host.querySelectorAll("button")).find((b) => b.textContent === "Send")?.click());
+}
+
+it("sends on plain HTTP where crypto.randomUUID is unavailable", async () => {
+  const getRandomValues = crypto.getRandomValues.bind(crypto);
+  vi.stubGlobal("crypto", { getRandomValues });
+  await submitMessage();
+  expect(transport.runAgent).toHaveBeenCalledWith(expect.objectContaining({ runId: expect.any(String) }));
+});
+
+it("shows preparation failures and preserves the typed message", async () => {
+  vi.stubGlobal("crypto", { getRandomValues: () => { throw new Error("Random generation unavailable"); } });
+  await submitMessage();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain("Random generation unavailable");
+  expect(host.querySelector("textarea")?.value).toBe("hi");
+  expect(transport.runAgent).not.toHaveBeenCalled();
 });

@@ -56,13 +56,15 @@ function ConversationView({ initial, changed }: { initial: Conversation; changed
 
   async function send() {
     if (!input.trim() || running || !isReady) return;
-    const content = input.trim(); const id = crypto.randomUUID();
+    const content = input.trim();
     setError(""); setSending(true); setInput("");
-    agent.threadId = initial.id;
-    agent.setMessages(thread.messages);
-    agent.addMessage({ id, role: "user", content });
-    setThread((current) => ({ ...current, messages: [...current.messages, { id, role: "user", content }] }));
     try {
+      // getRandomValues also works on self-hosted HTTP LAN origins; randomUUID does not.
+      const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
+      agent.threadId = initial.id;
+      agent.setMessages(thread.messages);
+      agent.addMessage({ id, role: "user", content });
+      setThread((current) => ({ ...current, messages: [...current.messages, { id, role: "user", content }] }));
       await copilotkit.runAgent({ agent, runId: id });
       const next = await assistantRequest<Conversation>(`/threads/${initial.id}`);
       setThread(next); changed(next);
