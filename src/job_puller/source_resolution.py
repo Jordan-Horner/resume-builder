@@ -13,9 +13,9 @@ import httpx
 
 from .config import AtsBoard
 from .database import InventoryDatabase
-from .models import JobObservation
+from .models import JobObservation, ProviderResult
 from .normalize import normalized_key
-from .providers import AshbyProvider, GreenhouseProvider, LeverProvider
+from .providers import AshbyProvider, GreenhouseProvider, LeverProvider, WorkdayProvider
 from .providers.ats import HttpProvider
 from .work_modes import WorkMode, explicit_arrangement
 
@@ -27,6 +27,7 @@ DATASETS = {
     "greenhouse": f"{DATASET_BASE}/greenhouse_companies.json",
     "lever": f"{DATASET_BASE}/lever_companies.json",
     "ashby": f"{DATASET_BASE}/ashby_companies.json",
+    "workday": f"{DATASET_BASE}/workday_companies.json",
 }
 SLUG = re.compile(r"^[A-Za-z0-9._-]+$")
 LEGAL_SUFFIXES = {
@@ -46,6 +47,7 @@ PROVIDER_CLASSES: dict[str, type[HttpProvider]] = {
     "greenhouse": GreenhouseProvider,
     "ashby": AshbyProvider,
     "lever": LeverProvider,
+    "workday": WorkdayProvider,
 }
 
 
@@ -66,6 +68,7 @@ class BoardCandidate:
     board_id: str
     company: str
     api_url: str | None = None
+    careers_url: str | None = None
     origin: str = "catalog"
     priority: int = 0
 
@@ -180,6 +183,39 @@ class AtsCatalog:
                         priority=0 if board_id in exact_matches else 1,
                     )
                 )
+        workday_matches = []
+        for entry in self.entries.get("workday", ()):
+            tenant, datacenter, site = entry.split("|")
+            if tenant.casefold() not in variants:
+                continue
+            site_key = site.casefold()
+            specialized = any(
+                marker in site_key
+                for marker in (
+                    "private",
+                    "internal",
+                    "hardware",
+                    "subsidiary",
+                    "contingent",
+                    "university",
+                    "event",
+                )
+            ) or site_key in {"intern", "graduate", "newgrad"}
+            public = any(marker in site_key for marker in ("career", "jobs", "external"))
+            workday_matches.append(
+                (specialized, not public, len(site_key), site_key, tenant, datacenter, site)
+            )
+        for *_sort_key, tenant, datacenter, site in sorted(workday_matches)[:3]:
+            host = f"https://{tenant}.{datacenter}.myworkdayjobs.com"
+            candidates.append(
+                BoardCandidate(
+                    "workday",
+                    f"{tenant}-{site}".casefold(),
+                    company,
+                    api_url=f"{host}/wday/cxs/{tenant}/{site}/jobs",
+                    careers_url=f"{host}/en-US/{site}",
+                )
+            )
         if include_probes and not candidates:
             candidates.extend(
                 BoardCandidate(
@@ -205,7 +241,10 @@ def _validate_catalog(provider: str, payload: Any) -> tuple[str, ...]:
     for value in payload:
         if not isinstance(value, str):
             raise CatalogError(f"{provider} catalog contains a non-string entry")
-        if not SLUG.fullmatch(value):
+        parts = value.split("|") if provider == "workday" else [value]
+        if (provider == "workday" and len(parts) != 3) or any(
+            not SLUG.fullmatch(part) for part in parts
+        ):
             raise CatalogError(f"invalid {provider} board identifier: {value!r}")
         result.append(value)
     return tuple(dict.fromkeys(result))
@@ -276,8 +315,18 @@ def _provider(candidate: BoardCandidate, timeout: float) -> HttpProvider:
         id=candidate.board_id,
         name=candidate.company,
         api_url=candidate.api_url,
+        careers_url=candidate.careers_url,
     )
     return PROVIDER_CLASSES[candidate.provider](board, timeout, None)
+
+
+def _fetch_candidate(
+    candidate: BoardCandidate, targets: list[LinkedInTarget], timeout: float
+) -> ProviderResult:
+    provider = _provider(candidate, timeout)
+    if isinstance(provider, WorkdayProvider):
+        return provider.fetch_exact_titles([target.title for target in targets])
+    return provider.fetch(datetime.now(UTC) - timedelta(days=3650))
 
 
 def linkedin_targets(
@@ -305,9 +354,7 @@ def linkedin_targets(
 def _stored_observation(item: dict[str, object]) -> JobObservation:
     modes = item.get("work_modes")
     normalized_modes = (
-        [WorkMode(str(mode)) for mode in modes]
-        if isinstance(modes, list)
-        else [WorkMode.UNKNOWN]
+        [WorkMode(str(mode)) for mode in modes] if isinstance(modes, list) else [WorkMode.UNKNOWN]
     )
     return JobObservation(
         provider=str(item["provider"]),
@@ -354,6 +401,8 @@ def _match_record(
         "provider": match.observation.provider,
         "board_id": match.observation.provider_board_id,
         "source_url": match.observation.source_url,
+        "linkedin_location": target.location,
+        "resolved_location": match.observation.location,
         "work_modes": sorted(mode.value for mode in match.observation.work_modes),
         "confidence": round(match.confidence, 3),
         "reason": match.reason,
@@ -374,10 +423,13 @@ def resolve_linkedin_sources(
     workers: int = 12,
     seen_since: datetime | None = None,
     targets: list[LinkedInTarget] | None = None,
+    providers: set[str] | None = None,
 ) -> ResolutionReport:
     started = perf_counter()
-    targets = targets if targets is not None else linkedin_targets(
-        database, seen_since=seen_since, limit=limit
+    targets = (
+        targets
+        if targets is not None
+        else linkedin_targets(database, seen_since=seen_since, limit=limit)
     )
     by_company: dict[str, list[LinkedInTarget]] = {}
     for target in targets:
@@ -403,9 +455,7 @@ def resolve_linkedin_sources(
             if match is None:
                 continue
             item = next(
-                item
-                for item, observation in stored_candidates
-                if observation is match.observation
+                item for item, observation in stored_candidates if observation is match.observation
             )
             report.matches.append(_match_record(target, match, board_origin="local-inventory"))
             report.local_matches += 1
@@ -432,24 +482,41 @@ def resolve_linkedin_sources(
         for company_key, company_targets in unresolved_by_company.items()
         if company_targets
     }
-    board_tasks: dict[
-        tuple[str, str], tuple[BoardCandidate, dict[str, LinkedInTarget]]
-    ] = {}
+    board_tasks: dict[tuple[str, str, str], tuple[BoardCandidate, dict[str, LinkedInTarget]]] = {}
     probe_companies = 0
     for _company_key, company_targets in sorted(unresolved_by_company.items()):
         company = company_targets[0].company
         board_candidates = catalog.boards_for(company)
+        if providers is not None:
+            board_candidates = [
+                candidate for candidate in board_candidates if candidate.provider in providers
+            ]
         if include_probes and not board_candidates and probe_companies < max_probe_companies:
             board_candidates = catalog.boards_for(company, include_probes=True)
+            if providers is not None:
+                board_candidates = [
+                    candidate for candidate in board_candidates if candidate.provider in providers
+                ]
             if board_candidates:
                 probe_companies += 1
         for candidate in board_candidates:
-            board_key = (candidate.provider, candidate.board_id.casefold())
-            if board_key not in board_tasks:
-                board_tasks[board_key] = (candidate, {})
-            board_tasks[board_key][1].update(
-                (target.job_id, target) for target in company_targets
-            )
+            if candidate.provider == "workday":
+                for target in company_targets:
+                    board_key = (
+                        candidate.provider,
+                        candidate.board_id.casefold(),
+                        normalized_key(target.title),
+                    )
+                    if board_key not in board_tasks:
+                        board_tasks[board_key] = (candidate, {})
+                    board_tasks[board_key][1][target.job_id] = target
+            else:
+                board_key = (candidate.provider, candidate.board_id.casefold(), "")
+                if board_key not in board_tasks:
+                    board_tasks[board_key] = (candidate, {})
+                board_tasks[board_key][1].update(
+                    (target.job_id, target) for target in company_targets
+                )
     report.probe_companies = probe_companies
     report.boards_considered = len(board_tasks)
     prioritized_tasks = sorted(
@@ -461,12 +528,14 @@ def resolve_linkedin_sources(
     report.board_requests_submitted = len(prioritized_tasks)
     report.board_requests_deferred = report.boards_considered - len(prioritized_tasks)
 
-    fetched: list[tuple[BoardCandidate, list[LinkedInTarget], Any]] = []
+    fetched: list[tuple[BoardCandidate, list[LinkedInTarget], ProviderResult]] = []
     with ThreadPoolExecutor(max_workers=max(1, workers)) as executor:
         futures = {
             executor.submit(
-                _provider(candidate, timeout).fetch,
-                datetime.now(UTC) - timedelta(days=3650),
+                _fetch_candidate,
+                candidate,
+                list(company_targets.values()),
+                timeout,
             ): (candidate, list(company_targets.values()))
             for candidate, company_targets in prioritized_tasks
         }

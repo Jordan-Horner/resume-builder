@@ -847,3 +847,16 @@ def test_new_jobs_keeps_processing_manifest_if_shortlist_generation_fails(
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["status"] == "processing"
     assert manifest["new_to_database_job_ids"] == ["new"]
+
+
+def test_resolve_sources_forwards_provider_filter(monkeypatch):
+    captured = []
+    monkeypatch.setattr(jobs_module, "puller_main", lambda args: captured.extend(args) or 0)
+
+    assert (
+        jobs_module.main(["resolve-sources", "--provider", "workday", "--max-requests", "100"]) == 0
+    )
+    provider_arg = captured.index("--provider")
+    assert captured[provider_arg : provider_arg + 2] == ["--provider", "workday"]
+    request_arg = captured.index("--max-requests")
+    assert captured[request_arg : request_arg + 2] == ["--max-requests", "100"]

@@ -103,6 +103,8 @@ def enrich_observation(
     address_lookup: AddressLookup | None = None,
     client: httpx.Client | None = None,
 ) -> JobObservation:
+    if observation.provider == "workday" and observation.parser_version == "workday-cxs-v3":
+        return observation
     has_description = len(observation.description_text.strip()) >= 200
     should_resolve_direct = observation.provider in {"linkedin", "indeed"} and bool(
         observation.direct_apply_url

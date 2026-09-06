@@ -84,6 +84,8 @@ def parser() -> argparse.ArgumentParser:
     )
     resolve.add_argument("--apply", action="store_true")
     resolve.add_argument("--limit", type=int)
+    resolve.add_argument("--max-requests", type=int)
+    resolve.add_argument("--provider", action="append")
     resolve.add_argument("--probe-missing", action="store_true")
     resolve.add_argument("--catalog-cache", default="cache/ats-source-catalog")
     new = commands.add_parser(
@@ -823,8 +825,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 forwarded.append("--apply")
             if args.limit is not None:
                 forwarded.extend(("--limit", str(args.limit)))
+            if args.max_requests is not None:
+                forwarded.extend(("--max-requests", str(args.max_requests)))
             if args.probe_missing:
                 forwarded.append("--probe-missing")
+            for provider in args.provider or []:
+                forwarded.extend(("--provider", provider))
             forwarded.extend(("--catalog-cache", args.catalog_cache))
             return puller_main(forwarded)
         if args.command == "new":

@@ -89,6 +89,60 @@ def test_catalog_rejects_unsafe_identifiers():
         raise AssertionError("unsafe catalog identifier was accepted")
 
 
+def test_catalog_builds_bounded_workday_boards_from_exact_tenant_match():
+    catalog = AtsCatalog(
+        {
+            "greenhouse": (),
+            "ashby": (),
+            "lever": (),
+            "workday": (
+                "generalmotors|wd5|Careers",
+                "generalmotors|wd5|GM_Careers",
+                "unrelated|wd1|jobs",
+            ),
+        }
+    )
+
+    boards = catalog.boards_for("General Motors")
+
+    assert [board.provider for board in boards] == ["workday", "workday"]
+    assert boards[0].api_url == (
+        "https://generalmotors.wd5.myworkdayjobs.com/wday/cxs/generalmotors/Careers/jobs"
+    )
+    assert boards[0].careers_url == ("https://generalmotors.wd5.myworkdayjobs.com/en-US/Careers")
+
+
+def test_catalog_prefers_public_workday_site_within_three_request_cap():
+    catalog = AtsCatalog(
+        {
+            "workday": (
+                "boeing|wd1|aaeoy",
+                "boeing|wd1|alpfa",
+                "boeing|wd1|clear",
+                "boeing|wd1|external_careers",
+                "boeing|wd1|external_subsidiary",
+            )
+        }
+    )
+
+    boards = catalog.boards_for("Boeing")
+
+    assert len(boards) == 3
+    assert boards[0].board_id == "boeing-external_careers"
+    assert all("subsidiary" not in board.board_id for board in boards)
+
+
+def test_catalog_rejects_malformed_workday_entries():
+    from job_puller.source_resolution import _validate_catalog
+
+    for value in ("tenant|wd5", "tenant|wd5|jobs|extra", "tenant|wd5|../jobs"):
+        try:
+            _validate_catalog("workday", [value])
+        except CatalogError:
+            continue
+        raise AssertionError(f"unsafe Workday catalog identifier was accepted: {value}")
+
+
 def test_match_requires_exact_title_strong_description_overlap_and_known_mode():
     description = " ".join(f"requirement-{index}" for index in range(120))
     matched = match_posting(target(description), [posting("ats-1", description, WorkMode.ONSITE)])
@@ -109,8 +163,8 @@ def test_match_requires_exact_title_strong_description_overlap_and_known_mode():
 
 
 def test_catalog_loader_uses_validated_cached_copy_when_refresh_fails(tmp_path):
-    for provider in ("greenhouse", "lever", "ashby"):
-        value = ["example"]
+    for provider in ("greenhouse", "lever", "ashby", "workday"):
+        value = ["example|wd5|jobs"] if provider == "workday" else ["example"]
         (tmp_path / f"{provider}.json").write_text(json.dumps(value))
 
     def fail(_request: httpx.Request) -> httpx.Response:
@@ -152,7 +206,9 @@ def test_resolver_caps_company_slug_fallback_across_the_whole_run(monkeypatch):
         def fetch(self, _cutoff):
             return type("Result", (), {"success": False})()
 
-    monkeypatch.setattr(resolution_module, "_provider", lambda _candidate, _timeout: FailedProvider())
+    monkeypatch.setattr(
+        resolution_module, "_provider", lambda _candidate, _timeout: FailedProvider()
+    )
     report = resolve_linkedin_sources(
         Database(),
         AtsCatalog({"greenhouse": (), "ashby": (), "lever": ()}),
@@ -236,7 +292,9 @@ def test_resolver_deduplicates_boards_and_enforces_request_budget(monkeypatch):
         def fetch(self, _cutoff):
             return type("Result", (), {"success": False})()
 
-    monkeypatch.setattr(resolution_module, "_provider", lambda _candidate, _timeout: FailedProvider())
+    monkeypatch.setattr(
+        resolution_module, "_provider", lambda _candidate, _timeout: FailedProvider()
+    )
     report = resolve_linkedin_sources(
         Database(),
         AtsCatalog({"greenhouse": ("acme", "beta"), "ashby": (), "lever": ()}),
@@ -246,3 +304,67 @@ def test_resolver_deduplicates_boards_and_enforces_request_budget(monkeypatch):
     assert report.boards_considered == 2
     assert report.board_requests_submitted == 1
     assert report.board_requests_deferred == 1
+
+
+def test_resolver_can_limit_network_queries_to_workday(monkeypatch):
+    requested = []
+
+    class Database:
+        def stored_direct_ats_observations(self, _companies):
+            return []
+
+    class FailedProvider:
+        def fetch(self, _cutoff):
+            return type("Result", (), {"success": False})()
+
+    def provider(candidate, _timeout):
+        requested.append(candidate.provider)
+        return FailedProvider()
+
+    monkeypatch.setattr(resolution_module, "_provider", provider)
+    resolve_linkedin_sources(
+        Database(),
+        AtsCatalog(
+            {
+                "greenhouse": ("example",),
+                "workday": ("example|wd5|jobs",),
+            }
+        ),
+        targets=[target(" ".join(f"requirement-{index}" for index in range(120)))],
+        providers={"workday"},
+    )
+
+    assert requested == ["workday"]
+
+
+def test_resolver_rejects_partial_board_results_before_unique_matching(monkeypatch):
+    description = " ".join(f"requirement-{index}" for index in range(120))
+
+    class Database:
+        def stored_direct_ats_observations(self, _companies):
+            return []
+
+    class PartialProvider:
+        def fetch(self, _cutoff):
+            now = datetime.now(UTC)
+            return ProviderResult(
+                "ashby:example",
+                "ashby",
+                [posting("ats-1", description, WorkMode.ONSITE)],
+                now,
+                now,
+                False,
+                "another same-title detail failed",
+            )
+
+    monkeypatch.setattr(
+        resolution_module, "_provider", lambda _candidate, _timeout: PartialProvider()
+    )
+    report = resolve_linkedin_sources(
+        Database(),
+        AtsCatalog({"ashby": ("example",)}),
+        targets=[target(description)],
+    )
+
+    assert report.boards_failed == 1
+    assert report.network_matches == 0

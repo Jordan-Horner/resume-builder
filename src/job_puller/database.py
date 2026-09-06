@@ -688,7 +688,7 @@ class InventoryDatabase:
                    FROM observations o
                    JOIN job_observation_links l ON l.observation_id=o.id
                    JOIN jobs j ON j.id=l.job_id
-                   WHERE o.provider IN ('greenhouse','ashby','lever')
+                   WHERE o.provider IN ('greenhouse','ashby','lever','workday')
                      AND j.status IN ('active','reopened')
                      AND j.normalized_company IN ({placeholders})
                    ORDER BY o.last_seen_at DESC""",
@@ -747,7 +747,7 @@ class InventoryDatabase:
             linked = conn.execute(
                 """SELECT l.job_id FROM job_observation_links l
                    JOIN observations o ON o.id=l.observation_id
-                   WHERE o.id=? AND o.provider IN ('greenhouse','ashby','lever')""",
+                   WHERE o.id=? AND o.provider IN ('greenhouse','ashby','lever','workday')""",
                 (ats_observation_id,),
             ).fetchone()
             if linked is None:
@@ -1213,6 +1213,21 @@ class InventoryDatabase:
         status = "reopened" if row[1] in {"closed", "possibly_closed"} else row[1]
         if candidate_score >= current_score:
             candidate_modes = self._observation_work_modes(conn, observation_id)
+            current_modes = frozenset(
+                WorkMode(item[0])
+                for item in conn.execute(
+                    "SELECT mode FROM job_work_modes WHERE job_id=?", (row[0],)
+                ).fetchall()
+            ) or frozenset({WorkMode.UNKNOWN})
+            selected_modes = (
+                current_modes
+                if candidate_modes == frozenset({WorkMode.UNKNOWN})
+                and current_modes != frozenset({WorkMode.UNKNOWN})
+                else candidate_modes
+            )
+            current_location = conn.execute(
+                "SELECT location FROM jobs WHERE id=?", (row[0],)
+            ).fetchone()[0]
             conn.execute(
                 """UPDATE jobs SET display_company=?, display_title=?,
                     normalized_company=?, normalized_title=?,
@@ -1228,8 +1243,8 @@ class InventoryDatabase:
                     row[6],
                     normalized_key(row[5]),
                     normalized_key(row[6]),
-                    row[7],
-                    display_work_mode(candidate_modes),
+                    row[7] or current_location,
+                    display_work_mode(selected_modes),
                     row[18],
                     row[14],
                     row[15],
@@ -1246,7 +1261,7 @@ class InventoryDatabase:
                     row[0],
                 ),
             )
-            self._replace_job_work_modes(conn, row[0], candidate_modes)
+            self._replace_job_work_modes(conn, row[0], selected_modes)
         else:
             conn.execute(
                 "UPDATE jobs SET last_seen_at=?, status=?, closed_at=NULL WHERE id=?",

@@ -107,6 +107,48 @@ def test_verified_ats_source_replaces_unknown_linkedin_projection(tmp_path):
     assert db.unresolved_linkedin_targets() == []
 
 
+def test_incomplete_direct_source_does_not_erase_known_location_or_mode(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    linkedin = observation()
+    linkedin.location = "Phoenix, AZ"
+    linkedin.work_arrangement = explicit_arrangement(
+        [WorkMode.ONSITE], source="linkedin", rule="structured_badge"
+    )
+    db.record_result(result(linkedin))
+    target = db.active_inventory()[0]
+    with db.connect() as conn:
+        linkedin_observation_id = conn.execute(
+            "SELECT id FROM observations WHERE provider='linkedin'"
+        ).fetchone()[0]
+    workday = observation(
+        provider="workday",
+        job_id="REQ-1",
+        source="https://example.wd5.myworkdayjobs.com/job/REQ-1",
+    )
+    workday.provider_board_id = "example-careers"
+    workday.location = ""
+    workday.remote = None
+    workday.work_arrangement = explicit_arrangement(
+        [WorkMode.UNKNOWN], source="workday_structured_field", rule="remote_type_missing"
+    )
+
+    db.record_source_resolution(
+        str(target["id"]),
+        linkedin_observation_id=str(linkedin_observation_id),
+        observation=workday,
+        source_key="workday:example-careers",
+        confidence=0.96,
+        reason="verified_test_match",
+        seen_at=datetime.now(UTC),
+    )
+
+    refreshed = db.active_inventory()[0]
+    assert refreshed["location"] == "Phoenix, AZ"
+    assert refreshed["work_modes"] == ["onsite"]
+    assert refreshed["providers"] == ["linkedin", "workday"]
+
+
 def test_unresolved_linkedin_targets_can_be_limited_to_current_refresh(tmp_path):
     db = InventoryDatabase(tmp_path / "inventory.db")
     db.migrate()

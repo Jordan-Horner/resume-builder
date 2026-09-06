@@ -64,6 +64,18 @@ def _parser() -> argparse.ArgumentParser:
     )
     resolve.add_argument("--limit", type=int, help="Limit the number of LinkedIn jobs inspected")
     resolve.add_argument(
+        "--max-requests",
+        type=int,
+        help="Override the configured request ceiling for a manual audit",
+    )
+    resolve.add_argument(
+        "--provider",
+        action="append",
+        choices=("greenhouse", "ashby", "lever", "workday"),
+        dest="resolve_providers",
+        help="Query one ATS provider; repeat to select more than one",
+    )
+    resolve.add_argument(
         "--catalog-cache",
         default="cache/ats-source-catalog",
         help="Catalog cache path relative to the job-search directory",
@@ -140,8 +152,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "resolve-sources":
-        if args.limit is not None and args.limit < 1:
-            print("--limit must be positive", file=sys.stderr)
+        if (args.limit is not None and args.limit < 1) or (
+            args.max_requests is not None and args.max_requests < 1
+        ):
+            print("--limit and --max-requests must be positive", file=sys.stderr)
             return 2
         from .source_resolution import (
             DATASET_REVISION,
@@ -162,9 +176,14 @@ def main(argv: list[str] | None = None) -> int:
                 apply=args.apply,
                 include_probes=args.probe_missing,
                 max_probe_companies=config.source_resolution.max_probe_companies,
-                max_board_requests=config.source_resolution.max_board_requests_per_refresh,
+                max_board_requests=(
+                    args.max_requests
+                    if args.max_requests is not None
+                    else config.source_resolution.max_board_requests_per_refresh
+                ),
                 workers=config.source_resolution.workers,
                 targets=targets,
+                providers=set(args.resolve_providers) if args.resolve_providers else None,
             )
         else:
             resolution_report = ResolutionReport()

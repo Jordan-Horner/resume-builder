@@ -18,7 +18,7 @@ from job_puller.eligibility import (
     remote_matches,
 )
 from job_puller.models import JobObservation, ProviderResult
-from job_puller.normalize import clean_text, html_to_text, parse_datetime
+from job_puller.normalize import clean_text, html_to_text, normalized_key, parse_datetime
 from job_puller.work_modes import WorkArrangement, WorkMode, explicit_arrangement
 
 
@@ -34,7 +34,14 @@ def _provider_work_arrangement(
             modes.add(WorkMode.REMOTE)
         elif normalized == "hybrid":
             modes.add(WorkMode.HYBRID)
-        elif normalized in {"onsite", "on-site", "in-office", "office-based"}:
+        elif normalized in {
+            "onsite",
+            "on-site",
+            "onsite job",
+            "on-site job",
+            "in-office",
+            "office-based",
+        }:
             modes.add(WorkMode.ONSITE)
         else:
             continue
@@ -569,6 +576,183 @@ class SmartRecruitersProvider(CandidateDetailProvider):
 
 class WorkdayProvider(HttpProvider):
     name = "workday"
+
+    def fetch(self, since: datetime) -> ProviderResult:
+        started = datetime.now(UTC)
+        observations: list[JobObservation] = []
+        metrics: dict[str, int] = {}
+        detail_errors: list[str] = []
+        try:
+            with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:
+                candidates = self._fetch(client, since)
+                selected, metrics = self._eligible(candidates, since)
+                metrics["detail_requests"] = len(selected)
+                metrics["work_mode_mismatch"] = 0
+                for candidate in selected:
+                    try:
+                        observation = self._detail(client, candidate.raw_payload)
+                    except (httpx.HTTPError, ValueError, json.JSONDecodeError) as exc:
+                        detail_errors.append(
+                            f"{candidate.provider_job_id}: {type(exc).__name__}: {exc}"
+                        )
+                        continue
+                    if self.search and not remote_matches(observation, self.search):
+                        metrics["work_mode_mismatch"] += 1
+                    observations.append(observation)
+            metrics["detail_errors"] = len(detail_errors)
+            metrics["accepted"] = len(observations)
+            completed = datetime.now(UTC)
+            return ProviderResult(
+                self.source_key,
+                self.name,
+                observations,
+                started,
+                completed,
+                not detail_errors,
+                "; ".join(detail_errors) or None,
+                suspicious_empty=not candidates,
+                authoritative_complete=bool(candidates)
+                and self.search is None
+                and not detail_errors,
+                metrics=metrics,
+            )
+        except Exception as exc:
+            return ProviderResult(
+                self.source_key,
+                self.name,
+                observations,
+                started,
+                datetime.now(UTC),
+                False,
+                f"{type(exc).__name__}: {exc}",
+                metrics=metrics,
+            )
+
+    def fetch_exact_titles(self, titles: Sequence[str]) -> ProviderResult:
+        """Search narrowly, then read Workday's authoritative detail response."""
+        started = datetime.now(UTC)
+        metrics = {"search_requests": 0, "detail_requests": 0, "accepted": 0}
+        observations: list[JobObservation] = []
+        try:
+            if not self.board.api_url:
+                raise ValueError(f"Workday board {self.board.id!r} requires api_url")
+            seen_paths: set[str] = set()
+            with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:
+                for title in dict.fromkeys(
+                    clean_text(title) for title in titles if clean_text(title)
+                ):
+                    metrics["search_requests"] += 1
+                    response = client.post(
+                        self.board.api_url,
+                        json={
+                            "appliedFacets": {},
+                            "limit": 20,
+                            "offset": 0,
+                            "searchText": title,
+                        },
+                    )
+                    response.raise_for_status()
+                    for item in response.json().get("jobPostings") or []:
+                        path = str(item.get("externalPath") or "")
+                        if (
+                            not path
+                            or path in seen_paths
+                            or normalized_key(str(item.get("title") or "")) != normalized_key(title)
+                        ):
+                            continue
+                        seen_paths.add(path)
+                        metrics["detail_requests"] += 1
+                        observations.append(self._detail(client, item))
+            metrics["accepted"] = len(observations)
+            completed = datetime.now(UTC)
+            return ProviderResult(
+                self.source_key,
+                self.name,
+                observations,
+                started,
+                completed,
+                True,
+                suspicious_empty=not observations,
+                metrics=metrics,
+            )
+        except Exception as exc:
+            return ProviderResult(
+                self.source_key,
+                self.name,
+                observations,
+                started,
+                datetime.now(UTC),
+                False,
+                f"{type(exc).__name__}: {exc}",
+                metrics=metrics,
+            )
+
+    def _detail(self, client: httpx.Client, item: dict) -> JobObservation:
+        assert self.board.api_url
+        external_path = str(item.get("externalPath") or "")
+        detail_url = f"{self.board.api_url.removesuffix('/jobs')}{external_path}"
+        response = client.get(detail_url)
+        response.raise_for_status()
+        payload = response.json().get("jobPostingInfo") or {}
+        locations = [
+            clean_text(value)
+            for value in [payload.get("location"), *(payload.get("additionalLocations") or [])]
+            if clean_text(value)
+        ]
+        locations = list(dict.fromkeys(locations))
+        location = " / ".join(locations)
+        arrangement = _provider_work_arrangement(
+            [payload.get("remoteType")],
+            provider=self.name,
+            rule="remote_type",
+        )
+        if arrangement is None and any(
+            re.search(r"\bremote\b", value, re.IGNORECASE) for value in locations
+        ):
+            arrangement = explicit_arrangement(
+                [WorkMode.REMOTE],
+                source="workday_structured_location",
+                rule="remote_location",
+                matched_text=location,
+            )
+        origin = self.board.careers_url or self.board.api_url.split("/wday/cxs/")[0]
+        source_url = str(payload.get("externalUrl") or "")
+        if not source_url:
+            source_url = (
+                f"{origin}{external_path}" if external_path.startswith("/") else external_path
+            )
+        description = str(payload.get("jobDescription") or "")
+        arrangement = arrangement or explicit_arrangement(
+            [WorkMode.UNKNOWN],
+            source="workday_structured_field",
+            rule="remote_type_missing",
+        )
+        modes = arrangement.available_modes
+        return JobObservation(
+            provider=self.name,
+            provider_board_id=self.board.id,
+            provider_job_id=str(
+                payload.get("jobReqId")
+                or payload.get("jobPostingId")
+                or item.get("bulletFields", [""])[0]
+                or external_path
+            ),
+            title=clean_text(payload.get("title") or item.get("title")),
+            company=self.board.name,
+            source_url=source_url,
+            direct_apply_url=source_url,
+            location=location or clean_text(item.get("locationsText")),
+            description_html=description,
+            description_text=html_to_text(description),
+            posted_at=_workday_posted_at(
+                payload.get("postedOn") or item.get("postedOn"), datetime.now(UTC)
+            ),
+            employment_type=clean_text(payload.get("timeType")) or None,
+            remote=(True if modes == frozenset({WorkMode.REMOTE}) else None),
+            work_arrangement=arrangement,
+            raw_payload={"search": item, "jobPostingInfo": payload},
+            parser_version="workday-cxs-v3",
+        )
 
     def _fetch(self, client: httpx.Client, since: datetime) -> list[JobObservation]:
         if not self.board.api_url:

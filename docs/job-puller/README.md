@@ -251,15 +251,20 @@ Resolve first-party copies of active LinkedIn jobs whose work mode is unknown:
 resume-builder jobs resolve-sources             # read-only dry run
 resume-builder jobs resolve-sources --apply     # attach verified ATS observations
 resume-builder jobs resolve-sources --limit 50
+resume-builder jobs resolve-sources --provider workday
+resume-builder jobs resolve-sources --provider workday --max-requests 100
 ```
 
 The resolver first checks direct ATS observations already stored by the normal
 provider refresh. It removes local matches before loading or querying the board
-catalog. Remaining jobs use cached, pinned, MIT-licensed Greenhouse, Ashby, and
-Lever board directories. Candidate requests are prioritized by exact catalog
-identity, then compact-prefix identity, then company-slug probes; duplicate
-provider/board pairs are fetched only once. Requests are bounded and concurrent;
-no browser, account, cookie, or paid proxy service is used. A match must have the
+catalog. Remaining jobs use cached, pinned, MIT-licensed Greenhouse, Ashby,
+Lever, and Workday board directories. Candidate requests are prioritized by
+exact catalog identity, then compact-prefix identity, then company-slug probes; duplicate
+provider/board pairs are fetched only once. Workday uses exact employer-tenant
+and title searches, then requests job details only for exact-title hits. Its CXS
+detail fields—not the generic posting page—supply the location and work mode.
+Requests are bounded and concurrent; no browser, account, cookie, or paid proxy
+service is used. A match must have the
 same normalized title, at least 85% three-word description coverage, a unique
 best candidate, and an explicit ATS work mode. The ATS observation becomes the
 canonical display source while the LinkedIn observation remains as provenance.
@@ -274,8 +279,9 @@ Resolution failure is visible in the manifest but does not change provider
 refresh success.
 
 `--probe-missing` additionally tries a bounded set of safe company-derived
-Greenhouse, Ashby, and Lever board IDs when the catalog has no useful entry. It
-is opt-in for manual runs. Automatic runs enable this fallback for at most 8
+Greenhouse, Ashby, and Lever board IDs when the catalog has no useful entry.
+Workday tenants are never guessed. It is opt-in for manual runs. Automatic runs
+enable this fallback for at most 8
 missing companies per refresh, within a hard 40-request ceiling. Configure the
 bounds with the optional
 `source_resolution` mapping in `search.yml`:

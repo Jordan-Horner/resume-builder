@@ -145,3 +145,21 @@ def test_complete_direct_ats_observation_does_not_refetch_its_own_page():
     )
 
     assert enrich_observation(observation, client=NoRequestClient()) is observation
+
+
+def test_structured_workday_detail_never_falls_back_to_page_json_ld():
+    class NoRequestClient:
+        def get(self, *_args, **_kwargs):
+            raise AssertionError("authoritative Workday detail was refetched")
+
+    observation = JobObservation(
+        "workday",
+        "REQ-1",
+        "AI Engineer",
+        "Example",
+        "https://example.wd5.myworkdayjobs.com/job/REQ-1",
+        description_text="Short but authoritative description.",
+        parser_version="workday-cxs-v3",
+    )
+
+    assert enrich_observation(observation, client=NoRequestClient()) is observation

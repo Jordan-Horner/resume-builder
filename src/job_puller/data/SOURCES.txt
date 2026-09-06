@@ -3,16 +3,16 @@ Public starter board catalog, reviewed 2026-09-05.
 Selected from https://github.com/Feashliaa/job-board-aggregator
 Dataset commit: ecb67960f3e3f87b832efab823a479d4d64a2c07
 Files: data/greenhouse_companies.json, data/ashby_companies.json,
-data/lever_companies.json.
+data/lever_companies.json, data/workday_companies.json.
 
 This is a bounded starter selection, not the full upstream catalog.
 Greenhouse and Lever entries returned non-empty public job APIs during review.
 Ashby entries are catalog-sourced; live reachability is environment-dependent.
 No candidate or private workspace information is included.
 
-The optional `resolve-sources` command downloads the three named dataset files
+The optional `resolve-sources` command downloads the four named dataset files
 from the same pinned commit into the private workspace cache. It uses them only
-to narrow first-party Greenhouse, Ashby, and Lever API requests for unresolved
+to narrow first-party Greenhouse, Ashby, Lever, and Workday API requests for unresolved
 employers. The catalog is validated as data and is not executable code.
 
 MIT License

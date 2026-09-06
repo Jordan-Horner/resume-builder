@@ -456,6 +456,87 @@ def test_workday_paginates_when_later_pages_report_zero_total():
     assert [job.provider_job_id for job in jobs] == ["1", "2", "3"]
 
 
+def test_workday_exact_title_fetch_uses_cxs_detail_for_location_and_mode(monkeypatch):
+    board = AtsBoard(
+        id="example-careers",
+        name="Example",
+        api_url="https://example.wd5.myworkdayjobs.com/wday/cxs/example/Careers/jobs",
+        careers_url="https://example.wd5.myworkdayjobs.com/en-US/Careers",
+    )
+    search_payload = {
+        "jobPostings": [
+            {
+                "title": "AI Engineer",
+                "externalPath": "/job/Phoenix-AZ/AI-Engineer_REQ-1",
+            },
+            {
+                "title": "Senior AI Engineer",
+                "externalPath": "/job/Phoenix-AZ/Senior-AI-Engineer_REQ-2",
+            },
+        ]
+    }
+    detail_payload = {
+        "jobPostingInfo": {
+            "title": "AI Engineer",
+            "jobDescription": "<p>Build reliable AI services for customers.</p>",
+            "location": "Phoenix, AZ",
+            "additionalLocations": ["Austin, TX"],
+            "postedOn": "Posted Yesterday",
+            "timeType": "Full time",
+            "jobReqId": "REQ-1",
+            "remoteType": "Hybrid",
+            "externalUrl": "https://example.wd5.myworkdayjobs.com/en-US/Careers/job/x",
+        }
+    }
+
+    class Client:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def post(self, url, json=None):
+            assert url == board.api_url
+            assert json["searchText"] in {"AI Engineer", "ai"}
+            payload = (
+                search_payload
+                if json["searchText"] == "AI Engineer"
+                else {"jobPostings": search_payload["jobPostings"][:1]}
+            )
+            return response("POST", url, payload)
+
+        def get(self, url):
+            assert url == (
+                "https://example.wd5.myworkdayjobs.com/wday/cxs/example/Careers/"
+                "job/Phoenix-AZ/AI-Engineer_REQ-1"
+            )
+            return response("GET", url, detail_payload)
+
+    monkeypatch.setattr(ats_module.httpx, "Client", lambda **_kwargs: Client())
+
+    result = WorkdayProvider(board).fetch_exact_titles(["AI Engineer"])
+
+    assert result.success is True
+    assert result.metrics == {"search_requests": 1, "detail_requests": 1, "accepted": 1}
+    assert len(result.observations) == 1
+    job = result.observations[0]
+    assert job.provider_job_id == "REQ-1"
+    assert job.location == "Phoenix, AZ / Austin, TX"
+    assert job.work_modes == {WorkMode.HYBRID}
+    assert job.description_text == "Build reliable AI services for customers."
+
+    normal = WorkdayProvider(
+        board,
+        search=SearchSettings(families=[{"name": "ai", "titles": ["AI Engineer"]}]),
+    ).fetch(SINCE)
+
+    assert normal.success is True
+    assert normal.observations[0].parser_version == "workday-cxs-v3"
+    assert normal.observations[0].work_modes == {WorkMode.HYBRID}
+    assert normal.metrics["detail_requests"] == 1
+
+
 def test_ats_filter_keeps_recent_target_titles_regardless_of_work_mode():
     search = SearchSettings(
         remote_only=True,
