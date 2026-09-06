@@ -22,6 +22,7 @@ from .atomic import atomic_write_text
 from .discovery_activation import activate_portfolio, preview_activation
 from .discovery_evidence import (
     DiscoveryEvidenceSet,
+    EvidenceQuerySeed,
     HistoricalTitleState,
     ResumeDocument,
     evidence_set,
@@ -33,6 +34,7 @@ from .discovery_portfolio import (
     ColdStartLane,
     ColdStartPortfolio,
     ColdStartQuery,
+    role_enrichment_queries,
 )
 from .integrations import (
     integration_setup_guide,
@@ -234,9 +236,13 @@ def _role_proposals(evidence: DiscoveryEvidenceSet) -> list[RoleProposal]:
     except ValueError:
         titles = None
     expansion = extract_query_expansion_set(evidence.documents)
+    capability_by_role: dict[str, EvidenceQuerySeed] = {}
+    for seed in expansion.capability_combinations:
+        capability_by_role.setdefault(normalized_key(seed.evidence_role), seed)
     proposals: list[RoleProposal] = []
     for title in (titles.historical_titles if titles else [])[: MAX_TOTAL_QUERIES - 6]:
         current = title.state == HistoricalTitleState.ACTIVE
+        capability = capability_by_role.get(normalized_key(title.exact_title))
         proposals.append(
             RoleProposal(
                 role_id=_role_id(title.query_title, ColdStartLane.HISTORICAL_TITLE),
@@ -246,21 +252,8 @@ def _role_proposals(evidence: DiscoveryEvidenceSet) -> list[RoleProposal]:
                 lane=ColdStartLane.HISTORICAL_TITLE,
                 source_ids=title.source_ids,
                 evidence_role=title.exact_title,
+                evidence_terms=capability.evidence_terms if capability else [],
                 reason=title.reason,
-            )
-        )
-    for seed in expansion.capability_combinations:
-        proposals.append(
-            RoleProposal(
-                role_id=_role_id(seed.query, ColdStartLane.CAPABILITY_COMBINATION),
-                title=seed.query,
-                group=RoleGroup.RELATED,
-                intent=RoleIntent.EXPLORE,
-                lane=ColdStartLane.CAPABILITY_COMBINATION,
-                source_ids=[seed.source_id],
-                evidence_role=seed.evidence_role,
-                evidence_terms=seed.evidence_terms,
-                reason="These capabilities appear together in one source evidence block.",
             )
         )
     return proposals
@@ -485,10 +478,17 @@ def skip_setup(root: Path) -> JobSearchSetupState:
     return state
 
 
-def _portfolio_from_state(state: JobSearchSetupState) -> ColdStartPortfolio:
+def portfolio_from_setup_state(state: JobSearchSetupState) -> ColdStartPortfolio:
+    """Build title searches plus bounded, evidence-linked title refinements."""
+    selected_roles = [
+        item
+        for item in state.roles
+        if item.intent in {RoleIntent.SEARCH, RoleIntent.EXPLORE}
+        and item.lane != ColdStartLane.CAPABILITY_COMBINATION
+    ]
     queries = [
         ColdStartQuery(
-            query_id=item.role_id.replace("role-", f"{item.lane.value}-", 1),
+            query_id=item.role_id,
             lane=item.lane,
             query=item.title,
             enabled=True,
@@ -497,9 +497,9 @@ def _portfolio_from_state(state: JobSearchSetupState) -> ColdStartPortfolio:
             evidence_terms=item.evidence_terms,
             reason=item.reason,
         )
-        for item in state.roles
-        if item.intent in {RoleIntent.SEARCH, RoleIntent.EXPLORE}
+        for item in selected_roles
     ]
+    queries.extend(role_enrichment_queries(queries, []))
     return ColdStartPortfolio(
         generated_at=_now(),
         resume_hash=state.evidence_hash,
@@ -554,7 +554,7 @@ def _compile_setup(root: Path, state: JobSearchSetupState) -> None:
     search["location"] = state.eligibility.intended_country
     search["accepted_work_modes"] = state.location.accepted_work_modes
     search.pop("remote_only", None)
-    portfolio = _portfolio_from_state(state)
+    portfolio = portfolio_from_setup_state(state)
     atomic_write_text(preferences_path, yaml.safe_dump(preferences, sort_keys=False))
     atomic_write_text(config_path, yaml.safe_dump(search_config, sort_keys=False))
     atomic_write_text(root / PORTFOLIO_PATH, portfolio.model_dump_json(indent=2) + "\n")

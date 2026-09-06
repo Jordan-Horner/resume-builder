@@ -188,22 +188,6 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
             },
         )
 
-    @app.get("/api/skills")
-    def skills() -> dict[str, Any]:
-        try:
-            return {"skills": service.career_skills()}
-        except ValueError as exc:
-            raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-    @app.put("/api/skills/{fact_id}/search")
-    def set_skill_search(fact_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        if type(payload.get("enabled")) is not bool:
-            raise HTTPException(status_code=400, detail="enabled must be true or false")
-        try:
-            return service.set_skill_search(fact_id, payload["enabled"])
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-
     @app.get("/api/job-filter-defaults")
     def job_filter_defaults() -> dict[str, Any]:
         try:

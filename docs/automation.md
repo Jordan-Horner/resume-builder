@@ -76,7 +76,7 @@ This is the inexpensive first-pass screen only; it does not run deeper company,
 compensation, or quality-of-life research. The per-run maximum bounds jobs that
 may contact the provider. Cached results do not consume that job allowance, and
 provider-call telemetry counts both structured requests. Jobs with
-hard local conflicts, incomplete listings, or no saved title/skill search signal
+hard local conflicts, incomplete listings, or no saved title search signal
 are skipped before any provider call and remain available for a manual screen.
 
 Provider output is validated against both its structural schema and the exact

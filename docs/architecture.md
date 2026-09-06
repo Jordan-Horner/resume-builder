@@ -32,17 +32,19 @@ editorial approval.
 11. **Application history** preserves submitted-artifact pins, append-only
     outcomes, and evidence-cited answers without turning application prose into
     career evidence.
-12. **Portal career views** keep imported source documents in the evidence layer,
-    expose generated Resumes from canonical Markdown and build reports, and Skills from
-    `vault/facts/skills/`. The library shows every directional resume and only tailored
+12. **Portal career views** keep imported source documents in the evidence layer and
+    expose generated Resumes from canonical Markdown and build reports. The library
+    shows every directional resume and only tailored
     resumes backed by a current successful mint; internal build and review status is
     not presented as document metadata. FastAPI compiles and renders the current
     canonical Markdown with the existing selected theme for a read-only portal view.
     That view omits CLI workflow notices and does not change review or mint state,
     publish a reviewed preview, or expose arbitrary workspace files.
-    Enabled skill search signals are derived from the existing discovery
-    portfolio's vault-backed `source_ids`; the portal does not maintain a second
-    skill registry or career profile. Onboarding marks every uploaded career document
+    Job-search enrichment is automatic and role-bound: a title may receive a
+    bounded provider-query refinement only when two literal skills co-occur in
+    evidence for that same role. Standalone skill searches are never created, and
+    manually entered titles remain title-only unless a supported relationship already
+    exists. Onboarding marks every uploaded career document
     as a resume in the same source manifest, while the Resumes page presents only
     directional and tailored outputs. Resume-driven role suggestions select from typed
     source entries rather than unrelated career notes. Operating-system

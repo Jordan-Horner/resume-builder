@@ -51,10 +51,10 @@ interface:
   associated with an application when one was recorded.
 - **Resumes** renders active directional and tailored resumes from their
   canonical Markdown sources and supports reversible retirement.
-- **Skills** surfaces confirmed vault evidence and lets the user select a
-  bounded set of skills to broaden future searches.
 - **Settings** manages search preferences, job sources, scrape schedules,
-  blocked companies, integrations, and appliance health.
+  blocked companies, integrations, and appliance health. Search titles are
+  automatically paired with a bounded set of role-linked resume skills when
+  the imported evidence supports the relationship.
 
 The first-run flow accepts PDF, DOCX, Markdown, HTML, and text sources, suggests
 target roles from verified excerpts when an AI provider is connected, and

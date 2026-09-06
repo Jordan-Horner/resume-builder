@@ -3,19 +3,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import yaml
-
-from resume_builder.job_setup_defaults import scaffold_job_search
 from resume_builder.web_career import (
     archive_directional_resume,
     directional_resume_removal_impact,
     list_resumes,
-    list_skills,
     resolve_application_resume_preview,
     resolve_directional_resume_reference,
     resolve_resume_preview,
     restore_directional_resume,
-    set_skill_search_enabled,
 )
 from resume_builder.workspace import initialize_workspace
 
@@ -240,10 +235,9 @@ def test_resume_library_ignores_macos_metadata_generated_resumes(tmp_path: Path)
     assert directional["items"] == []
 
 
-def test_skills_are_derived_from_vault_facts_and_resume_evidence(tmp_path: Path) -> None:
+def test_resume_library_preserves_skill_fact_evidence(tmp_path: Path) -> None:
     root = _workspace(tmp_path)
     _skill(root, "SKILL-001", "Incident response")
-    _skill(root, "SKILL-002", "API troubleshooting")
     resume = root / "resumes" / "baselines" / "support-operations.md"
     resume.parent.mkdir(parents=True, exist_ok=True)
     resume.write_text(
@@ -272,7 +266,6 @@ Production support specialist. <!-- evidence: SKILL-001 -->
     tailored.parent.mkdir(parents=True, exist_ok=True)
     tailored.write_text(resume.read_text(encoding="utf-8"), encoding="utf-8")
 
-    skills = list_skills(root)
     resumes = [
         item
         for section in list_resumes(root)["sections"]
@@ -280,53 +273,8 @@ Production support specialist. <!-- evidence: SKILL-001 -->
         if item["kind"] != "original"
     ]
 
-    assert [item["id"] for item in skills] == ["SKILL-001", "SKILL-002"]
-    assert skills[0]["resumes"] == ["Support Operations"]
-    assert skills[1]["resumes"] == []
     assert [item["kind"] for item in resumes] == ["directional"]
     assert all(item["skill_fact_ids"] == ["SKILL-001"] for item in resumes)
-
-
-def test_enabling_vault_skill_adds_capability_query_without_changing_titles(
-    tmp_path: Path,
-) -> None:
-    root = _workspace(tmp_path)
-    scaffold_job_search(root)
-    _skill(root, "SKILL-001", "Incident response")
-    preferences_path = root / "job-search" / "preferences.yml"
-    preferences = yaml.safe_load(preferences_path.read_text(encoding="utf-8"))
-    preferences["desired_title_terms"] = ["Production Support Engineer"]
-    preferences_path.write_text(yaml.safe_dump(preferences, sort_keys=False), encoding="utf-8")
-
-    result = set_skill_search_enabled(root, "SKILL-001", True)
-
-    saved = yaml.safe_load(preferences_path.read_text(encoding="utf-8"))
-    portfolio = json.loads(
-        (root / "build" / "job-search" / "cold-start-portfolio.json").read_text()
-    )
-    assert result["search"]["enabled"] is True
-    assert saved["desired_title_terms"] == ["Production Support Engineer"]
-    assert saved["interest_terms"] == []
-    assert not (root / "job-search" / "skill-search.json").exists()
-    assert (root / "build" / "job-search" / "portfolio-before-last-portal-change.json").is_file()
-    assert (root / "build" / "job-search" / "search-before-last-portal-change.yml").is_file()
-    capability = next(
-        item for item in portfolio["queries"] if item["lane"] == "capability_combination"
-    )
-    assert capability["query"] == "Incident response"
-    assert capability["source_ids"] == ["vault:SKILL-001"]
-
-
-def test_needs_review_skill_cannot_be_used_for_search(tmp_path: Path) -> None:
-    root = _workspace(tmp_path)
-    _skill(root, "SKILL-001", "Unverified platform", status="needs-review")
-
-    try:
-        set_skill_search_enabled(root, "SKILL-001", True)
-    except ValueError as exc:
-        assert "confirmed" in str(exc)
-    else:
-        raise AssertionError("needs-review skill was enabled")
 
 
 def test_multiple_baselines_do_not_get_an_arbitrary_primary_label(tmp_path: Path) -> None:

@@ -1,4 +1,4 @@
-import type { Application, CareerSkill, GmailSetup, Integration, Job, JobFilters, JobScreenResult, OnboardingStatus, ResumeLibrary, ResumeRecommendation, SalaryEstimateResult, SearchPreferences, TelegramPairing } from "./types";
+import type { Application, GmailSetup, Integration, Job, JobFilters, JobScreenResult, OnboardingStatus, ResumeLibrary, ResumeRecommendation, SalaryEstimateResult, SearchPreferences, TelegramPairing } from "./types";
 
 export interface UpdateStatus {
   version: string;
@@ -174,19 +174,6 @@ export async function getSavedJobScreen(jobId: string): Promise<JobScreenResult 
 }
 export function screenJob(jobId: string): Promise<JobScreenResult> {
   return request(`/api/jobs/${encodeURIComponent(jobId)}/screen`, { method: "POST" });
-}
-
-export async function getSkills(): Promise<CareerSkill[]> {
-  const payload = await request<{ skills: CareerSkill[] }>("/api/skills");
-  return payload.skills;
-}
-
-export function setSkillSearch(factId: string, enabled: boolean): Promise<CareerSkill> {
-  return request(`/api/skills/${encodeURIComponent(factId)}/search`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ enabled }),
-  });
 }
 
 export function getBlockedCompanies(): Promise<{ companies: string[] }> { return request("/api/blocked-companies"); }

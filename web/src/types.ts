@@ -196,7 +196,6 @@ export interface SearchPreferences {
   status: "active" | "ready_to_activate" | "in_progress" | "skipped" | "not_configured";
   revision: string;
   titles: string[];
-  skill_terms: string[];
   country: string;
   work_modes: WorkMode[];
   onsite_locations: string[];
@@ -231,22 +230,6 @@ export interface ResumeSection {
 }
 
 export interface ResumeLibrary { sections: ResumeSection[]; }
-
-export interface CareerSkill {
-  id: string;
-  title: string;
-  description: string;
-  status_label: string;
-  status_tone: "neutral" | "positive" | "attention" | "negative";
-  themes: string[];
-  sources: string[];
-  resumes: string[];
-  search: {
-    enabled: boolean;
-    can_change: boolean;
-    disabled_reason: string | null;
-  };
-}
 
 export interface ResumeRecommendation {
   status: "available" | "unavailable";

@@ -9,10 +9,9 @@ const JobsPage = lazy(() => import("./pages/JobsPage").then((module) => ({ defau
 const OnboardingPage = lazy(() => import("./pages/OnboardingPage").then((module) => ({ default: module.OnboardingPage })));
 const ResumesPage = lazy(() => import("./pages/ResumesPage").then((module) => ({ default: module.ResumesPage })));
 const SettingsPage = lazy(() => import("./pages/SettingsPage").then((module) => ({ default: module.SettingsPage })));
-const SkillsPage = lazy(() => import("./pages/SkillsPage").then((module) => ({ default: module.SkillsPage })));
 
-type Route = "jobs" | "applications" | "resumes" | "skills" | "settings";
-const ROUTES: Route[] = ["jobs", "applications", "resumes", "skills", "settings"];
+type Route = "jobs" | "applications" | "resumes" | "settings";
+const ROUTES: Route[] = ["jobs", "applications", "resumes", "settings"];
 
 function routeFromPath(): Route {
   const candidate = window.location.pathname.split("/")[1] as Route;
@@ -100,7 +99,6 @@ export function App() {
           {route === "jobs" && <JobsPage />}
           {route === "applications" && <ApplicationsPage />}
           {route === "resumes" && <ResumesPage />}
-          {route === "skills" && <SkillsPage />}
           {route === "settings" && <SettingsPage />}
         </Suspense>
       </main>

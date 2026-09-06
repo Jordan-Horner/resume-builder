@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
 import re
 from datetime import UTC, datetime
@@ -139,22 +140,13 @@ class TitleSeedReport(StrictModel):
     historical_titles: list[HistoricalTitleSeed] = Field(min_length=1)
 
 
-class EvidenceQueryKind(StrEnum):
-    CAPABILITY_COMBINATION = "capability_combination"
-
-
 class EvidenceQuerySeed(StrictModel):
-    seed_id: str
-    kind: EvidenceQueryKind
-    query: str
     evidence_terms: list[str] = Field(min_length=2, max_length=2)
-    source_id: str
     evidence_role: str
     support_count: int = Field(ge=1)
 
 
 class ResumeQueryExpansion(StrictModel):
-    schema_version: Literal[1] = 1
     corpus_hash: str
     capability_combinations: list[EvidenceQuerySeed] = Field(default_factory=list)
 
@@ -226,6 +218,14 @@ def _query_title(exact_title: str) -> str:
     return re.split(r"\s*/\s*", title, maxsplit=1)[0].strip()
 
 
+def _role_capability_query(role_title: str, evidence_terms: list[str]) -> str:
+    """Keep capability discovery anchored to the role that supplied the evidence."""
+    title = _query_title(role_title)
+    parts = [title]
+    parts.extend(term for term in evidence_terms if not _contains_phrase(title, term))
+    return " ".join(parts)
+
+
 def _end_year(date_text: str) -> int | None:
     if re.search(r"\b(?:present|current)\b", date_text, flags=re.IGNORECASE):
         return datetime.now(UTC).year
@@ -235,11 +235,14 @@ def _end_year(date_text: str) -> int | None:
 
 def _resume_sections(document: ResumeDocument) -> tuple[list[_RoleEvidence], str]:
     """Return role-scoped evidence plus global skills from one Markdown resume."""
-    if document.interpretation is not None:
-        return [
+    interpreted_roles = (
+        [
             _RoleEvidence(role.title, role.dates, role.excerpt)
             for role in document.interpretation.roles
-        ], ""
+        ]
+        if document.interpretation is not None
+        else None
+    )
     roles: list[_RoleEvidence] = []
     section = ""
     current_title = ""
@@ -320,22 +323,12 @@ def _resume_sections(document: ResumeDocument) -> tuple[list[_RoleEvidence], str
         if current_title and line.startswith("-"):
             current_lines.append(line)
     flush()
-    return roles, "\n".join(skill_lines)
+    return interpreted_roles if interpreted_roles is not None else roles, "\n".join(skill_lines)
 
 
-def _structured_skills(document: ResumeDocument) -> list[tuple[str, str]]:
-    section = ""
+def _structured_skills(skill_lines: str) -> list[tuple[str, str]]:
     skills: list[tuple[str, str]] = []
-    for raw_line in document.content.splitlines():
-        line = _HTML_COMMENT.sub("", raw_line).strip()
-        if line.startswith("# "):
-            section = normalized_key(line[2:])
-            continue
-        if line.startswith("## "):
-            section = normalized_key(line[3:])
-            continue
-        if section != "technical skills":
-            continue
+    for line in skill_lines.splitlines():
         match = _SKILL_LINE.match(line)
         if match:
             category = normalized_key(match.group(1))
@@ -354,8 +347,8 @@ def _structured_skills(document: ResumeDocument) -> list[tuple[str, str]]:
 
 def extract_query_expansion(document: ResumeDocument) -> ResumeQueryExpansion:
     """Extract bounded literal capability combinations from one resume."""
-    roles, _ = _resume_sections(document)
-    skills = _structured_skills(document)
+    roles, skill_lines = _resume_sections(document)
+    skills = _structured_skills(skill_lines)
     resume_hash = evidence_set([document]).corpus_hash
     if not roles or not skills:
         return ResumeQueryExpansion(corpus_hash=resume_hash)
@@ -368,7 +361,7 @@ def extract_query_expansion(document: ResumeDocument) -> ResumeQueryExpansion:
         and normalized_key(term) not in _LOW_SIGNAL_CAPABILITIES
         and 1 <= len(normalized_key(term).split()) <= 3
     }
-    pair_candidates: dict[tuple[str, str], tuple[int, int, str]] = {}
+    pair_candidates: dict[tuple[str, str, str], tuple[int, int, str]] = {}
     for role in roles:
         role_year = _end_year(role.date_text) or 0
         for evidence_line in role.text.splitlines():
@@ -377,23 +370,18 @@ def extract_query_expansion(document: ResumeDocument) -> ResumeQueryExpansion:
                 for key, term in capability_terms.items()
                 if _contains_phrase(evidence_line, term)
             )
-            for left_index, left in enumerate(present):
-                for right in present[left_index + 1 :]:
-                    pair = (left, right)
-                    prior = pair_candidates.get(pair, (0, 0, role.title))
-                    pair_candidates[pair] = (
-                        prior[0] + 1,
-                        max(prior[1], role_year),
-                        role.title,
-                    )
+            for left, right in itertools.combinations(present, 2):
+                pair = (normalized_key(role.title), left, right)
+                prior = pair_candidates.get(pair, (0, 0, role.title))
+                pair_candidates[pair] = (
+                    prior[0] + 1,
+                    max(prior[1], role_year),
+                    role.title,
+                )
 
     combinations = [
         EvidenceQuerySeed(
-            seed_id=f"capability-{_hash(pair)[:12]}",
-            kind=EvidenceQueryKind.CAPABILITY_COMBINATION,
-            query=f"{capability_terms[pair[0]]} {capability_terms[pair[1]]}",
-            evidence_terms=[capability_terms[pair[0]], capability_terms[pair[1]]],
-            source_id=document.source_id,
+            evidence_terms=[capability_terms[pair[1]], capability_terms[pair[2]]],
             evidence_role=role_title,
             support_count=support,
         )
@@ -407,16 +395,24 @@ def extract_query_expansion(document: ResumeDocument) -> ResumeQueryExpansion:
 def extract_query_expansion_set(documents: list[ResumeDocument]) -> ResumeQueryExpansion:
     """Merge literal capability combinations across unique documents without cross-source joins."""
     evidence = evidence_set(documents)
-    candidates: dict[str, EvidenceQuerySeed] = {}
+    candidates: dict[tuple[str, str, str], EvidenceQuerySeed] = {}
     for document in evidence.documents:
         for seed in extract_query_expansion(document).capability_combinations:
-            key = normalized_key(seed.query)
+            key = (
+                normalized_key(seed.evidence_role),
+                normalized_key(seed.evidence_terms[0]),
+                normalized_key(seed.evidence_terms[1]),
+            )
             prior = candidates.get(key)
             if prior is None or seed.support_count > prior.support_count:
                 candidates[key] = seed
     combinations = sorted(
         candidates.values(),
-        key=lambda item: (-item.support_count, normalized_key(item.query), item.source_id),
+        key=lambda item: (
+            -item.support_count,
+            normalized_key(item.evidence_role),
+            *(normalized_key(term) for term in item.evidence_terms),
+        ),
     )[:6]
     return ResumeQueryExpansion(
         corpus_hash=evidence.corpus_hash,

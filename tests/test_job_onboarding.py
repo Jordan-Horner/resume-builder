@@ -8,6 +8,7 @@ import yaml
 
 from resume_builder import source_import
 from resume_builder.discovery_evidence import ResumeDocument, evidence_set, extract_title_seed
+from resume_builder.discovery_portfolio import ColdStartLane, ColdStartPortfolio
 from resume_builder.job_onboarding import (
     JobSearchSetupAnswer,
     SetupStatus,
@@ -136,6 +137,7 @@ def test_job_setup_saves_inactive_configuration_then_activates(tmp_path: Path) -
     assert state.step == SetupStep.ROLES
     assert any(item.title == "Reliability Engineer" for item in state.roles)
     assert any(item.title == "Support Specialist" for item in state.roles)
+    assert all(item.lane != ColdStartLane.CAPABILITY_COMBINATION for item in state.roles)
 
     state = apply_answer(root, _answer(state, {"decisions": {}, "add": ["Cloud Engineer"]}))
     state = apply_answer(
@@ -168,6 +170,14 @@ def test_job_setup_saves_inactive_configuration_then_activates(tmp_path: Path) -
     state = apply_answer(root, _answer(state, {"action": "save"}))
 
     assert state.status == SetupStatus.READY_TO_ACTIVATE
+    portfolio = ColdStartPortfolio.model_validate_json(
+        (root / "build" / "job-search" / "cold-start-portfolio.json").read_text()
+    )
+    assert any(
+        item.lane == ColdStartLane.CAPABILITY_COMBINATION
+        and item.query == "Reliability Engineer AWS Kubernetes"
+        for item in portfolio.queries
+    )
     config_path = root / "job-search" / "config" / "search.yml"
     assert yaml.safe_load(config_path.read_text())["enabled"] is False
     assert not (root / "job-search" / "new-jobs.json").exists()

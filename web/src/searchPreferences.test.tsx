@@ -12,7 +12,6 @@ const preferences: SearchPreferences = {
   status: "active",
   revision: "rev-1",
   titles: ["Support Engineer"],
-  skill_terms: [],
   country: "United States",
   work_modes: ["remote"],
   onsite_locations: [],
@@ -52,8 +51,8 @@ it("adds multiple searchable title bubbles and saves them as active preferences"
   }));
 });
 
-it("keeps the current titles when the backend reports exhausted skill capacity", async () => {
-  vi.mocked(previewRoleTitles).mockRejectedValueOnce(new Error("Remove a role or skill before adding another."));
+it("keeps the current titles when the backend reports exhausted title capacity", async () => {
+  vi.mocked(previewRoleTitles).mockRejectedValueOnce(new Error("Remove a job title before adding another."));
   await act(async () => root.render(<SearchPreferencesSection />));
   const input = host.querySelector('input[placeholder="e.g. Site Reliability Engineer"]') as HTMLInputElement;
   await act(async () => {
@@ -61,7 +60,7 @@ it("keeps the current titles when the backend reports exhausted skill capacity",
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
   await act(async () => [...host.querySelectorAll("button")].find((button) => button.textContent === "Add")?.click());
-  expect(host.textContent).toContain("Remove a role or skill");
+  expect(host.textContent).toContain("Remove a job title");
   expect([...host.querySelectorAll(".role-bubble > span")].map((item) => item.textContent)).toEqual(["Support Engineer"]);
   expect(input.value).toBe("Platform Engineer");
 });

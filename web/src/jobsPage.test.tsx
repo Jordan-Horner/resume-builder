@@ -24,7 +24,7 @@ beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   host = document.createElement("div"); document.body.append(host); root = createRoot(host);
   vi.mocked(api.getJobFilterDefaults).mockResolvedValue(EMPTY_VIEW);
-  vi.mocked(api.getSearchPreferences).mockResolvedValue({ status: "active", revision: "one", titles: [], skill_terms: [], country: "US", work_modes: ["remote"], onsite_locations: [], remote_location_terms: [], clearance_preference: "neutral", compensation: { skipped: true, minimum: null, target: null, currency: null, period: null } });
+  vi.mocked(api.getSearchPreferences).mockResolvedValue({ status: "active", revision: "one", titles: [], country: "US", work_modes: ["remote"], onsite_locations: [], remote_location_terms: [], clearance_preference: "neutral", compensation: { skipped: true, minimum: null, target: null, currency: null, period: null } });
   vi.mocked(api.getBlockedCompanies).mockResolvedValue({ companies: [] });
   vi.mocked(api.getResumeRecommendation).mockResolvedValue({ status: "unavailable", recommended_resume: null, match: null, target: null, message: "None" });
   vi.mocked(api.getJobs).mockResolvedValue({ jobs: [job], count: 1, reviewable_count: 1 });

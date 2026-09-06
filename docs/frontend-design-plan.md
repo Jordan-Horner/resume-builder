@@ -13,15 +13,13 @@ execute in CI rather than silently skipping.
 
 ## Product shape
 
-The frontend has five primary pages:
+The frontend has four primary pages:
 
 1. **Jobs** — search, filter, and disposition inventory jobs.
 2. **Applications** — see the jobs the user applied for and their current status.
 3. **Resumes** — inspect the primary baseline plus directional and tailored
    canonical Markdown resume sources and their current readiness.
-4. **Skills** — inspect canonical skill facts, see which resumes cite them, and
-   select a bounded set of confirmed facts for job-search expansion.
-5. **Settings** — integration setup/job sources and blocked-company management,
+4. **Settings** — integration setup/job sources and blocked-company management,
    organized into `/settings/scrapers`, `/settings/integrations`, and
    `/settings/blocked-companies`. Desktop uses left navigation; mobile uses a
    section selector. `/settings` restores the last section (Scrapers initially).
@@ -187,18 +185,18 @@ browser; live Telegram pairing is kept in short-lived server memory.
 
 Settings includes Search preferences as the primary editable source of scraper
 intent after onboarding. Titles are one removable bubble list; every visible title
-becomes a managed title family. Confirmed skills selected on the Skills page remain
-a separate capability lane, reference stable vault fact IDs, and are shown here as
-read-only search signals. Saving ordinary preferences preserves those capability
-queries instead of flattening them into job titles. Country, work modes, hybrid/on-site locations,
+becomes a managed title family. Evidence-backed enrichment is automatic: when two
+literal skills are tied to the same selected or suggested role, the system may add a
+bounded title-and-skill provider query. Skill-only queries are never created, and a
+manually entered title remains title-only when no supported relationship exists.
+Country, work modes, hybrid/on-site locations,
 remote location terms, and compensation can be edited without AI or network calls.
 Saving preserves provider toggles and manual search families, updates only managed
 families, and does not start a scan. Target compensation remains a ranking preference,
 not a ceiling. A revision token prevents one open browser tab from overwriting newer
 changes from another.
 
-Resumes and Skills are read-only projections of the career workspace, except for
-the explicit skill search toggle. Imported documents remain vault evidence and do
+Resumes are read-only projections of the career workspace. Imported documents remain vault evidence and do
 not appear as application-ready resumes. The Resumes page presents every directional
 resume and only tailored resumes with a current successful mint. It does not expose
 internal build, review, or mint lifecycle labels.
@@ -227,7 +225,7 @@ offers Finish setup before any scrape action.
 Use a simple top navigation:
 
 ```text
-Resume Builder       Jobs     Applications     Resumes     Skills     Settings
+Resume Builder       Jobs     Applications     Resumes     Settings
 ```
 
 The active page is clearly marked. Connection health stays inside the Integrations

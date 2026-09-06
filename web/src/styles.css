@@ -668,8 +668,6 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
 .career-import-panel > div > p { max-width: 360px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
 .career-import-panel .resume-dropzone { min-height: 168px; padding: 22px; background: var(--surface-raised); }
 .career-import-panel .resume-import-list { margin-bottom: 12px; }
-.career-count { display: grid; justify-items: end; color: var(--muted); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
-.career-count strong { color: var(--ink); font-size: 22px; line-height: 1; letter-spacing: 0; }
 .career-section { margin-top: 34px; }
 .career-section + .career-section { margin-top: 48px; }
 .career-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
@@ -685,10 +683,7 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
 .career-row p { max-width: 760px; margin: 6px 0 0; color: #b1bac4; font-size: 13px; line-height: 1.5; }
 .career-row small { display: block; margin-top: 6px; color: var(--muted); font-size: 11px; }
 .career-row-meta { display: grid; justify-items: end; gap: 8px; color: var(--muted); font-size: 11px; }
-.quiet-badge, .evidence-state { padding: 3px 7px; border-radius: 999px; background: var(--surface-raised); color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .03em; }
-.evidence-state.positive { background: var(--success-soft); color: #7ee787; }
-.evidence-state.attention { background: #3b2e16; color: #e3b341; }
-.evidence-state.negative { background: #3d1f24; color: #ff7b72; }
+.quiet-badge { padding: 3px 7px; border-radius: 999px; background: var(--surface-raised); color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .03em; }
 .resume-recommendation { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; margin-top: 16px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-raised); font-size: 12px; }
 .resume-recommendation > span { color: var(--muted); }
 .resume-recommendation strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -742,24 +737,14 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
   .resume-reader-title { grid-column: 1 / -1; grid-row: 2; justify-items: start; }
   .resume-reader-actions { grid-column: 2; grid-row: 1; }
 }
-.career-tools { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 14px; }
-.career-tools .search-field { max-width: 520px; }
-.career-tools p { flex: 0 0 auto; margin: 0; color: var(--muted); font-size: 12px; }
-.skill-search-toggle { min-width: 126px; justify-content: flex-end; }
-.career-no-results { padding: 28px 4px; border-top: 1px solid var(--line); color: var(--muted); }
-.signal-list { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 14px; padding: 0; list-style: none; }
-.signal-list li { padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-raised); font-size: 12px; }
 @media (max-width: 700px) {
-  .career-heading, .career-tools { align-items: flex-start; flex-direction: column; }
+  .career-heading { align-items: flex-start; flex-direction: column; }
   .career-import-panel { grid-template-columns: 1fr; gap: 18px; }
   .career-material-actions { align-items: stretch; flex-direction: column; width: 100%; }
-  .career-count { justify-items: start; }
-  .career-tools .search-field { width: 100%; max-width: none; }
   .career-row { grid-template-columns: 1fr; gap: 14px; }
   .career-row-meta { justify-items: start; }
   .retired-resume-row { grid-template-columns: 1fr; padding-bottom: 12px; }
   .retired-resume-row > .text-button { justify-self: start; }
-  .skill-search-toggle { justify-content: space-between; }
   .application-resume, .resume-recommendation { grid-template-columns: 1fr; gap: 6px; }
 }
 .blocked-company-panel p { color: var(--muted); font-size: 13px; }

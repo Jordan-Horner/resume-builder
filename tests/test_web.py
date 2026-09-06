@@ -251,6 +251,13 @@ def test_resume_preview_rejects_files_outside_generated_resume_folders(tmp_path:
     assert response.json()["detail"] == "generated resume was not found"
 
 
+def test_removed_skills_api_is_not_available(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+
+    assert client.get("/api/skills").status_code == 404
+    assert client.put("/api/skills/SKILL-001/search", json={"enabled": True}).status_code == 404
+
+
 def test_manual_onboarding_routes_through_preference_steps(tmp_path: Path) -> None:
     client = _client(tmp_path)
     client.post(
@@ -284,7 +291,7 @@ def test_job_search_preferences_route_exposes_editable_defaults(tmp_path: Path) 
     assert response.json()["revision"]
 
 
-def test_career_library_routes_expose_vault_backed_resumes_and_skills(tmp_path: Path) -> None:
+def test_career_library_route_exposes_vault_backed_resumes(tmp_path: Path) -> None:
     client = _client(tmp_path)
 
     resume_payload = client.get("/api/resumes").json()
@@ -294,7 +301,6 @@ def test_career_library_routes_expose_vault_backed_resumes_and_skills(tmp_path: 
         "retired",
     ]
     assert all(section["items"] == [] for section in resume_payload["sections"])
-    assert client.get("/api/skills").json() == {"skills": []}
 
 
 def test_retired_resume_can_be_restored_through_portal(tmp_path: Path) -> None:
@@ -311,13 +317,6 @@ def test_retired_resume_can_be_restored_through_portal(tmp_path: Path) -> None:
     assert response.status_code == 200
     assert response.json()["restored"] is True
     assert (workspace / "resumes" / "baselines" / "support.md").is_file()
-
-
-def test_skill_search_route_rejects_invalid_payload(tmp_path: Path) -> None:
-    response = _client(tmp_path).put("/api/skills/SKILL-001/search", json={"enabled": "yes"})
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == "enabled must be true or false"
 
 
 @pytest.mark.parametrize(

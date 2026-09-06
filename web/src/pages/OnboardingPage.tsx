@@ -93,7 +93,7 @@ function RolesStep({ setup, busy: parentBusy, error, onSubmit, onBack }: StepPro
   return <div className="onboarding-content roles-step role-bubbles-step">
     <p className="eyebrow">Your next role</p>
     <h1 id="onboarding-title">Which roles do you want to search for?</h1>
-    <p className="onboarding-lede">We suggested these from your resume. Keep the ones you want, remove the rest, or add your own.</p>
+    <p className="onboarding-lede">We suggested these from your resume. Keep the ones you want, remove the rest, or add your own. Relevant skills refine each search automatically when your work history supports the connection.</p>
     <ul className="role-bubbles" aria-label="Roles included in your job search">{titles.map((title, index) =>
       <li key={title} className={highlight === title ? "role-bubble highlighted" : "role-bubble"}>
         <span>{title}</span><button type="button" disabled={busy} aria-label={`Remove ${title}`} onClick={() => {

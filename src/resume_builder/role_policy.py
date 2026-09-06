@@ -37,6 +37,6 @@ def check_query_capacity(queries: Iterable[str]) -> int:
     count = len({normalized_key(query) for query in queries})
     if count > MAX_TOTAL_QUERIES:
         raise ValueError(
-            f"you can search at most {MAX_TOTAL_QUERIES} unique roles and skills; remove one before adding another"
+            f"you can search at most {MAX_TOTAL_QUERIES} unique job titles; remove one before adding another"
         )
     return MAX_TOTAL_QUERIES - count

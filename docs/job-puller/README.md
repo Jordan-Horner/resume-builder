@@ -69,11 +69,12 @@ hash with `preferences apply`. This cannot delete inventory, start a provider
 scan, or call an AI model. It updates screening preferences only; future search
 query changes remain behind the separate discovery activation workflow.
 
-A reviewed capability family can set one transport-neutral `provider_query`,
+A role-bound capability family can set one transport-neutral `provider_query`,
 `commercial_admission: query_result`, and `commercial_only: true`. This allows
-a commercial search for literal resume capabilities without widening direct
-ATS-board admission. Ordinary manually configured families retain strict title
-matching by default.
+a commercial title-and-skill search only when the imported resume ties those
+literal capabilities to the same role. It does not create standalone skill
+searches or widen direct ATS-board admission. Ordinary manually configured
+families retain strict title matching by default.
 
 LinkedIn receives one compatible Boolean query per family through its public guest jobs surface. Indeed receives
 one plain query per `titles` entry because the GraphQL transport used by JobSpy does not reliably honor

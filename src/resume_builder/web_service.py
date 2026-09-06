@@ -39,7 +39,6 @@ from .discovery_evidence import (
 from .discovery_portfolio import (
     ColdStartLane,
     ColdStartPortfolio,
-    ColdStartQuery,
     build_cold_start_portfolio,
     generate_title_suggestions,
     load_cached_title_generation,
@@ -57,6 +56,7 @@ from .job_onboarding import (
     SetupStep,
     activation_preview,
     apply_answer,
+    portfolio_from_setup_state,
     start_setup,
 )
 from .job_onboarding import (
@@ -559,7 +559,6 @@ class DashboardService:
             else "not_configured",
             "revision": self._job_search_preferences_revision(),
             "titles": titles,
-            "skill_terms": list(preferences.get("interest_terms", [])),
             "country": profile.get("intended_work_country") or "United States",
             "work_modes": preferences.get("accepted_work_modes") or [],
             "onsite_locations": preferences.get("accepted_location_terms") or [],
@@ -631,16 +630,7 @@ class DashboardService:
         if payload.get("scope") not in {"onboarding", "settings"}:
             raise ValueError("role scope must be onboarding or settings")
         titles = clean_titles(payload.get("titles"), allow_empty=True)
-        queries = list(titles)
-        path = self.workspace / PORTFOLIO_PATH
-        if path.is_file():
-            portfolio = ColdStartPortfolio.model_validate_json(path.read_text(encoding="utf-8"))
-            queries.extend(
-                item.query
-                for item in portfolio.queries
-                if any(source.startswith("vault:") for source in item.source_ids)
-            )
-        remaining = check_query_capacity(queries)
+        remaining = check_query_capacity(titles)
         return {
             "titles": titles,
             "remaining": remaining,
@@ -741,29 +731,12 @@ class DashboardService:
                 for value in [family.get("provider_query"), *(family.get("titles") or [])]
                 if value
             }
+            generated_portfolio = portfolio_from_setup_state(state)
             queries = [
-                ColdStartQuery(
-                    query_id=f"user-{hashlib.sha256(title.casefold().encode()).hexdigest()[:12]}",
-                    lane=ColdStartLane.ADJACENT_TITLE,
-                    query=title,
-                    source_ids=["user-confirmed-settings"],
-                    reason="Explicitly included in Search preferences.",
-                )
-                for title in titles
-                if normalized_key(title) not in manual_queries
+                item
+                for item in generated_portfolio.queries
+                if normalized_key(item.query) not in manual_queries
             ]
-            if (self.workspace / PORTFOLIO_PATH).is_file():
-                current_portfolio = ColdStartPortfolio.model_validate_json(
-                    (self.workspace / PORTFOLIO_PATH).read_text(encoding="utf-8")
-                )
-                existing_queries = {normalized_key(item.query) for item in queries}
-                queries.extend(
-                    item
-                    for item in current_portfolio.queries
-                    if any(source.startswith("vault:") for source in item.source_ids)
-                    and normalized_key(item.query) not in manual_queries
-                    and normalized_key(item.query) not in existing_queries
-                )
             check_query_capacity(item.query for item in queries)
             portfolio = ColdStartPortfolio(
                 generated_at=datetime.now(UTC).isoformat(),
@@ -824,17 +797,6 @@ class DashboardService:
         from .web_career import resolve_application_resume_preview
 
         return resolve_application_resume_preview(self.workspace, application_id)
-
-    def career_skills(self) -> list[dict[str, Any]]:
-        from .web_career import list_skills
-
-        return list_skills(self.workspace)
-
-    def set_skill_search(self, fact_id: str, enabled: bool) -> dict[str, Any]:
-        from .web_career import set_skill_search_enabled
-
-        with self._state_lock:
-            return set_skill_search_enabled(self.workspace, fact_id, enabled)
 
     def job_resume_recommendation(self, job_id: str) -> dict[str, Any]:
         """Resolve existing target, direction, match, and resume artifacts for one job."""

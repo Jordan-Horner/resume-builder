@@ -74,7 +74,7 @@ export function SearchPreferencesSection() {
       setPreferences(updated);
       setLocations(updated.onsite_locations.join(", "));
       setRemoteTerms(updated.remote_location_terms.join(", "));
-      setNotice("Search preferences saved. Future scrapes will use these titles.");
+      setNotice("Search preferences saved. Future searches will use these titles and any supported skill refinements.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not save search preferences.");
     } finally { setBusy(false); }
@@ -89,14 +89,12 @@ export function SearchPreferencesSection() {
   return <section className="search-preferences-panel" aria-labelledby="search-preferences-heading">
     <div className="settings-section-heading"><div><h2 id="search-preferences-heading">Search preferences</h2><p>These settings shape every future scrape. Saving does not start one.</p></div><button className="primary-button" disabled={!valid || busy} onClick={() => void save()}>{busy ? "Saving…" : "Save changes"}</button></div>
 
-    <div className="settings-group"><div className="settings-group-copy"><h3>Job titles</h3><p>Every title below is searched. Add close alternatives you would genuinely consider.</p></div><div>
+    <div className="settings-group"><div className="settings-group-copy"><h3>Job titles</h3><p>Every title below is searched directly. When your resume ties relevant skills to the same role, Resume Builder adds a few focused title-and-skill searches automatically.</p></div><div>
       <fieldset disabled={busy} style={{ border: 0, padding: 0, margin: 0 }}><ul className="role-bubbles compact" aria-label="Titles included in searches">{preferences.titles.map((item, index) => <li className="role-bubble" key={item}><span>{item}</span><button type="button" aria-label={`Remove ${item}`} onClick={() => { patch({ titles: preferences.titles.filter((_, position) => position !== index) }); setRemoved({ title: item, index }); setNotice(`${item} removed.`); }}>×</button></li>)}</ul>
       {!preferences.titles.length && <p className="field-hint error-text">Add at least one title.</p>}
       <div className="role-feedback"><span role="status">{notice}</span>{removed && <button className="text-button" onClick={() => { const next = [...preferences.titles]; next.splice(Math.min(removed.index, next.length), 0, removed.title); void applyTitles(next); }}>Undo</button>}</div>
       <form className="role-add compact" onSubmit={(event) => { event.preventDefault(); addTitle(); }}><label className="field"><span>Add another title</span><div><input ref={input} value={title} placeholder="e.g. Site Reliability Engineer" onChange={(event) => setTitle(event.target.value)} /><button className="secondary-button" disabled={busy || !title.trim()} type="submit">Add</button></div></label></form>
     </fieldset></div></div>
-
-    <div className="settings-group"><div className="settings-group-copy"><h3>Resume skills</h3><p>Confirmed vault skills can broaden provider searches without becoming job-title filters.</p></div><div>{preferences.skill_terms.length ? <ul className="signal-list">{preferences.skill_terms.map((item) => <li key={item}>{item}</li>)}</ul> : <p className="field-hint">No vault skills are currently used for search.</p>}<a className="empty-state-link" href="/skills">Manage search skills</a></div></div>
 
     <div className="settings-group"><div className="settings-group-copy"><h3>Where you can work</h3><p>Country scopes the scrape. Cities and regions apply only to hybrid and on-site roles.</p></div><div className="preference-fields"><label className="field"><span>Country</span><input value={preferences.country} maxLength={100} onChange={(event) => patch({ country: event.target.value })} /></label><div><span className="field-label">Work modes</span><div className="mode-grid compact">{(["remote", "hybrid", "onsite"] as WorkMode[]).map((mode) => <button type="button" key={mode} className={preferences.work_modes.includes(mode) ? "mode-card selected" : "mode-card"} aria-pressed={preferences.work_modes.includes(mode)} onClick={() => toggleMode(mode)}><span>{preferences.work_modes.includes(mode) ? "✓" : ""}</span><strong>{mode === "onsite" ? "On-site" : mode[0].toUpperCase() + mode.slice(1)}</strong></button>)}</div></div>{needsPlace && <label className="field"><span>Accepted cities or regions</span><input value={locations} placeholder="New York, Boston" onChange={(event) => setLocations(event.target.value)} /></label>}<label className="field"><span>Remote location terms <em>optional</em></span><input value={remoteTerms} placeholder="USA, East Coast" onChange={(event) => setRemoteTerms(event.target.value)} /></label></div></div>
 

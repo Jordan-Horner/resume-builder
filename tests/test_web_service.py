@@ -567,6 +567,41 @@ def test_search_preferences_update_preserves_providers_and_manual_families(tmp_p
     assert saved_preferences["clearance_preference"] == "prefer"
 
 
+def test_search_preferences_keep_automatic_role_skill_enrichment(tmp_path):
+    root = _fresh_workspace(tmp_path)
+    service = DashboardService(root, inventory_loader=lambda: [])
+    service.import_resume(
+        "resume.md",
+        b"""# Experience
+## Example Cloud | Reliability Engineer | 2024 - 2026
+- Supported Kubernetes services on AWS.
+# Technical Skills
+- AWS, Kubernetes
+""",
+    )
+    service.start_preference_setup(use_ai=False)
+    service.answer_preference_step("roles", {"titles": ["Reliability Engineer"]})
+    service.answer_preference_step(
+        "location", {"search_country": "United States", "accepted_work_modes": ["remote"]}
+    )
+    service.answer_preference_step("compensation", {"skipped": True})
+    service.answer_preference_step("review", {"action": "save"})
+
+    current = service.job_search_preferences()
+    service.update_job_search_preferences(current)
+
+    config = yaml.safe_load((root / "job-search/config/search.yml").read_text())
+    managed = [
+        family
+        for family in config["search"]["families"]
+        if family["name"].startswith("resume-discovery-")
+    ]
+    assert any(family["titles"] == ["Reliability Engineer"] for family in managed)
+    assert any(
+        family.get("provider_query") == "Reliability Engineer AWS Kubernetes" for family in managed
+    )
+
+
 def test_search_preferences_update_migrates_active_legacy_workspace(tmp_path):
     root = _fresh_workspace(tmp_path)
     preferences_path = root / "job-search/preferences.yml"
@@ -633,30 +668,6 @@ def test_search_preferences_update_still_requires_inactive_setup(tmp_path):
         )
 
 
-def test_search_preferences_keep_skill_terms_out_of_role_titles(tmp_path):
-    root = _fresh_workspace(tmp_path)
-    service = DashboardService(root, inventory_loader=lambda: [])
-    service.import_resume("resume.md", b"# Experience\n\nSupported production systems.\n")
-    service.start_preference_setup(use_ai=False)
-    service.answer_preference_step(
-        "roles", {"decisions": {}, "add": ["Technical Support Engineer"]}
-    )
-    service.answer_preference_step(
-        "location", {"search_country": "United States", "accepted_work_modes": ["remote"]}
-    )
-    service.answer_preference_step("compensation", {"skipped": True})
-    service.answer_preference_step("review", {"action": "save"})
-    preferences_path = root / "job-search/preferences.yml"
-    preferences = yaml.safe_load(preferences_path.read_text(encoding="utf-8"))
-    preferences["interest_terms"] = ["Incident response"]
-    preferences_path.write_text(yaml.safe_dump(preferences, sort_keys=False), encoding="utf-8")
-
-    result = service.job_search_preferences()
-
-    assert result["titles"] == ["Technical Support Engineer"]
-    assert result["skill_terms"] == ["Incident response"]
-
-
 @pytest.mark.parametrize(
     ("filename", "content", "message"),
     [
@@ -709,28 +720,9 @@ def test_revisit_suggestion_choice_preserves_session_and_answers(tmp_path):
     assert any(role["title"] == "Support Engineer" for role in resumed["setup"]["roles"])
 
 
-def test_role_preview_uses_shared_identity_and_live_skill_capacity(tmp_path):
-    from resume_builder.discovery_portfolio import ColdStartPortfolio, ColdStartQuery
-    from resume_builder.job_setup_defaults import PORTFOLIO_PATH
-
+def test_role_preview_uses_shared_identity_and_title_capacity(tmp_path):
     root = _fresh_workspace(tmp_path)
     service = DashboardService(root, inventory_loader=lambda: [])
-    portfolio = ColdStartPortfolio(
-        generated_at="2026-09-05T00:00:00+00:00",
-        resume_hash="test",
-        queries=[
-            ColdStartQuery(
-                query_id="skill-one",
-                lane="capability_combination",
-                query="Python",
-                source_ids=["vault:skill-one"],
-                reason="Confirmed skill",
-            )
-        ],
-    )
-    path = root / PORTFOLIO_PATH
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(portfolio.model_dump_json(), encoding="utf-8")
     for scope in ("onboarding", "settings"):
         result = service.preview_role_titles(
             {
@@ -739,10 +731,10 @@ def test_role_preview_uses_shared_identity_and_live_skill_capacity(tmp_path):
             }
         )
         assert result["titles"] == ["Support Engineer"]
-        assert result["remaining"] == 20
-        with pytest.raises(ValueError, match="roles and skills"):
+        assert result["remaining"] == 21
+        with pytest.raises(ValueError, match="job titles"):
             service.preview_role_titles(
-                {"scope": scope, "titles": [f"Role {n}" for n in range(22)]}
+                {"scope": scope, "titles": [f"Role {n}" for n in range(23)]}
             )
         assert (
             service.preview_role_titles({"scope": scope, "titles": ["Python"]})["remaining"] == 21

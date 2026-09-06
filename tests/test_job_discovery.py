@@ -258,10 +258,57 @@ def test_normalized_snapshot_role_layout_is_supported() -> None:
 
 def test_query_expansion_keeps_capabilities_role_coherent() -> None:
     expansion = extract_query_expansion(fictional_resume())
-    queries = {item.query for item in expansion.capability_combinations}
+    combinations = {
+        (item.evidence_role, tuple(item.evidence_terms))
+        for item in expansion.capability_combinations
+    }
 
-    assert "AWS Kubernetes" in queries
-    assert "FastAPI Terraform" not in queries
+    assert ("Production Services Lead", ("AWS", "Kubernetes")) in combinations
+    assert not any(set(terms) == {"FastAPI", "Terraform"} for _, terms in combinations)
+
+
+def test_query_expansion_combines_interpreted_roles_with_raw_skills() -> None:
+    document = fictional_resume().model_copy(
+        update={
+            "interpretation": ResumeInterpretation.model_validate(
+                {
+                    "roles": [
+                        {
+                            "title": "Production Services Lead",
+                            "dates": "2024 - 2026",
+                            "excerpt": "Led production incident response across AWS and Kubernetes services.",
+                        }
+                    ]
+                }
+            )
+        }
+    )
+
+    combinations = extract_query_expansion(document).capability_combinations
+
+    assert any(item.evidence_terms == ["AWS", "Kubernetes"] for item in combinations)
+
+
+def test_query_expansion_keeps_the_same_skill_pair_separate_by_role() -> None:
+    document = ResumeDocument(
+        source_id="fictional-shared-skills.md",
+        content="""\
+# Work Experience
+## Example Cloud | Reliability Engineer | 2024 - 2026
+- Supported AWS services running on Kubernetes.
+## Example Data | Platform Engineer | 2022 - 2024
+- Deployed AWS services to Kubernetes.
+# Technical Skills
+- AWS, Kubernetes
+""",
+    )
+
+    combinations = extract_query_expansion(document).capability_combinations
+
+    assert {item.evidence_role for item in combinations} == {
+        "Reliability Engineer",
+        "Platform Engineer",
+    }
 
 
 def test_query_expansion_does_not_invent_missing_terms() -> None:

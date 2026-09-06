@@ -2,15 +2,11 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { getResumes, getSkills, restoreResume, setSkillSearch, uploadResume } from "./api";
+import { getResumes, restoreResume, uploadResume } from "./api";
 import { ResumesPage } from "./pages/ResumesPage";
-import { SkillsPage } from "./pages/SkillsPage";
-import type { CareerSkill } from "./types";
 
 vi.mock("./api", () => ({
   getResumes: vi.fn(),
-  getSkills: vi.fn(),
-  setSkillSearch: vi.fn(),
   restoreResume: vi.fn(),
   uploadResume: vi.fn(),
 }));
@@ -102,18 +98,4 @@ it("keeps retired resumes quiet and restores them on request", async () => {
   await act(async () => Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "Restore")?.click());
 
   expect(restoreResume).toHaveBeenCalledWith("resumes/archived/support.md");
-});
-
-it("lets a confirmed vault skill become a search signal", async () => {
-  const skill: CareerSkill = { id: "SKILL-001", title: "Incident response", description: "Coordinated production incidents.", status_label: "Confirmed", status_tone: "positive", themes: ["operations"], sources: ["SRC-example"], resumes: ["Support Operations"], search: { enabled: false, can_change: true, disabled_reason: null } };
-  vi.mocked(getSkills).mockResolvedValue([skill]);
-  vi.mocked(setSkillSearch).mockResolvedValue({ ...skill, search: { ...skill.search, enabled: true } });
-
-  await act(async () => root.render(<SkillsPage />));
-  const toggle = host.querySelector('input[type="checkbox"]') as HTMLInputElement;
-  await act(async () => toggle.click());
-
-  expect(setSkillSearch).toHaveBeenCalledWith("SKILL-001", true);
-  expect(host.textContent).toContain("Used by 1 resume");
-  expect(host.textContent).toContain("Search on");
 });
