@@ -20,6 +20,19 @@ def test_extracts_labeled_base_salary_as_yearly_compensation():
     )
 
 
+def test_repairs_truncated_thousands_group_in_labeled_salary_range():
+    description = "The base salary range for this role is $143,00 to $210,000."
+
+    assert extract_compensation_range(description) == (
+        CompensationRange(143_000, 210_000, "USD", "yearly")
+    )
+
+
+def test_does_not_repair_unlabeled_or_implausible_malformed_ranges():
+    assert extract_compensation_range("The range is $143,00 to $210,000.") is None
+    assert extract_compensation_range("Salary range: $14,00 to $2,100.") is None
+
+
 def test_infers_unlabeled_annual_sized_range():
     assert extract_compensation_range("The expected range is $80K-$90K.") == (
         CompensationRange(80_000, 90_000, "USD", "yearly")

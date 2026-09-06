@@ -17,6 +17,16 @@ DOLLAR_RANGE = re.compile(
     re.IGNORECASE,
 )
 
+MALFORMED_LABELED_ANNUAL_MINIMUM = re.compile(
+    r"\b(?:base\s+)?salary\s+range\b[^$\n]{0,80}"
+    r"(?P<currency>CA\$|C\$|US\$|\$|€|£)\s*"
+    r"(?P<minimum>\d{2,3},\d{2})\s*"
+    r"(?:-|\u2013|\u2014|to)\s*"
+    r"(?:(?P<second_currency>CA\$|C\$|US\$|\$|€|£)\s*)?"
+    r"(?P<maximum>\d{1,3}(?:,\d{3})+)(?:\.\d+)?\b",
+    re.IGNORECASE,
+)
+
 CURRENCIES = {
     "$": "USD",
     "US$": "USD",
@@ -53,8 +63,25 @@ def _interval(value: str) -> str:
     return "daily"
 
 
+def _repair_labeled_annual_minimum(description: str) -> str:
+    """Repair one missing trailing zero in an otherwise plausible labeled range."""
+    for match in MALFORMED_LABELED_ANNUAL_MINIMUM.finditer(description):
+        currency_symbol = match.group("currency").upper()
+        second_symbol = (match.group("second_currency") or currency_symbol).upper()
+        if CURRENCIES[currency_symbol] != CURRENCIES[second_symbol]:
+            continue
+        repaired_minimum = f'{match.group("minimum")}0'
+        minimum = _amount(repaired_minimum, None)
+        maximum = _amount(match.group("maximum"), None)
+        if 10_000 <= minimum <= maximum <= 2_000_000:
+            start, end = match.span("minimum")
+            return f"{description[:start]}{repaired_minimum}{description[end:]}"
+    return description
+
+
 def extract_compensation_range(description: str) -> CompensationRange | None:
     """Return the first plausible range, inferring annual periods from annual-sized amounts."""
+    description = _repair_labeled_annual_minimum(description)
     for match in DOLLAR_RANGE.finditer(description):
         minimum = _amount(match.group("minimum"), match.group("minimum_k"))
         maximum = _amount(match.group("maximum"), match.group("maximum_k"))
