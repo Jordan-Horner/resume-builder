@@ -536,6 +536,72 @@ def test_search_preferences_update_preserves_providers_and_manual_families(tmp_p
     assert not (root / "build/job-search/latest-refresh.json").exists()
 
 
+def test_search_preferences_update_migrates_active_legacy_workspace(tmp_path):
+    root = _fresh_workspace(tmp_path)
+    preferences_path = root / "job-search/preferences.yml"
+    preferences = yaml.safe_load(preferences_path.read_text(encoding="utf-8"))
+    preferences.update(
+        {
+            "desired_title_terms": ["Support Engineer"],
+            "accepted_work_modes": ["remote"],
+            "minimum_salary": 80_000,
+            "salary_currency": "USD",
+            "salary_period": "year",
+        }
+    )
+    preferences_path.write_text(yaml.safe_dump(preferences, sort_keys=False), encoding="utf-8")
+    config_path = root / "job-search/config/search.yml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["enabled"] = True
+    config["search"]["families"] = [
+        {"name": "manual-support", "enabled": True, "titles": ["Support Engineer"]}
+    ]
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    service = DashboardService(root, inventory_loader=lambda: [])
+
+    current = service.job_search_preferences()
+    updated = service.update_job_search_preferences(
+        {
+            **current,
+            "titles": ["Support Engineer", "Platform Engineer"],
+            "compensation": {
+                "skipped": False,
+                "minimum": 85_000,
+                "target": None,
+                "currency": "USD",
+                "period": "year",
+            },
+        }
+    )
+
+    assert current["status"] == "active"
+    assert updated["titles"] == ["Support Engineer", "Platform Engineer"]
+    setup = web_service.load_setup_state(root)
+    assert setup is not None
+    assert setup.status == web_service.SetupStatus.ACTIVE
+    assert setup.session_id.startswith("legacy-")
+    rendered = config_path.read_text(encoding="utf-8")
+    assert "manual-support" in rendered
+    assert "Platform Engineer" in rendered
+
+
+def test_search_preferences_update_still_requires_inactive_setup(tmp_path):
+    root = _fresh_workspace(tmp_path)
+    service = DashboardService(root, inventory_loader=lambda: [])
+    current = service.job_search_preferences()
+
+    with pytest.raises(ValueError, match="finish job-search setup"):
+        service.update_job_search_preferences(
+            {
+                **current,
+                "titles": ["Support Engineer"],
+                "country": "United States",
+                "work_modes": ["remote"],
+                "compensation": {"skipped": True},
+            }
+        )
+
+
 def test_search_preferences_keep_skill_terms_out_of_role_titles(tmp_path):
     root = _fresh_workspace(tmp_path)
     service = DashboardService(root, inventory_loader=lambda: [])

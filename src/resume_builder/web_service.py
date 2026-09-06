@@ -28,7 +28,7 @@ from .agent_contracts import ModelProviderError
 from .agent_openrouter import OpenRouterAdapter
 from .applications import current_application_status, iter_records, record_application
 from .atomic import atomic_write_json, atomic_write_text
-from .discovery_activation import preview_activation
+from .discovery_activation import MANAGED_FAMILY_PREFIX, preview_activation
 from .discovery_evidence import (
     ResumeDocument,
     extract_query_expansion,
@@ -47,6 +47,7 @@ from .job_onboarding import (
     CompensationAnswers,
     EligibilityAnswers,
     JobSearchSetupAnswer,
+    JobSearchSetupState,
     LocationAnswers,
     RoleGroup,
     RoleIntent,
@@ -502,10 +503,15 @@ class DashboardService:
         )
         profile = dict(preferences.get("screening_profile") or {})
         setup = load_setup_state(self.workspace)
+        config = load_config(self.workspace / JOBS_CONFIG)
         titles = preferences.get("desired_title_terms", [])
         titles = list(dict.fromkeys(str(title).strip() for title in titles if str(title).strip()))
         return {
-            "status": setup.status.value if setup else "not_configured",
+            "status": setup.status.value
+            if setup
+            else "active"
+            if config.enabled
+            else "not_configured",
             "revision": self._job_search_preferences_revision(),
             "titles": titles,
             "skill_terms": list(preferences.get("interest_terms", [])),
@@ -524,6 +530,55 @@ class DashboardService:
         }
 
     _clean_titles = staticmethod(clean_titles)
+
+    def _legacy_active_setup_state(
+        self,
+        current: dict[str, Any],
+        preferences: dict[str, Any],
+        *,
+        country: str,
+        location: LocationAnswers,
+        compensation: CompensationAnswers,
+    ) -> JobSearchSetupState | None:
+        """Reconstruct portal bookkeeping for a pre-onboarding active workspace."""
+        if not load_config(self.workspace / JOBS_CONFIG).enabled:
+            return None
+        profile = dict(preferences.get("screening_profile") or {})
+        timestamp = datetime.now(UTC).isoformat()
+        roles = [
+            RoleProposal(
+                role_id=(
+                    f"role-legacy-{hashlib.sha256(title.casefold().encode()).hexdigest()[:12]}"
+                ),
+                title=title,
+                group=RoleGroup.RELATED,
+                intent=RoleIntent.SEARCH,
+                lane=ColdStartLane.ADJACENT_TITLE,
+                source_ids=["legacy-preferences"],
+                reason="Preserved from search preferences created before portal onboarding.",
+            )
+            for title in current["titles"]
+        ]
+        return JobSearchSetupState(
+            session_id=f"legacy-{current['revision'][:24]}",
+            status=SetupStatus.ACTIVE,
+            step=SetupStep.COMPLETE,
+            created_at=timestamp,
+            updated_at=timestamp,
+            evidence_hash=f"legacy-{current['revision']}",
+            source_ids=[],
+            roles=roles,
+            eligibility=EligibilityAnswers(
+                intended_country=country,
+                authorized_to_work=profile.get("authorized_to_work"),
+                requires_sponsorship=profile.get("requires_sponsorship"),
+                held_clearances=profile.get("held_clearances") or [],
+                holds_clearance_or_public_trust=profile.get("holds_clearance_or_public_trust"),
+                willing_to_obtain_clearance=profile.get("willing_to_obtain_clearance"),
+            ),
+            location=location,
+            compensation=compensation,
+        )
 
     def preview_role_titles(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Validate an unsaved selection against the current shared search budget."""
@@ -564,7 +619,18 @@ class DashboardService:
                 }
             )
             compensation = CompensationAnswers.model_validate(payload.get("compensation"))
+            preferences_path = self.workspace / PREFERENCES_PATH
+            config_path = self.workspace / JOBS_CONFIG
+            preferences = yaml.safe_load(preferences_path.read_text(encoding="utf-8"))
             state = load_setup_state(self.workspace)
+            if state is None:
+                state = self._legacy_active_setup_state(
+                    current,
+                    preferences,
+                    country=country,
+                    location=location,
+                    compensation=compensation,
+                )
             if state is None:
                 raise ValueError("finish job-search setup before editing search preferences")
             existing = {normalized_key(item.title): item for item in state.roles}
@@ -601,9 +667,6 @@ class DashboardService:
             state.step = SetupStep.COMPLETE
             state.updated_at = datetime.now(UTC).isoformat()
 
-            preferences_path = self.workspace / PREFERENCES_PATH
-            config_path = self.workspace / JOBS_CONFIG
-            preferences = yaml.safe_load(preferences_path.read_text(encoding="utf-8"))
             preferences["desired_title_terms"] = titles
             preferences["accepted_work_modes"] = location.accepted_work_modes
             preferences["accepted_location_terms"] = [
@@ -619,6 +682,15 @@ class DashboardService:
             preferences["screening_profile"] = profile
             preferences = validate_preferences(preferences)
 
+            config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+            manual_queries = {
+                normalized_key(str(value))
+                for family in config.get("search", {}).get("families", [])
+                if isinstance(family, dict)
+                and not str(family.get("name", "")).startswith(MANAGED_FAMILY_PREFIX)
+                for value in [family.get("provider_query"), *(family.get("titles") or [])]
+                if value
+            }
             queries = [
                 ColdStartQuery(
                     query_id=f"user-{hashlib.sha256(title.casefold().encode()).hexdigest()[:12]}",
@@ -628,6 +700,7 @@ class DashboardService:
                     reason="Explicitly included in Search preferences.",
                 )
                 for title in titles
+                if normalized_key(title) not in manual_queries
             ]
             if (self.workspace / PORTFOLIO_PATH).is_file():
                 current_portfolio = ColdStartPortfolio.model_validate_json(
@@ -638,6 +711,7 @@ class DashboardService:
                     item
                     for item in current_portfolio.queries
                     if any(source.startswith("vault:") for source in item.source_ids)
+                    and normalized_key(item.query) not in manual_queries
                     and normalized_key(item.query) not in existing_queries
                 )
             check_query_capacity(item.query for item in queries)
@@ -646,7 +720,6 @@ class DashboardService:
                 resume_hash=state.evidence_hash,
                 queries=queries,
             )
-            config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
             config.setdefault("search", {})["location"] = country
             config["search"]["accepted_work_modes"] = location.accepted_work_modes
             preview = preview_activation(portfolio, yaml.safe_dump(config, sort_keys=False))
