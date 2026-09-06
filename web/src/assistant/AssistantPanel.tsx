@@ -1,10 +1,30 @@
 import { useEffect, useRef, useState } from "react";
 import { CopilotKitProvider, useAgent, useCopilotKit } from "@copilotkit/react-core/v2";
+import ReactMarkdown from "react-markdown";
 import { assistantRequest, type Conversation, type Proposal } from "./api";
 
-interface Props { open: boolean; target: { id: string; name: string; nonce: number } | null; onClose: () => void }
+interface Props { open: boolean; target: { kind: "resume" | "job"; id: string; name: string; nonce: number } | null; onClose: () => void }
 
 function ProposalView({ proposal, decide }: { proposal: Proposal; decide: (id: string, action: string) => void }) {
+  if (proposal.payload.kind === "resume_removal") {
+    const retiring = proposal.payload.action === "retire" || proposal.payload.application_references.length > 0;
+    return <section className="assistant-proposal assistant-removal" aria-label="Proposed resume removal">
+    <strong>{retiring ? "Retire this directional résumé?" : "Remove this directional résumé?"}</strong>
+    <p>{retiring ? `It will leave future matching but ${proposal.payload.application_references.length} application ${proposal.payload.application_references.length === 1 ? "copy" : "copies"} will remain available.` : "It will stop appearing in Resumes and future matching."} Career-vault evidence and tailored résumés stay unchanged.</p>
+    {proposal.status === "pending" ? <div className="assistant-actions">
+      <button className="danger-button" onClick={() => decide(proposal.id, "accept")}>{retiring ? "Retire résumé" : "Remove résumé"}</button>
+      <button className="text-button" onClick={() => decide(proposal.id, "decline")}>Keep résumé</button>
+    </div> : <p role="status">{proposal.status === "applying" ? `${retiring ? "Retiring" : "Removing"} résumé…` : proposal.message}</p>}
+  </section>;
+  }
+  if (proposal.payload.kind === "resume_restore") return <section className="assistant-proposal" aria-label="Proposed resume restoration">
+    <strong>Restore this directional résumé?</strong>
+    <p>It will return to the active library and may be recommended for future jobs.</p>
+    {proposal.status === "pending" ? <div className="assistant-actions">
+      <button className="primary-button" onClick={() => decide(proposal.id, "accept")}>Restore résumé</button>
+      <button className="text-button" onClick={() => decide(proposal.id, "decline")}>Keep retired</button>
+    </div> : <p role="status">{proposal.status === "applying" ? "Restoring résumé…" : proposal.message}</p>}
+  </section>;
   return <section className="assistant-proposal" aria-label="Proposed resume change">
     <strong>Suggested wording</strong>
     <small>Current</small><p>{proposal.payload.before}</p>
@@ -91,8 +111,11 @@ function ConversationView({ initial, changed }: { initial: Conversation; changed
 
   return <>
     <div className="assistant-transcript" aria-label="Conversation">
-      {!thread.messages.length && <div className="assistant-intro"><h3>What would you like to work on?</h3><p>{thread.resume_id ? "Ask about this résumé or work through a wording change together." : "Ask about your job queue, or open a directional résumé to discuss it."}</p></div>}
-      {thread.messages.map((message) => <div className={`assistant-message ${message.role}`} key={message.id}><small>{message.role === "user" ? "You" : "Assistant"}</small><p>{message.content}</p></div>)}
+      {!thread.messages.length && <div className="assistant-intro"><h3>What would you like to work on?</h3><p>{thread.resume_id ? "Ask about this résumé, revise it, or remove it from active use." : thread.job_id ? "Ask me to screen this job or explain its fit." : "Ask about your job queue, or attach a job or directional résumé."}</p></div>}
+      {thread.messages.map((message) => <div className={`assistant-message ${message.role}`} key={message.id}>
+        <small>{message.role === "user" ? "You" : "Assistant"}</small>
+        <div className="assistant-markdown"><ReactMarkdown skipHtml>{message.content}</ReactMarkdown></div>
+      </div>)}
       {thread.proposals.map((proposal) => <ProposalView key={proposal.id} proposal={proposal} decide={decide} />)}
       {running && <p className="assistant-progress" role="status">Working with your career workspace…</p>}
       <div ref={end} />
@@ -124,9 +147,10 @@ export default function AssistantPanel({ open, target, onClose }: Props) {
     setThread(next); active.current = next; setHistory(false);
     try { localStorage.setItem("resume-builder.assistant.v1", id); } catch { console.warn("Assistant history preference could not be saved; server history remains available."); }
   }
-  async function start(resumeId: string | null = null) {
+  async function start(context?: { kind: "resume" | "job"; id: string }) {
     try {
-      const next = await assistantRequest<Conversation>("/threads", { method: "POST", body: JSON.stringify({ resume_id: resumeId }) });
+      const body = context?.kind === "job" ? { job_id: context.id } : { resume_id: context?.id ?? null };
+      const next = await assistantRequest<Conversation>("/threads", { method: "POST", body: JSON.stringify(body) });
       await select(next.id);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not start conversation."); }
   }
@@ -148,7 +172,8 @@ export default function AssistantPanel({ open, target, onClose }: Props) {
   useEffect(() => { void refresh(); }, []);
   useEffect(() => { if (open) header.current?.focus(); }, [open]);
   const busy = active.current?.runs.some((run) => run.status === "running") || active.current?.proposals.some((proposal) => proposal.status === "applying");
-  const pendingTarget = target && observedTarget.current !== target.nonce && target.id !== thread?.resume_id;
+  const activeTargetId = target?.kind === "job" ? thread?.job_id : thread?.resume_id;
+  const pendingTarget = target && observedTarget.current !== target.nonce && target.id !== activeTargetId;
 
   return <aside className="assistant-panel" aria-label="Career assistant" onKeyDown={(event) => { if (event.key === "Escape") onClose(); }}>
     <header className="assistant-header"><strong>Assistant</strong><div>
@@ -156,8 +181,9 @@ export default function AssistantPanel({ open, target, onClose }: Props) {
       <button className="text-button" disabled={busy} onClick={() => void start()}>New</button>
       <button ref={header} className="assistant-close" aria-label="Close assistant" onClick={onClose}>×</button>
     </div></header>
-    {pendingTarget && <div className="assistant-context"><span>{target.name}</span><button className="text-button" disabled={busy} onClick={() => { observedTarget.current = target.nonce; void start(target.id); }}>Discuss this résumé</button></div>}
+    {pendingTarget && <div className="assistant-context"><span>{target.name}</span><button className="text-button" disabled={busy} onClick={() => { observedTarget.current = target.nonce; void start({ kind: target.kind, id: target.id }); }}>{target.kind === "job" ? "Discuss this job" : "Discuss this résumé"}</button></div>}
     {thread?.resume_id && <div className="assistant-context"><small>Working on</small><span>{thread.resume_id.split("/").pop()?.replace(/\.md$/, "").replaceAll("-", " ")}</span></div>}
+    {thread?.job_id && <div className="assistant-context"><small>Working on job</small><span>{thread.context_name || thread.job_id}</span></div>}
     {error && <div className="assistant-context" role="alert">{error}<button className="text-button" onClick={() => void refresh()}>Retry</button></div>}
     {history ? <div className="assistant-history">{threads.map((item) => <button key={item.id} onClick={() => { select(item.id).catch((reason: Error) => setError(reason.message)); }}>{item.title}<small>{new Date(item.updated_at).toLocaleDateString()}</small></button>)}</div>
       : !status ? <p className="assistant-context" role="status">Connecting…</p>

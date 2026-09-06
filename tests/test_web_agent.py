@@ -25,6 +25,13 @@ def test_assistant_threads_are_persistent_and_validated(client: TestClient) -> N
     assert client.get(f"/api/assistant/threads/{identity}").status_code == 404
 
 
+def test_assistant_rejects_unknown_job_context(client: TestClient) -> None:
+    response = client.post("/api/assistant/threads", json={"job_id": "missing-job"})
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Choose an existing job"
+
+
 def test_cross_origin_writes_and_direct_agent_access_are_rejected(client: TestClient) -> None:
     assert (
         client.post(

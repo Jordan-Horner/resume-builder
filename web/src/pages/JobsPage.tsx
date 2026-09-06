@@ -1,10 +1,11 @@
 import { useDeferredValue, useEffect, useState } from "react";
-import { activateJobSearch, getJobs, getResumeRecommendation, markJobApplied, markJobNotInterested, getBlockedCompanies, setCompanyBlocked, getJobFilterDefaults, getSearchPreferences, getJobSources, startJobScan } from "../api";
+import { activateJobSearch, getJobs, getResumeRecommendation, markJobApplied, markJobNotInterested, getBlockedCompanies, setCompanyBlocked, getJobFilterDefaults, getSearchPreferences, getJobSources, startJobScan, getSavedJobScreen, screenJob } from "../api";
 import { ArrowIcon, EmptyState, ErrorMessage, LoadingRows, SearchIcon } from "../components";
 import { EMPTY_FILTERS, persistView, restoreView } from "../viewPreferences";
 import { JobViewFilters } from "../JobViewFilters";
 import { JobSalary } from "../components/JobSalary";
-import type { Job, JobFilters, ResumeRecommendation, SearchPreferences, ViewFilters } from "../types";
+import type { Job, JobFilters, JobScreenResult, ResumeRecommendation, SearchPreferences, ViewFilters } from "../types";
+import { useAssistant } from "../assistant/AssistantProvider";
 
 
 const DATE_FILTERS = [
@@ -56,6 +57,7 @@ function compactCurrency(value: number, currency: string) {
 }
 
 export function JobsPage() {
+  const assistant = useAssistant();
   const [filters, setFilters] = useState<JobFilters>(EMPTY_FILTERS);
   const [defaults, setDefaults] = useState<ViewFilters | null>(null);
   const [preferencesUpdated, setPreferencesUpdated] = useState(false);
@@ -70,6 +72,9 @@ export function JobsPage() {
   const [selected, setSelected] = useState<Job | null>(null);
   const [resumeRecommendation, setResumeRecommendation] = useState<ResumeRecommendation | null>(null);
   const [resumeRecommendationError, setResumeRecommendationError] = useState("");
+  const [jobScreen, setJobScreen] = useState<JobScreenResult | null>(null);
+  const [screening, setScreening] = useState(false);
+  const [screenError, setScreenError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [queueError, setQueueError] = useState("");
@@ -167,6 +172,24 @@ export function JobsPage() {
       });
     return () => { active = false; };
   }, [selected]);
+
+  useEffect(() => {
+    let active = true;
+    setJobScreen(null); setScreenError("");
+    if (!selected) return () => { active = false; };
+    getSavedJobScreen(selected.id)
+      .then((result) => { if (active) setJobScreen(result); })
+      .catch((reason: unknown) => { if (active) setScreenError(reason instanceof Error ? reason.message : "Could not load this job screen."); });
+    return () => { active = false; };
+  }, [selected]);
+
+  async function runJobScreen() {
+    if (!selected || screening) return;
+    setScreening(true); setScreenError("");
+    try { setJobScreen(await screenJob(selected.id)); }
+    catch (reason) { setScreenError(reason instanceof Error ? reason.message : "Could not screen this job."); }
+    finally { setScreening(false); }
+  }
 
   async function runManualScan() {
     if (scanning) return;
@@ -366,6 +389,17 @@ export function JobsPage() {
               {resumeRecommendationError && (
                 <p className="recommendation-error" role="status">{resumeRecommendationError}</p>
               )}
+              <section className="job-screen-card" aria-label="Job screen">
+                {jobScreen ? <>
+                  <div className="job-screen-heading"><span>Career fit</span><strong>{jobScreen.result.fit_label}</strong><em>{jobScreen.result.eligibility_label}</em></div>
+                  <p>{jobScreen.result.reasoning_summary}</p>
+                  <div className="job-screen-actions"><button className="text-button" onClick={() => void runJobScreen()} disabled={screening}>{screening ? "Screening…" : "Refresh screen"}</button><button className="text-button" onClick={() => assistant.discussJob(selected.id, `${selected.title} at ${selected.company}`)}>Discuss job</button></div>
+                </> : <>
+                  <div><strong>Should you pursue this job?</strong><p>Check eligibility and career fit using your saved preferences and résumé evidence.</p></div>
+                  <div className="job-screen-actions"><button className="secondary-button" onClick={() => void runJobScreen()} disabled={screening}>{screening ? "Screening job…" : "Screen job"}</button><button className="text-button" onClick={() => assistant.discussJob(selected.id, `${selected.title} at ${selected.company}`)}>Discuss job</button></div>
+                </>}
+                {screenError && <p className="recommendation-error" role="alert">{screenError}</p>}
+              </section>
               <div className="job-actions" aria-label="Update job status">
                 {selected.url && (
                   <a className="secondary-button original-link" href={selected.url} target="_blank" rel="noreferrer">

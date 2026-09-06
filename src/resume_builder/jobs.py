@@ -233,15 +233,13 @@ def _prescreen_job_hash(job: dict[str, Any]) -> str:
     return _hash_text(json.dumps({field: job.get(field) for field in fields}, sort_keys=True))
 
 
-def _resume_paths(preferences: dict[str, Any]) -> list[Path]:
+def _resume_paths(preferences: dict[str, Any], root: Path = Path(".")) -> list[Path]:
     globs = preferences.get("resume_globs") or ["resumes/baselines/*.md", "resumes/tailored/*.md"]
-    return sorted(
-        {path for pattern in globs for path in Path.cwd().glob(pattern) if path.is_file()}
-    )
+    return sorted({path for pattern in globs for path in root.glob(pattern) if path.is_file()})
 
 
-def _resume_corpus(preferences: dict[str, Any]) -> tuple[str, str]:
-    paths = _resume_paths(preferences)
+def _resume_corpus(preferences: dict[str, Any], root: Path = Path(".")) -> tuple[str, str]:
+    paths = _resume_paths(preferences, root)
     text = "\n".join(path.read_text(encoding="utf-8") for path in paths)
     return text, _hash_text(text)
 
@@ -532,14 +530,17 @@ def get_job_screening_packet(
     *,
     config_path: Path = DEFAULT_CONFIG,
     preferences_path: Path = DEFAULT_PREFERENCES,
+    workspace: Path = Path("."),
 ) -> ScreeningPacket:
     """Build one bounded, read-only packet from authoritative local inputs."""
-    preferences = _with_application_dispositions(_load_preferences(preferences_path))
+    preferences = _with_application_dispositions(
+        _load_preferences(preferences_path), workspace / DEFAULT_APPLICATIONS_ROOT
+    )
     inventory = {str(item["id"]): item for item in _database(config_path).active_inventory()}
     job = inventory.get(job_id)
     if job is None:
         raise ValueError(f"active job not found: {job_id}")
-    resume_text, _ = _resume_corpus(preferences)
+    resume_text, _ = _resume_corpus(preferences, workspace)
     prescreen = _prescreen(job, preferences, _terms(resume_text))
     return build_screening_packet(job, preferences, prescreen, inventory=list(inventory.values()))
 

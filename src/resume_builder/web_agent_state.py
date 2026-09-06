@@ -40,13 +40,16 @@ class WebAgentState(AgentState):
                     message TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL
                 );
             """)
+            columns = {row[1] for row in db.execute("PRAGMA table_info(web_threads)")}
+            if "job_id" not in columns:
+                db.execute("ALTER TABLE web_threads ADD COLUMN job_id TEXT")
 
-    def create_thread(self, resume_id: str | None) -> dict[str, Any]:
+    def create_thread(self, resume_id: str | None, *, job_id: str | None = None) -> dict[str, Any]:
         identity = str(uuid4())
         with self._connect() as db:
             db.execute(
-                "INSERT INTO web_threads VALUES (?, ?, ?, ?)",
-                (identity, resume_id, "New conversation", _now()),
+                "INSERT INTO web_threads(id,resume_id,title,updated_at,job_id) VALUES (?, ?, ?, ?, ?)",
+                (identity, resume_id, "New conversation", _now(), job_id),
             )
         return self.thread(identity)
 

@@ -22,6 +22,73 @@ def _client(tmp_path: Path) -> TestClient:
     return TestClient(create_app(workspace))
 
 
+def test_openrouter_can_be_configured_without_onboarding(tmp_path: Path, monkeypatch) -> None:
+    import httpx
+
+    from resume_builder.agent_config import DEFAULT_AGENT_CONFIG
+    from resume_builder.web_service import OPENROUTER_SECRET_PATH
+
+    client = _client(tmp_path)
+    workspace = tmp_path / "workspace"
+    monkeypatch.setattr(httpx, "get", lambda *a, **kw: httpx.Response(200, json={"data": {}}))
+    response = client.put("/api/integrations/openrouter", json={"api_key": "fixture-key"})
+    assert response.status_code == 200
+    assert "fixture-key" not in response.text
+    assert (workspace / DEFAULT_AGENT_CONFIG).is_file()
+    secret = workspace / OPENROUTER_SECRET_PATH
+    assert secret.read_text().strip() == "fixture-key"
+    assert secret.stat().st_mode & 0o777 == 0o600
+    original_config = (workspace / DEFAULT_AGENT_CONFIG).read_text()
+    replacement = client.put("/api/integrations/openrouter", json={"api_key": "replacement-key"})
+    assert replacement.status_code == 200
+    assert (workspace / DEFAULT_AGENT_CONFIG).read_text() == original_config
+    monkeypatch.setattr(httpx, "get", lambda *a, **kw: httpx.Response(401))
+    rejected = client.put("/api/integrations/openrouter", json={"api_key": "rejected-fixture"})
+    assert rejected.status_code == 400
+    assert "rejected-fixture" not in rejected.text
+    assert secret.read_text().strip() == "replacement-key"
+    assert (workspace / DEFAULT_AGENT_CONFIG).read_text() == original_config
+
+
+def test_job_screen_routes_separate_cached_read_from_explicit_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from resume_builder.web_service import DashboardService
+
+    result = {"status": "complete", "cached": False, "result": {"fit": "good_match"}}
+    monkeypatch.setattr(DashboardService, "saved_job_screen", lambda self, job_id: None)
+    monkeypatch.setattr(DashboardService, "screen_job", lambda self, job_id, refresh=False: result)
+    client = _client(tmp_path)
+
+    assert client.get("/api/jobs/job-1/screen").status_code == 204
+    response = client.post("/api/jobs/job-1/screen")
+    assert response.status_code == 200
+    assert response.json() == result
+
+
+@pytest.mark.parametrize("key", ["", "  ", None, 123, "a\nb", "x" * 513])
+def test_openrouter_rejects_invalid_key_input(tmp_path: Path, key: object) -> None:
+    client = _client(tmp_path)
+    assert client.put("/api/integrations/openrouter", json={"api_key": key}).status_code == 400
+
+
+@pytest.mark.parametrize("status,body", [(500, {}), (200, {}), (200, [])])
+def test_openrouter_unexpected_response_does_not_save(
+    tmp_path: Path, monkeypatch, status, body
+) -> None:
+    import httpx
+
+    from resume_builder.web_service import OPENROUTER_SECRET_PATH
+
+    client = _client(tmp_path)
+    monkeypatch.setattr(httpx, "get", lambda *a, **kw: httpx.Response(status, json=body))
+    assert (
+        client.put("/api/integrations/openrouter", json={"api_key": "fixture-key"}).status_code
+        == 400
+    )
+    assert not (tmp_path / "workspace" / OPENROUTER_SECRET_PATH).exists()
+
+
 def test_resume_upload_route_accepts_multipart_file(tmp_path: Path) -> None:
     client = _client(tmp_path)
 
@@ -224,9 +291,26 @@ def test_career_library_routes_expose_vault_backed_resumes_and_skills(tmp_path: 
     assert [section["id"] for section in resume_payload["sections"]] == [
         "directional",
         "tailored",
+        "retired",
     ]
     assert all(section["items"] == [] for section in resume_payload["sections"])
     assert client.get("/api/skills").json() == {"skills": []}
+
+
+def test_retired_resume_can_be_restored_through_portal(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    workspace = tmp_path / "workspace"
+    retired = workspace / "resumes" / "archived" / "support.md"
+    retired.parent.mkdir(parents=True, exist_ok=True)
+    retired.write_text("# Support\n", encoding="utf-8")
+
+    response = client.post(
+        "/api/resumes/restore", json={"resume_id": "resumes/archived/support.md"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["restored"] is True
+    assert (workspace / "resumes" / "baselines" / "support.md").is_file()
 
 
 def test_skill_search_route_rejects_invalid_payload(tmp_path: Path) -> None:

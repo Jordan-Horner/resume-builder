@@ -26,7 +26,8 @@ The frontend has five primary pages:
    `/settings/blocked-companies`. Desktop uses left navigation; mobile uses a
    section selector. `/settings` restores the last section (Scrapers initially).
    Existing `/integrations` links resolve to `/settings/integrations`.
-   Integration controls and API behavior are unchanged. Editable Job preferences
+Gmail, Telegram, and OpenRouter use portal-native guided connection flows; the
+Integrations API never returns CLI setup commands. Editable Job preferences
    are a separate follow-up; no placeholder is shown.
 
 Company blocking lives beside the company name in job details. Blocking hides
@@ -166,6 +167,16 @@ are surfaced as failures. Provider switches are locked during a portal scan.
 
 Endpoints: GET /api/job-sources, PUT /api/job-sources/{provider} with a boolean
 enabled value, and POST /api/job-sources/scan. No credentials form is added.
+
+Gmail setup presents the existing six Google Cloud steps one at a time, accepts
+the downloaded Desktop OAuth JSON without retaining a copy, and completes the
+supported loopback authorization in the browser. The portal stores only the
+verified refresh credentials in the existing owner-only external runtime path.
+Telegram setup validates a concealed BotFather token, then displays a one-use
+pairing QR code and Telegram link while the server waits for the matching private
+chat. Tokens are never returned to the browser or written inside either Git
+repository. Reloading the integrations page preserves Gmail step progress in the
+browser; live Telegram pairing is kept in short-lived server memory.
 
 Settings includes Search preferences as the primary editable source of scraper
 intent after onboarding. Titles are one removable bubble list; every visible title

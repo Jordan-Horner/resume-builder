@@ -23,6 +23,7 @@ from resume_builder.applications import (
     main,
     migrate_dispositions,
     outcome_report,
+    record_application,
     validate_history,
 )
 from resume_builder.layout import VaultLayout
@@ -79,6 +80,36 @@ def test_record_apply_pins_workspace_artifacts(tmp_path: Path):
     assert stored["application"]["resume"]["path"] == "exports/resume.pdf"
     assert len(stored["application"]["resume"]["sha256"]) == 64
     assert stored["events"][0]["status"] == "applied"
+
+
+def test_application_resumes_use_one_content_addressed_snapshot(tmp_path: Path):
+    resume = tmp_path / "resumes" / "baselines" / "support.md"
+    resume.parent.mkdir(parents=True)
+    resume.write_text("# Support résumé\n", encoding="utf-8")
+    root = tmp_path / "applications"
+
+    first = record_application(
+        root,
+        tmp_path,
+        company="Example",
+        role="Support Engineer",
+        job_id="job-1",
+        resume=resume,
+    )
+    second = record_application(
+        root,
+        tmp_path,
+        company="Acme",
+        role="Support Engineer",
+        job_id="job-2",
+        resume=resume,
+    )
+
+    assert (
+        first["application"]["resume"]["snapshot_path"]
+        == second["application"]["resume"]["snapshot_path"]
+    )
+    assert len(list((root / "resume-snapshots").iterdir())) == 1
 
 
 def test_record_captures_existing_prescreen_decision(tmp_path: Path):

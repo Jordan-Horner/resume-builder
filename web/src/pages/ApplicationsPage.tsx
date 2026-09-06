@@ -64,7 +64,7 @@ export function ApplicationsPage() {
                 <div className="application-history">
                   <div className="application-resume">
                     <span>Resume used</span>
-                    {item.resume ? <strong>{item.resume.name}<small>{item.resume.detail}</small></strong> : <strong>Not recorded<small>This application predates resume tracking.</small></strong>}
+                    {item.resume ? <strong>{item.resume.preview_url ? <a href={item.resume.preview_url} target="_blank" rel="noreferrer">{item.resume.name}</a> : item.resume.name}<small>{item.resume.detail}</small></strong> : <strong>Not recorded<small>This application predates resume tracking.</small></strong>}
                   </div>
                   <h3>History</h3>
                   {item.events.map((event) => (

@@ -1,4 +1,4 @@
-import type { Application, CareerSkill, Integration, Job, JobFilters, OnboardingStatus, ResumeLibrary, ResumeRecommendation, SalaryEstimateResult, SearchPreferences } from "./types";
+import type { Application, CareerSkill, GmailSetup, Integration, Job, JobFilters, JobScreenResult, OnboardingStatus, ResumeLibrary, ResumeRecommendation, SalaryEstimateResult, SearchPreferences, TelegramPairing } from "./types";
 
 export interface UpdateStatus {
   version: string;
@@ -74,6 +74,36 @@ export async function getIntegrations(): Promise<Integration[]> {
   return payload.integrations;
 }
 
+export function configureOpenRouter(apiKey: string): Promise<{ connected: boolean; message: string }> {
+  return request("/api/integrations/openrouter", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ api_key: apiKey }),
+  });
+}
+
+export function getGmailSetup(): Promise<GmailSetup> {
+  return request("/api/integrations/gmail/setup");
+}
+
+export function beginGmailAuthorization(file: File): Promise<{ authorization_url: string }> {
+  const body = new FormData();
+  body.append("file", file);
+  return request("/api/integrations/gmail/authorize", { method: "POST", body });
+}
+
+export function startTelegramPairing(token: string): Promise<TelegramPairing> {
+  return request("/api/integrations/telegram/pairing", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  });
+}
+
+export function getTelegramPairing(sessionId: string): Promise<TelegramPairing> {
+  return request(`/api/integrations/telegram/pairing/${encodeURIComponent(sessionId)}`);
+}
+
 export function getOnboardingStatus(): Promise<OnboardingStatus> {
   return request<OnboardingStatus>("/api/onboarding");
 }
@@ -128,9 +158,22 @@ export function saveSearchPreferences(preferences: SearchPreferences): Promise<S
 }
 
 export function getResumes(): Promise<ResumeLibrary> { return request("/api/resumes"); }
+export function restoreResume(resumeId: string): Promise<{ restored: boolean; message: string }> {
+  return request("/api/resumes/restore", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ resume_id: resumeId }),
+  });
+}
 
 export function getResumeRecommendation(jobId: string): Promise<ResumeRecommendation> {
   return request(`/api/jobs/${encodeURIComponent(jobId)}/resume-recommendation`);
+}
+export async function getSavedJobScreen(jobId: string): Promise<JobScreenResult | null> {
+  return (await request<JobScreenResult | null>(`/api/jobs/${encodeURIComponent(jobId)}/screen`)) ?? null;
+}
+export function screenJob(jobId: string): Promise<JobScreenResult> {
+  return request(`/api/jobs/${encodeURIComponent(jobId)}/screen`, { method: "POST" });
 }
 
 export async function getSkills(): Promise<CareerSkill[]> {

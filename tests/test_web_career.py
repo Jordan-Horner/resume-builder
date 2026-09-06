@@ -7,9 +7,14 @@ import yaml
 
 from resume_builder.job_setup_defaults import scaffold_job_search
 from resume_builder.web_career import (
+    archive_directional_resume,
+    directional_resume_removal_impact,
     list_resumes,
     list_skills,
+    resolve_application_resume_preview,
+    resolve_directional_resume_reference,
     resolve_resume_preview,
+    restore_directional_resume,
     set_skill_search_enabled,
 )
 from resume_builder.workspace import initialize_workspace
@@ -62,8 +67,134 @@ def test_resume_library_keeps_imported_sources_out_of_generated_resumes(tmp_path
     assert [section["id"] for section in library["sections"]] == [
         "directional",
         "tailored",
+        "retired",
     ]
     assert all(section["items"] == [] for section in library["sections"])
+
+
+def test_directional_resume_removal_archives_only_the_resume(tmp_path: Path) -> None:
+    root = _workspace(tmp_path)
+    resume = root / "resumes" / "baselines" / "support.md"
+    resume.parent.mkdir(parents=True, exist_ok=True)
+    resume.write_text("# Support\n", encoding="utf-8")
+    fact = root / "vault" / "facts" / "skills" / "SKILL-001.md"
+    fact.parent.mkdir(parents=True, exist_ok=True)
+    fact.write_text("vault evidence\n", encoding="utf-8")
+
+    impact = directional_resume_removal_impact(root, "resumes/baselines/support.md")
+    result = archive_directional_resume(root, impact)
+
+    assert result["archived"] is True
+    assert not resume.exists()
+    assert (root / "resumes" / "archived" / "support.md").read_text() == "# Support\n"
+    assert fact.read_text() == "vault evidence\n"
+
+
+def test_used_directional_resume_is_retired_after_application_copy_is_preserved(
+    tmp_path: Path,
+) -> None:
+    from resume_builder.applications import record_application
+
+    root = _workspace(tmp_path)
+    resume = root / "resumes" / "baselines" / "support.md"
+    resume.parent.mkdir(parents=True, exist_ok=True)
+    resume.write_text("# Support\n", encoding="utf-8")
+    record_application(
+        root / "applications",
+        root,
+        company="Example",
+        role="Support Engineer",
+        resume=resume,
+    )
+    application = next(iter((root / "applications").glob("APP-*.json")))
+    legacy = json.loads(application.read_text(encoding="utf-8"))
+    old_snapshot = root / legacy["application"]["resume"].pop("snapshot_path")
+    old_snapshot.unlink()
+    application.write_text(json.dumps(legacy), encoding="utf-8")
+
+    impact = directional_resume_removal_impact(root, "resumes/baselines/support.md")
+    result = archive_directional_resume(root, impact)
+
+    assert impact["action"] == "retire"
+    assert result["retired"] is True
+    assert not resume.exists()
+    assert (root / "resumes" / "archived" / "support.md").is_file()
+    saved = json.loads(application.read_text(encoding="utf-8"))
+    snapshot = root / saved["application"]["resume"]["snapshot_path"]
+    assert snapshot.read_text(encoding="utf-8") == "# Support\n"
+
+
+def test_retired_directional_resume_can_be_restored(tmp_path: Path) -> None:
+    root = _workspace(tmp_path)
+    retired = root / "resumes" / "archived" / "support.md"
+    retired.parent.mkdir(parents=True, exist_ok=True)
+    retired.write_text("# Support\n", encoding="utf-8")
+
+    result = restore_directional_resume(root, "resumes/archived/support.md")
+
+    assert result["restored"] is True
+    assert (root / "resumes" / "baselines" / "support.md").read_text() == "# Support\n"
+    assert not retired.exists()
+
+
+def test_application_preview_uses_preserved_copy_after_source_changes(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from resume_builder.applications import record_application
+
+    root = _workspace(tmp_path)
+    resume = root / "resumes" / "baselines" / "support.md"
+    resume.parent.mkdir(parents=True, exist_ok=True)
+    resume.write_text("# Submitted version\n", encoding="utf-8")
+    record = record_application(
+        root / "applications",
+        root,
+        company="Example",
+        role="Support Engineer",
+        resume=resume,
+    )
+    resume.write_text("# New version\n", encoding="utf-8")
+    rendered_from: list[Path] = []
+
+    def render(_root: Path, source: Path) -> Path:
+        rendered_from.append(source)
+        return source
+
+    monkeypatch.setattr("resume_builder.web_career._render_portal_preview", render)
+
+    resolve_application_resume_preview(root, record["application"]["id"])
+
+    assert rendered_from[0].read_text(encoding="utf-8") == "# Submitted version\n"
+
+
+def test_directional_resume_can_be_resolved_by_visible_name(tmp_path: Path) -> None:
+    root = _workspace(tmp_path)
+    resume = root / "resumes" / "baselines" / "support.md"
+    resume.parent.mkdir(parents=True, exist_ok=True)
+    resume.write_text(
+        """---
+version: 1
+lang: en
+page_format: letter
+candidate:
+  name: Example User
+  headline: Support Operations
+  email: example@example.invalid
+  evidence: []
+---
+
+# Professional Summary
+
+Evidence-backed resume.
+""",
+        encoding="utf-8",
+    )
+
+    assert resolve_directional_resume_reference(root, "Support") == "resumes/baselines/support.md"
+    assert (
+        resolve_directional_resume_reference(root, "resumes/baselines/support.md")
+        == "resumes/baselines/support.md"
+    )
 
 
 def test_resume_library_does_not_present_source_documents_as_resumes(
@@ -91,6 +222,7 @@ def test_resume_library_does_not_present_source_documents_as_resumes(
     assert [section["id"] for section in library["sections"]] == [
         "directional",
         "tailored",
+        "retired",
     ]
     assert all(section["items"] == [] for section in library["sections"])
 

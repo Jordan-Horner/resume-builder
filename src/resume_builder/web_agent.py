@@ -68,7 +68,13 @@ def install_assistant(app: FastAPI, workspace: Path) -> None:
 
     def thread(identity: str) -> dict[str, Any]:
         try:
-            return store().thread(identity)
+            result = store().thread(identity)
+            job_id = result.get("job_id")
+            if job_id:
+                job = DashboardService(workspace).get_job(job_id)
+                if job:
+                    result["context_name"] = f"{job['title']} at {job['company']}"
+            return result
         except LookupError as exc:
             raise HTTPException(404, "Conversation not found") from exc
 
@@ -159,6 +165,17 @@ def install_assistant(app: FastAPI, workspace: Path) -> None:
     @router.post("/threads", status_code=201)
     def create_thread(payload: dict[str, Any]) -> dict[str, Any]:
         selected = payload.get("resume_id")
+        selected_job = payload.get("job_id")
+        if selected is not None and selected_job is not None:
+            raise HTTPException(400, "Choose either a resume or a job")
+        if selected_job is not None:
+            try:
+                found = DashboardService(workspace).get_job(selected_job)
+            except (ValueError, TypeError):
+                found = None
+            if found is None:
+                raise HTTPException(400, "Choose an existing job")
+            return store().create_thread(None, job_id=selected_job)
         try:
             if selected is not None:
                 resume_path(workspace, selected)
@@ -193,7 +210,16 @@ def install_assistant(app: FastAPI, workspace: Path) -> None:
         thread(identity)
         if decision not in {"accept", "decline"}:
             raise HTTPException(400, "Choose accept or decline")
-        if decision == "accept" and not configured():
+        proposal = next(
+            (item for item in thread(identity)["proposals"] if item["id"] == proposal_id), None
+        )
+        if proposal is None:
+            raise HTTPException(404, "Proposed change not found")
+        if (
+            decision == "accept"
+            and proposal["payload"].get("kind") not in {"resume_removal", "resume_restore"}
+            and not configured()
+        ):
             raise HTTPException(409, "Configure AI before applying a reviewed change")
         try:
             claimed = store().claim_proposal(identity, proposal_id)

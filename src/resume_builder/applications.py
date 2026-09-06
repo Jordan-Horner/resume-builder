@@ -18,11 +18,12 @@ import yaml
 from job_puller.config import load_config, resolve_database_path
 from job_puller.database import InventoryDatabase
 
-from .atomic import atomic_write_json
+from .atomic import atomic_write_bytes, atomic_write_json
 from .evidence import load_fact_evidence
 
 SCHEMA_VERSION = 1
 DEFAULT_ROOT = Path("applications")
+RESUME_SNAPSHOT_ROOT = Path("resume-snapshots")
 RATE_SAMPLE_FLOOR = 10
 STATUSES = {
     "applied",
@@ -81,6 +82,76 @@ def _artifact(path: Path | None, workspace: Path) -> dict[str, str] | None:
         "path": relative.as_posix(),
         "sha256": hashlib.sha256(resolved.read_bytes()).hexdigest(),
     }
+
+
+def _resume_snapshot(root: Path, workspace: Path, artifact: dict[str, str]) -> dict[str, str]:
+    """Pin one deduplicated, immutable copy of an application résumé."""
+    source = (workspace / artifact["path"]).resolve()
+    content = source.read_bytes()
+    digest = hashlib.sha256(content).hexdigest()
+    if digest != artifact["sha256"]:
+        raise ValueError("resume changed while the application was being recorded")
+    suffix = source.suffix.casefold() if source.suffix else ".bin"
+    snapshot = root / RESUME_SNAPSHOT_ROOT / f"{digest}{suffix}"
+    if snapshot.exists():
+        if snapshot.read_bytes() != content:
+            raise ValueError("resume snapshot hash collision")
+    else:
+        atomic_write_bytes(snapshot, content)
+    updated = dict(artifact)
+    updated["snapshot_path"] = snapshot.resolve().relative_to(workspace.resolve()).as_posix()
+    return updated
+
+
+def preserve_application_resume_snapshots(
+    root: Path, workspace: Path, resume_path: str
+) -> dict[str, list[dict[str, str]]]:
+    """Backfill exact snapshots for application records that reference one résumé."""
+    protected: list[dict[str, str]] = []
+    blocked: list[dict[str, str]] = []
+    pending: list[tuple[Path, dict[str, Any], dict[str, str], dict[str, str]]] = []
+    for record_path, record in iter_records(root):
+        application = record["application"]
+        artifact = application.get("resume")
+        if not isinstance(artifact, dict) or artifact.get("path") != resume_path:
+            continue
+        identity = {
+            "id": str(application["id"]),
+            "company": str(application["company"]),
+            "role": str(application["role"]),
+        }
+        snapshot_value = artifact.get("snapshot_path")
+        snapshot = (
+            (workspace / snapshot_value).resolve() if isinstance(snapshot_value, str) else None
+        )
+        snapshot_root = (root / RESUME_SNAPSHOT_ROOT).resolve()
+        digest = artifact.get("sha256")
+        if (
+            snapshot is not None
+            and snapshot.is_relative_to(snapshot_root)
+            and snapshot.is_file()
+            and isinstance(digest, str)
+            and hashlib.sha256(snapshot.read_bytes()).hexdigest() == digest
+        ):
+            protected.append(identity)
+            continue
+        source = workspace / resume_path
+        if (
+            not source.is_file()
+            or not isinstance(digest, str)
+            or hashlib.sha256(source.read_bytes()).hexdigest() != digest
+        ):
+            blocked.append(identity)
+            continue
+        pending.append((record_path, record, artifact, identity))
+    if blocked:
+        return {"protected": protected, "blocked": blocked}
+    for record_path, record, artifact, identity in pending:
+        updated = json.loads(json.dumps(record))
+        updated["application"]["resume"] = _resume_snapshot(root, workspace, artifact)
+        atomic_write_json(record_path, updated)
+        protected.append(identity)
+    return {"protected": protected, "blocked": blocked}
 
 
 def _optional(value: str | None) -> str | None:
@@ -433,7 +504,11 @@ def record_application(
         resume=resume,
         note=note,
     )
-    return _write_or_preview(root, build_record(args, workspace), apply=True)["record"]
+    record = build_record(args, workspace)
+    artifact = record["application"].get("resume")
+    if isinstance(artifact, dict):
+        record["application"]["resume"] = _resume_snapshot(root, workspace, artifact)
+    return _write_or_preview(root, record, apply=True)["record"]
 
 
 def build_automated_record(

@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { getResumes, getSkills, setSkillSearch, uploadResume } from "./api";
+import { getResumes, getSkills, restoreResume, setSkillSearch, uploadResume } from "./api";
 import { ResumesPage } from "./pages/ResumesPage";
 import { SkillsPage } from "./pages/SkillsPage";
 import type { CareerSkill } from "./types";
@@ -11,6 +11,7 @@ vi.mock("./api", () => ({
   getResumes: vi.fn(),
   getSkills: vi.fn(),
   setSkillSearch: vi.fn(),
+  restoreResume: vi.fn(),
   uploadResume: vi.fn(),
 }));
 
@@ -28,6 +29,7 @@ it("adds more career material after onboarding", async () => {
   vi.mocked(getResumes).mockResolvedValue({ sections: [
     { id: "directional", title: "Directional resumes", description: "Reusable role directions.", items: [] },
     { id: "tailored", title: "Tailored resumes", description: "Job-specific resumes.", items: [] },
+    { id: "retired", title: "Retired resumes", description: "Hidden from matching.", items: [] },
   ] });
   vi.mocked(uploadResume).mockResolvedValue({ filename: "older-resume.pdf", registered_sources: 2 });
 
@@ -56,6 +58,7 @@ it("renders the server-organized resume library without classifying resumes", as
       { id: "resumes/baselines/support.md", name: "Support Operations", kind: "directional", updated_at: "2026-09-05T12:00:00Z", detail: "Reusable direction", error: null, preview_url: "/api/resume-preview?resume_id=resumes%2Fbaselines%2Fsupport.md&v=123", preview_message: null },
     ] },
     { id: "tailored", title: "Tailored resumes", description: "Job-specific resumes.", items: [] },
+    { id: "retired", title: "Retired resumes", description: "Hidden from matching.", items: [] },
   ] });
 
   await act(async () => root.render(<ResumesPage />));
@@ -74,6 +77,31 @@ it("renders the server-organized resume library without classifying resumes", as
   expect(host.querySelector("iframe")?.classList.contains("is-dimmed")).toBe(true);
   expect(host.textContent).toContain("Back to resumes");
   expect(host.textContent).not.toContain("Dim paper");
+});
+
+it("keeps retired resumes quiet and restores them on request", async () => {
+  vi.mocked(getResumes)
+    .mockResolvedValueOnce({ sections: [
+      { id: "directional", title: "Directional resumes", description: "Reusable role directions.", items: [] },
+      { id: "tailored", title: "Tailored resumes", description: "Job-specific resumes.", items: [] },
+      { id: "retired", title: "Retired resumes", description: "Hidden from matching.", items: [
+        { id: "resumes/archived/support.md", name: "Support Operations", kind: "directional", status: "retired", updated_at: "2026-09-05T12:00:00Z", detail: "Retired direction", error: null, preview_url: "/api/resume-preview?resume_id=retired", preview_message: null },
+      ] },
+    ] })
+    .mockResolvedValueOnce({ sections: [
+      { id: "directional", title: "Directional resumes", description: "Reusable role directions.", items: [] },
+      { id: "tailored", title: "Tailored resumes", description: "Job-specific resumes.", items: [] },
+      { id: "retired", title: "Retired resumes", description: "Hidden from matching.", items: [] },
+    ] });
+  vi.mocked(restoreResume).mockResolvedValue({ restored: true, message: "Restored" });
+
+  await act(async () => root.render(<ResumesPage />));
+  const summary = host.querySelector("summary") as HTMLElement;
+  expect(summary.textContent).toContain("Retired resumes");
+  await act(async () => summary.click());
+  await act(async () => Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "Restore")?.click());
+
+  expect(restoreResume).toHaveBeenCalledWith("resumes/archived/support.md");
 });
 
 it("lets a confirmed vault skill become a search signal", async () => {

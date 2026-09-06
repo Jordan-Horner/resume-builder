@@ -13,6 +13,7 @@ vi.mock("./api", () => ({
   markJobNotInterested: vi.fn(), setCompanyBlocked: vi.fn(), activateJobSearch: vi.fn(),
   getJobSources: vi.fn(), startJobScan: vi.fn(), estimateJobSalary: vi.fn(),
   getSavedJobSalary: vi.fn(),
+  getSavedJobScreen: vi.fn(), screenJob: vi.fn(),
 }));
 const job: Job = { id: "one", title: "Support Engineer", company: "Example", location: "Remote", employment_type: "fulltime", salary_min: null, salary_max: null, salary_currency: null, salary_interval: null, posted_at: null, first_seen_at: null, description: "Support customers", work_modes: ["remote"], providers: [], url: null };
 let root: Root;
@@ -30,6 +31,7 @@ beforeEach(() => {
   vi.mocked(api.markJobApplied).mockResolvedValue({});
   vi.mocked(api.markJobNotInterested).mockResolvedValue(undefined);
   vi.mocked(api.getSavedJobSalary).mockResolvedValue(null);
+  vi.mocked(api.getSavedJobScreen).mockResolvedValue(null);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); });
 async function click(text: string) {
@@ -77,6 +79,24 @@ it("offers salary estimation only inside the opened job description", async () =
   await act(async () => (host.querySelector(".job-row") as HTMLButtonElement).click());
   expect(host.querySelector(".job-detail .detail-tags")?.textContent).toContain("Estimate Salary");
   expect(api.estimateJobSalary).not.toHaveBeenCalled();
+});
+
+it("screens a job only after the user requests it", async () => {
+  const result = { status: "complete" as const, cached: false, result: {
+    job_id: "one", fit: "good_match", fit_label: "Good fit", eligibility: "eligible",
+    eligibility_label: "Eligible", recommendation: "pursue", recommendation_label: "Pursue",
+    confidence: "medium" as const, strengths: [], gaps: [], unknowns: [], stretch_case: null,
+    reasoning_summary: "Strong production support evidence.",
+  } };
+  vi.mocked(api.screenJob).mockResolvedValue(result);
+  await openJob();
+  expect(api.screenJob).not.toHaveBeenCalled();
+
+  await click("Screen job");
+
+  expect(api.screenJob).toHaveBeenCalledWith("one");
+  expect(host.textContent).toContain("Good fit");
+  expect(host.textContent).toContain("Strong production support evidence.");
 });
 
 it.each([{ salary_min: 80000, salary_max: null }, { salary_min: null, salary_max: 100000 }])("keeps posted partial pay instead of offering an estimate: %j", async (pay) => {

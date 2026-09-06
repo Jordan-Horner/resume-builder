@@ -3,11 +3,13 @@ import {
   getJobs,
   estimateJobSalary,
   getSavedJobSalary,
+  getSavedJobScreen,
   getOnboardingStatus,
   getSystemStatus,
   getScrapeSchedule,
   markJobApplied,
   markJobNotInterested,
+  screenJob,
   skipOnboarding,
   uploadResume,
 } from "./api";
@@ -61,6 +63,20 @@ describe("dashboard API client", () => {
     expect(await getSavedJobSalary("job-1")).toBeNull();
 
     expect(fetchMock).toHaveBeenCalledWith("/api/jobs/job-1/salary-estimate", undefined);
+  });
+
+  it("loads cached screening separately from an explicit screen", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: "complete" }), {
+        status: 200, headers: { "Content-Type": "application/json" },
+      }));
+
+    expect(await getSavedJobScreen("job-1")).toBeNull();
+    await screenJob("job-1");
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/jobs/job-1/screen", undefined);
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/jobs/job-1/screen", { method: "POST" });
   });
 
   it("loads and defers onboarding through explicit endpoints", async () => {

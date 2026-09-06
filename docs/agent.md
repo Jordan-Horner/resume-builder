@@ -99,6 +99,14 @@ the stronger configured model. The default `fast` tier minimizes routine cost.
 
 ## Configure private Telegram conversations
 
+For the normal setup, open **Settings → Integrations → Telegram** in the portal.
+Open the official BotFather from the guided panel, create a bot, and paste its token
+into the concealed field. After validation, scan the one-use pairing QR code or open
+the supplied Telegram link and tap **Start**. The portal confirms the connected bot
+without displaying or returning its token.
+
+The terminal wizard remains available for advanced or headless installations.
+
 Install the optional channel dependency, then run the personal setup wizard:
 
 ```bash

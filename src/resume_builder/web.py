@@ -11,8 +11,8 @@ from .workspace_state import discover_workspace
 
 def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
     try:
-        from fastapi import FastAPI, File, HTTPException, Query, Response, UploadFile
-        from fastapi.responses import FileResponse
+        from fastapi import FastAPI, File, HTTPException, Query, Request, Response, UploadFile
+        from fastapi.responses import FileResponse, RedirectResponse
         from fastapi.staticfiles import StaticFiles
     except ImportError as exc:
         raise RuntimeError(
@@ -20,6 +20,10 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         ) from exc
 
     service = DashboardService(workspace)
+    from .web_integrations import GMAIL_CLIENT_MAX_BYTES, PortalIntegrationService
+
+    integration_service = PortalIntegrationService(workspace)
+    resolved_static = static_dir.expanduser().resolve() if static_dir else None
     from .updates import UpdateChecker
 
     updates = UpdateChecker()
@@ -153,6 +157,37 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
             },
         )
 
+    @app.post("/api/resumes/restore")
+    def restore_resume(payload: dict[str, Any]) -> dict[str, Any]:
+        try:
+            resume_id = payload.get("resume_id")
+            if not isinstance(resume_id, str):
+                raise ValueError("Choose a retired résumé")
+            return service.restore_career_resume(resume_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/api/applications/{application_id}/resume-preview")
+    def application_resume_preview(application_id: str) -> FileResponse:
+        try:
+            document = service.application_resume_preview(application_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return FileResponse(
+            document["path"],
+            media_type=document["media_type"],
+            filename=document["filename"],
+            content_disposition_type="inline",
+            headers={
+                "Cache-Control": "private, max-age=31536000, immutable",
+                "X-Content-Type-Options": "nosniff",
+                "Content-Security-Policy": (
+                    "sandbox; default-src 'none'; style-src 'unsafe-inline'; "
+                    "img-src data:; font-src data:"
+                ),
+            },
+        )
+
     @app.get("/api/skills")
     def skills() -> dict[str, Any]:
         try:
@@ -262,6 +297,25 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
+    @app.get("/api/jobs/{job_id}/screen")
+    def saved_job_screen(job_id: str) -> Any:
+        try:
+            result = service.saved_job_screen(job_id)
+            return result if result is not None else Response(status_code=204)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.post("/api/jobs/{job_id}/screen")
+    def screen_job(job_id: str, refresh: bool = False) -> dict[str, Any]:
+        try:
+            return service.screen_job(job_id, refresh=refresh)
+        except ModelProviderError as exc:
+            raise HTTPException(
+                status_code=502, detail="Job screening failed. Please try again."
+            ) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     @app.post("/api/jobs/{job_id}/not-interested", status_code=204)
     def mark_not_interested(job_id: str) -> None:
         try:
@@ -323,7 +377,78 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
     def integrations() -> dict[str, Any]:
         return {"integrations": service.list_integrations()}
 
-    resolved_static = static_dir.expanduser().resolve() if static_dir else None
+    @app.put("/api/integrations/openrouter")
+    def configure_openrouter(payload: dict[str, Any]) -> dict[str, Any]:
+        try:
+            return service.configure_openrouter(payload.get("api_key"))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/api/integrations/gmail/setup")
+    def gmail_setup() -> dict[str, Any]:
+        return integration_service.gmail_setup()
+
+    @app.post("/api/integrations/gmail/authorize")
+    async def authorize_gmail(
+        request: Request,
+        file: UploadFile = File(...),  # noqa: B008
+    ) -> dict[str, str]:
+        try:
+            content = await file.read(GMAIL_CLIENT_MAX_BYTES + 1)
+            return integration_service.begin_gmail_oauth(
+                file.filename or "",
+                content,
+                redirect_uri=str(request.base_url).rstrip("/"),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        finally:
+            await file.close()
+
+    @app.post("/api/integrations/telegram/pairing", status_code=202)
+    def start_telegram_pairing(payload: dict[str, Any]) -> dict[str, Any]:
+        try:
+            return integration_service.start_telegram_pairing(payload.get("token"))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/api/integrations/telegram/pairing/{session_id}")
+    def telegram_pairing_status(session_id: str) -> dict[str, Any]:
+        try:
+            return integration_service.telegram_pairing_status(session_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.get("/api/integrations/telegram/pairing/{session_id}/qr")
+    def telegram_pairing_qr(session_id: str) -> Response:
+        try:
+            content = integration_service.telegram_pairing_qr(session_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return Response(
+            content=content,
+            media_type="image/svg+xml",
+            headers={
+                "Cache-Control": "no-store",
+                "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+
+    @app.get("/", include_in_schema=False)
+    def portal_root(request: Request, state: str = "", code: str = "", error: str = "") -> Any:
+        if error:
+            return RedirectResponse("/settings/integrations?gmail=cancelled", status_code=303)
+        if state and code:
+            try:
+                integration_service.complete_gmail_oauth(state, str(request.url))
+            except ValueError:
+                return RedirectResponse("/settings/integrations?gmail=error", status_code=303)
+            return RedirectResponse("/settings/integrations?gmail=connected", status_code=303)
+        if resolved_static and (resolved_static / "index.html").is_file():
+            return FileResponse(resolved_static / "index.html")
+        raise HTTPException(status_code=404, detail="Portal frontend is unavailable")
+
     if resolved_static and (resolved_static / "index.html").is_file():
         assets = resolved_static / "assets"
         if assets.is_dir():

@@ -389,7 +389,9 @@ screening_profile:
             ]
 
     monkeypatch.setattr(jobs_module, "_database", lambda _path: ScreeningInventory())
-    monkeypatch.setattr(jobs_module, "_resume_corpus", lambda _preferences: ("incident", "h"))
+    monkeypatch.setattr(
+        jobs_module, "_resume_corpus", lambda _preferences, _root=Path("."): ("incident", "h")
+    )
 
     packet = get_job_screening_packet(
         "fictional-shared",

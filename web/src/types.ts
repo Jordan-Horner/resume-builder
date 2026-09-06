@@ -41,6 +41,26 @@ export interface Job {
   url: string | null;
 }
 
+export interface JobScreenResult {
+  status: "complete";
+  cached: boolean;
+  result: {
+    job_id: string;
+    fit: string;
+    fit_label: string;
+    eligibility: string;
+    eligibility_label: string;
+    recommendation: string;
+    recommendation_label: string;
+    confidence: "high" | "medium" | "low";
+    strengths: string[];
+    gaps: string[];
+    unknowns: string[];
+    stretch_case: string | null;
+    reasoning_summary: string;
+  };
+}
+
 export interface SalaryEstimateResult {
   status: "posted" | "estimated" | "unavailable";
   job_id: string;
@@ -87,6 +107,7 @@ export interface ApplicationResume {
   path: string;
   sha256: string;
   available: boolean;
+  preview_url: string | null;
   detail: string;
 }
 
@@ -96,7 +117,31 @@ export interface Integration {
   description: string;
   status: "connected" | "configured" | "not_connected";
   detail: string;
-  setup_command: string;
+}
+
+export interface GmailSetupStep {
+  number: number;
+  total: number;
+  title: string;
+  instruction: string;
+  link_label: string;
+  link: string;
+}
+
+export interface GmailSetup {
+  connected: boolean;
+  privacy: string;
+  steps: GmailSetupStep[];
+}
+
+export interface TelegramPairing {
+  session_id: string;
+  username: string;
+  pairing_url: string;
+  qr_url: string;
+  status: "waiting" | "connected" | "failed";
+  error: string;
+  expires_at: string;
 }
 
 export interface OnboardingStatus {
@@ -142,6 +187,7 @@ export interface CareerResume {
   id: string;
   name: string;
   kind: "directional" | "tailored";
+  status?: "active" | "retired";
   updated_at: string | null;
   detail: string;
   error: string | null;
@@ -150,7 +196,7 @@ export interface CareerResume {
 }
 
 export interface ResumeSection {
-  id: "directional" | "tailored";
+  id: "directional" | "tailored" | "retired";
   title: string;
   description: string;
   items: CareerResume[];

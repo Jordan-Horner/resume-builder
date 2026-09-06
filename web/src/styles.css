@@ -447,9 +447,52 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
 .connection-state.connected i { background: var(--success); box-shadow: 0 0 0 4px var(--success-soft); }
 .connection-state.configured i { background: var(--warning); }
 .chevron { color: var(--muted); font-size: 20px; }
-.integration-setup { margin: 0 15px 20px 74px; background: var(--surface-raised); border-radius: 10px; padding: 16px; display: flex; align-items: end; justify-content: space-between; gap: 20px; }
+.integration-setup { margin: 0 15px 20px 74px; background: var(--surface-raised); border-radius: 10px; padding: 18px; display: flex; align-items: end; justify-content: space-between; gap: 20px; }
 .integration-setup p { margin: 0 0 7px; color: var(--muted); font-size: 13px; }
-.integration-setup code { background: #0d1117; color: var(--accent-strong); padding: 4px 7px; border-radius: 5px; font-size: 12px; }
+.openrouter-setup { display: block; }
+.openrouter-setup label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.openrouter-key-entry { display: flex; gap: 12px; margin: 12px 0; }
+.openrouter-key-entry input { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); font: inherit; }
+.openrouter-key-entry .primary-button { margin: 0; border: 1px solid transparent; }
+.openrouter-setup a { font-size: 13px; }
+.integration-banner { margin: 0 0 16px; padding: 10px 13px; border: 1px solid var(--line); border-radius: 7px; font-size: 13px; }
+.integration-banner.success { border-color: #2e6b3d; background: var(--success-soft); color: #7ee787; }
+.success-text { color: #7ee787 !important; }
+.integration-loading, .integration-connected-copy { display: block; align-items: initial; }
+.integration-connected-copy strong { display: block; margin-bottom: 6px; font-size: 14px; }
+.guided-integration { display: block; container-type: inline-size; }
+.integration-privacy { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.integration-privacy strong { color: #7ee787; font-size: 12px; letter-spacing: .03em; text-transform: uppercase; }
+.setup-progress { display: grid; grid-template-columns: auto minmax(120px, 1fr); align-items: center; gap: 16px; margin: 18px 0; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.setup-progress progress { width: 100%; height: 5px; appearance: none; border: 0; border-radius: 999px; overflow: hidden; background: #30363d; }
+.setup-progress progress::-webkit-progress-bar { background: #30363d; }
+.setup-progress progress::-webkit-progress-value { background: var(--accent); }
+.setup-progress progress::-moz-progress-bar { background: var(--accent); }
+.setup-step h3, .pairing-stage h3 { margin: 0 0 7px; font-size: 17px; letter-spacing: -.01em; }
+.setup-step > p, .pairing-stage > div > p { max-width: 680px; line-height: 1.55; }
+.setup-step ol { margin: 12px 0 16px; padding-left: 22px; color: #c9d1d9; font-size: 13px; line-height: 1.75; }
+.setup-kicker { display: block; margin-bottom: 7px; color: var(--accent-strong); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.external-setup-link { width: fit-content; margin-top: 10px; }
+.credential-upload, .telegram-token-form { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+.credential-upload label, .telegram-token-form label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 700; }
+.credential-upload input[type="file"] { width: 100%; margin: 10px 0 4px; padding: 12px; border: 1px dashed #484f58; border-radius: 7px; background: var(--surface); color: var(--muted); }
+.telegram-token-form input { width: 100%; margin: 10px 0 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); }
+.credential-upload .primary-button, .telegram-token-form .primary-button, .setup-navigation .primary-button, .pairing-stage .primary-button { border: 1px solid transparent; }
+.authorization-ready { margin-top: 16px; padding: 14px; border: 1px solid #2e6b3d; border-radius: 7px; background: var(--success-soft); }
+.authorization-ready .primary-button { width: fit-content; }
+.setup-navigation { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); }
+.setup-navigation .primary-button { margin: 0; }
+.setup-navigation .text-button:disabled { opacity: .35; cursor: default; }
+.pairing-stage { display: grid; grid-template-columns: minmax(0, 1fr) 184px; gap: 24px; align-items: center; }
+.pairing-stage img { width: 184px; height: 184px; padding: 8px; border-radius: 8px; background: #f6f8fa; }
+.pairing-wait { grid-column: 1 / -1; display: flex; align-items: center; gap: 9px; margin: 0 !important; padding-top: 14px; border-top: 1px solid var(--line); }
+.pairing-wait span { width: 9px; height: 9px; border: 2px solid #6e7681; border-top-color: var(--accent); border-radius: 50%; animation: pairing-spin .8s linear infinite; }
+@keyframes pairing-spin { to { transform: rotate(360deg); } }
+@container (max-width: 520px) {
+  .integration-privacy, .pairing-stage { grid-template-columns: 1fr; }
+  .pairing-stage img { grid-row: 1; width: 160px; height: 160px; }
+}
+@media (max-width: 600px) { .openrouter-key-entry { flex-direction: column; } }
 
 @media (max-width: 900px) {
   .jobs-page { padding-top: 20px; }
@@ -499,7 +542,6 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
   .connection-state { grid-column: 2; }
   .chevron { grid-column: 3; grid-row: 1; }
   .integration-setup { margin-left: 12px; flex-direction: column; align-items: stretch; }
-  .integration-setup code { display: block; overflow-x: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -665,10 +707,28 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
 .resume-recommendation em { color: var(--accent-strong); font-style: normal; font-weight: 700; }
 .recommendation-empty { margin: 12px 0 0; color: var(--muted); font-size: 12px; }
 .recommendation-error { margin: 10px 0 0; color: var(--warning); font-size: 12px; }
+.job-screen-card { margin: 12px 0; padding: 12px 13px; border: 1px solid var(--line); border-radius: 7px; background: #161b22; font-size: 12px; }
+.job-screen-card > div:first-child { min-width: 0; }
+.job-screen-card p { margin: 5px 0 0; color: var(--muted); line-height: 1.5; }
+.job-screen-heading { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; }
+.job-screen-heading > span { color: var(--muted); }
+.job-screen-heading > em { color: #a5d6ff; font-style: normal; }
+.job-screen-actions { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
+.job-screen-actions .secondary-button { min-height: 34px; }
 .resume-row-button { width: 100%; appearance: none; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .resume-row-button:hover:not(:disabled) { background: var(--surface-raised); }
 .resume-row-button:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--accent); outline-offset: -2px; }
 .resume-row-button:disabled { cursor: default; opacity: .72; }
+.retired-resumes { margin-top: 46px; border-top: 1px solid var(--line); color: var(--muted); }
+.retired-resumes > summary { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 4px; color: #b1bac4; font-size: 13px; font-weight: 700; cursor: pointer; list-style: none; }
+.retired-resumes > summary::-webkit-details-marker { display: none; }
+.retired-resumes > summary::before { content: "›"; margin-right: 8px; color: var(--muted); transform: rotate(0); transition: transform 160ms ease-out; }
+.retired-resumes[open] > summary::before { transform: rotate(90deg); }
+.retired-resumes > summary span { margin-left: auto; font-size: 11px; font-variant-numeric: tabular-nums; }
+.retired-resumes > p { margin: -8px 4px 8px 24px; color: var(--muted); font-size: 12px; }
+.retired-resume-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; border-bottom: 1px solid var(--line); }
+.retired-resume-row .resume-row-button { border-bottom: 0; }
+.retired-resume-row > .text-button { margin-right: 4px; }
 .resume-reader-page { height: calc(100vh - 69px); display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; background: #20252c; }
 .resume-reader-toolbar { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(0, 2fr) minmax(240px, 1fr); align-items: center; gap: 20px; padding: 12px clamp(18px, 4vw, 64px); border-bottom: 1px solid #363d46; background: #171b21; }
 .resume-reader-title { display: grid; justify-items: center; min-width: 0; }
@@ -697,6 +757,8 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
   .career-tools .search-field { width: 100%; max-width: none; }
   .career-row { grid-template-columns: 1fr; gap: 14px; }
   .career-row-meta { justify-items: start; }
+  .retired-resume-row { grid-template-columns: 1fr; padding-bottom: 12px; }
+  .retired-resume-row > .text-button { justify-self: start; }
   .skill-search-toggle { justify-content: space-between; }
   .application-resume, .resume-recommendation { grid-template-columns: 1fr; gap: 6px; }
 }

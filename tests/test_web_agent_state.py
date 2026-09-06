@@ -19,6 +19,16 @@ def test_threads_and_turns_survive_reopening(tmp_path: Path) -> None:
         state.begin_turn(thread["id"], "run-1", "Different request")
 
 
+def test_thread_can_persist_an_explicit_job_context(tmp_path: Path) -> None:
+    path = tmp_path / "agent.sqlite"
+    thread = WebAgentState(path).create_thread(None, job_id="job-123")
+
+    restored = WebAgentState(path).thread(thread["id"])
+
+    assert restored["resume_id"] is None
+    assert restored["job_id"] == "job-123"
+
+
 def test_only_one_turn_and_proposal_claim_can_run(tmp_path: Path) -> None:
     state = WebAgentState(tmp_path / "agent.sqlite")
     thread = state.create_thread(None)["id"]

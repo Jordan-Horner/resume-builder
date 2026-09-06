@@ -2,8 +2,8 @@ import { Component, createContext, lazy, Suspense, use, useCallback, useState, t
 import "./assistant.css";
 
 const AssistantPanel = lazy(() => import("./AssistantPanel"));
-interface Context { discuss: (id: string, name: string) => void }
-const AssistantContext = createContext<Context>({ discuss: () => undefined });
+interface Context { discuss: (id: string, name: string) => void; discussJob: (id: string, name: string) => void }
+const AssistantContext = createContext<Context>({ discuss: () => undefined, discussJob: () => undefined });
 export function useAssistant() { return use(AssistantContext); }
 
 class AssistantBoundary extends Component<{ children: ReactNode; onClose: () => void }, { failed: boolean }> {
@@ -18,11 +18,14 @@ class AssistantBoundary extends Component<{ children: ReactNode; onClose: () => 
 export function AssistantProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [visited, setVisited] = useState(false);
-  const [target, setTarget] = useState<{ id: string; name: string; nonce: number } | null>(null);
+  const [target, setTarget] = useState<{ kind: "resume" | "job"; id: string; name: string; nonce: number } | null>(null);
   const discuss = useCallback((id: string, name: string) => {
-    setTarget({ id, name, nonce: Date.now() }); setVisited(true); setOpen(true);
+    setTarget({ kind: "resume", id, name, nonce: Date.now() }); setVisited(true); setOpen(true);
   }, []);
-  return <AssistantContext value={{ discuss }}>
+  const discussJob = useCallback((id: string, name: string) => {
+    setTarget({ kind: "job", id, name, nonce: Date.now() }); setVisited(true); setOpen(true);
+  }, []);
+  return <AssistantContext value={{ discuss, discussJob }}>
     <div className={open ? "assistant-layout is-open" : "assistant-layout"}>
       <div className="assistant-workspace">{children}</div>
       {visited && <div className="assistant-dock" hidden={!open}>

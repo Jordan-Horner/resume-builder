@@ -34,7 +34,17 @@ company evidence must match the application's employer, including when a thread
 or requisition matches. Unresolved messages remain in the existing ambiguity
 review path rather than changing application history.
 
-## Install and authorize
+## Connect from the portal
+
+Open **Settings → Integrations → Gmail**. The portal explains the read-only data
+boundary and presents the six Google Cloud tasks one at a time. On the final step,
+upload the downloaded Desktop OAuth JSON, select **Use this file**, and continue to
+Google. Resume Builder validates the file in memory without saving a copy, uses a
+short-lived one-use authorization session, and returns to the portal after Google
+verifies read-only access.
+
+The container image already includes Gmail support. Source installations need the
+optional official Google client dependencies:
 
 Install the optional official Google client dependencies:
 
@@ -42,7 +52,7 @@ Install the optional official Google client dependencies:
 python -m pip install -e ".[gmail]"
 ```
 
-Run the guided connection from a terminal:
+The CLI remains available for advanced or headless installations:
 
 ```bash
 resume-builder gmail connect

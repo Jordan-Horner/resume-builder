@@ -14,6 +14,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import httpx
 import yaml
 from bs4 import BeautifulSoup
 
@@ -67,8 +68,10 @@ from .job_onboarding import (
 from .job_onboarding import (
     save_state as save_setup_state,
 )
+from .job_screening import EligibilityStatus, ScreeningCache, deterministic_ineligible_result
 from .job_setup_defaults import PORTFOLIO_PATH, PREFERENCES_PATH, scaffold_job_search
 from .job_target import parse_target
+from .jobs import get_job_screening_packet
 from .layout import VaultLayout
 from .preferences import _validated as validate_preferences
 from .project_report import project_report
@@ -79,6 +82,7 @@ from .salary_estimation import (
     build_salary_packet,
     has_posted_salary,
 )
+from .screening_service import ScreeningService
 from .source_import import (
     SUPPORTED,
     apply_import_plan,
@@ -155,6 +159,7 @@ class DashboardService:
         self._inventory_loader = inventory_loader or self._load_inventory
         self._state_lock = threading.Lock()
         self._salary_lock = threading.Lock()
+        self._screening_lock = threading.Lock()
 
     def _onboarding_record(self) -> dict[str, Any]:
         path = self.workspace / ONBOARDING_STATE_PATH
@@ -302,6 +307,45 @@ class DashboardService:
         path = self._openrouter_secret_path()
         atomic_write_text(path, api_key.strip() + "\n")
         path.chmod(0o600)
+
+    def configure_openrouter(self, api_key: Any) -> dict[str, Any]:
+        if not isinstance(api_key, str) or not 1 <= len(api_key.strip()) <= 512:
+            raise ValueError("Enter an OpenRouter API key")
+        key = api_key.strip()
+        if any(character.isspace() for character in key):
+            raise ValueError("The API key must not contain spaces or line breaks")
+        try:
+            response = httpx.get(
+                "https://openrouter.ai/api/v1/key",
+                headers={"Authorization": f"Bearer {key}"},
+                timeout=15,
+                follow_redirects=False,
+                trust_env=False,
+            )
+        except httpx.HTTPError as exc:
+            raise ValueError("Could not reach OpenRouter. Your saved key is unchanged.") from exc
+        if response.status_code in {401, 403}:
+            raise ValueError("OpenRouter rejected this key. Check it and try again.")
+        if response.status_code != 200:
+            raise ValueError("OpenRouter could not verify the key. Please try again shortly.")
+        try:
+            if not isinstance(response.json().get("data"), dict):
+                raise ValueError("Invalid key response")
+        except (ValueError, AttributeError) as exc:
+            raise ValueError(
+                "OpenRouter returned an unexpected response. The key was not saved."
+            ) from exc
+        with self._state_lock:
+            config_path = self.workspace / DEFAULT_AGENT_CONFIG
+            if not config_path.is_file():
+                atomic_write_text(config_path, render_default_agent_config())
+            else:
+                load_agent_config(config_path)
+            self._save_openrouter_key(key)
+        return {
+            "connected": True,
+            "message": "OpenRouter connected. Your existing model settings are preserved.",
+        }
 
     def _primary_resume_document(self) -> ResumeDocument:
         layout = VaultLayout.load(self.workspace / "vault")
@@ -764,6 +808,17 @@ class DashboardService:
 
         return resolve_resume_preview(self.workspace, resume_id)
 
+    def restore_career_resume(self, resume_id: str) -> dict[str, Any]:
+        from .web_career import restore_directional_resume
+
+        with self._state_lock:
+            return restore_directional_resume(self.workspace, resume_id)
+
+    def application_resume_preview(self, application_id: str) -> dict[str, Any]:
+        from .web_career import resolve_application_resume_preview
+
+        return resolve_application_resume_preview(self.workspace, application_id)
+
     def career_skills(self) -> list[dict[str, Any]]:
         from .web_career import list_skills
 
@@ -1105,6 +1160,68 @@ class DashboardService:
             result = estimator.get(packet, model=config.models.fast)
             return {**result.model_dump(mode="json"), "cached": True} if result else None
 
+    @staticmethod
+    def _present_screen(result: Any, *, cached: bool) -> dict[str, Any]:
+        fit_labels = {
+            "strong_match": "Strong fit",
+            "good_match": "Good fit",
+            "worthwhile_stretch": "Worthwhile stretch",
+            "weak_fit": "Weak fit",
+            "insufficient_information": "Not enough information",
+        }
+        recommendation_labels = {
+            "pursue": "Pursue",
+            "pursue_as_stretch": "Consider as a stretch",
+            "verify_eligibility": "Verify eligibility",
+            "deprioritize": "Deprioritize",
+            "do_not_apply": "Do not apply",
+        }
+        payload = result.model_dump(mode="json")
+        payload["fit_label"] = fit_labels[payload["fit"]]
+        payload["eligibility_label"] = payload["eligibility"].replace("_", " ").title()
+        payload["recommendation_label"] = recommendation_labels[payload["recommendation"]]
+        return {"status": "complete", "cached": cached, "result": payload}
+
+    def _screening_packet(self, job_id: str) -> Any:
+        return get_job_screening_packet(
+            job_id,
+            config_path=self.workspace / JOBS_CONFIG,
+            preferences_path=self.workspace / PREFERENCES_PATH,
+            workspace=self.workspace,
+        )
+
+    def saved_job_screen(self, job_id: str) -> dict[str, Any] | None:
+        """Return deterministic or cached screening without invoking a model."""
+        with self._screening_lock:
+            packet = self._screening_packet(job_id)
+            if packet.eligibility == EligibilityStatus.INELIGIBLE:
+                return self._present_screen(deterministic_ineligible_result(packet), cached=False)
+            config_path = self.workspace / DEFAULT_AGENT_CONFIG
+            if not config_path.is_file():
+                return None
+            config = load_agent_config(config_path)
+            cache = ScreeningCache(self.workspace / "build/job-search/screening-cache.sqlite")
+            result = cache.get(packet, config.models.fast)
+            return self._present_screen(result, cached=True) if result else None
+
+    def screen_job(self, job_id: str, *, refresh: bool = False) -> dict[str, Any]:
+        """Run the existing bounded job screen after an explicit user request."""
+        with self._screening_lock:
+            packet = self._screening_packet(job_id)
+            if packet.eligibility == EligibilityStatus.INELIGIBLE:
+                return self._present_screen(deterministic_ineligible_result(packet), cached=False)
+            config_path = self.workspace / DEFAULT_AGENT_CONFIG
+            if not config_path.is_file() or not self._openrouter_configured():
+                raise ValueError("Connect OpenRouter in Settings before screening this job")
+            config = load_agent_config(config_path)
+            adapter = OpenRouterAdapter(config, api_key=self._openrouter_key())
+            service = ScreeningService(
+                adapter,
+                ScreeningCache(self.workspace / "build/job-search/screening-cache.sqlite"),
+            )
+            result, cached = service.screen(packet, model=config.models.fast, refresh=refresh)
+            return self._present_screen(result, cached=cached)
+
     def mark_not_interested(self, job_id: str) -> None:
         if self.get_job(job_id) is None:
             raise ValueError(f"job not found: {job_id}")
@@ -1168,7 +1285,9 @@ class DashboardService:
                     "applied_on": application["applied_on"],
                     "created_at": application["created_at"],
                     "current_status": current_application_status(record),
-                    "resume": self._application_resume_view(application.get("resume")),
+                    "resume": self._application_resume_view(
+                        application.get("resume"), application["id"]
+                    ),
                     "resume_attribution": self._resume_attribution(application.get("resume")),
                     "events": [
                         {
@@ -1184,18 +1303,32 @@ class DashboardService:
             )
         return sorted(applications, key=lambda item: item["applied_on"], reverse=True)
 
-    def _application_resume_view(self, artifact: object) -> dict[str, Any] | None:
+    def _application_resume_view(
+        self, artifact: object, application_id: str
+    ) -> dict[str, Any] | None:
         if not isinstance(artifact, dict) or not isinstance(artifact.get("path"), str):
             return None
         path = Path(artifact["path"])
         kind = "tailored" if path.parts[:2] == ("resumes", "tailored") else "directional"
-        available = (self.workspace / path).is_file()
+        snapshot_value = artifact.get("snapshot_path")
+        snapshot = (
+            (self.workspace / snapshot_value).resolve() if isinstance(snapshot_value, str) else None
+        )
+        snapshot_root = (self.workspace / APPLICATIONS_ROOT / "resume-snapshots").resolve()
+        if snapshot is not None and not snapshot.is_relative_to(snapshot_root):
+            snapshot = None
+        available = bool(snapshot and snapshot.is_file()) or (self.workspace / path).is_file()
         return {
             "name": path.stem.replace("-", " ").title(),
             "kind": kind,
             "path": artifact["path"],
             "sha256": artifact.get("sha256"),
             "available": available,
+            "preview_url": (
+                f"/api/applications/{application_id}/resume-preview"
+                if snapshot is not None and snapshot.is_file()
+                else None
+            ),
             "detail": (
                 "Tailored for this job" if kind == "tailored" else "Closest directional resume"
             )
@@ -1257,23 +1390,20 @@ class DashboardService:
                 "detail": f"{len(enabled_providers)} sources enabled"
                 if enabled_providers
                 else "No sources enabled",
-                "setup_command": "resume-builder onboard run",
             },
             {
                 "id": "gmail",
                 "name": "Gmail",
                 "description": "Detect applications and status updates from your inbox.",
                 "status": "connected" if gmail_connected else "not_connected",
-                "detail": "Read-only access" if gmail_connected else "Setup required",
-                "setup_command": "resume-builder gmail connect",
+                "detail": "Read-only access" if gmail_connected else "Not connected",
             },
             {
                 "id": "telegram",
                 "name": "Telegram",
                 "description": "Use the private career assistant from Telegram.",
                 "status": "connected" if telegram_configured else "not_connected",
-                "detail": "Private bot ready" if telegram_configured else "Setup required",
-                "setup_command": "resume-builder agent telegram-setup",
+                "detail": "Private bot ready" if telegram_configured else "Not connected",
             },
             {
                 "id": "discord",
@@ -1284,8 +1414,7 @@ class DashboardService:
                 else ("configured" if discord_configured else "not_connected"),
                 "detail": "Webhook ready"
                 if discord_connected
-                else ("Webhook key required" if discord_configured else "Setup required"),
-                "setup_command": "resume-builder automation init --timezone America/New_York",
+                else ("Webhook key required" if discord_configured else "Not connected"),
             },
             {
                 "id": "openrouter",
@@ -1293,6 +1422,5 @@ class DashboardService:
                 "description": "Power screening and assistant features with your model provider.",
                 "status": "connected" if openrouter_connected else "not_connected",
                 "detail": "API key available" if openrouter_connected else "API key not available",
-                "setup_command": "resume-builder agent init",
             },
         ]

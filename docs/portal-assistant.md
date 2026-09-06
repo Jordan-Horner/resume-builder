@@ -5,6 +5,13 @@ a CopilotKit account or cloud service. OpenRouter credentials and model choices
 remain in the existing server-side integration configuration; model usage is billed
 by that provider. Telemetry and CopilotKit channels are disabled.
 
+After onboarding, use **Settings → Integrations → OpenRouter** to add or replace
+the API key. Save and connect verifies the key with OpenRouter's
+[key endpoint](https://openrouter.ai/docs/api/reference/limits) before using the
+existing secret store. It creates default agent configuration only when missing,
+preserves existing model choices, and does not restart onboarding or scrape jobs.
+Keys are never returned to the browser; a rejected key leaves the old one intact.
+
 ## Deployment
 
 The appliance remains one container and one public port. Supervisor starts a local
@@ -19,10 +26,11 @@ Persist `/state` alongside the career workspace. This is a single-user private p
 not a multi-tenant authentication boundary. Keep it behind your private network or
 an authenticated reverse proxy.
 
-## Initial scope
+## Capabilities
 
-Open Assistant for job-queue questions, or select Discuss resume on a directional
-resume. Context is explicit and does not silently follow navigation. History survives
+Open Assistant for job-queue questions, select **Discuss job** on a job, or select
+**Discuss résumé** on a directional resume. Context is explicit and does not silently
+follow navigation. History survives
 refresh; Stop cancels a response. The UI is lazy-loaded and uses the portal dark theme.
 On desktop and tablet it floats at the bottom right (400px wide, up to 620px tall),
 without resizing or hiding the workspace. Only phone viewports up to 480px use
@@ -30,13 +38,24 @@ a full-screen chat surface. Closing the window preserves the conversation.
 Responses currently show working progress followed by the completed answer, not
 token-by-token model output.
 
+The assistant can run the existing bounded, deterministic-plus-semantic job screen for
+an explicitly attached job. The same cached result appears in the job detail; screening
+does not submit, dismiss, or otherwise change the job.
+
 The assistant can propose one wording-only block replacement. A before/after card
 offers Use this wording or Keep current. Accepting claims a durable proposal once,
 checks the source revision and factual equivalence, records existing feedback, compiles,
 runs an independent language review, and invokes the existing preview pipeline.
-The vault, other resumes, and minted application artifacts remain unchanged.
-Factual enrichment, minting, deletion and application submission are not exposed as
-agent write tools in this initial release. A failure after saving prose explicitly
+The assistant can also propose removing an attached or uniquely named directional résumé from
+the résumé library.
+Removal requires a separate confirmation card and archives the Markdown source out of
+active matching. When applications reference it, the operation first stores one immutable,
+content-addressed copy per unique résumé and then retires the directional source. Application
+history can continue rendering the exact recorded copy without duplicating identical files.
+Retired résumés remain available in a collapsed library section and can be restored. Vault
+evidence, source material, other résumés, and minted tailored application artifacts remain
+unchanged. Factual enrichment, minting, permanent deletion,
+and application submission are not exposed as agent write tools. A failure after saving prose explicitly
 reports that the current draft needs review; it never pretends to roll it back.
 
 Restarted operations are marked interrupted, not automatically replayed. A repeated

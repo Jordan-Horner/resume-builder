@@ -665,24 +665,34 @@ def _require_external(path: Path, workspace: Path, label: str) -> Path:
     return resolved
 
 
-def _validate_client_configuration(path: Path) -> Path:
-    if not path.is_file():
-        raise ValueError(f"Google OAuth client file not found: {path}")
+def validate_client_configuration(content: bytes | str) -> dict[str, object]:
+    """Validate an uploaded Google Desktop OAuth client without persisting it."""
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(f"Google OAuth client file is not valid JSON: {path}") from exc
+        text = content.decode("utf-8") if isinstance(content, bytes) else content
+        payload = json.loads(text)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("The Google OAuth file is not valid JSON") from exc
     installed = payload.get("installed") if isinstance(payload, dict) else None
     if not isinstance(installed, dict):
         if isinstance(payload, dict) and "web" in payload:
-            raise ValueError("Google OAuth client must use the Desktop app application type")
-        raise ValueError("Google OAuth client JSON is missing its installed-app configuration")
+            raise ValueError("Choose Desktop app—not Web application—in Google Cloud")
+        raise ValueError("This is not a Google Desktop OAuth client file")
     required = ("client_id", "client_secret", "auth_uri", "token_uri")
     missing = [key for key in required if not str(installed.get(key, "")).strip()]
     if missing:
         raise ValueError(
-            "Google OAuth Desktop client JSON is missing: " + ", ".join(sorted(missing))
+            "The Google OAuth file is incomplete. Download it again from Google Cloud."
         )
+    return payload
+
+
+def _validate_client_configuration(path: Path) -> Path:
+    if not path.is_file():
+        raise ValueError(f"Google OAuth client file not found: {path}")
+    try:
+        validate_client_configuration(path.read_bytes())
+    except OSError as exc:
+        raise ValueError(f"Could not read the Google OAuth client file: {path}") from exc
     return path
 
 
@@ -751,6 +761,11 @@ def _write_secret(path: Path, content: str) -> None:
         os.chmod(path, 0o600)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def write_gmail_token(path: Path, credentials_json: str) -> None:
+    """Persist verified Gmail credentials outside Git with owner-only permissions."""
+    _write_secret(path, credentials_json)
 
 
 def connect_google(credentials_path: Path, token_path: Path) -> None:
