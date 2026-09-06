@@ -20,18 +20,19 @@ def test_first_party_boards_are_bundled_and_local_entries_override_them(tmp_path
         "blinkhealth",
         "intercom",
     }
-    assert {board.id for board in config.providers.ashby.boards} == {"baseten"}
+    assert {board.id for board in config.providers.ashby.boards} == {"baseten", "lumaai"}
     assert {board.id for board in config.providers.lever.boards} == {"floqast"}
+    assert {board.id for board in config.providers.rippling.boards} == {"riot-platforms-careers"}
     raw = yaml.safe_load(path.read_text())
     raw["providers"] = {
         "ashby": {"boards": [{"id": "baseten", "name": "Local override", "enabled": False}]}
     }
     path.write_text(yaml.safe_dump(raw))
     boards = load_config(path).providers.ashby.boards
-    assert len(boards) == 1
-    assert boards[0].id == "baseten"
-    assert boards[0].name == "Local override"
-    assert boards[0].enabled is False
+    assert {board.id for board in boards} == {"baseten", "lumaai"}
+    overridden = next(board for board in boards if board.id == "baseten")
+    assert overridden.name == "Local override"
+    assert overridden.enabled is False
     raw["use_bundled_boards"] = False
     path.write_text(yaml.safe_dump(raw))
     assert len(load_config(path).providers.ashby.boards) == 1

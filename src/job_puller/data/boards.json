@@ -7,6 +7,12 @@
         "name": "Baseten",
         "enabled": true,
         "careers_url": "https://jobs.ashbyhq.com/baseten"
+      },
+      {
+        "id": "lumaai",
+        "name": "Luma AI",
+        "enabled": true,
+        "careers_url": "https://jobs.ashbyhq.com/lumaai"
       }
     ],
     "greenhouse": [
@@ -35,6 +41,14 @@
         "name": "FloQast",
         "enabled": true,
         "careers_url": "https://jobs.lever.co/floqast"
+      }
+    ],
+    "rippling": [
+      {
+        "id": "riot-platforms-careers",
+        "name": "Riot Platforms, Inc.",
+        "enabled": true,
+        "careers_url": "https://ats.rippling.com/riot-platforms-careers/jobs"
       }
     ],
     "workday": [
