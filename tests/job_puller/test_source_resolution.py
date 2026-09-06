@@ -1,8 +1,6 @@
 import json
 from datetime import UTC, datetime, timedelta
 
-import httpx
-
 import job_puller.source_resolution as resolution_module
 from job_puller.database import InventoryDatabase
 from job_puller.models import JobObservation, ProviderResult
@@ -50,6 +48,10 @@ def test_company_slug_candidates_are_bounded_and_strip_legal_suffixes():
         "obsidian-security",
         "obsidiansecurity",
     )
+    assert company_slug_candidates("Core Specialty Insurance Holdings, Inc.") == (
+        "core-specialty-insurance",
+        "corespecialtyinsurance",
+    )
 
 
 def test_catalog_uses_exact_or_compact_company_board_without_extra_probes():
@@ -69,6 +71,31 @@ def test_catalog_uses_exact_or_compact_company_board_without_extra_probes():
     assert all(board.origin == "catalog" for board in boards)
 
 
+def test_catalog_prefers_private_registered_board_for_exact_company():
+    from types import SimpleNamespace
+
+    board = SimpleNamespace(
+        id="riot-platforms-careers",
+        name="Riot Platforms, Inc.",
+        api_url=None,
+        careers_url="https://ats.rippling.com/riot-platforms-careers/jobs",
+    )
+    providers = SimpleNamespace(
+        rippling=SimpleNamespace(boards=[board]),
+        greenhouse=SimpleNamespace(boards=[]),
+        ashby=SimpleNamespace(boards=[]),
+        lever=SimpleNamespace(boards=[]),
+        workday=SimpleNamespace(boards=[]),
+    )
+    catalog = AtsCatalog({}).add_configured_boards(SimpleNamespace(providers=providers))
+
+    candidates = catalog.boards_for("Riot Platforms, Inc.")
+
+    assert [(item.provider, item.board_id, item.origin) for item in candidates] == [
+        ("rippling", "riot-platforms-careers", "private-registry")
+    ]
+
+
 def test_catalog_adds_bounded_probes_only_when_company_is_missing():
     catalog = AtsCatalog({"greenhouse": (), "ashby": (), "lever": ()})
 
@@ -76,6 +103,20 @@ def test_catalog_adds_bounded_probes_only_when_company_is_missing():
 
     assert len(boards) == 6
     assert all(board.origin == "company-slug-probe" for board in boards)
+
+
+def test_catalog_allows_delimited_prefix_for_short_company_name():
+    catalog = AtsCatalog(
+        {
+            "greenhouse": (),
+            "ashby": ("luma-ai", "lumana", "lumilens"),
+            "lever": (),
+        }
+    )
+
+    boards = catalog.boards_for("Luma")
+
+    assert [(board.provider, board.board_id) for board in boards] == [("ashby", "luma-ai")]
 
 
 def test_catalog_rejects_unsafe_identifiers():
@@ -132,6 +173,24 @@ def test_catalog_prefers_public_workday_site_within_three_request_cap():
     assert all("subsidiary" not in board.board_id for board in boards)
 
 
+def test_catalog_keeps_distinct_workday_datacenters_for_same_site():
+    catalog = AtsCatalog(
+        {
+            "workday": (
+                "salesforce|wd1|external_career_site",
+                "salesforce|wd12|external_career_site",
+            )
+        }
+    )
+
+    boards = catalog.boards_for("Salesforce")
+
+    assert [board.api_url for board in boards] == [
+        "https://salesforce.wd1.myworkdayjobs.com/wday/cxs/salesforce/external_career_site/jobs",
+        "https://salesforce.wd12.myworkdayjobs.com/wday/cxs/salesforce/external_career_site/jobs",
+    ]
+
+
 def test_catalog_rejects_malformed_workday_entries():
     from job_puller.source_resolution import _validate_catalog
 
@@ -162,22 +221,17 @@ def test_match_requires_exact_title_strong_description_overlap_and_known_mode():
     assert match_posting(target(description), [wrong_title, unknown, unrelated]) is None
 
 
-def test_catalog_loader_uses_validated_cached_copy_when_refresh_fails(tmp_path):
+def test_catalog_loader_uses_private_snapshots_and_defaults_missing_providers(tmp_path):
     for provider in ("greenhouse", "lever", "ashby", "workday"):
         value = ["example|wd5|jobs"] if provider == "workday" else ["example"]
         (tmp_path / f"{provider}.json").write_text(json.dumps(value))
 
-    def fail(_request: httpx.Request) -> httpx.Response:
-        raise httpx.ConnectError("offline", request=_request)
-
-    with httpx.Client(transport=httpx.MockTransport(fail)) as client:
-        catalog = AtsCatalog.load(
-            tmp_path,
-            max_age=timedelta(0),
-            client=client,
-        )
+    catalog = AtsCatalog.load(tmp_path)
 
     assert catalog.entries["greenhouse"] == ("example",)
+
+    (tmp_path / "lever.json").unlink()
+    assert AtsCatalog.load(tmp_path).entries["lever"] == ()
 
 
 def test_resolver_caps_company_slug_fallback_across_the_whole_run(monkeypatch):
@@ -221,6 +275,80 @@ def test_resolver_caps_company_slug_fallback_across_the_whole_run(monkeypatch):
     assert report.probe_companies == 1
     assert report.boards_considered == 3
     assert report.board_requests_submitted == 3
+
+
+def test_ashby_fetch_retries_compact_catalog_slug(monkeypatch):
+    requested = []
+    now = datetime.now(UTC)
+
+    class Provider:
+        def __init__(self, candidate):
+            self.candidate = candidate
+
+        def fetch(self, _cutoff):
+            requested.append(self.candidate.board_id)
+            success = self.candidate.board_id == "lumaai"
+            return ProviderResult(
+                f"ashby:{self.candidate.board_id}",
+                "ashby",
+                [],
+                now,
+                now,
+                success,
+                None if success else "HTTPStatusError: 404 Not Found",
+            )
+
+    monkeypatch.setattr(
+        resolution_module,
+        "_provider",
+        lambda candidate, _timeout: Provider(candidate),
+    )
+
+    result = resolution_module._fetch_candidate(
+        resolution_module.BoardCandidate("ashby", "luma-ai", "Luma"),
+        [target(" ".join(f"requirement-{index}" for index in range(120)))],
+        30,
+    )
+
+    assert result.success is True
+    assert result.source_key == "ashby:lumaai"
+    assert requested == ["luma-ai", "lumaai"]
+
+
+def test_ashby_fetch_does_not_retry_compact_slug_after_network_failure(monkeypatch):
+    requested = []
+    now = datetime.now(UTC)
+
+    class Provider:
+        def __init__(self, candidate):
+            self.candidate = candidate
+
+        def fetch(self, _cutoff):
+            requested.append(self.candidate.board_id)
+            return ProviderResult(
+                f"ashby:{self.candidate.board_id}",
+                "ashby",
+                [],
+                now,
+                now,
+                False,
+                "ConnectTimeout: timed out",
+            )
+
+    monkeypatch.setattr(
+        resolution_module,
+        "_provider",
+        lambda candidate, _timeout: Provider(candidate),
+    )
+
+    result = resolution_module._fetch_candidate(
+        resolution_module.BoardCandidate("ashby", "luma-ai", "Luma"),
+        [target(" ".join(f"requirement-{index}" for index in range(120)))],
+        30,
+    )
+
+    assert result.success is False
+    assert requested == ["luma-ai"]
 
 
 def test_resolver_reuses_stored_ats_observation_before_network(tmp_path):
@@ -335,6 +463,40 @@ def test_resolver_can_limit_network_queries_to_workday(monkeypatch):
     )
 
     assert requested == ["workday"]
+
+
+def test_resolver_prefers_board_from_captured_apply_url(monkeypatch):
+    requested = []
+
+    class Database:
+        def stored_direct_ats_observations(self, _companies):
+            return []
+
+    def fetch(candidate, _targets, _timeout):
+        requested.append((candidate.provider, candidate.board_id, candidate.origin))
+        now = datetime.now(UTC)
+        return ProviderResult(
+            f"{candidate.provider}:{candidate.board_id}",
+            candidate.provider,
+            [],
+            now,
+            now,
+            True,
+        )
+
+    monkeypatch.setattr(resolution_module, "_fetch_candidate", fetch)
+    captured_target = resolution_module.replace(
+        target(" ".join(f"requirement-{index}" for index in range(120))),
+        company="Riot Platforms, Inc.",
+        direct_apply_url=(
+            "https://ats.rippling.com/riot-platforms-careers/jobs/"
+            "19611d4b-3a3f-452a-9ea4-d2cd914f7716?src=LinkedIn"
+        ),
+    )
+
+    resolve_linkedin_sources(Database(), AtsCatalog({}), targets=[captured_target])
+
+    assert requested == [("rippling", "riot-platforms-careers", "captured-apply-url")]
 
 
 def test_resolver_rejects_partial_board_results_before_unique_matching(monkeypatch):

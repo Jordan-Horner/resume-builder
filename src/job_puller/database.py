@@ -10,6 +10,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from .detail_cache import CachedProviderDetail
 from .models import JobObservation, ProviderResult
@@ -341,6 +342,51 @@ class InventoryDatabase:
                    ORDER BY observations DESC, company, url"""
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def record_captured_application_links(self, rows: list[dict[str, object]]) -> int:
+        """Attach authenticated-browser Apply destinations to their LinkedIn observations."""
+        prepared: list[tuple[str, str]] = []
+        for row in rows:
+            job_id = str(row.get("job_id") or "").strip()
+            url = str(row.get("captured_url") or "").strip()
+            if not job_id or not url:
+                continue
+            parsed = urlsplit(url)
+            if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                raise ValueError(f"invalid captured URL for job {job_id}")
+            host = (parsed.hostname or "").casefold()
+            if host == "linkedin.com" or host.endswith(".linkedin.com"):
+                raise ValueError(f"captured URL for job {job_id} is still LinkedIn")
+            prepared.append((job_id, url))
+        imported = 0
+        with self.transaction() as conn:
+            for job_id, url in prepared:
+                row = conn.execute(
+                    """SELECT o.id FROM observations o
+                       JOIN job_observation_links l ON l.observation_id=o.id
+                       JOIN jobs j ON j.id=l.job_id
+                       WHERE j.id=? AND j.status IN ('active','reopened')
+                         AND o.provider='linkedin'
+                       ORDER BY LENGTH(o.description_text) DESC, o.last_seen_at DESC
+                       LIMIT 1""",
+                    (job_id,),
+                ).fetchone()
+                if row is None:
+                    continue
+                normalized = canonical_url(url)
+                conn.execute(
+                    """UPDATE observations
+                       SET direct_apply_url=?, canonical_apply_url=?
+                       WHERE id=?""",
+                    (url, normalized, str(row[0])),
+                )
+                conn.execute(
+                    """UPDATE jobs SET canonical_apply_url=?
+                       WHERE id=? AND preferred_observation_id=?""",
+                    (normalized, job_id, str(row[0])),
+                )
+                imported += 1
+        return imported
 
     def reconcile_exact_duplicates(self) -> int:
         with self.transaction() as conn:
@@ -689,7 +735,7 @@ class InventoryDatabase:
             rows = conn.execute(
                 f"""SELECT j.id AS job_id, o.id AS observation_id, o.title_raw AS title,
                           o.company_raw AS company, o.location_raw AS location,
-                          o.description_text AS description, o.posted_at
+                          o.description_text AS description, o.posted_at, o.direct_apply_url
                    FROM jobs j
                    JOIN job_observation_links l ON l.job_id=j.id
                    JOIN observations o ON o.id=l.observation_id
@@ -712,6 +758,7 @@ class InventoryDatabase:
                 "location": str(row[4]),
                 "description": str(row[5]),
                 "posted_at": datetime.fromisoformat(str(row[6])) if row[6] else None,
+                "direct_apply_url": str(row[7]),
             }
         return list(selected.values())
 
@@ -736,7 +783,7 @@ class InventoryDatabase:
                    FROM observations o
                    JOIN job_observation_links l ON l.observation_id=o.id
                    JOIN jobs j ON j.id=l.job_id
-                   WHERE o.provider IN ('greenhouse','ashby','lever','workday')
+                   WHERE o.provider IN ('rippling','greenhouse','ashby','lever','workday')
                      AND j.status IN ('active','reopened')
                      AND j.normalized_company IN ({placeholders})
                    ORDER BY o.last_seen_at DESC""",
@@ -795,7 +842,8 @@ class InventoryDatabase:
             linked = conn.execute(
                 """SELECT l.job_id FROM job_observation_links l
                    JOIN observations o ON o.id=l.observation_id
-                   WHERE o.id=? AND o.provider IN ('greenhouse','ashby','lever','workday')""",
+                   WHERE o.id=?
+                     AND o.provider IN ('rippling','greenhouse','ashby','lever','workday')""",
                 (ats_observation_id,),
             ).fetchone()
             if linked is None:

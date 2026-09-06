@@ -43,8 +43,7 @@ def test_hybrid_schedule_beats_generic_remote_language():
         ),
         (
             "Lead AI Engineer / Architect - Hybrid",
-            "Work arrangement: Hybrid. Three days per week on-site. Two days per "
-            "week remote.",
+            "Work arrangement: Hybrid. Three days per week on-site. Two days per week remote.",
         ),
         (
             "Systems Engineer - Design & Development - Hybrid",

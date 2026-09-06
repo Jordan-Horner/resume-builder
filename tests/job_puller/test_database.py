@@ -66,6 +66,31 @@ def test_active_inventory_exposes_stable_consumer_projection(tmp_path):
     assert inventory[0]["url"] == "https://example.com/apply/1"
 
 
+def test_browser_capture_attaches_external_apply_url_without_changing_seen_time(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    seen_at = datetime(2026, 9, 1, tzinfo=UTC)
+    item = observation()
+    item.work_arrangement = explicit_arrangement(
+        [WorkMode.UNKNOWN], source="linkedin", rule="not_listed"
+    )
+    db.record_result(result(item, when=seen_at))
+    job = db.active_inventory()[0]
+    captured_url = "https://jobs.ashbyhq.com/example/ats-1"
+
+    imported = db.record_captured_application_links(
+        [{"job_id": job["id"], "captured_url": captured_url}]
+    )
+
+    assert imported == 1
+    refreshed = db.active_inventory()[0]
+    assert refreshed["url"] == captured_url
+    assert refreshed["last_seen_at"] == seen_at.isoformat()
+    assert db.active_application_links() == [
+        {"url": captured_url, "company": "Example, Inc.", "observations": 1}
+    ]
+
+
 def test_reclassify_commercial_work_modes_previews_then_applies_correction(tmp_path):
     db = InventoryDatabase(tmp_path / "inventory.db")
     db.migrate()

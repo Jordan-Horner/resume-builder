@@ -25,18 +25,10 @@ uv run job-puller config validate
 
 The personal files live under `workspace/job-search/`. New Resume Builder
 workspaces receive neutral preferences and an inactive collector configuration.
-They also enable an offline bundled starter catalog: 17 Greenhouse, 14 Ashby,
-and 3 Lever boards. These public IDs were selected directly from the MIT-licensed
-job-board-aggregator datasets. Attribution and the pinned source
-revision are packaged in `job_puller/data/SOURCES.txt`. This is not the entire
-upstream dataset. Catalog presence does not guarantee a matching job or future
-availability. Other provider types still require their own board catalog.
-
-`use_bundled_boards: true` opts an existing collector into this catalog. Existing
-inline/registry entries override bundled IDs, so local disabled entries remain
-disabled; provider toggles also remain respected. Existing configurations are not
-automatically opted in. No catalog download or scan occurs at startup. Updates to
-the packaged catalog arrive with application updates, not a new background schedule.
+ATS board identities are private, locally observed data. They are learned from
+direct application links already present in inventory or from an authenticated
+browser-capture CSV; the public package does not download or bundle a third-party
+board list.
 After career sources have been hydrated, continue the unified setup:
 
 ```bash
@@ -249,10 +241,13 @@ they are the rotating discovery surface. Individual malformed details are report
 jobs, while the partial run remains unsuccessful so its checkpoint cannot advance.
 
 LinkedIn's logged-out detail response usually does not expose the external Apply
-destination. Job Puller therefore does not treat LinkedIn-page parsing as its
-primary source-resolution strategy. If an external destination is present, it
-is still validated hop by hop and may supply `JobPosting` JSON-LD, but normal
-resolution starts from public ATS board catalogs and the employer's ATS API.
+destination. If an external destination is present, it is validated hop by hop.
+For authenticated pages, export `job_id,captured_url` rows and import them into
+the private inventory and board registry:
+
+```bash
+resume-builder jobs boards import-capture linkedin-ats-capture.csv
+```
 
 Resolve first-party copies of active LinkedIn jobs whose work mode is unknown:
 
@@ -266,10 +261,10 @@ resume-builder jobs resolve-sources --provider workday --max-requests 100
 
 The resolver first checks direct ATS observations already stored by the normal
 provider refresh. It removes local matches before loading or querying the board
-catalog. Remaining jobs use cached, pinned, MIT-licensed Greenhouse, Ashby,
-Lever, and Workday board directories. Candidate requests are prioritized by
-exact catalog identity, then compact-prefix identity, then company-slug probes; duplicate
-provider/board pairs are fetched only once. Workday uses exact employer-tenant
+catalog. Remaining jobs prefer the private board registry learned from captured
+Apply destinations, followed by optional private catalog snapshots and bounded
+company-slug probes. Candidate requests are prioritized by provenance; duplicate
+provider/board endpoints are fetched only once. Workday uses exact employer-tenant
 and title searches, then requests job details only for exact-title hits. Its CXS
 detail fields—not the generic posting page—supply the location and work mode.
 Requests are bounded and concurrent; no browser, account, cookie, or paid proxy
@@ -281,9 +276,10 @@ Ambiguous or weak matches do not write anything.
 
 This resolution step runs automatically inside `jobs new` whenever LinkedIn was
 part of the refresh. Automatic runs apply verified matches before shortlist
-generation, inspect only LinkedIn observations seen during that refresh, and
-record their result under `source_resolution` in the latest-refresh manifest.
-The manual command remains useful for read-only audits and historical backfills.
+generation, prioritize LinkedIn observations seen during that refresh, then use
+remaining capacity to drain the historical unresolved backlog. They record their
+result under `source_resolution` in the latest-refresh manifest. The manual
+command remains useful for read-only audits and explicit backfills.
 Resolution failure is visible in the manifest but does not change provider
 refresh success.
 
@@ -302,13 +298,12 @@ source_resolution:
   max_board_requests_per_refresh: 40
   max_probe_companies: 8
   workers: 12
-  catalog_cache_hours: 24
+  catalog_cache_hours: 24 # retained for configuration compatibility
 ```
 
-Catalog lookup remains the efficient bulk path. Workday continues
-to work for explicitly configured boards, but is excluded from reverse matching
-until its list API can provide enough posting text for the same strict identity
-check.
+Private registry lookup remains the efficient bulk path. Workday candidates are
+searched by exact title and each distinct tenant/site endpoint is retained until
+verified, including duplicate site names hosted in different datacenters.
 
 ## Adding direct ATS boards
 

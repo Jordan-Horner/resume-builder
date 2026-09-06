@@ -567,14 +567,21 @@ def test_automatic_source_resolution_applies_configured_bounds(tmp_path: Path, m
     monkeypatch.setattr(
         resolution_module.AtsCatalog,
         "load",
-        lambda path, **kwargs: captured.update(catalog_path=path, catalog_kwargs=kwargs)
-        or object(),
+        lambda path, **kwargs: (
+            captured.update(catalog_path=path, catalog_kwargs=kwargs)
+            or SimpleNamespace(add_configured_boards=lambda _config: "catalog")
+        ),
     )
-    targets = [object()]
+    fresh_target = SimpleNamespace(job_id="fresh")
+    backlog_target = SimpleNamespace(job_id="backlog")
+    targets = [fresh_target, backlog_target]
+    target_calls = []
     monkeypatch.setattr(
         resolution_module,
         "linkedin_targets",
-        lambda *_args, **_kwargs: targets,
+        lambda *_args, **kwargs: (
+            target_calls.append(kwargs) or ([fresh_target] if kwargs.get("seen_since") else targets)
+        ),
     )
 
     def resolve(database, catalog, **kwargs):
@@ -605,6 +612,10 @@ def test_automatic_source_resolution_applies_configured_bounds(tmp_path: Path, m
         "workers": 6,
         "targets": targets,
     }
+    assert target_calls == [
+        {"seen_since": started_at, "limit": 75},
+        {},
+    ]
 
 
 def test_automatic_source_resolution_skips_catalog_when_no_targets(tmp_path: Path, monkeypatch):

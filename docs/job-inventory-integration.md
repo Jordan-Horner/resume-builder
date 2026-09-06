@@ -75,8 +75,9 @@ The initial supported providers are:
 Direct ATS scans cover boards declared in configuration and boards discovered
 from commercial-board results. Unknown-mode LinkedIn observations can also be
 resolved in a dry-run-first funnel. Existing ATS observations are matched first;
-only unresolved jobs continue to a pinned public board directory that narrows
-Greenhouse, Ashby, Lever, and Workday candidates by employer. Board identities
+only unresolved jobs continue to the private observed-board registry and optional
+local catalog snapshots that narrow Greenhouse, Ashby, Lever, Rippling, and
+Workday candidates by employer. Board identities
 are deduplicated globally and prioritized before a hard request ceiling is applied.
 Workday performs one exact-title search per request unit and fetches its
 authoritative CXS detail only after an exact-title hit.

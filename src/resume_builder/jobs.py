@@ -11,7 +11,7 @@ import json
 import re
 import sys
 from collections.abc import Sequence
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -669,11 +669,17 @@ def _resolve_sources_after_refresh(
         settings = config.source_resolution
         if not settings.enabled:
             return {"status": "skipped", "reason": "disabled"}
-        targets = linkedin_targets(
+        fresh_targets = linkedin_targets(
             database,
             seen_since=started_at,
             limit=settings.max_targets_per_refresh,
         )
+        targets = list(fresh_targets)
+        if len(targets) < settings.max_targets_per_refresh:
+            selected_ids = {target.job_id for target in targets}
+            backlog = linkedin_targets(database)
+            targets.extend(target for target in backlog if target.job_id not in selected_ids)
+            targets = targets[: settings.max_targets_per_refresh]
         if not targets:
             return {
                 "status": "complete",
@@ -682,9 +688,7 @@ def _resolve_sources_after_refresh(
             }
         catalog = AtsCatalog.load(
             resolve_project_path(config_path, "cache/ats-source-catalog"),
-            timeout=config.request_timeout_seconds,
-            max_age=timedelta(hours=settings.catalog_cache_hours),
-        )
+        ).add_configured_boards(config)
         report = resolve_linkedin_sources(
             database,
             catalog,

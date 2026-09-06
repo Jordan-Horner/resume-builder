@@ -3,32 +3,29 @@ from __future__ import annotations
 import json
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 
-import httpx
-
-from .config import AtsBoard
+from .boards import recognize_board
+from .config import AtsBoard, InventoryConfig
 from .database import InventoryDatabase
 from .models import JobObservation, ProviderResult
 from .normalize import normalized_key
-from .providers import AshbyProvider, GreenhouseProvider, LeverProvider, WorkdayProvider
+from .providers import (
+    AshbyProvider,
+    GreenhouseProvider,
+    LeverProvider,
+    RipplingProvider,
+    WorkdayProvider,
+)
 from .providers.ats import HttpProvider
 from .work_modes import WorkMode, explicit_arrangement
 
-DATASET_REVISION = "ecb67960f3e3f87b832efab823a479d4d64a2c07"
-DATASET_BASE = (
-    f"https://raw.githubusercontent.com/Feashliaa/job-board-aggregator/{DATASET_REVISION}/data"
-)
-DATASETS = {
-    "greenhouse": f"{DATASET_BASE}/greenhouse_companies.json",
-    "lever": f"{DATASET_BASE}/lever_companies.json",
-    "ashby": f"{DATASET_BASE}/ashby_companies.json",
-    "workday": f"{DATASET_BASE}/workday_companies.json",
-}
+DATASET_REVISION = "private-board-registry-v1"
+CATALOG_PROVIDERS = ("greenhouse", "lever", "ashby", "workday")
 SLUG = re.compile(r"^[A-Za-z0-9._-]+$")
 LEGAL_SUFFIXES = {
     "co",
@@ -42,8 +39,11 @@ LEGAL_SUFFIXES = {
     "llp",
     "ltd",
     "plc",
+    "holding",
+    "holdings",
 }
 PROVIDER_CLASSES: dict[str, type[HttpProvider]] = {
+    "rippling": RipplingProvider,
     "greenhouse": GreenhouseProvider,
     "ashby": AshbyProvider,
     "lever": LeverProvider,
@@ -60,6 +60,7 @@ class LinkedInTarget:
     location: str
     description: str
     posted_at: datetime | None
+    direct_apply_url: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,65 +109,67 @@ class CatalogError(ValueError):
 
 
 class AtsCatalog:
-    """Validated, cached index of public ATS board identifiers."""
+    """Validated index of private ATS board identifiers."""
 
     def __init__(self, entries: dict[str, tuple[str, ...]]):
         self.entries = entries
+        self.registered: tuple[BoardCandidate, ...] = ()
+
+    def add_configured_boards(self, config: InventoryConfig | Any) -> AtsCatalog:
+        """Prefer private, observed board routes over public catalog guesses."""
+        candidates: list[BoardCandidate] = []
+        for provider in PROVIDER_CLASSES:
+            for board in getattr(config.providers, provider).boards:
+                candidates.append(
+                    BoardCandidate(
+                        provider=provider,
+                        board_id=board.id,
+                        company=board.name,
+                        api_url=board.api_url,
+                        careers_url=board.careers_url,
+                        origin="private-registry",
+                        priority=-1,
+                    )
+                )
+        self.registered = tuple(candidates)
+        return self
 
     @classmethod
     def load(
         cls,
         cache_dir: Path,
-        *,
-        timeout: float = 30,
-        max_age: timedelta = timedelta(hours=24),
-        client: httpx.Client | None = None,
     ) -> AtsCatalog:
+        """Load optional private catalog snapshots without downloading third-party seeds."""
         cache_dir.mkdir(parents=True, exist_ok=True)
-        owns_client = client is None
-        client = client or httpx.Client(timeout=timeout, follow_redirects=True)
         loaded: dict[str, tuple[str, ...]] = {}
-        try:
-            for provider, url in DATASETS.items():
-                path = cache_dir / f"{provider}.json"
-                fresh = path.exists() and (
-                    datetime.now(UTC).timestamp() - path.stat().st_mtime <= max_age.total_seconds()
-                )
-                if fresh:
-                    payload = json.loads(path.read_text(encoding="utf-8"))
-                else:
-                    try:
-                        response = client.get(url)
-                        response.raise_for_status()
-                        payload = response.json()
-                    except (httpx.HTTPError, json.JSONDecodeError):
-                        if not path.exists():
-                            raise
-                        payload = json.loads(path.read_text(encoding="utf-8"))
-                    else:
-                        _validate_catalog(provider, payload)
-                        path.write_text(
-                            json.dumps(payload, separators=(",", ":")), encoding="utf-8"
-                        )
-                loaded[provider] = _validate_catalog(provider, payload)
-        finally:
-            if owns_client:
-                client.close()
+        for provider in CATALOG_PROVIDERS:
+            path = cache_dir / f"{provider}.json"
+            payload = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
+            loaded[provider] = _validate_catalog(provider, payload)
         return cls(loaded)
 
     def boards_for(self, company: str, *, include_probes: bool = False) -> list[BoardCandidate]:
         variants = company_slug_candidates(company)
         compact = variants[-1] if variants else ""
-        candidates: list[BoardCandidate] = []
+        company_key = normalized_key(company)
+        candidates: list[BoardCandidate] = [
+            candidate
+            for candidate in self.registered
+            if normalized_key(candidate.company) == company_key
+        ]
         for provider in ("greenhouse", "ashby", "lever"):
             catalog = self.entries.get(provider, ())
             exact_matches = [entry for entry in catalog if entry.casefold() in variants]
             prefix_matches: list[str] = []
-            if compact and len(compact) >= 5:
+            if compact:
+                delimited_prefix = f"{variants[0]}-"
                 prefix_matches.extend(
                     entry
                     for entry in catalog
-                    if _compact_slug(entry).startswith(compact)
+                    if (
+                        (len(compact) >= 5 and _compact_slug(entry).startswith(compact))
+                        or entry.casefold().startswith(delimited_prefix)
+                    )
                     and len(_compact_slug(entry)) <= len(compact) + 15
                     and entry not in exact_matches
                 )
@@ -228,9 +231,15 @@ class AtsCatalog:
                 for provider in ("greenhouse", "ashby", "lever")
                 for board_id in variants[:2]
             )
-        unique: dict[tuple[str, str], BoardCandidate] = {}
+        unique: dict[tuple[str, str, str], BoardCandidate] = {}
         for candidate in candidates:
-            unique.setdefault((candidate.provider, candidate.board_id.casefold()), candidate)
+            # One Workday tenant/site can exist in more than one datacenter. Keep
+            # each endpoint until it has been tried instead of allowing a stale
+            # catalog row to hide the live endpoint.
+            endpoint = candidate.api_url.casefold() if candidate.api_url else ""
+            unique.setdefault(
+                (candidate.provider, candidate.board_id.casefold(), endpoint), candidate
+            )
         return list(unique.values())
 
 
@@ -326,7 +335,17 @@ def _fetch_candidate(
     provider = _provider(candidate, timeout)
     if isinstance(provider, WorkdayProvider):
         return provider.fetch_exact_titles([target.title for target in targets])
-    return provider.fetch(datetime.now(UTC) - timedelta(days=3650))
+    cutoff = datetime.now(UTC) - timedelta(days=3650)
+    result = provider.fetch(cutoff)
+    compact_id = _compact_slug(candidate.board_id)
+    if (
+        result.success
+        or candidate.provider != "ashby"
+        or compact_id == candidate.board_id.casefold()
+        or "404" not in (result.error or "")
+    ):
+        return result
+    return _provider(replace(candidate, board_id=compact_id), timeout).fetch(cutoff)
 
 
 def linkedin_targets(
@@ -345,6 +364,7 @@ def linkedin_targets(
             location=str(item["location"]),
             description=str(item["description"]),
             posted_at=item["posted_at"] if isinstance(item["posted_at"], datetime) else None,
+            direct_apply_url=str(item.get("direct_apply_url") or ""),
         )
         for item in database.unresolved_linkedin_targets(seen_since=seen_since)
     ]
@@ -482,11 +502,30 @@ def resolve_linkedin_sources(
         for company_key, company_targets in unresolved_by_company.items()
         if company_targets
     }
-    board_tasks: dict[tuple[str, str, str], tuple[BoardCandidate, dict[str, LinkedInTarget]]] = {}
+    board_tasks: dict[
+        tuple[str, str, str, str], tuple[BoardCandidate, dict[str, LinkedInTarget]]
+    ] = {}
     probe_companies = 0
     for _company_key, company_targets in sorted(unresolved_by_company.items()):
         company = company_targets[0].company
-        board_candidates = catalog.boards_for(company)
+        board_candidates: list[BoardCandidate] = []
+        for target in company_targets:
+            recognized = recognize_board(target.direct_apply_url, target.company)
+            if recognized is None or recognized[0] not in PROVIDER_CLASSES:
+                continue
+            provider, board = recognized
+            board_candidates.append(
+                BoardCandidate(
+                    provider=provider,
+                    board_id=board.id,
+                    company=target.company,
+                    api_url=board.api_url,
+                    careers_url=board.careers_url,
+                    origin="captured-apply-url",
+                    priority=-2,
+                )
+            )
+        board_candidates.extend(catalog.boards_for(company))
         if providers is not None:
             board_candidates = [
                 candidate for candidate in board_candidates if candidate.provider in providers
@@ -505,13 +544,14 @@ def resolve_linkedin_sources(
                     board_key = (
                         candidate.provider,
                         candidate.board_id.casefold(),
+                        (candidate.api_url or "").casefold(),
                         normalized_key(target.title),
                     )
                     if board_key not in board_tasks:
                         board_tasks[board_key] = (candidate, {})
                     board_tasks[board_key][1][target.job_id] = target
             else:
-                board_key = (candidate.provider, candidate.board_id.casefold(), "")
+                board_key = (candidate.provider, candidate.board_id.casefold(), "", "")
                 if board_key not in board_tasks:
                     board_tasks[board_key] = (candidate, {})
                 board_tasks[board_key][1].update(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 import sys
@@ -80,7 +81,7 @@ def _parser() -> argparse.ArgumentParser:
     resolve.add_argument(
         "--provider",
         action="append",
-        choices=("greenhouse", "ashby", "lever", "workday"),
+        choices=("rippling", "greenhouse", "ashby", "lever", "workday"),
         dest="resolve_providers",
         help="Query one ATS provider; repeat to select more than one",
     )
@@ -106,6 +107,14 @@ def _parser() -> argparse.ArgumentParser:
         choices=SUPPORTED_PROVIDERS,
         dest="board_providers",
         help="Limit discovery to one provider; repeat to select more than one",
+    )
+    import_capture = board_commands.add_parser(
+        "import-capture",
+        help="Import browser-captured LinkedIn application destinations and discover boards",
+    )
+    import_capture.add_argument("capture", help="CSV containing job_id and captured_url columns")
+    import_capture.add_argument(
+        "--output", default="config/boards.yml", help="Board registry YAML path"
     )
     check = board_commands.add_parser(
         "check", help="Test one ATS vendor's configured boards without updating inventory"
@@ -195,7 +204,7 @@ def main(argv: list[str] | None = None) -> int:
         targets = linkedin_targets(database, limit=args.limit)
         if targets:
             cache_dir = resolve_project_path(config_path, args.catalog_cache)
-            catalog = AtsCatalog.load(cache_dir, timeout=config.request_timeout_seconds)
+            catalog = AtsCatalog.load(cache_dir).add_configured_boards(config)
             resolution_report = resolve_linkedin_sources(
                 database,
                 catalog,
@@ -248,10 +257,20 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"  {result.error}", file=sys.stderr)
                 failed += int(result.outcome.value in {"failed", "blocked", "partial"})
             return 1 if failed else 0
+        if args.boards_action == "import-capture":
+            capture_path = Path(args.capture).expanduser()
+            try:
+                with capture_path.open(newline="", encoding="utf-8") as stream:
+                    rows = list(csv.DictReader(stream))
+                imported = database.record_captured_application_links(rows)
+            except (OSError, ValueError) as exc:
+                print(f"Capture import failed: {exc}", file=sys.stderr)
+                return 2
+            print(f"Imported captured application links: {imported}")
         output_path = resolve_project_path(config_path, args.output)
         discovered, discovery_report = discover_boards(
             database.active_application_links(),
-            providers=set(args.board_providers or SUPPORTED_PROVIDERS),
+            providers=set(getattr(args, "board_providers", None) or SUPPORTED_PROVIDERS),
             timeout=config.request_timeout_seconds,
         )
         registry = merge_registries(load_or_empty_registry(output_path), discovered)
