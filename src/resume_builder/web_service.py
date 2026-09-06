@@ -1013,6 +1013,25 @@ class DashboardService:
             )
             return {**result.model_dump(mode="json"), "cached": cached}
 
+    def saved_job_salary(self, job_id: str) -> dict[str, Any] | None:
+        """Return a current saved estimate without invoking the model."""
+        with self._salary_lock:
+            inventory = self._inventory_loader()
+            job = next((item for item in inventory if str(item.get("id")) == job_id), None)
+            if job is None:
+                raise LookupError(f"job not found: {job_id}")
+            packet = build_salary_packet(job, inventory)
+            estimator = SalaryEstimationService(self.workspace / SALARY_CACHE_PATH)
+            if has_posted_salary(packet.job):
+                posted, cached = estimator.estimate(packet, adapter=None, model="")
+                return {**posted.model_dump(mode="json"), "cached": cached}
+            config_path = self.workspace / DEFAULT_AGENT_CONFIG
+            if not config_path.is_file():
+                return None
+            config = load_agent_config(config_path)
+            result = estimator.get(packet, model=config.models.fast)
+            return {**result.model_dump(mode="json"), "cached": True} if result else None
+
     def mark_not_interested(self, job_id: str) -> None:
         if self.get_job(job_id) is None:
             raise ValueError(f"job not found: {job_id}")

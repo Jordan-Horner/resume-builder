@@ -11,7 +11,7 @@ from .workspace_state import discover_workspace
 
 def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
     try:
-        from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+        from fastapi import FastAPI, File, HTTPException, Query, Response, UploadFile
         from fastapi.responses import FileResponse
         from fastapi.staticfiles import StaticFiles
     except ImportError as exc:
@@ -241,6 +241,18 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         except OSError as exc:
             raise HTTPException(
                 status_code=500, detail="Could not read or save the salary estimate."
+            ) from exc
+
+    @app.get("/api/jobs/{job_id}/salary-estimate")
+    def saved_job_salary(job_id: str) -> Any:
+        try:
+            result = service.saved_job_salary(job_id)
+            return result if result is not None else Response(status_code=204)
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except (OSError, ValueError) as exc:
+            raise HTTPException(
+                status_code=500, detail="Could not read the saved salary estimate."
             ) from exc
 
     @app.get("/api/jobs/{job_id}/resume-recommendation")

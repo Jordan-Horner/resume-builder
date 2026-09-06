@@ -251,6 +251,15 @@ the cache. Its JSON response contains `status` (`posted`, `estimated` or
 `unavailable`), `job_id`, `posted_salary`, `estimate`, `model`, `generated_at`,
 `input_hash`, `method_version`, `related_postings` and `cached`.
 
+When a job detail is reopened, the dashboard uses
+`GET /api/jobs/{job_id}/salary-estimate` to restore a current saved estimate
+without invoking the model. It returns no content when there is no current
+saved estimate, leaving the explicit **Estimate Salary** action available. An
+estimate already running in the current portal session is shared across job
+detail mounts, so closing and reopening the detail keeps the progress state and
+does not start a duplicate request. Closing the browser does not cancel the
+server-side request; the completed result is restored from the saved cache.
+
 If either salary bound is already posted, including an extractable description
 range, the endpoint returns `posted` without making a model call. Otherwise it
 reuses an unchanged estimate for up to 30 days from

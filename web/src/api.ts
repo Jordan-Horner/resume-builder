@@ -56,6 +56,10 @@ export function estimateJobSalary(jobId: string): Promise<SalaryEstimateResult> 
   return request(`/api/jobs/${encodeURIComponent(jobId)}/estimate-salary`, { method: "POST" });
 }
 
+export async function getSavedJobSalary(jobId: string): Promise<SalaryEstimateResult | null> {
+  return (await request<SalaryEstimateResult | null>(`/api/jobs/${encodeURIComponent(jobId)}/salary-estimate`)) ?? null;
+}
+
 export function markJobApplied(jobId: string): Promise<unknown> {
   return request(`/api/jobs/${encodeURIComponent(jobId)}/applied`, { method: "POST" });
 }

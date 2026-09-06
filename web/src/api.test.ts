@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getJobs,
   estimateJobSalary,
+  getSavedJobSalary,
   getOnboardingStatus,
   getSystemStatus,
   getScrapeSchedule,
@@ -50,6 +51,16 @@ describe("dashboard API client", () => {
     await action("job-1");
 
     expect(fetchMock).toHaveBeenCalledWith(endpoint, { method: "POST" });
+  });
+
+  it("loads a saved salary estimate without requesting a new one", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, { status: 204 }),
+    );
+
+    expect(await getSavedJobSalary("job-1")).toBeNull();
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/jobs/job-1/salary-estimate", undefined);
   });
 
   it("loads and defers onboarding through explicit endpoints", async () => {

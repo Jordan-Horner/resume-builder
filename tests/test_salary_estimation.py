@@ -270,11 +270,19 @@ def test_endpoint_is_explicit_cached_and_leaves_browsing_unchanged(
     assert client.get("/api/jobs/fictional-job").json()["salary_min"] is None
     adapter.run_structured.assert_not_called()
     url = "/api/jobs/fictional-job/estimate-salary"
+    saved_url = "/api/jobs/fictional-job/salary-estimate"
+    assert client.get(saved_url).status_code == 204
+    adapter.run_structured.assert_not_called()
     response = client.post(url)
     assert response.status_code == 200
     assert response.json()["status"] == "estimated"
     assert not response.json()["cached"]
     assert client.post(url).json()["cached"]
+    assert adapter.run_structured.call_count == 1
+    saved = client.get(saved_url)
+    assert saved.status_code == 200
+    assert saved.json()["status"] == "estimated"
+    assert saved.json()["cached"] is True
     assert adapter.run_structured.call_count == 1
     assert client.get("/api/jobs/fictional-job").json()["salary_min"] is None
     assert client.get(url).status_code == 405
