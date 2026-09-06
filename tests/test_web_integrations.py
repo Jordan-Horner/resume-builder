@@ -8,7 +8,7 @@ import pytest
 
 from resume_builder.agent_config import load_agent_config
 from resume_builder.web import create_app
-from resume_builder.web_integrations import PortalIntegrationService
+from resume_builder.web_integrations import GmailOAuthSession, PortalIntegrationService
 from resume_builder.workspace import initialize_workspace
 
 testclient = pytest.importorskip("fastapi.testclient")
@@ -70,6 +70,58 @@ def test_gmail_setup_and_authorization_are_available_through_portal_routes(
     assert callback.status_code == 303
     assert callback.headers["location"] == "/settings/integrations?gmail=connected"
     assert completed and completed[0][0] == "safe-state"
+
+
+def test_gmail_oauth_callback_verifies_before_saving_owner_only_token(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import googleapiclient.discovery
+
+    import resume_builder.web_integrations as integrations
+
+    token_path = tmp_path / "runtime" / "gmail-token.json"
+
+    class Credentials:
+        def has_scopes(self, scopes: list[str]) -> bool:
+            return scopes == [integrations.GMAIL_READONLY_SCOPE]
+
+        def to_json(self) -> str:
+            return '{"refresh_token":"private-token"}'
+
+    class Flow:
+        credentials = Credentials()
+
+        def fetch_token(self, *, authorization_response: str) -> None:
+            assert "code=verified-code" in authorization_response
+
+    class Request:
+        def execute(self) -> dict[str, str]:
+            return {"emailAddress": "person@example.invalid"}
+
+    class Users:
+        def getProfile(self, *, userId: str) -> Request:
+            assert userId == "me"
+            return Request()
+
+    class Gmail:
+        def users(self) -> Users:
+            return Users()
+
+    monkeypatch.setattr(integrations, "default_state_path", lambda: tmp_path / "state.sqlite")
+    monkeypatch.setattr(integrations, "default_token_path", lambda _state: token_path)
+    monkeypatch.setattr(googleapiclient.discovery, "build", lambda *args, **kwargs: Gmail())
+    service = PortalIntegrationService(_workspace(tmp_path))
+    service._gmail_sessions["safe-state"] = GmailOAuthSession(
+        flow=Flow(), expires_at=time.monotonic() + 60
+    )
+
+    service.complete_gmail_oauth(
+        "safe-state",
+        "http://127.0.0.1:8765/?state=safe-state&code=verified-code",
+    )
+
+    assert "private-token" in token_path.read_text(encoding="utf-8")
+    assert stat.S_IMODE(token_path.stat().st_mode) == 0o600
 
 
 def test_telegram_pairing_validates_and_saves_one_private_identity(

@@ -230,7 +230,7 @@ class PortalIntegrationService:
             )
             write_telegram_token(destination, token)
             enable_private_telegram(config_path, user_id=user_id, chat_id=chat_id)
-        except ValueError as exc:
+        except Exception as exc:
             with self._lock:
                 session = self._telegram_sessions.get(session_id)
                 if session is not None:
