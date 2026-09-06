@@ -32,6 +32,7 @@ from .rendering import known_fact_ids, render_payload
 from .resume_parser import compile_markdown
 from .resume_templates import load_rendering_theme, rendering_theme_text
 from .role_policy import check_query_capacity
+from .source_import import is_metadata_name
 from .validation import parse_frontmatter
 
 SEARCH_CONFIG_PATH = Path("job-search/config/search.yml")
@@ -219,6 +220,8 @@ def list_skills(root: Path) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     skill_root = layout.facts / "skills"
     for path in sorted(skill_root.rglob("*.md")) if skill_root.is_dir() else []:
+        if is_metadata_name(path.relative_to(skill_root).as_posix()):
+            continue
         metadata, body = parse_frontmatter(path)
         fact_id = metadata.get("id")
         title = metadata.get("title")
