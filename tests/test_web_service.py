@@ -516,6 +516,7 @@ def test_search_preferences_update_preserves_providers_and_manual_families(tmp_p
             "work_modes": ["remote", "hybrid"],
             "onsite_locations": ["New York, NY"],
             "remote_location_terms": ["USA"],
+            "clearance_preference": "prefer",
             "compensation": {
                 "skipped": False,
                 "minimum": 90000,
@@ -528,12 +529,17 @@ def test_search_preferences_update_preserves_providers_and_manual_families(tmp_p
 
     rendered = config_path.read_text(encoding="utf-8")
     assert updated["titles"] == ["Platform Engineer", "Support Engineer"]
+    assert updated["clearance_preference"] == "prefer"
     assert "manual-sre" in rendered
     assert "Site Reliability Engineer" in rendered
     assert "linkedin:" in rendered and "enabled: false" in rendered
     assert "Platform Engineer" in rendered and "Support Engineer" in rendered
     assert "Technical Support Engineer" not in rendered
     assert not (root / "build/job-search/latest-refresh.json").exists()
+    saved_preferences = yaml.safe_load(
+        (root / "job-search/preferences.yml").read_text(encoding="utf-8")
+    )
+    assert saved_preferences["clearance_preference"] == "prefer"
 
 
 def test_search_preferences_update_migrates_active_legacy_workspace(tmp_path):

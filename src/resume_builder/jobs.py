@@ -26,7 +26,12 @@ from job_puller.locations import matching_location_terms
 from .applications import DEFAULT_ROOT as DEFAULT_APPLICATIONS_ROOT
 from .applications import application_job_dispositions
 from .atomic import atomic_write_json, atomic_write_text
-from .job_screening import ScreeningPacket, build_screening_packet, profile_from_preferences
+from .job_screening import (
+    ScreeningPacket,
+    build_screening_packet,
+    has_clearance_requirement,
+    profile_from_preferences,
+)
 
 DEFAULT_CONFIG = Path("job-search/config/search.yml")
 DEFAULT_PREFERENCES = Path("job-search/preferences.yml")
@@ -36,7 +41,7 @@ DEFAULT_NEW_OUTPUT = Path("job-search/new-jobs.json")
 DEFAULT_NEW_REVIEW_OUTPUT = Path("job-search/new-jobs-review.csv")
 DEFAULT_LATEST_REFRESH = Path("job-search/latest-refresh.json")
 DEFAULT_PROVIDER_COMPARISON = Path("job-search/provider-comparison.json")
-PRESCREEN_VERSION = 6
+PRESCREEN_VERSION = 7
 TOKEN = re.compile(r"[a-z][a-z0-9+#.]{2,}")
 PHRASE_TOKEN = re.compile(r"[a-z0-9]+")
 STOPWORDS = {
@@ -135,6 +140,7 @@ def _load_preferences(path: Path) -> dict[str, Any]:
         "accepted_location_terms",
         "excluded_location_terms",
         "include_unknown_locations",
+        "clearance_preference",
         "minimum_salary",
         "preferred_salary",
         "salary_currency",
@@ -186,6 +192,9 @@ def _load_preferences(path: Path) -> dict[str, Any]:
     include_unknown = payload.get("include_unknown_locations", True)
     if not isinstance(include_unknown, bool):
         raise ValueError("include_unknown_locations must be true or false")
+    clearance_preference = payload.get("clearance_preference", "neutral")
+    if clearance_preference not in {"neutral", "prefer", "exclude"}:
+        raise ValueError("clearance_preference must be neutral, prefer, or exclude")
     dispositions = payload.get("job_dispositions", {})
     if not isinstance(dispositions, dict) or any(
         not isinstance(job_id, str)
@@ -400,6 +409,7 @@ def _prescreen(
         hard_location_match = location_match or not location_required
     hard_mode_match = mode_match or not mode_required
     hard_salary_below = salary_below and salary_required
+    clearance_requirement = has_clearance_requirement(title, description)
     complete = bool(
         title.strip() and company.strip() and job.get("description_quality") == "complete"
     )
@@ -444,6 +454,7 @@ def _prescreen(
             "disposition": disposition,
             "salary_below_minimum": salary_below,
             "unwanted_title_terms": unwanted,
+            "clearance_requirement": clearance_requirement,
             "hard_conflicts": hard_conflicts,
         },
         "keyword_readiness": {

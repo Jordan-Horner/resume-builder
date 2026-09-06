@@ -91,7 +91,12 @@ def _semantic_score(item: dict[str, Any]) -> tuple[float, list[str]]:
     return score, reasons
 
 
-def score_shadow_job(item: dict[str, Any], *, positive_titles: list[str]) -> dict[str, Any]:
+def score_shadow_job(
+    item: dict[str, Any],
+    *,
+    positive_titles: list[str],
+    clearance_preference: str = "neutral",
+) -> dict[str, Any]:
     """Score one visible job without changing eligibility or queue membership."""
     score, reasons = _semantic_score(item)
     deterministic = item.get("deterministic")
@@ -110,6 +115,9 @@ def score_shadow_job(item: dict[str, Any], *, positive_titles: list[str]) -> dic
         if conflicts:
             score = max(0.0, score - 0.35)
             reasons.append("Deterministic preferences contain a required conflict warning.")
+        if clearance_preference == "prefer" and deterministic.get("clearance_requirement"):
+            score += 0.05
+            reasons.append("The role matches the explicit preference for clearance work.")
     similarity = _positive_similarity(str(item.get("title") or ""), positive_titles)
     if similarity:
         score += 0.12 * similarity
@@ -164,7 +172,11 @@ def build_shadow_order(
     settings = load_shadow_settings(preferences)
     active = [item for item in items if item.get("active") is True]
     scores = {
-        str(item.get("id") or ""): score_shadow_job(item, positive_titles=positive_titles)
+        str(item.get("id") or ""): score_shadow_job(
+            item,
+            positive_titles=positive_titles,
+            clearance_preference=str(preferences.get("clearance_preference", "neutral")),
+        )
         for item in active
     }
     if not settings.enabled:

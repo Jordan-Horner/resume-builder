@@ -71,6 +71,11 @@ def _job_view(job: dict[str, Any], *, source_order: int, active: bool) -> dict[s
         view["deterministic"] = {
             "queue_state": prescreen.get("queue_state"),
             "interest": prescreen.get("interest", {}),
+            "clearance_requirement": (
+                constraints.get("clearance_requirement", False)
+                if isinstance(constraints, dict)
+                else False
+            ),
             "hard_conflicts": (
                 constraints.get("hard_conflicts", []) if isinstance(constraints, dict) else []
             ),

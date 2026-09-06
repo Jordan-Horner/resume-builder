@@ -563,6 +563,7 @@ class DashboardService:
             "work_modes": preferences.get("accepted_work_modes") or [],
             "onsite_locations": preferences.get("accepted_location_terms") or [],
             "remote_location_terms": profile.get("remote_location_terms") or [],
+            "clearance_preference": preferences.get("clearance_preference", "neutral"),
             "compensation": {
                 "skipped": preferences.get("minimum_salary") is None
                 and preferences.get("preferred_salary") is None,
@@ -663,6 +664,9 @@ class DashboardService:
                 }
             )
             compensation = CompensationAnswers.model_validate(payload.get("compensation"))
+            clearance_preference = payload.get("clearance_preference", "neutral")
+            if clearance_preference not in {"neutral", "prefer", "exclude"}:
+                raise ValueError("clearance_preference must be neutral, prefer, or exclude")
             preferences_path = self.workspace / PREFERENCES_PATH
             config_path = self.workspace / JOBS_CONFIG
             preferences = yaml.safe_load(preferences_path.read_text(encoding="utf-8"))
@@ -720,6 +724,7 @@ class DashboardService:
             preferences["preferred_salary"] = compensation.target
             preferences["salary_currency"] = compensation.currency
             preferences["salary_period"] = compensation.period
+            preferences["clearance_preference"] = clearance_preference
             profile = dict(preferences.get("screening_profile") or {})
             profile["intended_work_country"] = country
             profile["remote_location_terms"] = location.remote_location_terms
@@ -1042,6 +1047,7 @@ class DashboardService:
             minimumPay=preferences.get("minimum_salary"),
             currency=preferences.get("salary_currency") or "USD",
             period=preferences.get("salary_period") or "year",
+            includeClearanceJobs=preferences.get("clearance_preference", "neutral") != "exclude",
         ).model_dump()
 
     def list_jobs(

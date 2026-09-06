@@ -8,6 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from job_puller.locations import matches_local_location, matches_search_location
 
+from .job_screening import has_clearance_requirement
+
 FilterTerm = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 
 
@@ -26,10 +28,15 @@ class ViewFilters(BaseModel):
     includeUnknownPay: bool = True
     includeUnknownMode: bool = True
     includeUnmatchedLocation: bool = False
+    includeClearanceJobs: bool = True
 
 
 def matches_view(job: dict[str, Any], filters: ViewFilters) -> bool:
     # Legacy clients may still send roles. Discovery owns roles, not this view.
+    if not filters.includeClearanceJobs and has_clearance_requirement(
+        str(job.get("title") or ""), str(job.get("description") or "")
+    ):
+        return False
     modes = set(job["work_modes"]) & {"remote", "hybrid", "onsite"}
     if filters.workModes and not modes.intersection(filters.workModes):
         if modes or not filters.includeUnknownMode:

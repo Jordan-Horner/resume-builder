@@ -44,6 +44,7 @@ def neutral_preferences() -> dict[str, Any]:
         "accepted_location_terms": [],
         "excluded_location_terms": [],
         "include_unknown_locations": True,
+        "clearance_preference": "neutral",
         "minimum_salary": None,
         "preferred_salary": None,
         "salary_currency": None,

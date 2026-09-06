@@ -24,7 +24,7 @@ beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   host = document.createElement("div"); document.body.append(host); root = createRoot(host);
   vi.mocked(api.getJobFilterDefaults).mockResolvedValue(EMPTY_VIEW);
-  vi.mocked(api.getSearchPreferences).mockResolvedValue({ status: "active", revision: "one", titles: [], skill_terms: [], country: "US", work_modes: ["remote"], onsite_locations: [], remote_location_terms: [], compensation: { skipped: true, minimum: null, target: null, currency: null, period: null } });
+  vi.mocked(api.getSearchPreferences).mockResolvedValue({ status: "active", revision: "one", titles: [], skill_terms: [], country: "US", work_modes: ["remote"], onsite_locations: [], remote_location_terms: [], clearance_preference: "neutral", compensation: { skipped: true, minimum: null, target: null, currency: null, period: null } });
   vi.mocked(api.getBlockedCompanies).mockResolvedValue({ companies: [] });
   vi.mocked(api.getResumeRecommendation).mockResolvedValue({ status: "unavailable", recommended_resume: null, match: null, target: null, message: "None" });
   vi.mocked(api.getJobs).mockResolvedValue({ jobs: [job], count: 1, reviewable_count: 1 });
@@ -58,6 +58,18 @@ it("refills the page from the backend after removing a result", async () => {
   await click("Not interested");
   expect(host.textContent).toContain("Platform Engineer");
   expect(host.textContent).toContain("101 jobs to review");
+});
+it("temporarily hides clearance jobs without changing saved preferences", async () => {
+  await act(async () => root.render(<JobsPage />));
+  const toggle = host.querySelector(".clearance-filter input") as HTMLInputElement;
+
+  await act(async () => toggle.click());
+
+  expect(api.getJobs).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      view: expect.objectContaining({ includeClearanceJobs: false }),
+    }),
+  );
 });
 it("retries a failed refresh without repeating the successful mutation", async () => {
   await openJob();

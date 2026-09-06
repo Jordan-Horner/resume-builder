@@ -50,4 +50,10 @@ describe("onboarding filter defaults", () => {
     expect(restored?.country).toBe("United States");
     expect(restored?.locations).toEqual(["Boston"]);
   });
+  it("migrates v5 views to showing both job types unless excluded by saved preferences", () => {
+    const oldView = { ...EMPTY_VIEW } as Partial<typeof EMPTY_VIEW>;
+    delete oldView.includeClearanceJobs;
+    localStorage.setItem("resume-builder.job-view.v5", JSON.stringify({ filters: { ...EMPTY_FILTERS, view: oldView }, previous: oldView }));
+    expect(restoreView(defaults).filters.view?.includeClearanceJobs).toBe(true);
+  });
 });

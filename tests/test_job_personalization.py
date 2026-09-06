@@ -61,6 +61,24 @@ def test_applied_title_is_a_positive_signal_but_not_a_visibility_filter():
     assert len(order) == len(items)
 
 
+def test_clearance_preference_is_a_modest_positive_score_signal():
+    clearance = _item("job-1", "stretch")
+    clearance["deterministic"]["clearance_requirement"] = True
+    ordinary = _item("job-2", "stretch")
+
+    order, scores = build_shadow_order(
+        [ordinary, clearance],
+        preferences={
+            "clearance_preference": "prefer",
+            "personalization": {"exploration_fraction": 0},
+        },
+        positive_titles=[],
+    )
+
+    assert order == ["job-1", "job-2"]
+    assert scores["job-1"]["score"] > scores["job-2"]["score"]
+
+
 def test_exploration_preserves_complete_set_and_marks_exploration_slot():
     items = [_item(f"job-{index}", "strong" if index < 5 else "weak") for index in range(1, 7)]
 

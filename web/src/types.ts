@@ -21,6 +21,7 @@ export interface ViewFilters {
   includeUnknownPay: boolean;
   includeUnknownMode: boolean;
   includeUnmatchedLocation: boolean;
+  includeClearanceJobs: boolean;
 }
 
 export interface Job {
@@ -174,6 +175,7 @@ export interface SearchPreferences {
   work_modes: WorkMode[];
   onsite_locations: string[];
   remote_location_terms: string[];
+  clearance_preference: "neutral" | "prefer" | "exclude";
   compensation: {
     skipped: boolean;
     minimum: number | null;

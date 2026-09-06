@@ -119,6 +119,13 @@ work modes, country, and minimum compensation. Roles remain discovery inputs,
 not inventory filters. A keyword field and a visible location field occupy the
 first row. Location starts with the onboarding country and is editable to a city,
 region, or country. The second row contains work mode, date, type, salary, and Clear.
+The saved clearance preference is tri-state. Neutral shows clearance and
+non-clearance jobs; Prefer also shows both and supplies a modest positive signal
+to fit evaluation; Exclude hides clearance-gated roles by default. A Jobs-page
+filter can temporarily override visibility without deleting inventory. Matching
+recognizes explicit clearance signals such as TS/SCI, Secret, Public Trust,
+polygraph, and eligibility to obtain a clearance while preserving postings that
+explicitly say no clearance is required.
 Work-mode and salary labels show actual selections. Menus dismiss outside or with Escape.
 `/api/jobs` accepts a validated `view_filters` JSON query in addition to legacy
 search/date parameters; filtering precedes counting and pagination. These are

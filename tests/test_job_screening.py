@@ -21,6 +21,7 @@ from resume_builder.job_screening import (
     _legacy_constraints,
     build_screening_packet,
     finalize_screen,
+    has_clearance_requirement,
     screening_prompt,
 )
 from resume_builder.screening_service import ScreeningService
@@ -74,6 +75,14 @@ def test_no_current_clearance_does_not_reject_obtainable_clearance() -> None:
         _clearance_constraint("Ability to obtain a Secret clearance.", profile).state
         == ConstraintState.UNKNOWN
     )
+
+
+def test_clearance_marker_supports_inventory_filter_language() -> None:
+    sample = "An active or rein-statable TS/SCI with Polygraph security clearance is REQUIRED."
+    assert has_clearance_requirement("AI Engineer", sample)
+    assert _clearance_constraint(sample, CandidateScreeningProfile()).code == "active_clearance"
+    assert has_clearance_requirement("Engineer (TS/SCI)", "Build mission systems.")
+    assert not has_clearance_requirement("Engineer", "No security clearance is required.")
 
 
 @pytest.mark.parametrize("case", CASES, ids=[case["name"] for case in CASES])

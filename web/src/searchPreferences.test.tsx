@@ -17,6 +17,7 @@ const preferences: SearchPreferences = {
   work_modes: ["remote"],
   onsite_locations: [],
   remote_location_terms: ["USA"],
+  clearance_preference: "neutral",
   compensation: { skipped: false, minimum: 80000, target: 125000, currency: "USD", period: "year" },
 };
 let host: HTMLDivElement;
@@ -63,4 +64,16 @@ it("keeps the current titles when the backend reports exhausted skill capacity",
   expect(host.textContent).toContain("Remove a role or skill");
   expect([...host.querySelectorAll(".role-bubble > span")].map((item) => item.textContent)).toEqual(["Support Engineer"]);
   expect(input.value).toBe("Platform Engineer");
+});
+
+it("saves clearance preference independently from the job-list filter", async () => {
+  await act(async () => root.render(<SearchPreferencesSection />));
+  const select = host.querySelector('option[value="neutral"]')?.parentElement as HTMLSelectElement;
+  await act(async () => {
+    select.value = "prefer";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  const save = [...host.querySelectorAll("button")].find((item) => item.textContent === "Save changes") as HTMLButtonElement;
+  await act(async () => save.click());
+  expect(saveSearchPreferences).toHaveBeenCalledWith(expect.objectContaining({ clearance_preference: "prefer" }));
 });

@@ -44,6 +44,7 @@ MUTABLE_FIELDS = {
     "accepted_location_terms",
     "excluded_location_terms",
     "include_unknown_locations",
+    "clearance_preference",
     "minimum_salary",
     "preferred_salary",
     "salary_currency",
@@ -59,6 +60,7 @@ HIGH_RISK_FIELDS = {
     "accepted_location_terms",
     "excluded_location_terms",
     "include_unknown_locations",
+    "clearance_preference",
     "minimum_salary",
     "screening_profile",
 }
