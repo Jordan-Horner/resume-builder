@@ -1,143 +1,70 @@
-# Container releases and host-managed updates
+# Container deployment and updates
 
-Every push to `main` runs Python, frontend, security, and container checks. Only
-after all required checks pass does CI advance the AMD64/ARM64 release tags in
-`ghcr.io/jordan-horner/resume-builder`. Pull requests never publish images.
-The local-build Compose file remains a development configuration. The published
-image is a single-container appliance: the portal, scheduler, and optional
-Telegram worker start together and share the same mounted workspace and runtime
-state.
+The published image is a single-container appliance for AMD64 and ARM64. It
+runs the portal, scheduler, and optional Telegram worker against the same
+workspace and runtime state. CI publishes images only from passing `main`
+builds; pull requests never publish them.
 
-CI runs the general checks first. On main, native Ubuntu AMD64 and ARM64 runners
-then build candidates in parallel with separate architecture caches, maximum
-provenance, and SBOM attestations. Candidates are pushed to GHCR by digest without
-release tags, pulled back by that exact digest, and checked for fresh startup,
-portal HTML, and the disabled-by-default scheduler. Only successful candidates
-upload a tested-digest artifact. Pull requests use a local validation image and
-have no registry write permission.
+## Image channels
 
-The serialized publication job combines the two tested image indexes without
-rebuilding. It checks that every runtime and attestation descriptor is preserved,
-then checks main's current commit immediately before advancing the `main` and
-`sha-<commit>` tags to the verified combined digest. The release notice is updated
-only after both tags resolve to that digest. Native runner labels are
-`ubuntu-24.04` and `ubuntu-24.04-arm`; the repository's Actions policy must permit
-both. The frontend build stage also stays native because it produces static assets.
+- `main`: latest passing build from `main`.
+- `sha-<full commit SHA>`: a rebuildable, commit-specific version.
+- `@sha256:<digest>`: an exact immutable image; use this for reliable rollback.
 
-Candidate uploads precede smoke testing: failed candidates may remain untagged in
-GHCR, but cannot advance release tags. Assembly uses a `candidate-<run>-<attempt>`
-tag, which may also remain after failure or supersession. These are intermediate
-registry artifacts, not deployment channels. No automatic registry deletion is
-performed. Tested-digest artifacts expire after one day; after expiry, rerun all
-jobs to rebuild and retest. Before expiry, rerunning failed jobs can reuse a
-successful architecture's tested digest from the same workflow run.
-
-GitHub's branch head and GHCR tags cannot be updated atomically. A new commit can
-arrive just after the final check; publication serialization prevents an older
-publisher from overwriting an already-published newer run. Registry tagging and
-GitHub release announcements are also separate operations: a partial failure
-fails CI and requires a rerun, rather than claiming atomic rollback.
-
-## Channels and identity
-
-- `main`: the most recently published passing build, a rolling development channel.
-- `sha-<full commit SHA>`: commit-addressed build for selecting a previous version.
-- `@sha256:<digest>`: exact immutable image identity (prefer for archival rollback).
-
-CI serializes publication and skips superseded commits. Image labels and runtime
-metadata record the commit, commit date, and channel. After a successful image
-push, CI updates a dedicated moving `main-build` tag and prerelease with the image
-digest and source link. Do not use that reserved tag for stable releases or enable
-release immutability on it. Numbered stable channels are not implemented yet.
-Rebuilding a commit can change dependencies; a SHA tag is not a substitute for
-an immutable digest. A failed announcement leaves an available image unannounced;
-rerun the workflow after resolving the failure.
+Rebuilding a commit can change dependencies, so preserve the image digest—not
+just its SHA tag—before an update.
 
 ## First deployment
 
-Keep the image private unless you deliberately change its package visibility in
-GitHub. On each Docker host, authenticate using `docker login ghcr.io` with a
-credential allowed to read the package (classic PAT with `read:packages` and
-access to the package). Do not put credentials in Compose or commit them.
+The image is private unless its GHCR package visibility is changed. Authenticate
+each Docker host with a credential that can read the package, such as a classic
+PAT with `read:packages`. Keep credentials out of Compose and source control.
 
 From a checkout containing `compose.deploy.yaml`:
 
 ```sh
+docker login ghcr.io
 docker compose -f compose.deploy.yaml pull
 docker compose -f compose.deploy.yaml up -d --no-build --wait --wait-timeout 120
 ```
 
-The portal is available at http://127.0.0.1:8766. Fresh deployments use the
-`resume-builder-workspace` and `resume-builder-state` volumes. The container
-creates a private workspace inside the empty workspace volume and an inactive
-scheduler configuration on first start;
-automatic scraping is enabled later in **Settings → Scrapers**. No Docker socket
-or privileged mode is used.
+Open http://127.0.0.1:8766. The first start creates private workspace and state
+volumes. Automatic scraping starts disabled; enable it in **Settings →
+Scrapers**. Manual **Find jobs now** runs and the separately managed Gmail
+worker do not depend on that switch.
 
-The Automatic scraping switch controls the job scheduler process through the
-container's private process supervisor. Turning it off does not disable manual
-**Find jobs now** runs and does not stop the independently managed Gmail worker.
+For a trusted private network, set `RESUME_BUILDER_WEB_BIND=0.0.0.0`. The portal
+has no authentication boundary, so do not expose it directly to the public
+internet. Configure host ports, bind-mounted paths, TLS, and reverse proxies on
+the host. The container needs neither privileged mode nor the Docker socket.
 
-For a trusted LAN such as a private TrueNAS network, set
-`RESUME_BUILDER_WEB_BIND=0.0.0.0`. Do not expose the unauthenticated portal to the
-public internet. Host ports, volume paths, image tags, TLS, and reverse-proxy
-settings remain host deployment concerns rather than portal settings.
+## Update checks
 
-## Migrate an existing two-container installation
+**Settings → About** shows the installed revision, release link, last successful
+check, and update status. The open portal polls every five minutes; the server
+contacts GitHub at most hourly and retries failures after five minutes. It sends
+no workspace data. Local builds do not check for updates, and the application
+does not install images or restart containers.
 
-1. Record the current image identity and take a restorable snapshot of both the
-   private workspace and runtime directory.
-2. Stop the existing automation and Telegram containers. Do not start the new
-   appliance while either old writer is running.
-3. Set `RESUME_BUILDER_WORKSPACE_PATH` and `RESUME_BUILDER_RUNTIME_PATH` to the
-   existing host directories. When these are unset, Compose creates fresh named
-   volumes instead.
-4. Start the new `resume-builder` service and open Settings → About. Confirm the
-   Portal is online. Scheduler is correctly shown as Off until automatic
-   scraping is enabled, then must change to Running.
-5. Keep the previous Compose definition and image available for rollback. Image
-   rollback does not reverse an incompatible data migration, so restore the
-   matching snapshot if stored data ever changes incompatibly.
-
-The scheduler's exclusive lock prevents a duplicate writer, but stopping the old
-containers is still a required migration step. A lock conflict is reported as a
-degraded Scheduler state rather than silently running twice.
-
-## Update checks in the portal
-
-Settings → About displays installed version, channel, revision, last successful
-check, and update status. A compact indicator beside Settings links to About;
-on mobile only its amber dot is shown, with an accessible label. About includes
-the release link and dismissal control. Dismissal is browser-local and specific to that revision. It does not
-hide the status in About or dismiss future builds.
-
-While the portal is open it polls its read-only API every five minutes. The
-server checks GitHub at most hourly, retrying failures after five minutes. No
-resume, job, or workspace data is sent. Offline or malformed responses are
-reported as unavailable, never as up to date. Local builds do not check GitHub.
-There is no installation endpoint, background Docker updater, or restart button.
-
-For a private repository, update checks need a **separate read-only GitHub
-credential** with repository Contents read access. Host Docker login does not
-grant access to GitHub release metadata inside the container. Save that token
-outside the repository in a file readable by container UID 1000, restrict its
-permissions, and set `RESUME_BUILDER_UPDATE_TOKEN_PATH` to its absolute path.
-Then consistently use both Compose files for start, pull, and update:
+Private repositories require a separate read-only GitHub credential with
+repository Contents access. Save it outside the repository in a file readable
+by container UID 1000, restrict its permissions, and set
+`RESUME_BUILDER_UPDATE_TOKEN_PATH` to its absolute path. Use both Compose files
+for every start, pull, and update:
 
 ```sh
-docker compose -f compose.deploy.yaml -f compose.updates-private.yaml up -d --no-build --wait
+docker compose -f compose.deploy.yaml -f compose.updates-private.yaml pull
+docker compose -f compose.deploy.yaml -f compose.updates-private.yaml up -d --no-build --wait --wait-timeout 120
 ```
 
-This mounts only that file as a read-only secret. Public repositories do not need
-the override. Never reuse the workflow's write-capable token for update checks.
+Public repositories do not need this override. Do not reuse a workflow token
+that can write releases.
 
-## Install an update and recover
+## Install or roll back an update
 
-1. Record the current container's image ID/digest and keep the old image locally.
-2. Finish active operations, stop the container that writes to the workspace, and
-   take a restorable snapshot/backup of the **entire** persistent volume. Keep
-   credentials protected in backups. Use your host's volume backup tooling.
-3. Pull the image, then recreate and verify health:
+Before updating, finish active writes, record the current image digest, keep the
+old image locally, and back up the entire persistent workspace and state.
+Protect that backup because runtime state may contain credentials. Then:
 
 ```sh
 docker compose -f compose.deploy.yaml pull
@@ -145,18 +72,28 @@ docker compose -f compose.deploy.yaml up -d --no-build --wait --wait-timeout 120
 docker compose -f compose.deploy.yaml ps
 ```
 
-Include the private-check override above if used. An unsuccessful health check
-returns a failure; Compose does not automatically roll back. Inspect logs on the
-host before resuming work. Settings → About should show the new build afterward.
+Include `compose.updates-private.yaml` in each command when using private update
+checks. A failed health check does not roll back automatically; inspect the host
+logs before resuming work.
 
-To select a previous commit, set `RESUME_BUILDER_IMAGE_TAG=sha-<full SHA>` and run
-the same pull/up commands. For exact digest pinning, use a local Compose override
-with `image: ghcr.io/jordan-horner/resume-builder@sha256:<saved digest>`.
-If an update migrated stored data incompatibly, stop it and restore the matching
-backup before running the old image. Never assume an image rollback reverses
-data migrations. Do not use `down -v` or delete the workspace volume to update.
+To use an earlier build, set
+`RESUME_BUILDER_IMAGE_TAG=sha-<full commit SHA>` and repeat the commands. For an
+exact rollback, override the image with:
 
-Compose file changes are separate from image updates: review and obtain updated
-deployment files when release notes require them. Pulling an image cannot change
-host configuration. Docker-host tools may monitor the `main` tag independently;
-automatic installation is not enabled by this project.
+```yaml
+image: ghcr.io/jordan-horner/resume-builder@sha256:<saved digest>
+```
+
+If an update changed stored data incompatibly, stop it and restore the matching
+backup before starting the old image. Never use `down -v` to update. Image pulls
+also cannot update Compose files; review release notes for host-configuration
+changes.
+
+## Release behavior
+
+CI builds and smoke-tests native AMD64 and ARM64 candidates, preserves SBOM and
+provenance attestations, then advances `main` and `sha-<commit>` only when both
+architectures pass and the commit is still current. Untagged failed candidates
+may remain in GHCR. Publishing the image and updating its GitHub prerelease are
+separate operations, so rerun a partially failed workflow after fixing its
+cause.
