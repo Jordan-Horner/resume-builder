@@ -20,7 +20,7 @@ from job_puller.detail_cache import ProviderDetailCache
 from job_puller.eligibility import commercial_title_matches, title_matches
 from job_puller.models import JobObservation, ProviderResult
 from job_puller.normalize import html_to_text, normalized_key, parse_datetime
-from job_puller.work_modes import WorkMode, explicit_arrangement
+from job_puller.work_modes import WorkMode, classify_work_arrangement, explicit_arrangement
 
 _BASE_URL = "https://www.linkedin.com"
 _SEARCH_URL = f"{_BASE_URL}/jobs-guest/jobs/api/seeMoreJobPostings/search"
@@ -634,6 +634,24 @@ class LinkedInGuestProvider:
         normalized_title = " ".join(title.casefold().split())
         normalized_location = " ".join(location.casefold().split())
         text = " ".join(description.casefold().split())
+        arrangement = classify_work_arrangement(
+            title=title,
+            location=location,
+            description=description,
+        )
+        if arrangement.available_modes == {WorkMode.HYBRID}:
+            evidence = arrangement.evidence[0]
+            return RemoteEvidence(
+                "contradiction", "hybrid_schedule", "description", evidence.matched_text
+            )
+        if arrangement.available_modes == {WorkMode.ONSITE}:
+            evidence = arrangement.evidence[0]
+            rule = (
+                "required_office_presence"
+                if "requir" in evidence.matched_text.casefold()
+                else "onsite_workplace"
+            )
+            return RemoteEvidence("contradiction", rule, "description", evidence.matched_text)
         title_location_exclusions = (
             ("hybrid_workplace", r"\bhybrid\b"),
             ("onsite_workplace", r"\bon-?site\b"),
@@ -642,15 +660,6 @@ class LinkedInGuestProvider:
         )
         description_exclusions = (
             ("remote_hands", r"\bremote hands\b"),
-            (
-                "hybrid_schedule",
-                r"\bhybrid (?:work|working|schedule|role|position|arrangement|model|policy)\b",
-            ),
-            (
-                "hybrid_schedule",
-                r"\b(?:role|position|schedule|workplace|work arrangement) "
-                r"(?:is|will be|operates as) (?:a )?hybrid\b",
-            ),
             ("onsite_workplace", r"\bon-?site\b"),
             ("onsite_workplace", r"\bonsite\b"),
             ("office_workplace", r"\bin[- ]office\b"),

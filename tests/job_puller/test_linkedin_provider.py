@@ -245,6 +245,27 @@ def test_provider_keeps_explicit_remote_contradictions(description):
     assert result.metrics["remote_contradiction_observed"] == 1
 
 
+def test_provider_classifies_remote_filtered_posting_with_hybrid_office_schedule():
+    description = (
+        "Location: Canton, Massachusetts, United States (Hybrid)\n\n"
+        "In this position, you'll be based in the Canton, MA office for a minimum "
+        "of three days a week, with the flexibility to work from home for some of "
+        "your working week."
+    )
+    client = FakeLinkedInClient(
+        pages={0: card(1, "SRE")},
+        details={"1": detail(description)},
+    )
+
+    result = provider(client).fetch(SINCE)
+
+    assert result.success
+    assert result.observations[0].work_modes == {WorkMode.HYBRID}
+    assert result.observations[0].work_arrangement.evidence[0].rule == "hybrid_schedule"
+    assert result.metrics["work_mode_mismatch"] == 1
+    assert result.metrics["remote_contradiction_observed"] == 1
+
+
 def test_provider_keeps_remote_filter_result_without_positive_evidence():
     client = FakeLinkedInClient(
         pages={0: card(1, "SRE", location="Austin, TX")},

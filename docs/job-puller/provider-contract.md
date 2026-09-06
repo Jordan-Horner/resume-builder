@@ -23,7 +23,9 @@ location-level workplace types.
 Structured provider fields take priority and must retain their field name, provider, and matched value as evidence.
 When no structured value exists, the shared classifier may use the displayed location or explicit scheduling
 phrases in the description. It deliberately does not classify bare title phrases such as `hybrid cloud` or
-`remote support`. Canonical jobs inherit the complete mode set from their preferred observation; all observation
+`remote support`. Required weekly office attendance, explicit hybrid workplace labels, and required primary office
+work override a legacy commercial-board Remote boolean. Conditional, optional, future, interview-only, travel-only,
+and technical uses of hybrid or onsite language do not. Canonical jobs inherit the complete mode set from their preferred observation; all observation
 evidence remains available for auditing even when another provider becomes preferred.
 
 The inventory persists observation modes and their evidence in `observation_work_modes`, and the canonical mode

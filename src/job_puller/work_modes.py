@@ -37,15 +37,60 @@ class WorkArrangement:
 
 
 HYBRID_PATTERNS = (
-    re.compile(r"\bhybrid\s+(?:role|position|job|schedule|work\s+arrangement)\b", re.I),
+    re.compile(
+        r"\bhybrid\s+(?:schedule|work(?:ing)?(?:\s+(?:arrangement|model|policy))?|"
+        r"workplace|arrangement|model|policy)\b",
+        re.I,
+    ),
     re.compile(r"\b(?:this|the)\s+(?:role|position|job)\s+is\s+(?:a\s+)?hybrid\b", re.I),
+    re.compile(
+        r"\b(?:location|work\s+location)\s*[:\-][^.\n]{0,100}\(\s*hybrid\s*\)",
+        re.I,
+    ),
+    re.compile(
+        r"\b(?:work\s+arrangement|workplace\s+options?)\s*:\s*"
+        r"(?:this\s+(?:role|position)\s+is\s+)?(?:fully\s+on[ -]?site\s*,?\s*or\s+)?"
+        r"hybrid(?:\s*/\s*flex)?\b",
+        re.I,
+    ),
     re.compile(
         r"\b(?:one|two|three|four|five|\d+)\s+(?:remote|office)\s+days?\s+"
         r"(?:each|per)\s+week\b",
         re.I,
     ),
+    re.compile(
+        r"\b(?:office|in[ -]?office|on[ -]?site)\b.{0,100}"
+        r"\b(?:minimum\s+of\s+|at\s+least\s+|up\s+to\s+)?"
+        r"(?:one|two|three|four|[1-4]|[1-4]\s*[-\N{EN DASH}]\s*[1-4])\s+days?\s*"
+        r"(?:/|a\s+|each\s+|per\s+)week\b",
+        re.I | re.S,
+    ),
+    re.compile(
+        r"\b(?:one|two|three|four|[1-4]|[1-4]\s*[-\N{EN DASH}]\s*[1-4])\s+days?\s*"
+        r"(?:/|a\s+|each\s+|per\s+)week\b.{0,100}"
+        r"\b(?:office|in[ -]?office|on[ -]?site)\b",
+        re.I | re.S,
+    ),
+)
+ONSITE_REMOTE_OVERRIDE_PATTERNS = (
+    re.compile(
+        r"\b(?:work\s+arrangement|workplace\s+type|telework\s+and\s+travel|location)"
+        r"\s*:\s*(?:fully\s+)?on[ -]?site\b",
+        re.I,
+    ),
+    re.compile(
+        r"\brequir(?:e|es|ed|ing)\b.{0,80}\b(?:come\s+)?into\s+"
+        r"(?:the\s+)?office\b",
+        re.I | re.S,
+    ),
+    re.compile(
+        r"\b(?:this|the)\s+(?:role|position|job)\s+is\s+(?:a\s+)?"
+        r"(?:fully\s+)?on[ -]?site\b",
+        re.I,
+    ),
 )
 ONSITE_PATTERNS = (
+    *ONSITE_REMOTE_OVERRIDE_PATTERNS,
     re.compile(r"\brequir(?:e|es|ed|ing)\b.{0,60}\b(?:on[ -]?site|in[ -]?office)\b", re.I | re.S),
     re.compile(r"\b(?:on[ -]?site|in[ -]?office)\s+(?:role|position|job)\b", re.I),
     re.compile(r"\b(?:on[ -]?site|in[ -]?office)\s+(?:presence|work|schedule|days?)\b", re.I),
@@ -91,14 +136,18 @@ def classify_work_arrangement(
     description: str = "",
     legacy_remote: bool | None = None,
 ) -> WorkArrangement:
-    if legacy_remote is True:
+    if legacy_remote is True and re.search(
+        r"\bremote\s+unless\b.{0,160}\b(?:on[ -]?site|in[ -]?office|office\s+presence)\b",
+        description,
+        re.I | re.S,
+    ):
         return explicit_arrangement(
             [WorkMode.REMOTE],
-            source="legacy",
-            rule="legacy_remote_true",
+            source="job_description",
+            rule="conditional_remote_location",
+            matched_text="remote unless",
         )
 
-    structured = f"{title}\n{location}"
     location_patterns = (
         (WorkMode.HYBRID, re.compile(r"\bhybrid\b", re.I), "structured_hybrid"),
         (
@@ -116,29 +165,67 @@ def classify_work_arrangement(
     # "remote support"), so only the location field supplies the broad keyword
     # evidence. Explicit arrangement phrases in the description are handled below.
     for mode, pattern, rule in location_patterns:
-        if mode is WorkMode.REMOTE and legacy_remote is False:
+        if mode is WorkMode.REMOTE:
             continue
         if match := pattern.search(location):
             return explicit_arrangement(
                 [mode], source="listing_location", rule=rule, matched_text=match.group(0)
             )
 
-    for mode, patterns, rule in (
-        (WorkMode.HYBRID, HYBRID_PATTERNS, "description_hybrid"),
-        (WorkMode.ONSITE, ONSITE_PATTERNS, "description_onsite"),
-        (WorkMode.REMOTE, REMOTE_PATTERNS, "description_remote"),
-    ):
-        if mode is WorkMode.REMOTE and legacy_remote is False:
-            continue
-        for pattern in patterns:
+    for pattern in HYBRID_PATTERNS:
+        if match := pattern.search(description):
+            return explicit_arrangement(
+                [WorkMode.HYBRID],
+                source="job_description",
+                rule="description_hybrid",
+                matched_text=match.group(0),
+            )
+
+    if legacy_remote is True:
+        for pattern in ONSITE_REMOTE_OVERRIDE_PATTERNS:
             if match := pattern.search(description):
                 return explicit_arrangement(
-                    [mode], source="job_description", rule=rule, matched_text=match.group(0)
+                    [WorkMode.ONSITE],
+                    source="job_description",
+                    rule="description_onsite",
+                    matched_text=match.group(0),
                 )
+        return explicit_arrangement(
+            [WorkMode.REMOTE],
+            source="legacy",
+            rule="legacy_remote_true",
+        )
+
+    for pattern in ONSITE_PATTERNS:
+        if match := pattern.search(description):
+            return explicit_arrangement(
+                [WorkMode.ONSITE],
+                source="job_description",
+                rule="description_onsite",
+                matched_text=match.group(0),
+            )
+
+    if legacy_remote is not False:
+        for pattern in REMOTE_PATTERNS:
+            if match := pattern.search(description):
+                return explicit_arrangement(
+                    [WorkMode.REMOTE],
+                    source="job_description",
+                    rule="description_remote",
+                    matched_text=match.group(0),
+                )
+
+    for mode, pattern, rule in location_patterns:
+        if mode is not WorkMode.REMOTE or legacy_remote is False:
+            continue
+        if match := pattern.search(location):
+            return explicit_arrangement(
+                [mode], source="listing_location", rule=rule, matched_text=match.group(0)
+            )
 
     # Keep the title in the signature so callers have one stable classifier
     # interface; deliberately do not infer arrangements from bare title words.
-    _ = structured
+    _ = title
     return explicit_arrangement([WorkMode.UNKNOWN], source="inferred", rule="insufficient_evidence")
 
 

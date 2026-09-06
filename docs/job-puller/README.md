@@ -110,7 +110,15 @@ resume-builder jobs shortlist
 resume-builder jobs screen <job-id>
 resume-builder jobs verify <job-id>
 resume-builder jobs resolve-sources
+resume-builder jobs reclassify-work-modes
+resume-builder jobs reclassify-work-modes --apply
 ```
+
+`jobs reclassify-work-modes` deterministically previews commercial-board observations whose
+legacy Remote flag conflicts with explicit hybrid or onsite posting language. `--apply` updates
+the observation evidence and the canonical mode when that observation is the preferred source.
+It does not call an AI model, refetch providers, or reinterpret optional, conditional, future,
+interview-only, travel-only, or technical uses of hybrid and onsite terms.
 
 Use `jobs new` for recurring discovery. It snapshots every canonical job ID in
 the database, refreshes the selected providers, then resolves newly seen

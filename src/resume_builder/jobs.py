@@ -88,6 +88,11 @@ def parser() -> argparse.ArgumentParser:
     resolve.add_argument("--provider", action="append")
     resolve.add_argument("--probe-missing", action="store_true")
     resolve.add_argument("--catalog-cache", default="cache/ats-source-catalog")
+    reclassify = commands.add_parser(
+        "reclassify-work-modes",
+        help="Preview deterministic corrections to legacy Remote labels",
+    )
+    reclassify.add_argument("--apply", action="store_true")
     new = commands.add_parser(
         "new", help="Refresh providers and shortlist only jobs new to the canonical database"
     )
@@ -832,6 +837,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             for provider in args.provider or []:
                 forwarded.extend(("--provider", provider))
             forwarded.extend(("--catalog-cache", args.catalog_cache))
+            return puller_main(forwarded)
+        if args.command == "reclassify-work-modes":
+            forwarded = ["--config", str(config_path), "reclassify-work-modes"]
+            if args.apply:
+                forwarded.append("--apply")
             return puller_main(forwarded)
         if args.command == "new":
             return _new_jobs(

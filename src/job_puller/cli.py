@@ -53,6 +53,15 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser(
         "reconcile", help="Consolidate exact provider identities while retaining observations"
     )
+    reclassify = commands.add_parser(
+        "reclassify-work-modes",
+        help="Recheck legacy commercial-board Remote labels against posting text",
+    )
+    reclassify.add_argument(
+        "--apply",
+        action="store_true",
+        help="Persist reviewed deterministic corrections; the default is a read-only preview",
+    )
     resolve = commands.add_parser(
         "resolve-sources",
         help="Find first-party ATS copies of LinkedIn jobs with unknown work mode",
@@ -149,6 +158,24 @@ def main(argv: list[str] | None = None) -> int:
         merged = database.reconcile_provider_identities()
         print(f"Reconciled canonical jobs: {merged}")
         print(f"Observations retained: {database.stats()['observations']}")
+        return 0
+
+    if args.command == "reclassify-work-modes":
+        changes = database.reclassify_commercial_work_modes(apply=args.apply)
+        print(
+            json.dumps(
+                {
+                    "mode": "apply" if args.apply else "dry-run",
+                    "changes": changes,
+                    "changed_observations": len(changes),
+                    "changed_canonical_jobs": sum(
+                        bool(item["canonical_updated"]) for item in changes
+                    ),
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
         return 0
 
     if args.command == "resolve-sources":

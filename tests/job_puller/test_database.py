@@ -66,6 +66,36 @@ def test_active_inventory_exposes_stable_consumer_projection(tmp_path):
     assert inventory[0]["url"] == "https://example.com/apply/1"
 
 
+def test_reclassify_commercial_work_modes_previews_then_applies_correction(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    item = observation(
+        description=(
+            "Location: Canton, Massachusetts, United States (Hybrid). "
+            "This position is based in the office for a minimum of three days a week. "
+        )
+    )
+    item.work_arrangement = explicit_arrangement(
+        [WorkMode.REMOTE], source="legacy", rule="legacy_remote_true"
+    )
+    db.record_result(result(item))
+
+    preview = db.reclassify_commercial_work_modes()
+
+    assert len(preview) == 1
+    assert preview[0]["from_modes"] == ["remote"]
+    assert preview[0]["to_modes"] == ["hybrid"]
+    assert preview[0]["canonical_updated"] is True
+    assert db.active_inventory()[0]["work_modes"] == ["remote"]
+
+    applied = db.reclassify_commercial_work_modes(apply=True)
+
+    assert applied == preview
+    assert db.active_inventory()[0]["work_modes"] == ["hybrid"]
+    with db.connect() as conn:
+        assert conn.execute("SELECT work_mode FROM jobs").fetchone()[0] == "hybrid"
+
+
 def test_verified_ats_source_replaces_unknown_linkedin_projection(tmp_path):
     db = InventoryDatabase(tmp_path / "inventory.db")
     db.migrate()

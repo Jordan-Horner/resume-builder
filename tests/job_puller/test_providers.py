@@ -608,6 +608,36 @@ def test_jobspy_adapter_normalizes_dataframe_row():
     assert job.direct_apply_url == "https://example.com/jobs/1"
 
 
+def test_jobspy_remote_flag_is_overridden_by_explicit_hybrid_schedule():
+    provider = JobSpyProvider(
+        "indeed",
+        CommercialProvider(),
+        SearchSettings(families=[{"name": "systems", "titles": ["systems engineer"]}]),
+    )
+
+    job = provider._normalize(
+        {
+            "id": "in-hybrid",
+            "title": "Systems Engineer",
+            "company": "Example",
+            "job_url": "https://indeed.com/viewjob?jk=hybrid",
+            "description": (
+                "<p>Work arrangement: Hybrid.</p>"
+                "<p>Three days per week on-site and two days remote.</p>"
+            ),
+            "is_remote": True,
+            "city": "Washington",
+            "state": "DC",
+            "country": "US",
+        },
+        "systems",
+    )
+
+    assert job is not None
+    assert job.work_modes == {WorkMode.HYBRID}
+    assert job.work_arrangement.evidence[0].rule == "description_hybrid"
+
+
 def test_jobspy_corrects_corroborated_ontario_canada_geocoding_conflict():
     provider = JobSpyProvider(
         "indeed",

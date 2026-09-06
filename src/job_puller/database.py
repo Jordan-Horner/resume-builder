@@ -14,7 +14,7 @@ from pathlib import Path
 from .detail_cache import CachedProviderDetail
 from .models import JobObservation, ProviderResult
 from .normalize import canonical_url, description_hash, normalized_key
-from .work_modes import WorkArrangement, WorkMode, display_work_mode
+from .work_modes import WorkArrangement, WorkMode, classify_work_arrangement, display_work_mode
 
 SCHEMA_VERSION = 7
 
@@ -345,6 +345,54 @@ class InventoryDatabase:
     def reconcile_exact_duplicates(self) -> int:
         with self.transaction() as conn:
             return self._reconcile_exact_duplicates(conn)
+
+    def reclassify_commercial_work_modes(self, *, apply: bool = False) -> list[dict[str, object]]:
+        """Re-evaluate legacy Remote observations using deterministic posting text."""
+        context = self.transaction() if apply else self.connect()
+        with context as conn:
+            rows = conn.execute(
+                """SELECT o.id, o.provider, o.title_raw, o.location_raw, o.description_text,
+                          l.job_id, j.preferred_observation_id
+                   FROM observations o
+                   JOIN job_observation_links l ON l.observation_id=o.id
+                   JOIN jobs j ON j.id=l.job_id
+                   WHERE o.provider IN ('indeed','linkedin') AND o.remote=1
+                   ORDER BY o.id"""
+            ).fetchall()
+            changes: list[dict[str, object]] = []
+            for row in rows:
+                current_modes = self._observation_work_modes(conn, str(row[0]))
+                arrangement = classify_work_arrangement(
+                    title=str(row[2]),
+                    location=str(row[3]),
+                    description=str(row[4]),
+                    legacy_remote=True,
+                )
+                if arrangement.available_modes == current_modes:
+                    continue
+                evidence = arrangement.evidence[0]
+                changes.append(
+                    {
+                        "observation_id": str(row[0]),
+                        "job_id": str(row[5]),
+                        "provider": str(row[1]),
+                        "from_modes": sorted(mode.value for mode in current_modes),
+                        "to_modes": sorted(mode.value for mode in arrangement.available_modes),
+                        "evidence_rule": evidence.rule,
+                        "evidence_text": evidence.matched_text,
+                        "canonical_updated": row[6] == row[0],
+                    }
+                )
+                if not apply:
+                    continue
+                self._replace_observation_work_modes(conn, str(row[0]), arrangement)
+                if row[6] == row[0]:
+                    self._replace_job_work_modes(conn, str(row[5]), arrangement.available_modes)
+                    conn.execute(
+                        "UPDATE jobs SET work_mode=? WHERE id=?",
+                        (display_work_mode(arrangement.available_modes), str(row[5])),
+                    )
+            return changes
 
     def record_verified_redirects(self, redirects: list[tuple[str, str]]) -> tuple[int, int, int]:
         """Persist Greenhouse short-link redirects and reconcile exact URL matches."""

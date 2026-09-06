@@ -10,7 +10,7 @@ from job_puller.config import CommercialProvider, SearchSettings
 from job_puller.eligibility import commercial_title_matches, remote_matches, title_matches
 from job_puller.models import JobObservation, ProviderResult
 from job_puller.normalize import html_to_text, normalized_key, parse_datetime
-from job_puller.work_modes import WorkMode, explicit_arrangement
+from job_puller.work_modes import WorkMode, classify_work_arrangement, explicit_arrangement
 
 _ONTARIO_CALIFORNIA = re.compile(
     r"^\s*Ontario\s*,\s*CA\s*,\s*(?:US|USA|United States)\s*$", re.IGNORECASE
@@ -196,15 +196,23 @@ class JobSpyProvider:
         )
         remote_value = value("is_remote", None)
         remote = bool(remote_value) if remote_value is not None else None
-        work_arrangement = (
-            explicit_arrangement(
+        description_text = html_to_text(raw_description)
+        work_arrangement = classify_work_arrangement(
+            title=title,
+            location=location,
+            description=description_text,
+            legacy_remote=remote,
+        )
+        if (
+            remote is True
+            and work_arrangement.available_modes == {WorkMode.REMOTE}
+            and work_arrangement.evidence[0].rule == "legacy_remote_true"
+        ):
+            work_arrangement = explicit_arrangement(
                 [WorkMode.REMOTE],
                 source="jobspy_structured_field",
                 rule="is_remote_true",
             )
-            if remote is True
-            else None
-        )
         raw_payload = {key: (None if self._is_nan(item) else item) for key, item in row.items()}
         raw_payload["search_family"] = family
         return JobObservation(
@@ -216,7 +224,7 @@ class JobSpyProvider:
             direct_apply_url=str(value("job_url_direct")),
             location=location,
             description_html=raw_description,
-            description_text=html_to_text(raw_description),
+            description_text=description_text,
             posted_at=parse_datetime(value("date_posted", None)),
             salary_min=self._number(value("min_amount", None)),
             salary_max=self._number(value("max_amount", None)),
