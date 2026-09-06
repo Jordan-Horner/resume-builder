@@ -70,7 +70,7 @@ def _repair_labeled_annual_minimum(description: str) -> str:
         second_symbol = (match.group("second_currency") or currency_symbol).upper()
         if CURRENCIES[currency_symbol] != CURRENCIES[second_symbol]:
             continue
-        repaired_minimum = f'{match.group("minimum")}0'
+        repaired_minimum = f"{match.group('minimum')}0"
         minimum = _amount(repaired_minimum, None)
         maximum = _amount(match.group("maximum"), None)
         if 10_000 <= minimum <= maximum <= 2_000_000:
