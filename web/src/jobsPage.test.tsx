@@ -14,6 +14,7 @@ vi.mock("./api", () => ({
   getJobSources: vi.fn(), startJobScan: vi.fn(), estimateJobSalary: vi.fn(),
   getSavedJobSalary: vi.fn(),
   getSavedJobScreen: vi.fn(), screenJob: vi.fn(),
+  getJobFeedback: vi.fn(), saveJobFeedback: vi.fn(), recordJobPostingOpened: vi.fn(),
 }));
 const job: Job = { id: "one", title: "Support Engineer", company: "Example", location: "Remote", employment_type: "fulltime", salary_min: null, salary_max: null, salary_currency: null, salary_interval: null, posted_at: null, first_seen_at: null, description: "Support customers", work_modes: ["remote"], providers: [], url: null };
 let root: Root;
@@ -24,7 +25,7 @@ beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   host = document.createElement("div"); document.body.append(host); root = createRoot(host);
   vi.mocked(api.getJobFilterDefaults).mockResolvedValue(EMPTY_VIEW);
-  vi.mocked(api.getSearchPreferences).mockResolvedValue({ status: "active", revision: "one", titles: [], country: "US", work_modes: ["remote"], onsite_locations: [], remote_location_terms: [], clearance_preference: "neutral", compensation: { skipped: true, minimum: null, target: null, currency: null, period: null } });
+  vi.mocked(api.getSearchPreferences).mockResolvedValue({ status: "active", revision: "one", titles: [], country: "US", work_modes: ["remote"], onsite_locations: [], remote_location_terms: [], clearance_preference: "neutral", preferred_job_attributes: [], avoided_job_attributes: [], compensation: { skipped: true, minimum: null, target: null, currency: null, period: null } });
   vi.mocked(api.getBlockedCompanies).mockResolvedValue({ companies: [] });
   vi.mocked(api.getResumeRecommendation).mockResolvedValue({ status: "unavailable", recommended_resume: null, match: null, target: null, message: "None" });
   vi.mocked(api.getJobs).mockResolvedValue({ jobs: [job], count: 1, reviewable_count: 1 });
@@ -32,6 +33,9 @@ beforeEach(() => {
   vi.mocked(api.markJobNotInterested).mockResolvedValue(undefined);
   vi.mocked(api.getSavedJobSalary).mockResolvedValue(null);
   vi.mocked(api.getSavedJobScreen).mockResolvedValue(null);
+  vi.mocked(api.getJobFeedback).mockResolvedValue({ job_id: "one", latest: null, personalization: { hot_label: "Learning your preferences", fit_score: 0.25, interest_score: 0.5, company_score: 0.5, fit_label: "Low", interest_label: "Neutral", company_label: "Neutral", confidence: "unknown", reasons: [] } });
+  vi.mocked(api.saveJobFeedback).mockResolvedValue({ job_id: "one", latest: { action: "interested", reasons: [], created_at: "2026-09-06T12:00:00Z" }, personalization: { hot_label: "Low priority", fit_score: 0.25, interest_score: 0.85, company_score: 0.5, fit_label: "Low", interest_label: "High", company_label: "Neutral", confidence: "unknown", reasons: ["You marked this job positively."] } });
+  vi.mocked(api.recordJobPostingOpened).mockResolvedValue(undefined);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); });
 async function click(text: string) {
@@ -59,6 +63,50 @@ it("refills the page from the backend after removing a result", async () => {
   expect(host.textContent).toContain("Platform Engineer");
   expect(host.textContent).toContain("101 jobs to review");
   expect(document.activeElement).toBe(host.querySelector(".job-row"));
+});
+
+it("records interested feedback without asking the user to classify it", async () => {
+  await openJob();
+  await click("Interested");
+
+  expect(api.saveJobFeedback).toHaveBeenCalledWith("one", "interested", []);
+  expect(host.textContent).not.toContain("What stands out?");
+  expect(host.textContent).toContain("Preference saved");
+  expect(host.textContent).toContain("Support Engineer");
+});
+
+it("shows completed quick-screen metadata in the queue", async () => {
+  vi.mocked(api.getJobs).mockResolvedValue({
+    jobs: [{ ...job, quick_screen: { status: "complete", label: "Strong", resume_name: "Support Engineer", generated_at: "2026-09-06T12:00:00Z" } }],
+    count: 1,
+    reviewable_count: 1,
+  });
+
+  await act(async () => root.render(<JobsPage />));
+
+  expect(host.querySelector(".job-screen-status")?.textContent).toContain("Strong · Support Engineer");
+});
+
+it("describes a failed automatic screen as unavailable, not as a fit judgment", async () => {
+  vi.mocked(api.getJobs).mockResolvedValue({
+    jobs: [{ ...job, quick_screen: { status: "failed", label: "Screen unavailable", resume_name: null, generated_at: null } }],
+    count: 1,
+    reviewable_count: 1,
+  });
+
+  await act(async () => root.render(<JobsPage />));
+
+  expect(host.querySelector(".job-screen-status")?.textContent).toBe("Screen unavailable");
+  expect(host.textContent).not.toContain("Screen failed");
+});
+
+it("records opening the original posting as a passive positive signal", async () => {
+  vi.mocked(api.getJobs).mockResolvedValue({ jobs: [{ ...job, url: "https://example.com/job" }], count: 1, reviewable_count: 1 });
+  await openJob();
+
+  await act(async () => (host.querySelector(".original-link") as HTMLAnchorElement).click());
+
+  expect(api.recordJobPostingOpened).toHaveBeenCalledWith("one");
 });
 
 it("returns focus to the selected job when details close", async () => {
@@ -115,9 +163,11 @@ it("screens a job only after the user requests it", async () => {
     eligibility_label: "Eligible", recommendation: "pursue", recommendation_label: "Pursue",
     confidence: "medium" as const, strengths: [], gaps: [], unknowns: [], stretch_case: null,
     reasoning_summary: "Strong production support evidence.",
+    preference_fit: { label: "Looks aligned" as const, matches: [{ preference: "Production ownership", direction: "prefer" as const, outcome: "match" as const, explanation: "The role owns production incidents.", posting_evidence: "production support" }], conflicts: [], unknown_count: 1 },
     evidence_coverage: "good" as const, evidence_strategy: "criterion-driven" as const,
     criterion_evidence: [{ criterion_id: "incident-response", label: "Incident response", importance: "required" as const, status: "demonstrated-candidate" as const, fact_ids: ["OPS-001"] }],
     criterion_assessments: [{ criterion_id: "incident-response", outcome: "supported" as const, confidence: "high" as const, fact_ids: ["OPS-001"], explanation: "Verified incident leadership directly supports this requirement.", materially_affects_recommendation: true }],
+    resume_match: { resume_id: "resumes/baselines/support.md", name: "Production Support Engineer", sha256: "a".repeat(64), label: "Strong match" as const, strongest_overlap: ["Incident response"], primary_gap: null, alternative: null },
     posting_coverage: "complete" as const, evidence_used: [{
       fact_id: "OPS-001", title: "Production incident response", category: "employment" as const, strength: "demonstrated" as const,
     }],
@@ -133,8 +183,66 @@ it("screens a job only after the user requests it", async () => {
   expect(host.textContent).toContain("Strong production support evidence.");
   expect(host.textContent).toContain("Based on 1 verified career fact.");
   expect(host.textContent).toContain("Incident response: Supported");
+  expect(host.textContent).toContain("Resume matchStrong matchProduction Support Engineer");
+  expect(host.textContent).toContain("Strongest overlap: Incident response");
+  expect(host.querySelector<HTMLAnchorElement>('.job-resume-match a')?.getAttribute("href")).toContain("resumes%2Fbaselines%2Fsupport.md");
   expect(host.textContent).toContain("Verified incident leadership directly supports this requirement.");
+  expect(host.textContent).toContain("What you wantLooks aligned");
+  expect(host.textContent).toContain("Matches: The role owns production incidents.");
+  expect(host.textContent).toContain("1 saved preference was not clear from this posting.");
   expect(host.textContent).toContain("Evidence used");
+});
+
+it("keeps screening state and late results attached to the job that started them", async () => {
+  let resolveFirst!: (value: Awaited<ReturnType<typeof api.screenJob>>) => void;
+  const secondJob = { ...job, id: "two", title: "Platform Engineer" };
+  const screenResult = (jobId: string, fitLabel: string): Awaited<ReturnType<typeof api.screenJob>> => ({
+    status: "complete" as const,
+    cached: false,
+    result: {
+      job_id: jobId,
+      fit: "good_match",
+      fit_label: fitLabel,
+      screening_label: "Quick screen" as const,
+      eligibility: "eligible",
+      eligibility_label: "Eligible",
+      recommendation: "pursue",
+      recommendation_label: "Pursue",
+      confidence: "medium" as const,
+      strengths: [],
+      gaps: [],
+      unknowns: [],
+      stretch_case: null,
+      reasoning_summary: `${fitLabel} evidence.`,
+      preference_fit: { label: "No job preferences saved" as const, matches: [], conflicts: [], unknown_count: 0 },
+      evidence_coverage: "good" as const,
+      evidence_strategy: "posting-wide",
+      criterion_evidence: undefined,
+      criterion_assessments: undefined,
+      posting_coverage: "complete" as const,
+      evidence_used: [],
+    },
+  });
+  vi.mocked(api.getJobs).mockResolvedValue({ jobs: [job, secondJob], count: 2, reviewable_count: 2 });
+  vi.mocked(api.screenJob).mockImplementation((jobId) => jobId === "one"
+    ? new Promise((resolve) => { resolveFirst = resolve; })
+    : Promise.resolve(screenResult("two", "Platform fit")));
+
+  await openJob();
+  await click("Screen job");
+  expect(host.textContent).toContain("Screening job…");
+
+  await act(async () => (host.querySelectorAll(".job-row")[1] as HTMLButtonElement).click());
+  expect(host.textContent).toContain("Screen job");
+  expect(host.textContent).not.toContain("Screening job…");
+
+  await click("Screen job");
+  expect(api.screenJob).toHaveBeenNthCalledWith(2, "two");
+  expect(host.textContent).toContain("Platform fit");
+
+  await act(async () => resolveFirst(screenResult("one", "Support fit")));
+  expect(host.textContent).toContain("Platform fit");
+  expect(host.textContent).not.toContain("Support fit");
 });
 
 it.each([{ salary_min: 80000, salary_max: null }, { salary_min: null, salary_max: 100000 }])("keeps posted partial pay instead of offering an estimate: %j", async (pay) => {

@@ -29,12 +29,14 @@ class QueueAdapter:
     def __init__(self, *, fail: bool = False) -> None:
         self.calls = 0
         self.fail = fail
+        self.models: list[str] = []
 
     def run(self, request: object) -> object:
         raise AssertionError("free-form model path must not be used")
 
     def run_structured(self, request: StructuredModelRequest) -> StructuredModelReply:
         self.calls += 1
+        self.models.append(request.model)
         if self.fail:
             raise AgentProviderError("fictional safe failure")
         packet = json.loads(request.prompt.split("\n", 1)[1])
@@ -166,6 +168,7 @@ def test_queue_keeps_every_job_and_bounds_provider_work(
     summary = build_screening_queue(
         adapter=adapter,
         model="fictional/model",
+        interpretation_model="fictional/public-job-model",
         cache_path=tmp_path / "cache.sqlite",
         input_path=source,
         output_path=output,
@@ -194,6 +197,7 @@ def test_queue_keeps_every_job_and_bounds_provider_work(
     assert summary.output_tokens == 50
     assert str(summary.cost_usd) == "0.02"
     assert adapter.calls == 2
+    assert adapter.models == ["fictional/public-job-model", "fictional/model"]
     assert len(load_notification_jobs(output)) == 3
 
 

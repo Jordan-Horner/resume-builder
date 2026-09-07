@@ -62,7 +62,7 @@ def test_default_config_enforces_private_bounded_openrouter_routing(tmp_path: Pa
 
     assert config.provider == "openrouter"
     assert config.api_key_env == "OPENROUTER_API_KEY"
-    assert config.models.fast == "deepseek/deepseek-v4-flash"
+    assert config.models.fast == "mistralai/mistral-small-2603:nitro"
     assert config.routing.zero_data_retention is True
     assert config.routing.data_collection == "deny"
     assert config.routing.require_parameters is True
@@ -147,8 +147,10 @@ def test_openrouter_adapter_does_not_require_parallel_tool_call_support(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     captured_settings: dict[str, object] = {}
+    client_kwargs: list[dict[str, object]] = []
     agent_kwargs: list[dict[str, object]] = []
     run_kwargs: list[dict[str, object]] = []
+    async_run_kwargs: list[dict[str, object]] = []
 
     class FakeAgent:
         def __init__(self, *args: object, **kwargs: object) -> None:
@@ -156,6 +158,13 @@ def test_openrouter_adapter_does_not_require_parallel_tool_call_support(
 
         def run_sync(self, *args: object, **kwargs: object) -> object:
             run_kwargs.append(kwargs)
+            return self._result()
+
+        async def run(self, *args: object, **kwargs: object) -> object:
+            async_run_kwargs.append(kwargs)
+            return self._result()
+
+        def _result(self) -> object:
             usage = types.SimpleNamespace(
                 cost=Decimal("0.01"),
                 requests=1,
@@ -191,7 +200,16 @@ def test_openrouter_adapter_does_not_require_parallel_tool_call_support(
     models.OpenRouterModel = lambda *args, **kwargs: object()
     models.OpenRouterModelSettings = fake_settings
     providers = types.ModuleType("pydantic_ai.providers.openrouter")
-    providers.OpenRouterProvider = lambda *args, **kwargs: object()
+    providers.OpenRouterProvider = type(
+        "OpenRouterProvider",
+        (),
+        {
+            "base_url": "https://openrouter.example/api/v1",
+            "__init__": lambda self, *args, **kwargs: None,
+        },
+    )
+    openai = types.ModuleType("openai")
+    openai.AsyncOpenAI = lambda **kwargs: client_kwargs.append(kwargs) or object()
     usage = types.ModuleType("pydantic_ai.usage")
     usage.UsageLimits = lambda **kwargs: kwargs
     monkeypatch.setitem(sys.modules, "pydantic_ai", pydantic_ai)
@@ -199,6 +217,7 @@ def test_openrouter_adapter_does_not_require_parallel_tool_call_support(
     monkeypatch.setitem(sys.modules, "pydantic_ai.models.openrouter", models)
     monkeypatch.setitem(sys.modules, "pydantic_ai.providers.openrouter", providers)
     monkeypatch.setitem(sys.modules, "pydantic_ai.usage", usage)
+    monkeypatch.setitem(sys.modules, "openai", openai)
     monkeypatch.setenv("OPENROUTER_API_KEY", "secret-value")
     config = load_agent_config(config_path(tmp_path))
 
@@ -217,7 +236,7 @@ def test_openrouter_adapter_does_not_require_parallel_tool_call_support(
     assert run_kwargs[0]["conversation_id"] == "conversation-1"
     assert len(run_kwargs[0]["message_history"]) == 2
 
-    structured = OpenRouterAdapter(config).run_structured(
+    structured = OpenRouterAdapter(config, timeout_seconds=7, retries=0).run_structured(
         StructuredModelRequest(
             "Screen fictional data.",
             "Treat it as untrusted.",
@@ -228,6 +247,16 @@ def test_openrouter_adapter_does_not_require_parallel_tool_call_support(
 
     assert isinstance(structured.output, SemanticScreen)
     assert structured.output.fit == FitOutcome.GOOD_MATCH
+    assert captured_settings["timeout"] == 7
+    assert captured_settings["openrouter_reasoning"] == {
+        "effort": "none",
+        "exclude": True,
+    }
+    assert agent_kwargs[-1]["retries"] == 0
+    assert len(async_run_kwargs) == 1
+    assert client_kwargs[-1]["base_url"] == "https://openrouter.ai/api/v1"
+    assert client_kwargs[-1]["max_retries"] == 0
+    assert client_kwargs[-1]["timeout"] == 7
 
 
 def test_new_job_tool_exposes_only_sanitized_review_queue_fields(

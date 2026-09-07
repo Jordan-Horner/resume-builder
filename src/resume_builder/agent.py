@@ -356,6 +356,18 @@ def _render_screen(result: ScreeningResult, *, cached: bool) -> str:
     ]
     if result.salary_estimate:
         lines.extend(("", format_salary_estimate(result.salary_estimate)))
+    if result.resume_match:
+        lines.extend(
+            (
+                "",
+                f"Closest resume: {result.resume_match.name}",
+                f"Resume match: {result.resume_match.label}",
+            )
+        )
+        if result.resume_match.strongest_overlap:
+            lines.append("Strongest overlap: " + ", ".join(result.resume_match.strongest_overlap))
+        if result.resume_match.primary_gap:
+            lines.append(f"Primary gap: {result.resume_match.primary_gap}")
     if result.stretch_case:
         lines.extend(("", f"Why it may be worth the stretch: {result.stretch_case}"))
     violated = [item for item in result.constraints if item.state.value == "violated"]
@@ -676,7 +688,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             cache = ScreeningCache(args.state.with_name("screening-cache.sqlite"))
             packet = enrich_packet_from_cached_interpretation(
                 packet,
-                model=model,
+                model=config.models.reasoning,
                 interpretation_cache=PostingInterpretationCache(
                     args.state.with_name("screening-cache.sqlite")
                 ),
@@ -701,6 +713,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         adapter,
                         PostingInterpretationCache(args.state.with_name("screening-cache.sqlite")),
                     ),
+                    interpretation_model=config.models.reasoning,
                     vault_root=args.preferences.expanduser().resolve().parent / "vault",
                 ).screen(packet, model=model, refresh=args.refresh)
             print(
@@ -719,6 +732,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             summary = build_screening_queue(
                 adapter=OpenRouterAdapter(config),
                 model=getattr(config.models, args.model_tier),
+                interpretation_model=config.models.reasoning,
                 cache_path=args.state.with_name("screening-cache.sqlite"),
                 input_path=args.input.expanduser(),
                 output_path=args.output.expanduser(),

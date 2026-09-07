@@ -17,6 +17,7 @@ from resume_builder.job_screening import (
     CriterionAssessmentOutcome,
     EligibilityStatus,
     FitOutcome,
+    PreferenceAssessmentOutcome,
     Recommendation,
     ScreeningCache,
     ScreeningPacket,
@@ -28,12 +29,16 @@ from resume_builder.job_screening import (
     has_clearance_requirement,
     screening_prompt,
     semantic_screen_output_type,
+    with_directional_resumes,
     with_screening_evidence,
 )
+from resume_builder.resume_screening import DirectionalResumeCandidate
 from resume_builder.screening_evidence import (
     CriterionEvidenceMatch,
     CriterionEvidenceStatus,
     EvidenceStrategy,
+    EvidenceStrength,
+    ScreeningEvidenceCard,
     ScreeningEvidenceSelection,
 )
 from resume_builder.screening_service import ScreeningService
@@ -318,6 +323,103 @@ def test_posting_instructions_remain_delimited_untrusted_data() -> None:
     assert "Ignore prior instructions" in prompt
 
 
+def test_semantic_preferences_are_screened_without_changing_eligibility() -> None:
+    packet = build_screening_packet(
+        {
+            "id": "fictional-semantic-preferences",
+            "title": "Production Support Engineer",
+            "company": "Fictional Systems",
+            "location": "Remote",
+            "work_modes": ["remote"],
+            "description_text": "Own production incidents and rotate through an inbound phone queue.",
+            "description_quality": "complete",
+            "url": "https://example.invalid/jobs/semantic-preferences",
+        },
+        {
+            "accepted_work_modes": ["remote"],
+            "include_unknown_locations": True,
+            "preferred_job_attributes": ["Production ownership"],
+            "avoided_job_attributes": ["Phone-first support"],
+            "screening_profile": {"supported_capabilities": ["production operations"]},
+        },
+        {},
+    )
+    semantic = SemanticScreen(
+        fit=FitOutcome.GOOD_MATCH,
+        confidence=Confidence.MEDIUM,
+        strengths=[
+            CitedFinding(
+                statement="Production operations experience aligns.",
+                fact_ids=[packet.candidate_evidence[0].fact_id],
+            )
+        ],
+        gaps=[],
+        unknowns=[],
+        reasoning_summary="The candidate evidence supports the central work.",
+        preference_assessments=[
+            {
+                "preference": "Production ownership",
+                "direction": "prefer",
+                "outcome": "match",
+                "explanation": "The role owns production incidents.",
+                "posting_evidence": "Own production incidents",
+            },
+            {
+                "preference": "Phone-first support",
+                "direction": "avoid",
+                "outcome": "conflict",
+                "explanation": "The role includes an inbound phone queue.",
+                "posting_evidence": "inbound phone queue",
+            },
+        ],
+    )
+
+    result = finalize_screen(packet, semantic, model="fictional/model")
+
+    assert result.eligibility == EligibilityStatus.ELIGIBLE
+    assert [item.outcome for item in result.preference_assessments] == ["match", "conflict"]
+
+
+def test_semantic_preference_evidence_must_come_from_posting() -> None:
+    packet = build_screening_packet(
+        {
+            "id": "fictional-invalid-preference-evidence",
+            "title": "Support Engineer",
+            "company": "Fictional Systems",
+            "location": "Remote",
+            "work_modes": ["remote"],
+            "description_text": "Support production systems.",
+            "description_quality": "complete",
+            "url": "https://example.invalid/jobs/invalid-preference-evidence",
+        },
+        {
+            "preferred_job_attributes": ["Production ownership"],
+            "screening_profile": {"supported_capabilities": ["production operations"]},
+        },
+        {},
+    )
+    semantic = SemanticScreen(
+        fit=FitOutcome.INSUFFICIENT_INFORMATION,
+        confidence=Confidence.LOW,
+        strengths=[],
+        gaps=[],
+        unknowns=[],
+        reasoning_summary="More evidence is needed.",
+        preference_assessments=[
+            {
+                "preference": "Production ownership",
+                "direction": "prefer",
+                "outcome": "match",
+                "explanation": "The role owns incidents.",
+                "posting_evidence": "Own every incident globally",
+            }
+        ],
+    )
+
+    with pytest.raises(ValueError, match="posting evidence"):
+        finalize_screen(packet, semantic, model="fictional/model")
+
+
 class FakeStructuredAdapter:
     def __init__(self) -> None:
         self.requests: list[StructuredModelRequest] = []
@@ -395,6 +497,7 @@ def test_screening_service_never_sends_confirmed_hard_conflicts(tmp_path: Path) 
             "accepted_work_modes": [],
             "accepted_location_terms": [],
             "include_unknown_locations": True,
+            "preferred_job_attributes": ["Production ownership"],
             "screening_profile": {"requires_sponsorship": True},
         },
         {},
@@ -406,6 +509,9 @@ def test_screening_service_never_sends_confirmed_hard_conflicts(tmp_path: Path) 
 
     assert result.recommendation == Recommendation.DO_NOT_APPLY
     assert result.model == "local/deterministic"
+    assert [(item.preference, item.outcome) for item in result.preference_assessments] == [
+        ("Production ownership", "unknown")
+    ]
     assert cached is False
     assert adapter.requests == []
 
@@ -426,6 +532,7 @@ def test_screening_service_does_not_pay_for_an_empty_evidence_packet(tmp_path: P
             "accepted_work_modes": ["remote"],
             "accepted_location_terms": [],
             "include_unknown_locations": True,
+            "avoided_job_attributes": ["Continuous phone queue"],
             "screening_profile": {},
         },
         {},
@@ -438,6 +545,9 @@ def test_screening_service_does_not_pay_for_an_empty_evidence_packet(tmp_path: P
     assert result.fit == FitOutcome.INSUFFICIENT_INFORMATION
     assert result.recommendation == Recommendation.NEEDS_MORE_EVIDENCE
     assert result.model == "local/evidence"
+    assert [(item.preference, item.outcome) for item in result.preference_assessments] == [
+        ("Continuous phone queue", "unknown")
+    ]
     assert "evidence-coverage limitation" in result.reasoning_summary
     assert cached is False
     assert adapter.requests == []
@@ -480,6 +590,40 @@ def test_partial_posting_and_supporting_only_evidence_cap_confidence() -> None:
     result = finalize_screen(packet, semantic, model="fictional/model")
 
     assert packet.posting_coverage == "partial"
+    assert result.confidence == Confidence.LOW
+
+
+def test_insufficient_fit_cannot_claim_high_confidence() -> None:
+    packet = build_screening_packet(
+        {
+            "id": "fictional-insufficient-fit",
+            "title": "Platform Engineer",
+            "company": "Fictional Platform",
+            "location": "Remote",
+            "work_modes": ["remote"],
+            "description_text": "Operate an unfamiliar platform.",
+            "description_quality": "complete",
+            "url": "https://example.invalid/jobs/insufficient-fit",
+        },
+        {
+            "accepted_work_modes": ["remote"],
+            "accepted_location_terms": [],
+            "include_unknown_locations": True,
+            "screening_profile": {"supported_capabilities": ["production operations"]},
+        },
+        {},
+    )
+    semantic = SemanticScreen(
+        fit=FitOutcome.INSUFFICIENT_INFORMATION,
+        confidence=Confidence.HIGH,
+        strengths=[],
+        gaps=[],
+        unknowns=["The supplied evidence does not settle the role fit."],
+        reasoning_summary="The supplied evidence does not support a reliable fit judgment.",
+    )
+
+    result = finalize_screen(packet, semantic, model="fictional/model")
+
     assert result.confidence == Confidence.LOW
 
 
@@ -551,7 +695,11 @@ def test_criterion_screen_rejects_unmapped_positive_findings() -> None:
         coverage="partial",
         eligible_fact_count=1,
         candidate_characters=packet.candidate_evidence_characters,
-        cards=packet.candidate_evidence,
+        cards=[
+            packet.candidate_evidence[0].model_copy(
+                update={"strength": EvidenceStrength.DEMONSTRATED}
+            )
+        ],
         strategy=EvidenceStrategy.CRITERION_DRIVEN,
         criterion_matches=[
             CriterionEvidenceMatch(
@@ -692,20 +840,353 @@ def test_semantic_screen_accepts_json_encoded_criterion_assessments() -> None:
     assert parsed.criterion_assessments[0].criterion_id == criterion.criterion_id
 
 
-def test_packet_bound_semantic_screen_rejects_missing_criterion_assessments() -> None:
+def test_directional_resume_revision_changes_screen_cache_identity() -> None:
+    packet = build_screening_packet(
+        {
+            "id": "resume-revision",
+            "title": "Reliability Engineer",
+            "company": "Example",
+            "location": "Remote",
+            "work_modes": ["remote"],
+            "description_text": "Lead incident response.",
+            "url": "https://example.invalid/resume-revision",
+        },
+        {
+            "accepted_work_modes": ["remote"],
+            "screening_profile": {"supported_capabilities": ["incident response"]},
+        },
+        {},
+    )
+    first = with_directional_resumes(
+        packet,
+        [
+            DirectionalResumeCandidate(
+                resume_id="resumes/baselines/sre.md",
+                name="SRE",
+                sha256="a" * 64,
+                fact_ids=["FACT-001"],
+            )
+        ],
+    )
+    second = with_directional_resumes(
+        packet,
+        [
+            DirectionalResumeCandidate(
+                resume_id="resumes/baselines/sre.md",
+                name="SRE",
+                sha256="b" * 64,
+                fact_ids=["FACT-001"],
+            )
+        ],
+    )
+
+    assert first.packet_hash != second.packet_hash
+    assert first.resume_revision != second.resume_revision
+
+
+def test_finalize_screen_includes_shared_resume_match() -> None:
+    packet = build_screening_packet(
+        {
+            "id": "resume-match",
+            "title": "Reliability Engineer",
+            "company": "Example",
+            "location": "Remote",
+            "work_modes": ["remote"],
+            "description_text": "Lead incident response.",
+            "url": "https://example.invalid/resume-match",
+        },
+        {
+            "accepted_work_modes": ["remote"],
+            "screening_profile": {"supported_capabilities": ["incident response"]},
+        },
+        {},
+    )
+    fact_id = packet.candidate_evidence[0].fact_id
+    evidence = ScreeningEvidenceSelection(
+        evidence_revision=packet.evidence_revision,
+        coverage="good",
+        eligible_fact_count=1,
+        candidate_characters=packet.candidate_evidence_characters,
+        cards=[
+            packet.candidate_evidence[0].model_copy(
+                update={"strength": EvidenceStrength.DEMONSTRATED}
+            )
+        ],
+        strategy=EvidenceStrategy.CRITERION_DRIVEN,
+        criterion_matches=[
+            CriterionEvidenceMatch(
+                criterion_id="incident-response",
+                label="Incident response",
+                description="Lead incident response.",
+                importance="required",
+                requirement_type="mandatory-role-defining",
+                status=CriterionEvidenceStatus.DEMONSTRATED_CANDIDATE,
+                fact_ids=[fact_id],
+            )
+        ],
+    )
+    enriched = with_directional_resumes(
+        with_screening_evidence(packet, evidence),
+        [
+            DirectionalResumeCandidate(
+                resume_id="resumes/baselines/sre.md",
+                name="Site Reliability Engineer",
+                sha256="a" * 64,
+                fact_ids=[fact_id],
+            )
+        ],
+    )
+    semantic = SemanticScreen(
+        fit=FitOutcome.STRONG_MATCH,
+        confidence=Confidence.HIGH,
+        criterion_assessments=[
+            CriterionAssessment(
+                criterion_id="incident-response",
+                outcome=CriterionAssessmentOutcome.SUPPORTED,
+                confidence=Confidence.HIGH,
+                fact_ids=[fact_id],
+                explanation="Verified incident-response evidence is present.",
+            )
+        ],
+        strengths=[
+            CitedFinding(
+                statement="Incident response is demonstrated.",
+                fact_ids=[fact_id],
+                criterion_id="incident-response",
+            )
+        ],
+        gaps=[],
+        unknowns=[],
+        reasoning_summary="The supplied evidence demonstrates the core work.",
+    )
+
+    result = finalize_screen(enriched, semantic, model="fictional/model")
+
+    assert result.resume_match is not None
+    assert result.resume_match.label == "Strong match"
+    assert result.resume_match.resume_id == "resumes/baselines/sre.md"
+
+
+def test_packet_bound_semantic_screen_completes_missing_criterion_assessments_as_unknown() -> None:
     packet = _criterion_screen_packet()
     output_type = semantic_screen_output_type(packet)
 
-    with pytest.raises(ValueError, match="exactly one assessment"):
-        output_type(
-            fit=FitOutcome.GOOD_MATCH,
-            confidence=Confidence.MEDIUM,
-            criterion_assessments=[],
-            strengths=[],
-            gaps=[],
-            unknowns=[],
-            reasoning_summary="The supplied evidence appears relevant.",
-        )
+    result = output_type(
+        fit=FitOutcome.GOOD_MATCH,
+        confidence=Confidence.MEDIUM,
+        criterion_assessments=[],
+        strengths=[],
+        gaps=[],
+        unknowns=[],
+        reasoning_summary="The supplied evidence appears relevant.",
+    )
+
+    assert {item.criterion_id for item in result.criterion_assessments} == {
+        "kubernetes",
+        "incident-response",
+    }
+    assert all(
+        item.outcome == CriterionAssessmentOutcome.UNKNOWN for item in result.criterion_assessments
+    )
+
+
+def test_packet_bound_semantic_screen_drops_cross_criterion_fact_citations() -> None:
+    packet = _criterion_screen_packet()
+    output_type = semantic_screen_output_type(packet)
+
+    result = output_type(
+        fit=FitOutcome.GOOD_MATCH,
+        confidence=Confidence.MEDIUM,
+        criterion_assessments=[
+            {
+                "criterion_id": "kubernetes",
+                "outcome": "supported",
+                "confidence": "high",
+                "fact_ids": ["WRONG-FACT"],
+                "explanation": "The model cited evidence from another criterion.",
+            }
+        ],
+        reasoning_summary="The technical qualifications appear relevant.",
+    )
+
+    assessment = next(
+        item for item in result.criterion_assessments if item.criterion_id == "kubernetes"
+    )
+    assert assessment.outcome == CriterionAssessmentOutcome.UNKNOWN
+    assert assessment.fact_ids == []
+
+
+def test_packet_bound_semantic_screen_completes_omitted_preferences_as_unknown() -> None:
+    packet = build_screening_packet(
+        {
+            "id": "fictional-omitted-preference",
+            "title": "Support Engineer",
+            "company": "Fictional Systems",
+            "location": "Remote",
+            "work_modes": ["remote"],
+            "description_text": "Support production systems.",
+            "description_quality": "complete",
+            "url": "https://example.invalid/jobs/omitted-preference",
+        },
+        {
+            "preferred_job_attributes": ["Production ownership"],
+            "avoided_job_attributes": ["Phone-first support"],
+        },
+        {},
+    )
+    output_type = semantic_screen_output_type(packet)
+
+    result = output_type(
+        fit=FitOutcome.INSUFFICIENT_INFORMATION,
+        confidence=Confidence.LOW,
+        preference_assessments=[
+            {
+                "preference": "Production ownership",
+                "direction": "prefer",
+                "outcome": "match",
+                "explanation": "The role supports production systems.",
+                "posting_evidence": "Support production systems",
+            }
+        ],
+        reasoning_summary="The supplied evidence is incomplete.",
+    )
+
+    assert [(item.preference, item.outcome) for item in result.preference_assessments] == [
+        ("Production ownership", PreferenceAssessmentOutcome.MATCH),
+        ("Phone-first support", PreferenceAssessmentOutcome.UNKNOWN),
+    ]
+
+
+def test_packet_bound_semantic_screen_derives_strengths_from_criterion_assessments() -> None:
+    packet = _criterion_screen_packet()
+    criterion = packet.criterion_evidence[0]
+    fact_id = criterion.fact_ids[0]
+    output_type = semantic_screen_output_type(packet)
+
+    result = output_type(
+        fit=FitOutcome.GOOD_MATCH,
+        confidence=Confidence.MEDIUM,
+        criterion_assessments=[
+            {
+                "criterion_id": criterion.criterion_id,
+                "outcome": "transferable",
+                "confidence": "medium",
+                "fact_ids": [fact_id],
+                "explanation": "Related evidence supports a transferable fit.",
+            },
+            {
+                "criterion_id": "incident-response",
+                "outcome": "unknown",
+                "confidence": "low",
+                "fact_ids": [],
+                "explanation": "No candidate evidence was retrieved.",
+            },
+        ],
+        strengths=[
+            {
+                "statement": "The model attached an unrelated fact.",
+                "fact_ids": ["UNRELATED-FACT"],
+                "criterion_id": criterion.criterion_id,
+            }
+        ],
+        reasoning_summary="The supplied evidence is partially relevant.",
+    )
+
+    assert [item.model_dump(mode="json") for item in result.strengths] == [
+        {
+            "statement": "Related evidence supports a transferable fit.",
+            "fact_ids": [fact_id],
+            "criterion_id": criterion.criterion_id,
+        }
+    ]
+
+
+def test_campus_hire_is_deprioritized_for_established_work_history() -> None:
+    packet = build_screening_packet(
+        {
+            "id": "campus-hire",
+            "title": "AI Engineer — Campus Hire",
+            "company": "Fictional Systems",
+            "location": "Remote",
+            "work_modes": ["remote"],
+            "description_text": "Currently pursuing a degree with 1\u20133 years of experience.",
+            "description_quality": "complete",
+            "url": "https://example.invalid/jobs/campus-hire",
+        },
+        {"accepted_work_modes": ["remote"]},
+        {},
+    )
+    role_cards = [
+        ScreeningEvidenceCard(
+            fact_id="ROLE-NEW",
+            category="employment",
+            fact_type="role",
+            title="Production Engineering Lead",
+            excerpt="Production Engineering Lead from 2024 through 2026.",
+            organization="current-company",
+            strength=EvidenceStrength.DEMONSTRATED,
+            sha256="a" * 64,
+        ),
+        ScreeningEvidenceCard(
+            fact_id="ROLE-OLD",
+            category="employment",
+            fact_type="role",
+            title="Support Associate",
+            excerpt="Support Associate from 2013 through 2015.",
+            organization="first-company",
+            strength=EvidenceStrength.DEMONSTRATED,
+            sha256="b" * 64,
+        ),
+    ]
+    packet = with_screening_evidence(
+        packet,
+        ScreeningEvidenceSelection(
+            evidence_revision="c" * 64,
+            coverage="good",
+            eligible_fact_count=2,
+            candidate_characters=sum(
+                len(card.title) + len(card.excerpt) + len(card.organization or "")
+                for card in role_cards
+            ),
+            cards=role_cards,
+            strategy=EvidenceStrategy.CRITERION_DRIVEN,
+            criterion_matches=[
+                CriterionEvidenceMatch(
+                    criterion_id="career-stage",
+                    label="1\u20133 years of experience for a campus hire",
+                    description="Currently pursuing or recently completed a degree.",
+                    importance="required",
+                    requirement_type="mandatory-role-defining",
+                    status=CriterionEvidenceStatus.DEMONSTRATED_CANDIDATE,
+                    fact_ids=["ROLE-NEW", "ROLE-OLD"],
+                )
+            ],
+        ),
+    )
+    semantic = SemanticScreen(
+        fit=FitOutcome.GOOD_MATCH,
+        confidence=Confidence.HIGH,
+        criterion_assessments=[
+            CriterionAssessment(
+                criterion_id="career-stage",
+                outcome=CriterionAssessmentOutcome.SUPPORTED,
+                confidence=Confidence.HIGH,
+                fact_ids=["ROLE-OLD"],
+                explanation="The candidate has more than the requested minimum experience.",
+            )
+        ],
+        reasoning_summary="The technical qualifications align.",
+    )
+
+    result = finalize_screen(packet, semantic, model="fictional/model")
+
+    assert result.fit == FitOutcome.WEAK_FIT
+    assert result.recommendation == Recommendation.DEPRIORITIZE
+    assert result.criterion_assessments[0].outcome == CriterionAssessmentOutcome.APPARENT_GAP
+    assert "entry-level" in result.gaps[0]
+    assert "Technical overlap does not make this a suitable career-level match" in (
+        result.reasoning_summary
+    )
 
 
 def test_criterion_screen_requires_exact_assessment_coverage() -> None:

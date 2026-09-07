@@ -41,6 +41,12 @@ export interface Job {
   work_modes: string[];
   providers: string[];
   url: string | null;
+  quick_screen?: {
+    status: "complete" | "skipped" | "failed";
+    label: string;
+    resume_name: string | null;
+    generated_at: string | null;
+  } | null;
 }
 
 export interface JobScreenResult {
@@ -61,6 +67,12 @@ export interface JobScreenResult {
     unknowns: string[];
     stretch_case: string | null;
     reasoning_summary: string;
+    preference_fit: {
+      label: "No job preferences saved" | "Looks aligned" | "Mixed" | "Probably not for you" | "Not enough information";
+      matches: JobPreferenceAssessment[];
+      conflicts: JobPreferenceAssessment[];
+      unknown_count: number;
+    };
     evidence_coverage: "good" | "partial" | "low";
     evidence_strategy?: "posting-wide" | "criterion-driven";
     criterion_evidence?: Array<{
@@ -78,6 +90,19 @@ export interface JobScreenResult {
       explanation: string;
       materially_affects_recommendation: boolean;
     }>;
+    resume_match?: {
+      resume_id: string;
+      name: string;
+      sha256: string;
+      label: "Strong match" | "Partial match" | "Weak match" | "Unknown match";
+      strongest_overlap: string[];
+      primary_gap: string | null;
+      alternative: {
+        resume_id: string;
+        name: string;
+        label: "Strong match" | "Partial match" | "Weak match" | "Unknown match";
+      } | null;
+    } | null;
     posting_coverage: "complete" | "partial";
     evidence_used: Array<{
       fact_id: string;
@@ -85,6 +110,32 @@ export interface JobScreenResult {
       category: "employment" | "projects" | "skills" | "education" | "certifications";
       strength: "demonstrated" | "supporting" | "credential";
     }>;
+  };
+}
+
+export interface JobPreferenceAssessment {
+  preference: string;
+  direction: "prefer" | "avoid";
+  outcome: "match" | "conflict" | "unknown";
+  explanation: string;
+  posting_evidence: string | null;
+}
+
+export type JobFeedbackAction = "interested" | "not_interested";
+export type JobFeedbackReason = "company" | "compensation" | "customer_facing" | "day_to_day" | "location" | "on_call" | "phone_support" | "role" | "seniority" | "travel" | "work_mode";
+export interface JobFeedback {
+  job_id: string;
+  latest: { action: "interested" | "not_interested" | "applied"; reasons: JobFeedbackReason[]; created_at: string } | null;
+  personalization: {
+    hot_label: "Hot for you" | "Promising" | "Learning your preferences" | "Low priority";
+    fit_score: number;
+    interest_score: number;
+    company_score: number;
+    fit_label: "Strong" | "Neutral" | "Low";
+    interest_label: "High" | "Neutral" | "Low";
+    company_label: "Positive" | "Neutral" | "Low";
+    confidence: "high" | "medium" | "low" | "unknown";
+    reasons: string[];
   };
 }
 
@@ -205,6 +256,8 @@ export interface SearchPreferences {
   onsite_locations: string[];
   remote_location_terms: string[];
   clearance_preference: "neutral" | "prefer" | "exclude";
+  preferred_job_attributes: string[];
+  avoided_job_attributes: string[];
   compensation: {
     skipped: boolean;
     minimum: number | null;

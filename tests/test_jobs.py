@@ -14,10 +14,23 @@ from resume_builder.jobs import (
     _prescreen,
     _prescreen_job_hash,
     _resolve_sources_after_refresh,
+    _resume_corpus,
     _with_application_dispositions,
     _write_review_csv,
     get_job_screening_packet,
 )
+
+
+def test_resume_corpus_skips_legacy_non_utf8_markdown(tmp_path, caplog):
+    baselines = tmp_path / "resumes" / "baselines"
+    baselines.mkdir(parents=True)
+    (baselines / "valid.md").write_text("# Platform Engineer", encoding="utf-8")
+    (baselines / "legacy.md").write_bytes(b"# Support Engineer \xa3")
+
+    text, _revision = _resume_corpus({}, tmp_path)
+
+    assert text == "# Platform Engineer"
+    assert "resume_corpus_skipped_non_utf8_file" in caplog.text
 
 
 def job(**updates):
@@ -350,6 +363,38 @@ screening_profile:
     assert loaded["job_dispositions"] == {"job-1": "applied"}
     assert loaded["include_unknown_locations"] is False
     assert loaded["screening_profile"]["requires_sponsorship"] is True
+
+
+def test_preferences_validate_semantic_job_attributes(tmp_path: Path):
+    path = tmp_path / "preferences.yml"
+    path.write_text(
+        """\
+schema_version: 1
+preferred_job_attributes: [Production ownership, production ownership]
+avoided_job_attributes: [Phone-first support]
+""",
+        encoding="utf-8",
+    )
+
+    loaded = _load_preferences(path)
+
+    assert loaded["preferred_job_attributes"] == ["Production ownership"]
+    assert loaded["avoided_job_attributes"] == ["Phone-first support"]
+
+
+def test_preferences_reject_conflicting_semantic_job_attributes(tmp_path: Path):
+    path = tmp_path / "preferences.yml"
+    path.write_text(
+        """\
+schema_version: 1
+preferred_job_attributes: [Phone-first support]
+avoided_job_attributes: [phone-first support]
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="both preferred and avoided"):
+        _load_preferences(path)
 
 
 def test_preferences_reject_unknown_screening_profile_fields(tmp_path: Path):

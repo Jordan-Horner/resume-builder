@@ -20,6 +20,7 @@ from .job_screening import (
     finalize_screen,
     screening_prompt,
     semantic_screen_output_type,
+    with_directional_resumes,
     with_screening_evidence,
 )
 from .posting_interpretation import (
@@ -28,6 +29,7 @@ from .posting_interpretation import (
     PostingInterpretationService,
     build_interpretation_packet,
 )
+from .resume_screening import load_directional_resume_candidates
 from .screening_evidence import select_criterion_screening_evidence
 
 LOGGER = logging.getLogger(__name__)
@@ -76,7 +78,10 @@ def enrich_packet_from_cached_interpretation(
             packet.job.model_dump(mode="python"),
             interpretation,
         )
-        return with_screening_evidence(packet, evidence)
+        packet = with_screening_evidence(packet, evidence)
+        return with_directional_resumes(
+            packet, load_directional_resume_candidates(resolved_vault.parent)
+        )
     except (OSError, ValueError) as exc:
         LOGGER.warning(
             "cached_criterion_evidence_retrieval_failed job_id=%s error_category=%s",
@@ -93,11 +98,13 @@ class ScreeningService:
         cache: ScreeningCache,
         *,
         interpretation_service: PostingInterpretationService | None = None,
+        interpretation_model: str | None = None,
         vault_root: Path | None = None,
     ):
         self.adapter = adapter
         self.cache = cache
         self.interpretation_service = interpretation_service
+        self.interpretation_model = interpretation_model
         self.vault_root = vault_root
 
     def screen(
@@ -151,7 +158,7 @@ class ScreeningService:
                 try:
                     shadow = self.interpretation_service.interpret(
                         interpretation_packet,
-                        model=model,
+                        model=self.interpretation_model or model,
                         refresh=refresh,
                     )
                 except ValueError as exc:
@@ -180,6 +187,12 @@ class ScreeningService:
                                 interpretation,
                             )
                             packet = with_screening_evidence(packet, evidence)
+                            packet = with_directional_resumes(
+                                packet,
+                                load_directional_resume_candidates(
+                                    self.vault_root.expanduser().resolve().parent
+                                ),
+                            )
                         except (OSError, ValueError) as exc:
                             interpretation_error = exc.__class__.__name__
                             LOGGER.warning(

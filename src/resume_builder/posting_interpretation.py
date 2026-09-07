@@ -147,9 +147,6 @@ class _PostingInterpretationBase(StrictModel):
         criterion_ids = [item.id for item in criteria]
         if len(criterion_ids) != len(set(criterion_ids)):
             raise ValueError("criterion IDs must be unique")
-        review_ids = [item.section_id for item in self.section_reviews]
-        if len(review_ids) != len(set(review_ids)):
-            raise ValueError("each posting section must be reviewed exactly once")
         if not any(item.importance == CriterionImportance.REQUIRED for item in criteria):
             raise ValueError("interpretation must identify at least one core or required criterion")
         return self
@@ -161,6 +158,13 @@ class ProposedPostingInterpretation(_PostingInterpretationBase):
 
 class PostingInterpretation(_PostingInterpretationBase):
     criteria: list[PostingCriterion] = Field(min_length=1, max_length=MAX_CRITERIA)
+
+    @model_validator(mode="after")
+    def validate_unique_section_reviews(self) -> PostingInterpretation:
+        review_ids = [item.section_id for item in self.section_reviews]
+        if len(review_ids) != len(set(review_ids)):
+            raise ValueError("each posting section must be reviewed exactly once")
+        return self
 
 
 _HEADING_KIND_PATTERNS: tuple[tuple[PostingSectionKind, re.Pattern[str]], ...] = (
@@ -555,15 +559,9 @@ def validate_interpretation(
         for section in packet.sections
         for unit in section.source_units
     }
-    review_ids = {review.section_id for review in interpretation.section_reviews}
-    if review_ids != set(sections):
-        missing = sorted(set(sections) - review_ids)
-        unknown = sorted(review_ids - set(sections))
-        raise ValueError(
-            f"section reviews must cover the packet exactly: missing={missing}, unknown={unknown}"
-        )
     cited_by_section: dict[str, int] = {}
     normalized_criteria: list[PostingCriterion] = []
+    normalized_cross_section_citation = False
     for raw_criterion in interpretation.criteria:
         if len(raw_criterion.source_unit_ids) != len(set(raw_criterion.source_unit_ids)):
             raise ValueError(f"criterion {raw_criterion.id} repeats a source unit")
@@ -574,14 +572,45 @@ def validate_interpretation(
                 raise ValueError(f"criterion {raw_criterion.id} cites an unknown source unit")
             resolved_units.append(resolved)
         section_ids = {section_id for section_id, _ in resolved_units}
+        source_unit_ids = list(raw_criterion.source_unit_ids)
         if len(section_ids) != 1:
-            raise ValueError(
-                f"criterion {raw_criterion.id} source units must belong to one section"
+            anchors = {
+                token
+                for token in _lexical_tokens(
+                    " ".join((raw_criterion.label, *raw_criterion.retrieval_terms))
+                )
+                if len(token) > 2 and token not in _GENERIC_ANCHOR_TOKENS
+            }
+            grouped_units: dict[str, list[tuple[str, str]]] = {}
+            for unit_id, (section_id, text) in zip(
+                raw_criterion.source_unit_ids, resolved_units, strict=True
+            ):
+                grouped_units.setdefault(section_id, []).append((unit_id, text))
+            source_section_id, selected_units = max(
+                grouped_units.items(),
+                key=lambda item: (
+                    len(anchors & set(_lexical_tokens(" ".join(text for _, text in item[1])))),
+                    -_SECTION_PRIORITY.get(sections[item[0]].kind, 99),
+                    len(item[1]),
+                    item[0],
+                ),
             )
-        source_section_id = next(iter(section_ids))
+            source_unit_ids = [unit_id for unit_id, _ in selected_units]
+            resolved_units = [(source_section_id, text) for _, text in selected_units]
+            normalized_cross_section_citation = True
+            LOGGER.info(
+                "posting_criterion_cross_section_citation_normalized "
+                "criterion_id=%s kept_section=%s removed_units=%d",
+                raw_criterion.id,
+                source_section_id,
+                len(raw_criterion.source_unit_ids) - len(source_unit_ids),
+            )
+        else:
+            source_section_id = next(iter(section_ids))
         criterion = PostingCriterion.model_validate(
             {
                 **raw_criterion.model_dump(exclude={"source_section_id", "source_excerpt"}),
+                "source_unit_ids": source_unit_ids,
                 "source_section_id": source_section_id,
                 "source_excerpt": "\n".join(text for _, text in resolved_units),
             }
@@ -595,22 +624,28 @@ def validate_interpretation(
         cited_by_section[source_section_id] = cited_by_section.get(source_section_id, 0) + 1
         normalized_criteria.append(criterion)
     normalized_reviews = [
-        review.model_copy(
-            update={
-                "disposition": (
-                    SectionDisposition.CRITERIA
-                    if cited_by_section.get(review.section_id, 0)
-                    else SectionDisposition.NON_EVALUATIVE
-                )
-            }
+        SectionReview(
+            section_id=section.id,
+            disposition=(
+                SectionDisposition.CRITERIA
+                if cited_by_section.get(section.id, 0)
+                else SectionDisposition.NON_EVALUATIVE
+            ),
+            reason=(
+                "Contains cited screening criteria."
+                if cited_by_section.get(section.id, 0)
+                else "No screening criterion was cited from this section."
+            ),
         )
-        for review in interpretation.section_reviews
+        for section in packet.sections
     ]
     return PostingInterpretation(
         criteria=normalized_criteria,
         section_reviews=normalized_reviews,
         criteria_complete=(
-            False if packet.posting_coverage == "partial" else interpretation.criteria_complete
+            False
+            if packet.posting_coverage == "partial" or normalized_cross_section_citation
+            else interpretation.criteria_complete
         ),
         limitations=interpretation.limitations,
     )

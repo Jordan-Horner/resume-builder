@@ -5,6 +5,19 @@ import { assistantRequest, type Conversation, type Proposal } from "./api";
 interface Props { open: boolean; modal?: boolean; target: { kind: "resume" | "job"; id: string; name: string; nonce: number } | null; onClose: () => void }
 
 function ProposalView({ proposal, decide }: { proposal: Proposal; decide: (id: string, action: string) => void }) {
+  if (proposal.payload.kind === "job_preference") {
+    const adding = proposal.payload.action === "add";
+    const avoiding = proposal.payload.direction === "avoid";
+    return <section className="assistant-proposal" aria-label="Proposed job preference">
+      <strong>{adding ? avoiding ? "Avoid this kind of work?" : "Prefer this kind of work?" : "Remove this preference?"}</strong>
+      <p>{proposal.payload.statement}</p>
+      <small>This shapes future quick screens. It does not affect whether you are qualified.</small>
+      {proposal.status === "pending" ? <div className="assistant-actions">
+        <button className="primary-button" onClick={() => decide(proposal.id, "accept")}>{adding ? "Save preference" : "Remove preference"}</button>
+        <button className="text-button" onClick={() => decide(proposal.id, "decline")}>Cancel</button>
+      </div> : <p role="status">{proposal.status === "applying" ? "Saving preference…" : proposal.message}</p>}
+    </section>;
+  }
   if (proposal.payload.kind === "resume_removal") {
     const retiring = proposal.payload.action === "retire" || proposal.payload.application_references.length > 0;
     return <section className="assistant-proposal assistant-removal" aria-label="Proposed resume removal">

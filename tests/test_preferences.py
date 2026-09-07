@@ -82,6 +82,33 @@ def test_apply_is_hash_pinned_and_does_not_start_provider_scan(
     assert refreshed == [True]
 
 
+def test_semantic_job_preferences_use_existing_confirmed_change_flow(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _workspace(tmp_path)
+    monkeypatch.setattr(preference_module, "_database", lambda path: _Inventory())
+    monkeypatch.setattr(preference_module, "_shortlist", lambda *args, **kwargs: 0)
+
+    proposal = propose(
+        root,
+        PreferenceChangeRequest(
+            add={
+                "preferred_job_attributes": ["Production ownership"],
+                "avoided_job_attributes": ["Phone-first support"],
+            }
+        ),
+    )
+
+    before = yaml.safe_load((root / PREFERENCES_PATH).read_text(encoding="utf-8"))
+    assert before["preferred_job_attributes"] == []
+    assert before["avoided_job_attributes"] == []
+
+    apply(root, proposal.confirmation_hash)
+    saved = yaml.safe_load((root / PREFERENCES_PATH).read_text(encoding="utf-8"))
+    assert saved["preferred_job_attributes"] == ["Production ownership"]
+    assert saved["avoided_job_attributes"] == ["Phone-first support"]
+
+
 def test_apply_rejects_stale_proposal(tmp_path: Path) -> None:
     root = _workspace(tmp_path)
     proposal = propose(

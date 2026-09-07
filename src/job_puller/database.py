@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 import shutil
 import sqlite3
@@ -18,6 +19,17 @@ from .normalize import canonical_url, description_hash, normalized_key
 from .work_modes import WorkArrangement, WorkMode, classify_work_arrangement, display_work_mode
 
 SCHEMA_VERSION = 7
+LOGGER = logging.getLogger(__name__)
+
+
+def _decode_inventory_text(value: bytes) -> str:
+    """Decode legacy public posting text without weakening private workspace reads."""
+    try:
+        return value.decode("utf-8")
+    except UnicodeDecodeError:
+        LOGGER.warning("inventory_text_decoded_with_windows_1252_fallback")
+        return value.decode("windows-1252", errors="replace")
+
 
 MIGRATION_1 = """
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -267,6 +279,7 @@ class InventoryDatabase:
 
     def connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.path)
+        conn.text_factory = _decode_inventory_text
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("PRAGMA journal_mode = WAL")

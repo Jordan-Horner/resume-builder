@@ -206,6 +206,41 @@ def test_non_resume_evaluable_criteria_are_acknowledged_but_never_retrieve_facts
     assert selection.criterion_matches[0].status == CriterionEvidenceStatus.NOT_RESUME_EVALUABLE
 
 
+def test_career_stage_criteria_retrieve_oldest_and_newest_confirmed_roles(
+    tmp_path: Path,
+) -> None:
+    initialize_workspace(tmp_path, git_name="Example", git_email="example@example.invalid")
+    _fact(
+        tmp_path,
+        "ROLE-OLD",
+        title="Support Associate",
+        body="Support Associate from 2013 through 2015.",
+        fact_type="role",
+        organization="first-company",
+    )
+    _fact(
+        tmp_path,
+        "ROLE-NEW",
+        title="Production Engineering Lead",
+        body="Production Engineering Lead from 2024 through 2026.",
+        fact_type="role",
+        organization="current-company",
+    )
+    interpretation = _interpretation(
+        _criterion(
+            "career-stage",
+            "1\u20133 years of relevant experience for a campus hire",
+            ["campus hire", "relevant experience"],
+        )
+    )
+
+    selection = select_criterion_screening_evidence(tmp_path / "vault", _job(), interpretation)
+
+    match = selection.criterion_matches[0]
+    assert match.fact_ids == ["ROLE-NEW", "ROLE-OLD"]
+    assert match.status == CriterionEvidenceStatus.DEMONSTRATED_CANDIDATE
+
+
 def test_selection_uses_confirmed_vault_evidence_without_private_profile_data(
     tmp_path: Path,
 ) -> None:
@@ -377,7 +412,7 @@ def test_shared_screening_packet_retrieves_evidence_from_the_workspace_vault(
         workspace=tmp_path,
     )
 
-    assert packet.schema_version == 4
+    assert packet.schema_version == 5
     assert packet.candidate_evidence[0].fact_id == "OPS-001"
     assert packet.evidence_coverage == EvidenceCoverage.PARTIAL
     assert packet.profile.supported_capabilities == []

@@ -12,7 +12,11 @@ from typing import Any
 from .agent_contracts import ModelAdapter, ModelProviderError
 from .applications import applied_job_ids
 from .atomic import atomic_write_json, atomic_write_text
-from .job_personalization import build_shadow_order
+from .job_personalization import (
+    build_shadow_order,
+    extract_preference_traits,
+    load_feedback_events,
+)
 from .job_screening import (
     Confidence,
     FitOutcome,
@@ -36,7 +40,18 @@ from .screening_service import ScreeningService, enrich_packet_from_cached_inter
 DEFAULT_SCREENING_OUTPUT = Path("job-search/new-job-screens.json")
 SCREENING_QUEUE_SCHEMA_VERSION = 1
 RECOMMENDED = {Recommendation.PURSUE, Recommendation.PURSUE_AS_STRETCH}
-QUEUE_JOB_FIELDS = ("id", "title", "company", "url", "posted_at", "first_seen_at")
+QUEUE_JOB_FIELDS = (
+    "id",
+    "title",
+    "company",
+    "url",
+    "posted_at",
+    "first_seen_at",
+    "salary_min",
+    "salary_max",
+    "salary_currency",
+    "work_modes",
+)
 
 
 @dataclass(frozen=True)
@@ -81,6 +96,7 @@ def _job_view(job: dict[str, Any], *, source_order: int, active: bool) -> dict[s
                 constraints.get("hard_conflicts", []) if isinstance(constraints, dict) else []
             ),
         }
+    view["preference_traits"] = extract_preference_traits(job)
     return {**view, "source_order": source_order, "active": active}
 
 
@@ -179,6 +195,7 @@ def build_screening_queue(
     *,
     adapter: ModelAdapter,
     model: str,
+    interpretation_model: str | None = None,
     cache_path: Path,
     input_path: Path = DEFAULT_NEW_OUTPUT,
     output_path: Path = DEFAULT_SCREENING_OUTPUT,
@@ -203,6 +220,7 @@ def build_screening_queue(
         interpretation_service=PostingInterpretationService(
             adapter, PostingInterpretationCache(cache_path)
         ),
+        interpretation_model=interpretation_model,
         vault_root=workspace / "vault",
     )
     items: list[dict[str, Any]] = []
@@ -238,7 +256,7 @@ def build_screening_queue(
         )
         packet = enrich_packet_from_cached_interpretation(
             packet,
-            model=model,
+            model=interpretation_model or model,
             interpretation_cache=PostingInterpretationCache(cache_path),
             vault_root=workspace / "vault",
         )
@@ -306,6 +324,7 @@ def build_screening_queue(
         items,
         preferences=preferences,
         positive_titles=positive_titles,
+        feedback_events=load_feedback_events(workspace / "job-search/job-feedback.json"),
     )
     for item in items:
         job_id = str(item.get("id") or "")

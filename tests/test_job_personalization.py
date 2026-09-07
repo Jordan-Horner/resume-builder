@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from resume_builder.job_personalization import build_shadow_order, load_shadow_settings
+from resume_builder.job_personalization import (
+    build_shadow_order,
+    extract_preference_traits,
+    extract_seniority,
+    load_shadow_settings,
+)
 
 
 def _item(job_id: str, score_kind: str, *, title: str = "Operations Engineer"):
@@ -120,3 +125,203 @@ def test_shadow_settings_reject_non_shadow_or_excessive_exploration():
         assert "from 0 to 0.5" in str(exc)
     else:
         raise AssertionError("unsafe exploration fraction should not be accepted")
+
+
+def test_three_reasoned_phone_rejections_lower_only_phone_heavy_jobs():
+    phone_job = _item("job-1", "strong", title="Technical Support Engineer")
+    phone_job["preference_traits"] = ["phone_support"]
+    escalation_job = _item("job-2", "strong", title="Technical Support Engineer")
+    feedback = [
+        {
+            "action": "not_interested",
+            "reasons": ["phone_support"],
+            "job": {"id": f"old-{index}", "traits": ["phone_support"]},
+        }
+        for index in range(3)
+    ]
+
+    _, scores = build_shadow_order(
+        [phone_job, escalation_job],
+        preferences={"personalization": {"exploration_fraction": 0}},
+        positive_titles=[],
+        feedback_events=feedback,
+    )
+
+    assert scores["job-1"]["interest_score"] < scores["job-2"]["interest_score"]
+    assert any("phone support" in reason.lower() for reason in scores["job-1"]["reasons"])
+
+
+def test_preference_traits_are_small_and_deterministic():
+    assert extract_preference_traits(
+        {
+            "title": "Support Engineer",
+            "description": "Handle inbound phone calls and join an on-call rotation.",
+        }
+    ) == ["on_call", "phone_support"]
+
+
+def test_seniority_uses_specific_title_signals_before_description_fallback():
+    assert extract_seniority({"title": "Senior Staff Engineer"}) == "staff"
+    assert extract_seniority({"title": "Backend Engineer, New Grad"}) == "new_grad"
+    assert (
+        extract_seniority(
+            {"title": "Backend Engineer", "description": "This is an entry-level position."}
+        )
+        == "entry"
+    )
+    assert extract_seniority({"title": "Backend Engineer"}) == "unknown"
+
+
+def test_company_affinity_requires_an_explicit_company_reason():
+    item = _item("job-1", "strong")
+    item["company"] = "Example"
+    ordinary_like = {
+        "action": "interested",
+        "reasons": ["day_to_day"],
+        "job": {"id": "old-1", "company": "Example"},
+    }
+    company_like = {
+        "action": "interested",
+        "reasons": ["company"],
+        "job": {"id": "old-2", "company": "Example"},
+    }
+
+    ordinary = build_shadow_order(
+        [item], preferences={}, positive_titles=[], feedback_events=[ordinary_like]
+    )[1]["job-1"]
+    explicit = build_shadow_order(
+        [item], preferences={}, positive_titles=[], feedback_events=[company_like]
+    )[1]["job-1"]
+
+    assert ordinary["company_score"] == 0.5
+    assert explicit["company_score"] > ordinary["company_score"]
+
+
+def test_positive_posting_opens_favor_shared_duties_without_overriding_fit():
+    incident_role = _item("job-1", "stretch", title="Technical Support Engineer")
+    incident_role["screening"]["result"]["criterion_evidence"] = [
+        {"criterion_id": "new-incident", "label": "Lead incident response"}
+    ]
+    phone_role = _item("job-2", "stretch", title="Technical Support Engineer")
+    phone_role["screening"]["result"]["criterion_evidence"] = [
+        {"criterion_id": "new-phone", "label": "Handle inbound phone queue"}
+    ]
+    opened = {
+        "action": "opened_posting",
+        "job": {
+            "id": "old-1",
+            "title": "Technical Support Engineer",
+            "screening": {"criteria": [{"label": "Own incident response", "outcome": "supported"}]},
+        },
+    }
+
+    _, scores = build_shadow_order(
+        [incident_role, phone_role],
+        preferences={"personalization": {"exploration_fraction": 0}},
+        positive_titles=[],
+        feedback_events=[opened],
+    )
+
+    assert scores["job-1"]["fit_score"] == scores["job-2"]["fit_score"]
+    assert scores["job-1"]["interest_score"] > scores["job-2"]["interest_score"]
+    assert scores["job-1"]["interest_score"] < 0.6
+
+
+def test_seniority_pattern_uses_historical_titles_and_positive_contrast():
+    senior = _item("job-1", "strong", title="Senior DevOps Engineer")
+    staff = _item("job-2", "strong", title="Staff DevOps Engineer")
+    feedback = [
+        {
+            "action": "not_interested",
+            "job": {"id": f"senior-{index}", "title": "Senior DevOps Engineer"},
+        }
+        for index in range(3)
+    ] + [
+        {
+            "action": "interested",
+            "job": {"id": "staff-positive", "title": "Staff DevOps Engineer"},
+        }
+    ]
+
+    _, scores = build_shadow_order(
+        [senior, staff],
+        preferences={"personalization": {"exploration_fraction": 0}},
+        positive_titles=[],
+        feedback_events=feedback,
+    )
+
+    pattern = scores["job-1"]["learning_sources"]["seniority_pattern"]
+    assert pattern == {
+        "level": "senior",
+        "negative_same_level": 3,
+        "positive_same_level": 0,
+        "positive_other_level": 1,
+        "applied": True,
+    }
+    assert scores["job-1"]["interest_score"] < scores["job-2"]["interest_score"]
+    assert any("other levels" in reason for reason in scores["job-1"]["reasons"])
+
+
+def test_seniority_pattern_requires_positive_contrast_and_clear_majority():
+    item = _item("job-1", "strong", title="Senior DevOps Engineer")
+    rejections = [
+        {
+            "action": "not_interested",
+            "job": {"id": f"negative-{index}", "title": "Senior DevOps Engineer"},
+        }
+        for index in range(3)
+    ]
+    mixed = (
+        rejections
+        + [
+            {
+                "action": "interested",
+                "job": {"id": f"senior-positive-{index}", "title": "Senior DevOps Engineer"},
+            }
+            for index in range(2)
+        ]
+        + [
+            {
+                "action": "applied",
+                "job": {"id": "staff-positive", "title": "Staff DevOps Engineer"},
+            }
+        ]
+    )
+
+    no_contrast = build_shadow_order(
+        [item], preferences={}, positive_titles=[], feedback_events=rejections
+    )[1]["job-1"]
+    contradictory = build_shadow_order(
+        [item], preferences={}, positive_titles=[], feedback_events=mixed
+    )[1]["job-1"]
+
+    assert no_contrast["learning_sources"]["seniority_pattern"]["applied"] is False
+    assert contradictory["learning_sources"]["seniority_pattern"]["applied"] is False
+
+
+def test_seniority_pattern_does_not_cross_role_families():
+    item = _item("job-1", "strong", title="Senior DevOps Engineer")
+    feedback = [
+        {
+            "action": "not_interested",
+            "job": {"id": f"support-{index}", "title": "Senior Technical Support Engineer"},
+        }
+        for index in range(3)
+    ] + [
+        {
+            "action": "interested",
+            "job": {"id": "support-positive", "title": "Staff Technical Support Engineer"},
+        }
+    ]
+
+    score = build_shadow_order(
+        [item], preferences={}, positive_titles=[], feedback_events=feedback
+    )[1]["job-1"]
+
+    assert score["learning_sources"]["seniority_pattern"] == {
+        "level": "senior",
+        "negative_same_level": 0,
+        "positive_same_level": 0,
+        "positive_other_level": 0,
+        "applied": False,
+    }

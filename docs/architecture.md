@@ -191,6 +191,37 @@ generated cache records remain outside Git and outside authoritative inventory
 state. The portal may display this metadata, but quick screening never filters,
 hides, or reorders job inventory.
 
+The version 5 screening packet also carries the user's bounded explicit
+`preferred_job_attributes` and `avoided_job_attributes`. They are sent in the
+same semantic-screen request; no second model stage or preference retriever is
+introduced. The result keeps preference assessments separate from résumé fit
+and deterministic eligibility, requires complete assessment coverage, and
+validates every cited posting excerpt locally.
+
+The same criterion-driven screen recommends the closest active directional
+resume without another provider request. The service intersects each validated
+criterion judgment with the canonical fact IDs visibly cited by each resume,
+then passes the resulting criterion matrix to the same gate-first classifier
+used by formal CLI matching. Missing bounded retrieval remains `Unknown match`;
+it is never converted into a weak resume or an assertion that the candidate
+lacks experience. Resume paths and content hashes are part of the screen cache
+identity, so editing or retiring a direction invalidates its old recommendation.
+Applying pins the selected path, hash, and match label at that moment. A minted
+same-job tailored resume still takes precedence.
+
+Posting interpretation and private fit use separate model routes. The
+candidate-independent interpretation uses the configured reasoning model and
+contains only public posting text. The bounded fit request uses the configured
+fast model and is the only stage that receives private candidate evidence. This
+improves extraction quality independently without adding another resume-matching
+call or increasing the private context sent to a provider.
+
+Interactive manual quick screens use the already-built posting-wide evidence
+packet in one provider stage. That stage has a hard 15-second wall-clock
+deadline and does not retry automatically. Criterion-driven posting
+interpretation remains separate from this blocking click path. Other agent
+workflows keep their normal retry behavior and provider limits.
+
 Quick-screen calibration is a separate offline boundary. Human-reviewed JSON
 cases refer to the stable criterion IDs created by posting interpretation and
 identify the canonical facts that are relevant to each criterion. The

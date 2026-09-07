@@ -95,7 +95,8 @@ resume-builder agent ask "What new jobs are ready to review?"
 ```
 
 Use `--model-tier reasoning` or `--model-tier writing` only when the task needs
-the stronger configured model. The default `fast` tier minimizes routine cost.
+the stronger configured model. The default `fast` tier minimizes routine cost
+and uses OpenRouter's `:nitro` provider routing to prioritize throughput.
 
 ## Configure private Telegram conversations
 
@@ -359,6 +360,14 @@ Onsite and hybrid roles use `accepted_location_terms`. Setting
 supplying terms restricts remote eligibility to those areas, while omitting the
 field preserves the legacy shared-location behavior.
 
+`preferred_job_attributes` and `avoided_job_attributes` store up to twenty
+plain-language statements each about work the user explicitly wants or avoids.
+They are personal interest signals, not candidate evidence or eligibility
+requirements. The quick screen evaluates every saved statement in its existing
+provider call and returns `match`, `conflict`, or `unknown` with posting evidence
+for every non-unknown judgment. Changing these fields changes the screening
+packet hash, so an older cached screen is not reused.
+
 ## Screen a complete new-job queue
 
 The batch command reuses the same per-job `ScreeningResult`; it does not create
@@ -388,11 +397,29 @@ job from the active view.
 `shadow_personalized_order` is a third, evaluation-only view. It contains every
 active job exactly once and cannot affect `suggested_order`, notifications, or
 visibility. Its explainable score may use explicit preference matches,
-structured semantic fit, and title similarity to previously applied-to jobs as
-positive evidence. Ignored jobs and reasonless `not_interested` dispositions
-are never learned as negative rules. A configurable exploration fraction
+structured semantic fit, title similarity to previously applied-to jobs, and
+positive posting opens, Interested decisions, and applications. Opening the
+original posting is recorded at most once per job and remains a weak signal;
+Interested is stronger and an application is strongest. The portal records
+these actions without asking the user to classify the algorithm. Feedback is
+stored in `job-search/job-feedback.json` with a small job and current-screen
+snapshot, including deterministic seniority and the already-extracted criteria. This lets otherwise-similar
+titles differ by their stated duties without another model call. The format
+also retains optional reasons for future confirmed preferences supplied through
+the agent.
+Positive actions modestly affect similar screened jobs; an explicitly named
+trait affects similar jobs only after three consistent reasoned choices. A configurable exploration fraction
 interleaves lower-ranked jobs so shadow evaluation can reveal useful
 opportunities that personalization would otherwise push down.
+Seniority learning also stays shadow-only. It modestly lowers a level within a
+similar role family only after at least three negative decisions, at least two
+more negative than positive decisions at that level, and at least one Interested
+or Applied decision at another level.
+Historical events derive missing seniority from their saved titles.
+
+The portal job list projects completed, skipped, and failed metadata from this
+same screening artifact. It does not run screening while browsing, and jobs
+without an attempted background screen remain unlabeled.
 
 Explicit preference changes use the deterministic `resume-builder preferences`
 service. An agent may translate a clear instruction into validated `set`,
@@ -400,6 +427,10 @@ service. An agent may translate a clear instruction into validated `set`,
 and confirmation hash instead of editing YAML directly. The service rechecks
 local jobs only: it cannot start collection, call a model, change application
 dispositions, or delete inventory. Ignored jobs remain neutral.
+The portal assistant exposes this same proposal/apply boundary for explicit
+plain-language job characteristics. It never learns a durable preference from a
+single Interested or Not interested action, and the confirmation card must be
+accepted before the preference file changes.
 
 Configure only the safe shadow behavior in `job-search/preferences.yml`:
 

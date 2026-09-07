@@ -1,14 +1,14 @@
 import { useDeferredValue, useEffect, useRef, useState } from "react";
 import {
   activateJobSearch, getBlockedCompanies, getJobFilterDefaults, getJobs, getJobSources,
-  getSearchPreferences, markJobApplied, markJobNotInterested, setCompanyBlocked, startJobScan,
+  getSearchPreferences, markJobApplied, saveJobFeedback, setCompanyBlocked, startJobScan,
 } from "../api";
 import { EmptyState, ErrorMessage, LoadingRows, SearchField } from "../components";
 import { JobViewFilters } from "../JobViewFilters";
 import { JobDetailPanel } from "../jobs/JobDetailPanel";
 import { formatCompactCurrency, formatWorkModes } from "../jobs/jobFormatters";
 import { JobRow } from "../jobs/JobRow";
-import type { Job, JobFilters, SearchPreferences, ViewFilters } from "../types";
+import type { Job, JobFeedback, JobFeedbackAction, JobFilters, JobScreenResult, SearchPreferences, ViewFilters } from "../types";
 import { EMPTY_FILTERS, persistView, restoreView } from "../viewPreferences";
 
 const DATE_FILTERS = [
@@ -36,7 +36,7 @@ export function JobsPage() {
   const [queueError, setQueueError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [queueRevision, setQueueRevision] = useState(0);
-  const [pendingAction, setPendingAction] = useState<"not-interested" | "applied" | null>(null);
+  const [pendingAction, setPendingAction] = useState<JobFeedbackAction | "applied" | null>(null);
   const [notice, setNotice] = useState("");
   const [blockedCompanies, setBlockedCompanies] = useState<string[]>([]);
   const [companyBusy, setCompanyBusy] = useState(false);
@@ -158,20 +158,42 @@ export function JobsPage() {
     window.requestAnimationFrame(() => selectedOrigin.current?.focus());
   }
 
-  async function dispositionSelected(disposition: "not-interested" | "applied") {
-    if (!selected || pendingAction || companyBusy) return;
+  function updateQuickScreen(screen: JobScreenResult) {
+    const resume = screen.result.resume_match;
+    setJobs((current) => current.map((job) => job.id === screen.result.job_id ? {
+      ...job,
+      quick_screen: {
+        status: "complete",
+        label: resume?.label.replace(/ match$/, "") || screen.result.fit_label,
+        resume_name: resume?.name || null,
+        generated_at: null,
+      },
+    } : job));
+  }
+
+  async function dispositionSelected(
+    disposition: JobFeedbackAction | "applied",
+  ): Promise<JobFeedback | null> {
+    if (!selected || pendingAction || companyBusy) return null;
     const job = selected;
     setPendingAction(disposition); setError("");
     try {
+      if (disposition === "interested") {
+        const result = await saveJobFeedback(job.id, disposition, []);
+        setNotice(`Preference saved for ${job.title}.`);
+        return result;
+      }
       if (disposition === "applied") await markJobApplied(job.id);
-      else await markJobNotInterested(job.id);
+      else await saveJobFeedback(job.id, disposition, []);
       setLoading(true);
       focusQueueAfterRefresh.current = true;
       setQueueRevision((value) => value + 1);
       setSelected(null);
       setNotice(disposition === "applied" ? `${job.title} moved to Applications.` : `${job.title} removed from your job inventory.`);
+      return null;
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not update this job");
+      return null;
     } finally { setPendingAction(null); }
   }
 
@@ -230,7 +252,7 @@ export function JobsPage() {
           </>}
         </section>
 
-        {selected && <JobDetailPanel job={selected} companyBlocked={selectedCompanyBlocked} companyBusy={companyBusy} pendingAction={pendingAction} queueLoading={loading} onClose={closeJob} onChangeCompany={changeCompany} onDisposition={dispositionSelected} />}
+        {selected && <JobDetailPanel job={selected} companyBlocked={selectedCompanyBlocked} companyBusy={companyBusy} pendingAction={pendingAction} queueLoading={loading} onClose={closeJob} onChangeCompany={changeCompany} onDisposition={dispositionSelected} onScreened={updateQuickScreen} />}
       </div>
     </div>
   );

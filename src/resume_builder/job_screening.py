@@ -23,7 +23,14 @@ from pydantic import (
 
 from job_puller.locations import location_key, matches_search_location, matching_location_terms
 
+from .job_personalization import extract_seniority
 from .posting_interpretation import bound_posting_description
+from .resume_screening import (
+    DirectionalResumeCandidate,
+    ResumeMatchSummary,
+    classify_directional_resumes,
+    resume_revision,
+)
 from .salary_estimation import (
     SALARY_INSTRUCTIONS,
     SalaryEstimate,
@@ -42,12 +49,18 @@ from .screening_evidence import (
     ScreeningEvidenceSelection,
 )
 
-SCREENING_SCHEMA_VERSION = 4
-SCREENING_RUBRIC_VERSION = 4
+SCREENING_SCHEMA_VERSION = 5
+SCREENING_RUBRIC_VERSION = 5
 MAX_DESCRIPTION_CHARS = 16_000
 MAX_CAPABILITIES = 40
 ProfileTerm = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 Finding = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+_CAREER_YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
+_CAREER_STAGE_CRITERION = re.compile(
+    r"\b(?:campus hire|new grad(?:uate)?|recent graduate|currently pursuing|"
+    r"\d+\s*(?:[-\u2013\u2014]|to)\s*\d+\s+years?)\b",
+    re.IGNORECASE,
+)
 
 
 class StrictModel(BaseModel):
@@ -103,6 +116,17 @@ class CriterionAssessmentOutcome(StrEnum):
     APPARENT_GAP = "apparent_gap"
 
 
+class PreferenceDirection(StrEnum):
+    PREFER = "prefer"
+    AVOID = "avoid"
+
+
+class PreferenceAssessmentOutcome(StrEnum):
+    MATCH = "match"
+    CONFLICT = "conflict"
+    UNKNOWN = "unknown"
+
+
 class CandidateScreeningProfile(StrictModel):
     """Explicit candidate inputs; unset fields must never become assumptions."""
 
@@ -152,8 +176,8 @@ class ScreeningJob(StrictModel):
 
 
 class ScreeningPacket(StrictModel):
-    schema_version: Literal[4] = 4
-    rubric_version: Literal[4] = 4
+    schema_version: Literal[5] = 5
+    rubric_version: Literal[5] = 5
     job: ScreeningJob
     profile: CandidateScreeningProfile
     deterministic_prescreen: dict[str, Any]
@@ -170,7 +194,13 @@ class ScreeningPacket(StrictModel):
     candidate_evidence_characters: int = Field(ge=0)
     evidence_strategy: EvidenceStrategy = EvidenceStrategy.POSTING_WIDE
     criterion_evidence: list[CriterionEvidenceMatch] = Field(default_factory=list, max_length=30)
+    resume_revision: str = ""
+    directional_resumes: list[DirectionalResumeCandidate] = Field(
+        default_factory=list, max_length=20, exclude=True, repr=False
+    )
     posting_coverage: Literal["complete", "partial"]
+    preferred_job_attributes: list[ProfileTerm] = Field(default_factory=list, max_length=20)
+    avoided_job_attributes: list[ProfileTerm] = Field(default_factory=list, max_length=20)
     interpretation_description: str = Field(
         default="", max_length=MAX_DESCRIPTION_CHARS, exclude=True, repr=False
     )
@@ -196,12 +226,31 @@ class CriterionAssessment(StrictModel):
     materially_affects_recommendation: bool = False
 
 
+class PreferenceAssessment(StrictModel):
+    """One explicit user preference judged only against supplied posting text."""
+
+    preference: ProfileTerm
+    direction: PreferenceDirection
+    outcome: PreferenceAssessmentOutcome
+    explanation: Finding
+    posting_evidence: Finding | None = None
+
+    @model_validator(mode="after")
+    def require_evidence_for_judgments(self) -> PreferenceAssessment:
+        if self.outcome == PreferenceAssessmentOutcome.UNKNOWN and self.posting_evidence:
+            raise ValueError("unknown preference assessments cannot cite posting evidence")
+        if self.outcome != PreferenceAssessmentOutcome.UNKNOWN and not self.posting_evidence:
+            raise ValueError("preference matches and conflicts require posting evidence")
+        return self
+
+
 class SemanticScreen(StrictModel):
     """Model-owned fit judgment. Eligibility is intentionally absent."""
 
     fit: FitOutcome
     confidence: Confidence
     criterion_assessments: list[CriterionAssessment] = Field(default_factory=list, max_length=30)
+    preference_assessments: list[PreferenceAssessment] = Field(default_factory=list, max_length=40)
     strengths: list[CitedFinding] = Field(default_factory=list, max_length=5)
     gaps: list[Finding] = Field(default_factory=list, max_length=5)
     unknowns: list[Finding] = Field(default_factory=list, max_length=5)
@@ -236,7 +285,7 @@ class SemanticScreen(StrictModel):
 
 
 class ScreeningResult(StrictModel):
-    schema_version: Literal[4] = 4
+    schema_version: Literal[5] = 5
     job_id: str
     packet_hash: str
     eligibility: EligibilityStatus
@@ -249,7 +298,7 @@ class ScreeningResult(StrictModel):
     unknowns: list[str]
     stretch_case: str | None
     reasoning_summary: str
-    rubric_version: Literal[4] = 4
+    rubric_version: Literal[5] = 5
     model: str
     generated_at: str
     salary_estimate: SalaryEstimate | None = None
@@ -260,6 +309,8 @@ class ScreeningResult(StrictModel):
     evidence_strategy: EvidenceStrategy = EvidenceStrategy.POSTING_WIDE
     criterion_evidence: list[CriterionEvidenceMatch] = Field(default_factory=list, max_length=30)
     criterion_assessments: list[CriterionAssessment] = Field(default_factory=list, max_length=30)
+    preference_assessments: list[PreferenceAssessment] = Field(default_factory=list, max_length=40)
+    resume_match: ResumeMatchSummary | None = None
 
 
 _NO_SPONSORSHIP_PATTERNS = (
@@ -775,6 +826,8 @@ def build_screening_packet(
             match.model_dump(mode="json") for match in selected_evidence.criterion_matches
         ],
         "posting_coverage": "partial" if description_truncated else "complete",
+        "preferred_job_attributes": preferences.get("preferred_job_attributes") or [],
+        "avoided_job_attributes": preferences.get("avoided_job_attributes") or [],
     }
     return ScreeningPacket.model_validate(
         {
@@ -810,6 +863,23 @@ def with_screening_evidence(
     )
 
 
+def with_directional_resumes(
+    packet: ScreeningPacket, candidates: Sequence[DirectionalResumeCandidate]
+) -> ScreeningPacket:
+    """Bind active resume revisions locally without sending resume files to the model."""
+    payload = packet.model_dump(mode="json", exclude={"packet_hash", "directional_resumes"})
+    payload["resume_revision"] = resume_revision(candidates)
+    return ScreeningPacket.model_validate(
+        {
+            **payload,
+            "packet_hash": _hash_json(payload),
+            "directional_resumes": list(candidates),
+            "interpretation_description": packet.interpretation_description,
+            "interpretation_description_truncated": packet.interpretation_description_truncated,
+        }
+    )
+
+
 SCREENING_INSTRUCTIONS = (
     """\
 You screen one job against only the supplied candidate profile and deterministic evidence.
@@ -818,6 +888,13 @@ Judge career fit only; do not decide eligibility and do not override determinist
 Candidate evidence cards are the only proof of candidate capabilities. Search-interest fields and
 job-description terms are navigation signals, never candidate evidence. Every strength must cite
 one to five fact_ids from candidate_evidence. Do not cite an ID that is not supplied.
+Judge every preferred_job_attribute and avoided_job_attribute separately against the supplied job
+posting. These are personal interests, never qualifications or eligibility requirements. Return
+exactly one preference_assessment for every supplied attribute, preserving its text and direction.
+Use match when the posting supports what the user prefers or avoids what they dislike. Use conflict
+when the posting conflicts with what the user prefers or contains what they dislike. Otherwise use
+unknown. Every match or conflict must quote a short exact substring from the supplied job title,
+company, location, work mode, employment type, or description. Unknown must not cite evidence.
 When criterion_evidence is present, evaluate those criteria rather than rediscovering the role shape.
 Return exactly one criterion_assessment for every criterion whose status is not
 not-resume-evaluable. Use only these outcomes: supported, partially_supported, transferable,
@@ -857,9 +934,60 @@ def screening_prompt(packet: ScreeningPacket) -> str:
     )
 
 
+def _established_career_span(packet: ScreeningPacket) -> tuple[int, list[str]]:
+    """Derive a conservative work-history span from confirmed role cards."""
+    role_cards = [
+        card
+        for card in packet.candidate_evidence
+        if card.category == "employment" and card.fact_type == "role"
+    ]
+    years = [
+        int(year)
+        for card in role_cards
+        for year in _CAREER_YEAR.findall(f"{card.title} {card.excerpt}")
+    ]
+    if len(role_cards) < 2 or len(years) < 2:
+        return 0, []
+    return max(years) - min(years), [card.fact_id for card in role_cards]
+
+
+def _early_career_criterion_ids(packet: ScreeningPacket) -> set[str]:
+    return {
+        item.criterion_id
+        for item in packet.criterion_evidence
+        if _CAREER_STAGE_CRITERION.search(f"{item.label} {item.description}")
+    }
+
+
 def finalize_screen(
     packet: ScreeningPacket, semantic: SemanticScreen, *, model: str
 ) -> ScreeningResult:
+    expected_preferences = {
+        (PreferenceDirection.PREFER, value) for value in packet.preferred_job_attributes
+    } | {(PreferenceDirection.AVOID, value) for value in packet.avoided_job_attributes}
+    returned_preferences = {
+        (item.direction, item.preference) for item in semantic.preference_assessments
+    }
+    if len(returned_preferences) != len(semantic.preference_assessments):
+        raise ValueError("preference assessments must be unique")
+    if returned_preferences != expected_preferences:
+        raise ValueError("screening must assess every supplied job preference exactly once")
+    posting_text = "\n".join(
+        [
+            packet.job.title,
+            packet.job.company,
+            packet.job.location,
+            " ".join(packet.job.work_modes),
+            packet.job.employment_type or "",
+            packet.job.description,
+        ]
+    ).casefold()
+    for preference_assessment in semantic.preference_assessments:
+        if (
+            preference_assessment.posting_evidence
+            and preference_assessment.posting_evidence.casefold() not in posting_text
+        ):
+            raise ValueError("preference assessment posting evidence was not supplied in the job")
     cards = {card.fact_id: card for card in packet.candidate_evidence}
     assessment_cited_ids = {
         fact_id for assessment in semantic.criterion_assessments for fact_id in assessment.fact_ids
@@ -891,29 +1019,29 @@ def finalize_screen(
                 "criterion-driven screening requires exactly one assessment for every "
                 f"resume-evaluable criterion; missing={missing}, unexpected={unexpected}"
             )
-        for criterion_id, assessment in assessments.items():
+        for criterion_id, criterion_assessment in assessments.items():
             criterion_match = criteria[criterion_id]
             if criterion_match.status == CriterionEvidenceStatus.NO_CANDIDATE_EVIDENCE:
-                if assessment.outcome != CriterionAssessmentOutcome.UNKNOWN:
+                if criterion_assessment.outcome != CriterionAssessmentOutcome.UNKNOWN:
                     raise ValueError("a no-candidate-evidence criterion must remain unknown")
-                if assessment.fact_ids:
+                if criterion_assessment.fact_ids:
                     raise ValueError("an unknown criterion assessment cannot cite facts")
-            invalid = sorted(set(assessment.fact_ids) - set(criterion_match.fact_ids))
+            invalid = sorted(set(criterion_assessment.fact_ids) - set(criterion_match.fact_ids))
             if invalid:
                 raise ValueError(
                     "criterion assessment cited evidence outside its criterion retrieval: "
                     + ", ".join(invalid)
                 )
-            if assessment.outcome == CriterionAssessmentOutcome.UNKNOWN:
-                if assessment.fact_ids:
+            if criterion_assessment.outcome == CriterionAssessmentOutcome.UNKNOWN:
+                if criterion_assessment.fact_ids:
                     raise ValueError("an unknown criterion assessment cannot cite facts")
-            elif not assessment.fact_ids:
+            elif not criterion_assessment.fact_ids:
                 raise ValueError(
                     f"criterion assessment {criterion_id} requires supporting fact_ids"
                 )
-            if assessment.outcome == CriterionAssessmentOutcome.SUPPORTED and not any(
+            if criterion_assessment.outcome == CriterionAssessmentOutcome.SUPPORTED and not any(
                 cards[fact_id].strength == EvidenceStrength.DEMONSTRATED
-                for fact_id in assessment.fact_ids
+                for fact_id in criterion_assessment.fact_ids
             ):
                 raise ValueError("supported criterion assessment requires demonstrated evidence")
     for finding in semantic.strengths:
@@ -940,6 +1068,8 @@ def finalize_screen(
                 )
     fit = semantic.fit
     confidence = semantic.confidence
+    if fit == FitOutcome.INSUFFICIENT_INFORMATION:
+        confidence = Confidence.LOW
     if packet.posting_coverage == "partial" and confidence == Confidence.HIGH:
         confidence = Confidence.MEDIUM
     demonstrated = any(
@@ -970,6 +1100,54 @@ def finalize_screen(
         fit = FitOutcome.GOOD_MATCH
         if confidence == Confidence.HIGH:
             confidence = Confidence.MEDIUM
+    gaps = list(semantic.gaps)
+    strengths = list(semantic.strengths)
+    reasoning_summary = semantic.reasoning_summary
+    criterion_assessments = list(semantic.criterion_assessments)
+    career_span, career_role_ids = _established_career_span(packet)
+    entry_level_target = extract_seniority(
+        {"title": packet.job.title, "description": packet.job.description}
+    ) in {"new_grad", "entry"}
+    if entry_level_target and career_span >= 5:
+        stage_criterion_ids = _early_career_criterion_ids(packet)
+        corrected: list[CriterionAssessment] = []
+        for assessment in criterion_assessments:
+            if assessment.criterion_id not in stage_criterion_ids:
+                corrected.append(assessment)
+                continue
+            criterion = criteria[assessment.criterion_id]
+            stage_ids = [fact_id for fact_id in career_role_ids if fact_id in criterion.fact_ids]
+            corrected.append(
+                assessment.model_copy(
+                    update={
+                        "outcome": CriterionAssessmentOutcome.APPARENT_GAP,
+                        "confidence": Confidence.HIGH,
+                        "fact_ids": stage_ids[:3],
+                        "explanation": (
+                            f"Confirmed work history spans about {career_span} years, while the "
+                            "posting explicitly targets entry-level, campus-hire, or recent-"
+                            "graduate candidates."
+                        ),
+                        "materially_affects_recommendation": True,
+                    }
+                )
+            )
+        criterion_assessments = corrected
+        strengths = [
+            finding for finding in strengths if finding.criterion_id not in stage_criterion_ids
+        ]
+        stage_gap = (
+            "The posting targets entry-level, campus-hire, or recent-graduate candidates, while "
+            f"confirmed work history spans about {career_span} years."
+        )
+        if stage_gap not in gaps:
+            gaps.insert(0, stage_gap)
+        reasoning_summary = (
+            f"{stage_gap} Technical overlap does not make this a suitable career-level match."
+        )
+        fit = FitOutcome.WEAK_FIT
+        confidence = Confidence.HIGH
+        cited_ids.update(career_role_ids)
     estimate = None
     if packet.salary_context is not None:
         estimate = validate_salary_estimate(
@@ -984,14 +1162,14 @@ def finalize_screen(
         )
     if packet.eligibility == EligibilityStatus.INELIGIBLE:
         recommendation = Recommendation.DO_NOT_APPLY
+    elif fit == FitOutcome.WEAK_FIT:
+        recommendation = Recommendation.DEPRIORITIZE
     elif packet.eligibility == EligibilityStatus.UNKNOWN:
         recommendation = Recommendation.VERIFY_ELIGIBILITY
     elif fit in {FitOutcome.STRONG_MATCH, FitOutcome.GOOD_MATCH}:
         recommendation = Recommendation.PURSUE
     elif fit == FitOutcome.WORTHWHILE_STRETCH:
         recommendation = Recommendation.PURSUE_AS_STRETCH
-    elif fit == FitOutcome.WEAK_FIT:
-        recommendation = Recommendation.DEPRIORITIZE
     else:
         recommendation = Recommendation.NEEDS_MORE_EVIDENCE
     return ScreeningResult(
@@ -1002,11 +1180,11 @@ def finalize_screen(
         recommendation=recommendation,
         confidence=confidence,
         constraints=packet.constraints,
-        strengths=semantic.strengths,
-        gaps=semantic.gaps,
+        strengths=strengths,
+        gaps=gaps,
         unknowns=semantic.unknowns,
         stretch_case=semantic.stretch_case,
-        reasoning_summary=semantic.reasoning_summary,
+        reasoning_summary=reasoning_summary,
         model=model,
         generated_at=datetime.now(UTC).isoformat(),
         salary_estimate=estimate,
@@ -1016,8 +1194,136 @@ def finalize_screen(
         evidence_used=[cards[fact_id] for fact_id in sorted(cited_ids)],
         evidence_strategy=packet.evidence_strategy,
         criterion_evidence=packet.criterion_evidence,
-        criterion_assessments=semantic.criterion_assessments,
+        criterion_assessments=criterion_assessments,
+        preference_assessments=semantic.preference_assessments,
+        resume_match=classify_directional_resumes(
+            packet.directional_resumes,
+            packet.criterion_evidence,
+            criterion_assessments,
+            posting_complete=packet.posting_coverage == "complete",
+        ),
     )
+
+
+def _complete_preference_assessments(
+    packet: ScreeningPacket, semantic: SemanticScreen
+) -> SemanticScreen:
+    """Fill omitted preference bookkeeping without inventing a model judgment."""
+    expected = [
+        (direction, preference)
+        for direction, preferences in (
+            (PreferenceDirection.PREFER, packet.preferred_job_attributes),
+            (PreferenceDirection.AVOID, packet.avoided_job_attributes),
+        )
+        for preference in preferences
+    ]
+    returned = {(item.direction, item.preference): item for item in semantic.preference_assessments}
+    if len(returned) != len(semantic.preference_assessments):
+        raise ValueError("preference assessments must be unique")
+    unexpected = sorted(set(returned) - set(expected))
+    if unexpected:
+        raise ValueError("screening returned a preference that was not supplied")
+    completed = [
+        returned.get(
+            key,
+            PreferenceAssessment(
+                preference=key[1],
+                direction=key[0],
+                outcome=PreferenceAssessmentOutcome.UNKNOWN,
+                explanation="The model did not assess this preference from the posting.",
+            ),
+        )
+        for key in expected
+    ]
+    return semantic.model_copy(update={"preference_assessments": completed})
+
+
+def _derive_criterion_strengths(
+    packet: ScreeningPacket, semantic: SemanticScreen
+) -> list[CitedFinding]:
+    """Build display strengths only from validated criterion assessments."""
+    if not packet.criterion_evidence:
+        return semantic.strengths
+    positive = {
+        CriterionAssessmentOutcome.SUPPORTED,
+        CriterionAssessmentOutcome.PARTIALLY_SUPPORTED,
+        CriterionAssessmentOutcome.TRANSFERABLE,
+    }
+    return [
+        CitedFinding(
+            statement=assessment.explanation,
+            fact_ids=assessment.fact_ids,
+            criterion_id=assessment.criterion_id,
+        )
+        for assessment in semantic.criterion_assessments
+        if assessment.outcome in positive and assessment.fact_ids
+    ]
+
+
+def _normalize_criterion_assessments(
+    packet: ScreeningPacket, semantic: SemanticScreen
+) -> list[CriterionAssessment]:
+    """Conservatively bind model assessments to locally retrieved evidence."""
+    if not packet.criterion_evidence:
+        return semantic.criterion_assessments
+    criteria = {
+        item.criterion_id: item
+        for item in packet.criterion_evidence
+        if item.status != CriterionEvidenceStatus.NOT_RESUME_EVALUABLE
+    }
+    returned = {item.criterion_id: item for item in semantic.criterion_assessments}
+    if len(returned) != len(semantic.criterion_assessments):
+        raise ValueError("criterion-driven screening requires unique criterion assessments")
+    unexpected = sorted(set(returned) - set(criteria))
+    if unexpected:
+        raise ValueError("screening returned a criterion that was not supplied")
+    cards = {card.fact_id: card for card in packet.candidate_evidence}
+    normalized: list[CriterionAssessment] = []
+    for criterion_id, criterion in criteria.items():
+        assessment = returned.get(criterion_id)
+        if assessment is None or criterion.status == CriterionEvidenceStatus.NO_CANDIDATE_EVIDENCE:
+            normalized.append(
+                CriterionAssessment(
+                    criterion_id=criterion_id,
+                    outcome=CriterionAssessmentOutcome.UNKNOWN,
+                    confidence=Confidence.LOW,
+                    explanation="No criterion-scoped candidate evidence was available.",
+                )
+            )
+            continue
+        valid_ids = [fact_id for fact_id in assessment.fact_ids if fact_id in criterion.fact_ids]
+        if assessment.outcome == CriterionAssessmentOutcome.UNKNOWN or not valid_ids:
+            normalized.append(
+                assessment.model_copy(
+                    update={
+                        "outcome": CriterionAssessmentOutcome.UNKNOWN,
+                        "confidence": Confidence.LOW,
+                        "fact_ids": [],
+                        "explanation": "No criterion-scoped candidate evidence was available.",
+                        "materially_affects_recommendation": False,
+                    }
+                )
+            )
+            continue
+        if assessment.outcome == CriterionAssessmentOutcome.SUPPORTED and not any(
+            cards[fact_id].strength == EvidenceStrength.DEMONSTRATED for fact_id in valid_ids
+        ):
+            normalized.append(
+                assessment.model_copy(
+                    update={
+                        "outcome": CriterionAssessmentOutcome.TRANSFERABLE,
+                        "confidence": Confidence.MEDIUM,
+                        "fact_ids": valid_ids,
+                        "explanation": (
+                            "Retrieved evidence is related but does not directly demonstrate "
+                            "this criterion."
+                        ),
+                    }
+                )
+            )
+            continue
+        normalized.append(assessment.model_copy(update={"fact_ids": valid_ids}))
+    return normalized
 
 
 def semantic_screen_output_type(packet: ScreeningPacket) -> type[SemanticScreen]:
@@ -1026,12 +1332,34 @@ def semantic_screen_output_type(packet: ScreeningPacket) -> type[SemanticScreen]
     class PacketBoundSemanticScreen(SemanticScreen):
         @model_validator(mode="after")
         def validate_packet_contract(self) -> PacketBoundSemanticScreen:
+            completed = _complete_preference_assessments(packet, self)
+            self.preference_assessments = completed.preference_assessments
+            self.criterion_assessments = _normalize_criterion_assessments(packet, self)
+            self.strengths = _derive_criterion_strengths(packet, self)
             finalize_screen(packet, self, model="provider/schema-validation")
             return self
 
     PacketBoundSemanticScreen.__name__ = f"SemanticScreen_{packet.packet_hash[:12]}"
     PacketBoundSemanticScreen.__qualname__ = PacketBoundSemanticScreen.__name__
     return PacketBoundSemanticScreen
+
+
+def _unevaluated_preference_assessments(
+    packet: ScreeningPacket, explanation: str
+) -> list[PreferenceAssessment]:
+    return [
+        PreferenceAssessment(
+            preference=preference,
+            direction=direction,
+            outcome=PreferenceAssessmentOutcome.UNKNOWN,
+            explanation=explanation,
+        )
+        for direction, preferences in (
+            (PreferenceDirection.PREFER, packet.preferred_job_attributes),
+            (PreferenceDirection.AVOID, packet.avoided_job_attributes),
+        )
+        for preference in preferences
+    ]
 
 
 def deterministic_ineligible_result(packet: ScreeningPacket) -> ScreeningResult:
@@ -1065,12 +1393,26 @@ def deterministic_ineligible_result(packet: ScreeningPacket) -> ScreeningResult:
         evidence_used=[],
         evidence_strategy=packet.evidence_strategy,
         criterion_evidence=packet.criterion_evidence,
+        preference_assessments=_unevaluated_preference_assessments(
+            packet,
+            "The job was excluded by an explicit requirement before personal preferences were evaluated.",
+        ),
     )
 
 
 def deterministic_insufficient_evidence_result(packet: ScreeningPacket) -> ScreeningResult:
     """Avoid paying a provider to rediscover that no candidate evidence was available."""
     criterion_driven = packet.evidence_strategy == EvidenceStrategy.CRITERION_DRIVEN
+    criterion_assessments = [
+        CriterionAssessment(
+            criterion_id=item.criterion_id,
+            outcome=CriterionAssessmentOutcome.UNKNOWN,
+            confidence=Confidence.LOW,
+            explanation="No relevant confirmed career evidence was retrieved.",
+        )
+        for item in packet.criterion_evidence
+        if item.status != CriterionEvidenceStatus.NOT_RESUME_EVALUABLE
+    ]
     return ScreeningResult(
         job_id=packet.job.id,
         packet_hash=packet.packet_hash,
@@ -1105,16 +1447,17 @@ def deterministic_insufficient_evidence_result(packet: ScreeningPacket) -> Scree
         evidence_used=[],
         evidence_strategy=packet.evidence_strategy,
         criterion_evidence=packet.criterion_evidence,
-        criterion_assessments=[
-            CriterionAssessment(
-                criterion_id=item.criterion_id,
-                outcome=CriterionAssessmentOutcome.UNKNOWN,
-                confidence=Confidence.LOW,
-                explanation="No relevant confirmed career evidence was retrieved.",
-            )
-            for item in packet.criterion_evidence
-            if item.status != CriterionEvidenceStatus.NOT_RESUME_EVALUABLE
-        ],
+        criterion_assessments=criterion_assessments,
+        preference_assessments=_unevaluated_preference_assessments(
+            packet,
+            "Personal preferences were not evaluated because no relevant confirmed career evidence was available.",
+        ),
+        resume_match=classify_directional_resumes(
+            packet.directional_resumes,
+            packet.criterion_evidence,
+            criterion_assessments,
+            posting_complete=packet.posting_coverage == "complete",
+        ),
     )
 
 

@@ -66,6 +66,23 @@ def test_active_inventory_exposes_stable_consumer_projection(tmp_path):
     assert inventory[0]["url"] == "https://example.com/apply/1"
 
 
+def test_active_inventory_decodes_legacy_windows_1252_posting_text(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    db.record_result(result(observation()))
+    job_id = str(db.active_inventory()[0]["id"])
+    legacy_text = b"Platform support with a \xa3120,000 salary"
+    with db.connect() as conn:
+        conn.execute(
+            "UPDATE jobs SET description_text=CAST(? AS TEXT) WHERE id=?",
+            (legacy_text, job_id),
+        )
+
+    inventory = db.active_inventory()
+
+    assert inventory[0]["description_text"] == "Platform support with a £120,000 salary"
+
+
 def test_browser_capture_attaches_external_apply_url_without_changing_seen_time(tmp_path):
     db = InventoryDatabase(tmp_path / "inventory.db")
     db.migrate()

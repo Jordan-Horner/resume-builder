@@ -114,7 +114,7 @@ def test_server_derives_exact_excerpt_and_section_from_source_unit_ids() -> None
     assert criterion.source_excerpt == "Operate Kubernetes.\nMaintain Terraform modules."
 
 
-def test_validation_rejects_unknown_or_cross_section_source_units() -> None:
+def test_validation_rejects_unknown_units_and_normalizes_cross_section_citations() -> None:
     packet = build_interpretation_packet(
         _job("Responsibilities\nOperate Kubernetes.\nRequirements\nMaintain Terraform modules.")
     )
@@ -143,8 +143,10 @@ def test_validation_rejects_unknown_or_cross_section_source_units() -> None:
         criteria_complete=True,
     )
 
-    with pytest.raises(ValueError, match="one section"):
-        validate_interpretation(packet, interpretation)
+    normalized = validate_interpretation(packet, interpretation)
+    assert normalized.criteria[0].source_section_id == "section-2"
+    assert normalized.criteria[0].source_unit_ids == ["section-2-unit-1"]
+    assert normalized.criteria_complete is False
 
     unknown = interpretation.model_copy(deep=True)
     unknown.criteria[0].source_unit_ids = ["section-1-unit-99"]
@@ -283,7 +285,7 @@ def test_shadow_section_budget_does_not_change_current_screen_payload() -> None:
     assert "interpretation_description" not in screening_prompt(packet)
 
 
-def test_validation_requires_exact_section_coverage_and_lexically_grounded_excerpt() -> None:
+def test_validation_derives_exact_section_coverage_and_requires_grounded_excerpt() -> None:
     packet = build_interpretation_packet(
         _job("Responsibilities\nOperate the production platform.\nBenefits\nMedical coverage.")
     )
@@ -298,11 +300,13 @@ def test_validation_requires_exact_section_coverage_and_lexically_grounded_excer
         validate_interpretation(packet, invalid)
 
     missing_review = valid.model_copy(update={"section_reviews": valid.section_reviews[:-1]})
-    with pytest.raises(ValueError, match="cover the packet exactly"):
-        validate_interpretation(packet, missing_review)
+    derived = validate_interpretation(packet, missing_review)
+    assert [review.section_id for review in derived.section_reviews] == [
+        section.id for section in packet.sections
+    ]
 
 
-def test_packet_bound_interpretation_rejects_cross_section_citations() -> None:
+def test_packet_bound_interpretation_normalizes_cross_section_citations() -> None:
     packet = build_interpretation_packet(
         _job(
             "Responsibilities\nOperate the production platform.\n"
@@ -315,8 +319,10 @@ def test_packet_bound_interpretation_rejects_cross_section_citations() -> None:
         packet.sections[1].source_units[0].id,
     ]
 
-    with pytest.raises(ValueError, match="must belong to one section"):
-        posting_interpretation_output_type(packet).model_validate(invalid.model_dump())
+    output_type = posting_interpretation_output_type(packet)
+    normalized = validate_interpretation(packet, output_type.model_validate(invalid.model_dump()))
+    assert len(normalized.criteria[0].source_unit_ids) == 1
+    assert normalized.criteria_complete is False
 
 
 def test_validation_rejects_a_criterion_bound_to_the_wrong_source_sentence() -> None:

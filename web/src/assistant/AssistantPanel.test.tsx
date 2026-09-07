@@ -50,6 +50,20 @@ it("renders a resume-removal confirmation separately from wording", async () => 
   await act(async () => Array.from(host.querySelectorAll("button")).find((b) => b.textContent === "Remove résumé")?.click());
   expect(assistantRequest).toHaveBeenCalledWith("/threads/saved/proposals/remove/accept", { method: "POST" });
 });
+it("renders a job-preference confirmation separately from resume wording", async () => {
+  const preference = { ...thread, proposals: [{ id: "preference", status: "pending", message: "", payload: {
+    kind: "job_preference" as const, direction: "avoid" as const, action: "add" as const,
+    statement: "Phone-first support", confirmation_hash: "hash",
+  } }] };
+  vi.mocked(assistantRequest).mockImplementation(async (path) => path === "/status"
+    ? { configured: true, online: true }
+    : path === "/threads" ? { threads: [preference] } : preference);
+  await act(async () => root.render(<AssistantPanel open target={null} onClose={() => undefined} />));
+  expect(host.textContent).toContain("Avoid this kind of work?");
+  expect(host.textContent).toContain("Phone-first support");
+  await act(async () => Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "Save preference")?.click());
+  expect(assistantRequest).toHaveBeenCalledWith("/threads/saved/proposals/preference/accept", { method: "POST" });
+});
 it("renders assistant markdown as readable, safe content", async () => {
   const markdownThread = {
     ...thread,

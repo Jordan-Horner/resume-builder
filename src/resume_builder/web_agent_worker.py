@@ -12,6 +12,11 @@ from .agent import AgentService
 from .agent_config import DEFAULT_AGENT_CONFIG, load_agent_config
 from .agent_contracts import AgentTool, InboundMessage
 from .agent_openrouter import OpenRouterAdapter
+from .job_setup_defaults import PREFERENCES_PATH
+from .jobs import _load_preferences
+from .preferences import PreferenceChangeRequest
+from .preferences import apply as apply_preferences
+from .preferences import propose as propose_preferences
 from .web_agent_resume import apply_wording, read_resume, replacement_source, resume_path
 from .web_agent_state import WebAgentState
 from .web_career import (
@@ -44,6 +49,11 @@ When asked to remove a directional resume from the resume library, use list_dire
 to resolve its stable ID, then call propose_named_resume_removal. If a resume is attached, call
 propose_resume_removal. Never claim that removing it deletes vault evidence. When asked to assess
 the attached job, call screen_job. A restoration also requires a confirmation card.
+You may read the user's saved job preferences. When the user explicitly asks to remember, add,
+remove, prefer, or avoid a job characteristic, call propose_job_preference_change. Do not infer a
+durable preference from casual discussion, one job decision, resume evidence, or application
+history. Job characteristics express what the user wants; never describe them as qualifications or
+eligibility requirements. Every change requires the confirmation card.
 """
 
 
@@ -131,6 +141,51 @@ def run_turn(root: Path, state: WebAgentState, thread_id: str, run_id: str) -> N
             return {"message": "Open a job and choose Discuss job first."}
         return dashboard.screen_job(job_id)
 
+    def get_job_preferences() -> dict[str, list[str]]:
+        """Read the user's explicit preferred and avoided job characteristics."""
+        preferences = _load_preferences(root / PREFERENCES_PATH)
+        return {
+            "preferred": preferences.get("preferred_job_attributes") or [],
+            "avoided": preferences.get("avoided_job_attributes") or [],
+        }
+
+    def propose_job_preference_change(
+        direction: str, action: str, statement: str
+    ) -> dict[str, Any]:
+        """Propose adding or removing one explicit job characteristic for confirmation."""
+        if direction not in {"prefer", "avoid"}:
+            raise ValueError("direction must be prefer or avoid")
+        if action not in {"add", "remove"}:
+            raise ValueError("action must be add or remove")
+        statement = statement.strip()
+        if not statement:
+            raise ValueError("preference statement cannot be empty")
+        field = "preferred_job_attributes" if direction == "prefer" else "avoided_job_attributes"
+        request_values: dict[str, list[str]] = {field: [statement]}
+        request = PreferenceChangeRequest(
+            add=request_values if action == "add" else {},
+            remove=request_values if action == "remove" else {},
+            reason="Explicitly requested in the portal assistant.",
+        )
+        change = propose_preferences(root, request)
+        if not change.changed_fields:
+            raise ValueError("that job preference is already in the requested state")
+        proposal = state.propose(
+            thread_id,
+            {
+                "kind": "job_preference",
+                "direction": direction,
+                "action": action,
+                "statement": statement,
+                "confirmation_hash": change.confirmation_hash,
+            },
+        )
+        return {
+            "proposal_id": proposal["id"],
+            "status": "pending",
+            "preferences_unchanged": True,
+        }
+
     # History comes only from our database, never from client-supplied system/tool messages.
     from .agent_contracts import ConversationTurn
 
@@ -163,6 +218,12 @@ def run_turn(root: Path, state: WebAgentState, thread_id: str, run_id: str) -> N
             propose_named_resume_restore,
         ),
         AgentTool("screen_job", screen_job.__doc__ or "", screen_job),
+        AgentTool("get_job_preferences", get_job_preferences.__doc__ or "", get_job_preferences),
+        AgentTool(
+            "propose_job_preference_change",
+            propose_job_preference_change.__doc__ or "",
+            propose_job_preference_change,
+        ),
     )
     reply = service.respond(
         InboundMessage("portal", thread_id, run["prompt"]),
@@ -183,6 +244,21 @@ def run_proposal(root: Path, state: WebAgentState, thread_id: str, proposal_id: 
     if proposal["status"] != "applying":
         return
     kind = proposal["payload"].get("kind", "wording")
+    if kind == "job_preference":
+        with (root / PREFERENCES_PATH).with_suffix(".assistant.lock").open("a+") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            try:
+                apply_preferences(root, proposal["payload"]["confirmation_hash"])
+            except ValueError as exc:
+                state.finish_proposal(thread_id, proposal_id, "failed", str(exc))
+            else:
+                state.finish_proposal(
+                    thread_id,
+                    proposal_id,
+                    "applied",
+                    "Job preference saved. Future quick screens will use it.",
+                )
+        return
     if kind == "resume_removal":
         try:
             result = archive_directional_resume(root, proposal["payload"])

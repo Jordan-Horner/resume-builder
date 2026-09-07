@@ -1,3 +1,4 @@
+import hashlib
 import json
 from datetime import UTC, datetime, timedelta
 
@@ -5,8 +6,18 @@ import pytest
 import yaml
 
 from resume_builder import web_service
-from resume_builder.job_screening import build_screening_packet, deterministic_ineligible_result
-from resume_builder.web_service import DashboardService, _clean_description
+from resume_builder.agent_config import (
+    DEFAULT_AGENT_CONFIG,
+    load_agent_config,
+    render_default_agent_config,
+)
+from resume_builder.job_screening import (
+    Confidence,
+    build_screening_packet,
+    deterministic_ineligible_result,
+    deterministic_insufficient_evidence_result,
+)
+from resume_builder.web_service import DashboardService, ScreeningInputError, _clean_description
 from resume_builder.workspace import initialize_workspace
 
 
@@ -53,6 +64,144 @@ def test_local_preference_conflict_does_not_claim_candidate_is_unqualified() -> 
     assert presented["screening_label"] == "Preference check"
     assert presented["fit_label"] == "Fit not evaluated"
     assert presented["eligibility_label"] == "Outside your preferences"
+
+
+def test_direct_bright_enrichment_reads_existing_inventory(tmp_path, monkeypatch) -> None:
+    from job_puller.config import load_config, resolve_database_path
+    from job_puller.database import InventoryDatabase
+    from job_puller.models import JobObservation, ProviderResult
+    from job_puller.work_modes import WorkMode, explicit_arrangement
+    from resume_builder import bright_data
+
+    workspace = tmp_path / "workspace"
+    initialize_workspace(workspace, git_name="Example", git_email="example@example.invalid")
+    config_path = workspace / web_service.JOBS_CONFIG
+    config = load_config(config_path)
+    database = InventoryDatabase(resolve_database_path(config_path, config.database_path))
+    database.migrate()
+    now = datetime.now(UTC)
+    database.record_result(
+        ProviderResult(
+            "linkedin:test",
+            "linkedin",
+            [
+                JobObservation(
+                    provider="linkedin",
+                    provider_job_id="1234567890",
+                    title="Platform Engineer",
+                    company="Example",
+                    source_url="https://www.linkedin.com/jobs/view/1234567890",
+                    work_arrangement=explicit_arrangement(
+                        [WorkMode.UNKNOWN], source="linkedin", rule="not_listed"
+                    ),
+                )
+            ],
+            now - timedelta(seconds=1),
+            now,
+            True,
+        )
+    )
+    service = DashboardService(workspace)
+    service.configure_bright_data("fixture-token", True, 100)
+    captured = {}
+
+    def enrich(_database, targets, **kwargs):
+        captured.update(targets=targets, kwargs=kwargs)
+        return {
+            "requested": 1,
+            "improved": 0,
+            "no_change": 1,
+            "failed": 0,
+            "skipped_cached": 0,
+        }
+
+    monkeypatch.setattr(bright_data, "enrich_linkedin_targets", enrich)
+
+    report = service.enrich_bright_data()
+
+    assert len(captured["targets"]) == 1
+    assert captured["kwargs"]["limit"] == 25
+    assert report["requested"] == 1
+    assert "1 unchanged" in report["message"]
+
+
+def test_shallow_insufficient_screen_is_presented_as_incomplete() -> None:
+    packet = build_screening_packet(
+        job("shallow", title="AI Engineer", mode="remote"),
+        {"accepted_work_modes": ["remote"], "screening_profile": {}},
+        {},
+    )
+    result = deterministic_insufficient_evidence_result(packet).model_copy(
+        update={
+            "model": "deepseek/deepseek-v4-flash:nitro",
+            "confidence": Confidence.HIGH,
+            "reasoning_summary": "No candidate evidence was supplied.",
+        }
+    )
+
+    presented = DashboardService._present_screen(result, cached=True)["result"]
+
+    assert presented["fit_label"] == "Screen incomplete"
+    assert presented["confidence"] == "low"
+    assert "Refresh" in presented["reasoning_summary"]
+    assert "not a judgment" in presented["reasoning_summary"]
+
+
+def test_interactive_job_screen_uses_criterion_extraction_before_candidate_screen(
+    tmp_path, monkeypatch
+) -> None:
+    packet = build_screening_packet(
+        job("screen-me", title="Support Engineer", mode="remote"),
+        {"accepted_work_modes": ["remote"], "screening_profile": {}},
+        {},
+    )
+    config_path = tmp_path / DEFAULT_AGENT_CONFIG
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text(render_default_agent_config(), encoding="utf-8")
+    captured: dict[str, object] = {}
+
+    class FakeAdapter:
+        def __init__(self, _config, **kwargs):
+            captured["adapter"] = kwargs
+
+    class FakeScreeningService:
+        def __init__(self, _adapter, _cache, **kwargs):
+            captured["service"] = kwargs
+
+        def screen(self, supplied_packet, **_kwargs):
+            return deterministic_insufficient_evidence_result(supplied_packet), False
+
+    service = DashboardService(tmp_path)
+    monkeypatch.setattr(service, "_screening_packet", lambda _job_id: packet)
+    monkeypatch.setattr(service, "_openrouter_configured", lambda: True)
+    monkeypatch.setattr(service, "_openrouter_key", lambda: "synthetic-test-credential")
+    monkeypatch.setattr(web_service, "OpenRouterAdapter", FakeAdapter)
+    monkeypatch.setattr(web_service, "ScreeningService", FakeScreeningService)
+
+    service.screen_job("screen-me")
+
+    assert captured["adapter"] == {
+        "api_key": "synthetic-test-credential",
+        "timeout_seconds": 25,
+        "retries": 1,
+    }
+    assert captured["service"]["interpretation_service"] is not None
+    assert captured["service"]["interpretation_model"] == load_agent_config(config_path).models.fast
+    assert captured["service"]["vault_root"] == tmp_path / "vault"
+
+
+def test_interactive_job_screen_wraps_input_decoding_failure(tmp_path, monkeypatch, caplog):
+    service = DashboardService(tmp_path)
+    decoding_error = UnicodeDecodeError("utf-8", b"\xa3", 0, 1, "invalid start byte")
+    monkeypatch.setattr(
+        service, "_screening_packet", lambda _job_id: (_ for _ in ()).throw(decoding_error)
+    )
+
+    with pytest.raises(ScreeningInputError, match="could not read one of its inputs"):
+        service.screen_job("legacy-job")
+
+    assert "stage=screening_packet" in caplog.text
+    assert "job_id=legacy-job" in caplog.text
 
 
 @pytest.mark.parametrize("source", ["saved", "environment", "none"])
@@ -132,6 +281,177 @@ def test_jobs_are_searchable_filterable_and_only_leave_after_disposition(
     assert state == {"schema_version": 2, "dismissed_job_ids": ["hybrid-1"]}
 
 
+def test_explicit_job_feedback_is_durable_and_interest_does_not_hide_job(
+    tmp_path, inventory, monkeypatch
+):
+    monkeypatch.setattr(web_service, "iter_records", lambda _root: [])
+    service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
+
+    saved = service.record_job_feedback("remote-1", "interested", ["day_to_day"])
+
+    assert saved["latest"]["action"] == "interested"
+    assert saved["latest"]["reasons"] == ["day_to_day"]
+    assert [item["id"] for item in service.list_jobs()] == [
+        "remote-1",
+        "hybrid-1",
+        "onsite-1",
+    ]
+    payload = json.loads((tmp_path / "job-search/job-feedback.json").read_text())
+    assert payload["schema_version"] == 1
+    assert payload["events"][0]["job"]["description_hash"]
+
+
+def test_opening_posting_records_one_weak_positive_with_screen_snapshot(
+    tmp_path, inventory, monkeypatch
+):
+    for path in (
+        tmp_path / "job-search/config/search.yml",
+        tmp_path / "job-search/preferences.yml",
+        tmp_path / DEFAULT_AGENT_CONFIG,
+    ):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("configured: true\n", encoding="utf-8")
+    service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
+    monkeypatch.setattr(
+        service,
+        "saved_job_screen",
+        lambda _job_id: {
+            "status": "complete",
+            "result": {
+                "fit": "good_match",
+                "recommendation": "pursue",
+                "confidence": "medium",
+                "resume_match": {
+                    "resume_id": "resumes/baselines/support.md",
+                    "name": "Support Engineer",
+                    "label": "Strong match",
+                },
+                "criterion_evidence": [{"criterion_id": "incidents", "label": "Incident response"}],
+                "criterion_assessments": [{"criterion_id": "incidents", "outcome": "supported"}],
+            },
+        },
+    )
+
+    service.record_job_open("remote-1")
+    service.record_job_open("remote-1")
+
+    payload = json.loads((tmp_path / "job-search/job-feedback.json").read_text())
+    assert len(payload["events"]) == 1
+    assert payload["events"][0]["action"] == "opened_posting"
+    assert payload["events"][0]["job"]["screening"] == {
+        "fit": "good_match",
+        "recommendation": "pursue",
+        "confidence": "medium",
+        "resume_match": {
+            "resume_id": "resumes/baselines/support.md",
+            "name": "Support Engineer",
+            "label": "Strong match",
+        },
+        "criteria": [{"label": "Incident response", "outcome": "supported"}],
+    }
+    (tmp_path / "job-search/config/search.yml").unlink()
+    (tmp_path / "job-search/preferences.yml").unlink()
+    (tmp_path / DEFAULT_AGENT_CONFIG).unlink()
+    assert service.job_feedback("remote-1")["latest"] is None
+
+
+def test_job_list_exposes_existing_background_screen_metadata(tmp_path, inventory):
+    output = tmp_path / "job-search/new-job-screens.json"
+    output.parent.mkdir(parents=True)
+    output.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "jobs": [
+                    {
+                        "id": "remote-1",
+                        "screening": {
+                            "status": "complete",
+                            "result": {
+                                "fit": "good_match",
+                                "generated_at": "2026-09-06T12:00:00+00:00",
+                                "resume_match": {
+                                    "name": "Support Engineer",
+                                    "label": "Strong match",
+                                },
+                            },
+                        },
+                    },
+                    {
+                        "id": "hybrid-1",
+                        "screening": {
+                            "status": "skipped",
+                            "reason": "hard_constraint_conflict",
+                        },
+                    },
+                    {
+                        "id": "onsite-1",
+                        "screening": {"status": "failed"},
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
+
+    jobs = {item["id"]: item for item in service.list_jobs()}
+
+    assert jobs["remote-1"]["quick_screen"] == {
+        "status": "complete",
+        "label": "Strong",
+        "resume_name": "Support Engineer",
+        "generated_at": "2026-09-06T12:00:00+00:00",
+    }
+    assert jobs["hybrid-1"]["quick_screen"] == {
+        "status": "skipped",
+        "label": "Outside required preferences",
+        "resume_name": None,
+        "generated_at": None,
+    }
+    assert jobs["onsite-1"]["quick_screen"] == {
+        "status": "failed",
+        "label": "Screen unavailable",
+        "resume_name": None,
+        "generated_at": None,
+    }
+
+
+def test_not_interested_feedback_keeps_reason_and_dismisses_job(tmp_path, inventory, monkeypatch):
+    monkeypatch.setattr(web_service, "iter_records", lambda _root: [])
+    service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
+
+    service.record_job_feedback("hybrid-1", "not_interested", ["phone_support"])
+
+    assert [item["id"] for item in service.list_jobs()] == ["remote-1", "onsite-1"]
+    latest = service.job_feedback("hybrid-1")["latest"]
+    assert latest["action"] == "not_interested"
+    assert latest["reasons"] == ["phone_support"]
+
+
+def test_not_interested_feedback_records_deterministic_seniority(tmp_path, inventory):
+    new_grad = {
+        **inventory[0],
+        "id": "new-grad-1",
+        "title": "Backend Engineer, New Grad",
+    }
+    service = DashboardService(tmp_path, inventory_loader=lambda: [new_grad])
+
+    service.record_job_feedback("new-grad-1", "not_interested", [])
+
+    payload = json.loads((tmp_path / "job-search/job-feedback.json").read_text())
+    assert payload["events"][0]["job"]["seniority"] == "new_grad"
+
+
+def test_job_feedback_rejects_unknown_actions_and_reasons(tmp_path, inventory):
+    service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
+
+    with pytest.raises(ValueError, match="unsupported feedback action"):
+        service.record_job_feedback("remote-1", "maybe", [])
+    with pytest.raises(ValueError, match="unsupported feedback reason"):
+        service.record_job_feedback("remote-1", "interested", ["mystery"])
+
+
 def test_mark_applied_creates_application_and_removes_job_from_queue(tmp_path, inventory):
     service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
 
@@ -143,6 +463,7 @@ def test_mark_applied_creates_application_and_removes_job_from_queue(tmp_path, i
     application = service.list_applications()[0]
     assert application["role"] == "Support Engineer"
     assert application["current_status"] == "applied"
+    assert service.job_feedback("remote-1")["latest"]["action"] == "applied"
 
 
 def test_mark_applied_pins_the_only_directional_resume_when_no_target_exists(tmp_path, inventory):
@@ -173,6 +494,41 @@ def test_mark_applied_does_not_guess_between_multiple_directional_resumes(tmp_pa
 
     assert record["application"]["resume"] is None
     assert service.list_applications()[0]["resume_attribution"] == "not_recorded"
+
+
+def test_mark_applied_pins_resume_selected_by_cached_quick_screen(tmp_path, inventory, monkeypatch):
+    folder = tmp_path / "resumes" / "baselines"
+    folder.mkdir(parents=True)
+    selected = folder / "support.md"
+    selected.write_text("# Support\n", encoding="utf-8")
+    (folder / "platform.md").write_text("# Platform\n", encoding="utf-8")
+    preferences = tmp_path / "job-search" / "preferences.yml"
+    preferences.parent.mkdir(parents=True)
+    preferences.write_text("version: 4\n", encoding="utf-8")
+    config = tmp_path / DEFAULT_AGENT_CONFIG
+    config.parent.mkdir(parents=True, exist_ok=True)
+    config.write_text(render_default_agent_config(), encoding="utf-8")
+    service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
+    monkeypatch.setattr(
+        service,
+        "saved_job_screen",
+        lambda _job_id: {
+            "status": "complete",
+            "result": {
+                "resume_match": {
+                    "resume_id": "resumes/baselines/support.md",
+                    "name": "Support Engineer",
+                    "sha256": hashlib.sha256(selected.read_bytes()).hexdigest(),
+                    "label": "Strong match",
+                }
+            },
+        },
+    )
+
+    record = service.mark_applied("remote-1")
+
+    assert record["application"]["resume"]["path"] == "resumes/baselines/support.md"
+    assert record["application"]["match_classification"] == "Strong match"
 
 
 def test_applied_jobs_do_not_appear_in_review_queue(tmp_path, inventory, monkeypatch):
@@ -542,6 +898,8 @@ def test_search_preferences_update_preserves_providers_and_manual_families(tmp_p
             "onsite_locations": ["New York, NY"],
             "remote_location_terms": ["USA"],
             "clearance_preference": "prefer",
+            "preferred_job_attributes": ["Production ownership"],
+            "avoided_job_attributes": ["Phone-first support"],
             "compensation": {
                 "skipped": False,
                 "minimum": 90000,
@@ -555,6 +913,8 @@ def test_search_preferences_update_preserves_providers_and_manual_families(tmp_p
     rendered = config_path.read_text(encoding="utf-8")
     assert updated["titles"] == ["Platform Engineer", "Support Engineer"]
     assert updated["clearance_preference"] == "prefer"
+    assert updated["preferred_job_attributes"] == ["Production ownership"]
+    assert updated["avoided_job_attributes"] == ["Phone-first support"]
     assert "manual-sre" in rendered
     assert "Site Reliability Engineer" in rendered
     assert "linkedin:" in rendered and "enabled: false" in rendered
@@ -565,6 +925,7 @@ def test_search_preferences_update_preserves_providers_and_manual_families(tmp_p
         (root / "job-search/preferences.yml").read_text(encoding="utf-8")
     )
     assert saved_preferences["clearance_preference"] == "prefer"
+    assert saved_preferences["preferred_job_attributes"] == ["Production ownership"]
 
 
 def test_search_preferences_keep_automatic_role_skill_enrichment(tmp_path):

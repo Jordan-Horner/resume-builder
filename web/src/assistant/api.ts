@@ -2,7 +2,8 @@ export interface AssistantMessage { id: string; role: "user" | "assistant"; cont
 export interface WordingProposalPayload { kind?: "wording"; resume_id: string; block_id: string; before: string; after: string; instruction: string }
 export interface RemovalProposalPayload { kind: "resume_removal"; action?: "archive" | "retire"; resume_id: string; name: string; revision: string; application_references: { id: string; company: string; role: string }[]; vault_unchanged: true; tailored_resumes_unchanged: true }
 export interface RestoreProposalPayload { kind: "resume_restore"; resume_id: string; name: string; revision: string }
-export interface Proposal { id: string; status: string; message: string; payload: WordingProposalPayload | RemovalProposalPayload | RestoreProposalPayload }
+export interface JobPreferenceProposalPayload { kind: "job_preference"; direction: "prefer" | "avoid"; action: "add" | "remove"; statement: string; confirmation_hash: string }
+export interface Proposal { id: string; status: string; message: string; payload: WordingProposalPayload | RemovalProposalPayload | RestoreProposalPayload | JobPreferenceProposalPayload }
 export interface Conversation {
   id: string; resume_id: string | null; job_id: string | null; context_name?: string; title: string; updated_at: string;
   messages: AssistantMessage[]; proposals: Proposal[];

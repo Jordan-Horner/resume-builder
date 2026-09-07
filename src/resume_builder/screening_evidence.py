@@ -34,6 +34,11 @@ _MARKDOWN_HEADING = re.compile(r"^#+\s+.*$", re.MULTILINE)
 _HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 _YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
+_CAREER_STAGE = re.compile(
+    r"\b(?:campus hire|new grad(?:uate)?|recent graduate|currently pursuing|"
+    r"entry[ -]level|intern(?:ship)?|\d+\s*(?:[-\u2013\u2014]|to)\s*\d+\s+years?)\b",
+    re.IGNORECASE,
+)
 
 _STOP_WORDS = {
     "about",
@@ -389,6 +394,32 @@ def _criterion_score(
     return score
 
 
+def _career_stage_role_facts(index: tuple[_IndexedFact, ...]) -> list[_IndexedFact]:
+    """Return bounded confirmed work-history endpoints for career-stage comparisons."""
+    roles = [
+        item
+        for item in index
+        if item.card.category == "employment" and item.card.fact_type == "role" and item.latest_year
+    ]
+    if not roles:
+        return []
+    oldest = min(roles, key=lambda item: (item.latest_year, item.card.fact_id))
+    newest = max(roles, key=lambda item: (item.latest_year, item.card.fact_id))
+    return list({item.card.fact_id: item for item in (newest, oldest)}.values())
+
+
+def _is_career_stage_criterion(criterion: PostingCriterion) -> bool:
+    text = " ".join(
+        (
+            criterion.label,
+            criterion.description,
+            criterion.source_excerpt,
+            *criterion.retrieval_terms,
+        )
+    )
+    return _CAREER_STAGE.search(text) is not None
+
+
 def _foundation(
     index: tuple[_IndexedFact, ...], ranked: list[tuple[int, _IndexedFact]]
 ) -> list[_IndexedFact]:
@@ -530,6 +561,7 @@ def select_criterion_screening_evidence(
         ),
     )
     rankings: dict[str, list[_IndexedFact]] = {}
+    career_stage_facts = _career_stage_role_facts(index)
     for criterion in priority:
         ranked = sorted(
             (
@@ -541,7 +573,13 @@ def select_criterion_screening_evidence(
             ),
             key=lambda pair: (-pair[0], -pair[1].latest_year, pair[1].card.fact_id),
         )
-        rankings[criterion.id] = [item for score, item in ranked if score > 0]
+        lexical_matches = [item for score, item in ranked if score > 0]
+        if _is_career_stage_criterion(criterion):
+            stage_ids = {item.card.fact_id for item in career_stage_facts}
+            lexical_matches = career_stage_facts + [
+                item for item in lexical_matches if item.card.fact_id not in stage_ids
+            ]
+        rankings[criterion.id] = lexical_matches
 
     chosen: list[ScreeningEvidenceCard] = []
     chosen_ids: set[str] = set()

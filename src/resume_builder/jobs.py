@@ -8,6 +8,7 @@ import fcntl
 import hashlib
 import io
 import json
+import logging
 import re
 import sys
 from collections.abc import Sequence
@@ -69,6 +70,7 @@ STOPWORDS = {
     "job",
     "who",
 }
+LOGGER = logging.getLogger(__name__)
 
 
 def parser() -> argparse.ArgumentParser:
@@ -147,6 +149,8 @@ def _load_preferences(path: Path) -> dict[str, Any]:
         "accepted_work_modes",
         "desired_title_terms",
         "interest_terms",
+        "preferred_job_attributes",
+        "avoided_job_attributes",
         "excluded_title_terms",
         "senior_title_terms",
         "accepted_senior_role_terms",
@@ -182,11 +186,33 @@ def _load_preferences(path: Path) -> dict[str, Any]:
         "accepted_location_terms",
         "excluded_location_terms",
         "resume_globs",
+        "preferred_job_attributes",
+        "avoided_job_attributes",
     )
     for field in list_fields:
         values = payload.get(field, [])
         if not isinstance(values, list) or any(not isinstance(value, str) for value in values):
             raise ValueError(f"{field} must be a list of strings")
+    for field in ("preferred_job_attributes", "avoided_job_attributes"):
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for value in payload.get(field, []):
+            value = value.strip()
+            if not value:
+                continue
+            if len(value) > 240:
+                raise ValueError(f"{field} entries cannot exceed 240 characters")
+            if value.casefold() not in seen:
+                cleaned.append(value)
+                seen.add(value.casefold())
+        if len(cleaned) > 20:
+            raise ValueError(f"{field} cannot contain more than 20 entries")
+        payload[field] = cleaned
+    conflicts = {value.casefold() for value in payload["preferred_job_attributes"]} & {
+        value.casefold() for value in payload["avoided_job_attributes"]
+    }
+    if conflicts:
+        raise ValueError("a job attribute cannot be both preferred and avoided")
     minimum_salary = payload.get("minimum_salary")
     if minimum_salary is not None and not isinstance(minimum_salary, (int, float)):
         raise ValueError("minimum_salary must be a number or null")
@@ -265,7 +291,13 @@ def _resume_paths(preferences: dict[str, Any], root: Path = Path(".")) -> list[P
 
 def _resume_corpus(preferences: dict[str, Any], root: Path = Path(".")) -> tuple[str, str]:
     paths = _resume_paths(preferences, root)
-    text = "\n".join(path.read_text(encoding="utf-8") for path in paths)
+    documents: list[str] = []
+    for path in paths:
+        try:
+            documents.append(path.read_text(encoding="utf-8"))
+        except UnicodeDecodeError:
+            LOGGER.warning("resume_corpus_skipped_non_utf8_file path=%s", path)
+    text = "\n".join(documents)
     return text, _hash_text(text)
 
 

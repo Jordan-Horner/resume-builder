@@ -10,6 +10,9 @@ export function SearchPreferencesSection() {
   const [title, setTitle] = useState("");
   const [locations, setLocations] = useState("");
   const [remoteTerms, setRemoteTerms] = useState("");
+  const [preferredAttribute, setPreferredAttribute] = useState("");
+  const [avoidedAttribute, setAvoidedAttribute] = useState("");
+  const [attributeNotice, setAttributeNotice] = useState("");
   const [removed, setRemoved] = useState<{ title: string; index: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -62,6 +65,25 @@ export function SearchPreferencesSection() {
     patch({ work_modes: next });
   }
 
+  function addAttribute(field: "preferred_job_attributes" | "avoided_job_attributes", value: string) {
+    if (!preferences) return;
+    const statement = value.trim();
+    const other = field === "preferred_job_attributes" ? preferences.avoided_job_attributes : preferences.preferred_job_attributes;
+    if (!statement) return;
+    if (preferences[field].some((item) => item.toLocaleLowerCase() === statement.toLocaleLowerCase())) {
+      setAttributeNotice("That preference is already saved."); return;
+    }
+    if (other.some((item) => item.toLocaleLowerCase() === statement.toLocaleLowerCase())) {
+      setAttributeNotice("The same preference cannot be both preferred and avoided."); return;
+    }
+    if (preferences[field].length >= 20) {
+      setAttributeNotice("Remove a preference before adding another."); return;
+    }
+    patch({ [field]: [...preferences[field], statement] });
+    field === "preferred_job_attributes" ? setPreferredAttribute("") : setAvoidedAttribute("");
+    setAttributeNotice("Preference added. Save changes when you are ready.");
+  }
+
   async function save() {
     if (!preferences || busy) return;
     setBusy(true); setError(""); setNotice("");
@@ -99,6 +121,12 @@ export function SearchPreferencesSection() {
     <div className="settings-group"><div className="settings-group-copy"><h3>Where you can work</h3><p>Country scopes the scrape. Cities and regions apply only to hybrid and on-site roles.</p></div><div className="preference-fields"><label className="field"><span>Country</span><input value={preferences.country} maxLength={100} onChange={(event) => patch({ country: event.target.value })} /></label><div><span className="field-label">Work modes</span><div className="mode-grid compact">{(["remote", "hybrid", "onsite"] as WorkMode[]).map((mode) => <button type="button" key={mode} className={preferences.work_modes.includes(mode) ? "mode-card selected" : "mode-card"} aria-pressed={preferences.work_modes.includes(mode)} onClick={() => toggleMode(mode)}><span>{preferences.work_modes.includes(mode) ? "✓" : ""}</span><strong>{mode === "onsite" ? "On-site" : mode[0].toUpperCase() + mode.slice(1)}</strong></button>)}</div></div>{needsPlace && <label className="field"><span>Accepted cities or regions</span><input value={locations} placeholder="New York, Boston" onChange={(event) => setLocations(event.target.value)} /></label>}<label className="field"><span>Remote location terms <em>optional</em></span><input value={remoteTerms} placeholder="USA, East Coast" onChange={(event) => setRemoteTerms(event.target.value)} /></label></div></div>
 
     <div className="settings-group"><div className="settings-group-copy"><h3>Security clearance</h3><p>Set a fit preference without confusing it with your temporary Jobs-page filter.</p></div><div className="preference-fields"><label className="field"><span>Clearance roles</span><select value={preferences.clearance_preference} onChange={(event) => patch({ clearance_preference: event.target.value as SearchPreferences["clearance_preference"] })}><option value="neutral">No preference — show both</option><option value="prefer">Prefer clearance roles</option><option value="exclude">Not interested — hide by default</option></select></label><p className="field-hint">Prefer influences fit scoring but keeps both kinds of jobs visible. Not interested hides clearance-gated roles by default; the Jobs-page filter can still show them temporarily.</p></div></div>
+
+    <div className="settings-group"><div className="settings-group-copy"><h3>What you want from a job</h3><p>Describe the work you enjoy and what you would rather avoid. Quick screens compare these statements with each posting; they never affect whether you are qualified.</p></div><div className="semantic-preferences">
+      <section aria-labelledby="preferred-attributes-heading"><h4 id="preferred-attributes-heading">I tend to prefer</h4><ul>{preferences.preferred_job_attributes.map((item) => <li key={item}><span>{item}</span><button type="button" aria-label={`Remove ${item}`} onClick={() => patch({ preferred_job_attributes: preferences.preferred_job_attributes.filter((value) => value !== item) })}>×</button></li>)}</ul>{!preferences.preferred_job_attributes.length && <p className="field-hint">No preferences added yet.</p>}<form onSubmit={(event) => { event.preventDefault(); addAttribute("preferred_job_attributes", preferredAttribute); }}><input maxLength={240} value={preferredAttribute} placeholder="e.g. Complex troubleshooting" onChange={(event) => setPreferredAttribute(event.target.value)} /><button type="submit" className="secondary-button" disabled={!preferredAttribute.trim()}>Add preference</button></form></section>
+      <section aria-labelledby="avoided-attributes-heading"><h4 id="avoided-attributes-heading">I tend to avoid</h4><ul>{preferences.avoided_job_attributes.map((item) => <li key={item}><span>{item}</span><button type="button" aria-label={`Remove ${item}`} onClick={() => patch({ avoided_job_attributes: preferences.avoided_job_attributes.filter((value) => value !== item) })}>×</button></li>)}</ul>{!preferences.avoided_job_attributes.length && <p className="field-hint">No preferences added yet.</p>}<form onSubmit={(event) => { event.preventDefault(); addAttribute("avoided_job_attributes", avoidedAttribute); }}><input maxLength={240} value={avoidedAttribute} placeholder="e.g. Continuous phone queue" onChange={(event) => setAvoidedAttribute(event.target.value)} /><button type="submit" className="secondary-button" disabled={!avoidedAttribute.trim()}>Add preference</button></form></section>
+      {attributeNotice && <p className="field-hint semantic-preference-notice" role="status">{attributeNotice}</p>}
+    </div></div>
 
     <div className="settings-group"><div className="settings-group-copy"><h3>Compensation</h3><p>Minimum filters poor fits. Target helps rank better-paying matches; it is not a ceiling. Jobs without pay stay visible.</p></div><div className="preference-fields"><label className="check-row compact"><input type="checkbox" checked={pay.skipped} onChange={(event) => patch({ compensation: { ...pay, skipped: event.target.checked, minimum: event.target.checked ? null : pay.minimum, target: event.target.checked ? null : pay.target, currency: event.target.checked ? null : (pay.currency || "USD"), period: event.target.checked ? null : (pay.period || "year") } })} /><span><strong>Don’t use compensation as a preference</strong></span></label>{!pay.skipped && <div className="form-grid"><label className="field"><span>Minimum</span><input type="number" min="0" value={pay.minimum ?? ""} onChange={(event) => patch({ compensation: { ...pay, minimum: event.target.value ? Number(event.target.value) : null } })} /></label><label className="field"><span>Target</span><input type="number" min="0" value={pay.target ?? ""} onChange={(event) => patch({ compensation: { ...pay, target: event.target.value ? Number(event.target.value) : null } })} /></label><label className="field"><span>Currency</span><select value={pay.currency || "USD"} onChange={(event) => patch({ compensation: { ...pay, currency: event.target.value } })}><option>USD</option><option>CAD</option><option>EUR</option><option>GBP</option></select></label><label className="field"><span>Period</span><select value={pay.period || "year"} onChange={(event) => patch({ compensation: { ...pay, period: event.target.value as "hour" | "year" } })}><option value="year">Per year</option><option value="hour">Per hour</option></select></label></div>}</div></div>
     {error && <ErrorMessage message={error} retry={() => void save()} />}

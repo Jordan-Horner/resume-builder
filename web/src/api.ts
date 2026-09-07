@@ -1,4 +1,4 @@
-import type { Application, GmailSetup, Integration, Job, JobFilters, JobScreenResult, OnboardingStatus, ResumeLibrary, ResumeRecommendation, SalaryEstimateResult, SearchPreferences, TelegramPairing } from "./types";
+import type { Application, GmailSetup, Integration, Job, JobFeedback, JobFeedbackAction, JobFeedbackReason, JobFilters, JobScreenResult, OnboardingStatus, ResumeLibrary, ResumeRecommendation, SalaryEstimateResult, SearchPreferences, TelegramPairing } from "./types";
 
 export interface UpdateStatus {
   version: string;
@@ -50,6 +50,22 @@ export async function getJobs(filters: JobFilters): Promise<{ jobs: Job[]; count
 
 export function markJobNotInterested(jobId: string): Promise<void> {
   return request(`/api/jobs/${encodeURIComponent(jobId)}/not-interested`, { method: "POST" });
+}
+
+export function getJobFeedback(jobId: string): Promise<JobFeedback> {
+  return request(`/api/jobs/${encodeURIComponent(jobId)}/feedback`);
+}
+
+export function saveJobFeedback(jobId: string, action: JobFeedbackAction, reasons: JobFeedbackReason[]): Promise<JobFeedback> {
+  return request(`/api/jobs/${encodeURIComponent(jobId)}/feedback`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, reasons }),
+  });
+}
+
+export function recordJobPostingOpened(jobId: string): Promise<void> {
+  return request(`/api/jobs/${encodeURIComponent(jobId)}/opened-posting`, { method: "POST", keepalive: true });
 }
 
 export function estimateJobSalary(jobId: string): Promise<SalaryEstimateResult> {

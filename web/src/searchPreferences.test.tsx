@@ -17,6 +17,8 @@ const preferences: SearchPreferences = {
   onsite_locations: [],
   remote_location_terms: ["USA"],
   clearance_preference: "neutral",
+  preferred_job_attributes: ["Production ownership"],
+  avoided_job_attributes: ["Phone-first support"],
   compensation: { skipped: false, minimum: 80000, target: 125000, currency: "USD", period: "year" },
 };
 let host: HTMLDivElement;
@@ -48,6 +50,24 @@ it("adds multiple searchable title bubbles and saves them as active preferences"
   expect(saveSearchPreferences).toHaveBeenCalledWith(expect.objectContaining({
     titles: ["Support Engineer", "Platform Engineer"],
     revision: "rev-1",
+  }));
+});
+
+it("adds and removes plain-language job preferences", async () => {
+  await act(async () => root.render(<SearchPreferencesSection />));
+  const input = host.querySelector('input[placeholder="e.g. Complex troubleshooting"]') as HTMLInputElement;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, "Engineering ownership");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "Add preference")?.click());
+  expect(host.textContent).toContain("Engineering ownership");
+  await act(async () => Array.from(host.querySelectorAll("button")).find((button) => button.getAttribute("aria-label") === "Remove Phone-first support")?.click());
+  const save = Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "Save changes") as HTMLButtonElement;
+  await act(async () => save.click());
+  expect(saveSearchPreferences).toHaveBeenCalledWith(expect.objectContaining({
+    preferred_job_attributes: ["Production ownership", "Engineering ownership"],
+    avoided_job_attributes: [],
   }));
 });
 

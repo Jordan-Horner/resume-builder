@@ -53,6 +53,7 @@ def run_background_quick_screening(
     return build_screening_queue(
         adapter=OpenRouterAdapter(config, api_key=key),
         model=config.models.fast,
+        interpretation_model=config.models.fast,
         cache_path=root / DEFAULT_SCREENING_CACHE,
         input_path=input_path or root / DEFAULT_NEW_OUTPUT,
         output_path=root / DEFAULT_SCREENING_OUTPUT,

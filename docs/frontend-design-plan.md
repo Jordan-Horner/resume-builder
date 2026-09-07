@@ -191,6 +191,12 @@ bounded title-and-skill provider query. Skill-only queries are never created, an
 manually entered title remains title-only when no supported relationship exists.
 Country, work modes, hybrid/on-site locations,
 remote location terms, and compensation can be edited without AI or network calls.
+The same page shows two compact row lists for plain-language work preferences:
+what the user tends to prefer and what they tend to avoid. These settings are
+directly editable without an AI provider. The assistant may offer the same
+change through its existing confirmation card, but it cannot silently infer or
+save a rule. Job details show the resulting preference fit separately from
+career fit and eligibility.
 Saving preserves provider toggles and manual search families, updates only managed
 families, and does not start a scan. Target compensation remains a ranking preference,
 not a ceiling. A revision token prevents one open browser tab from overwriting newer
@@ -260,6 +266,15 @@ Opening a job is read-only. It stays in the review queue until the user chooses
 `Not interested` or `Applied`. The first action dismisses it; the second creates
 an application record and moves it to Applications. Store disposition state in
 the backend so it is consistent across browser sessions.
+
+The detail pane also offers `Interested` without asking the user to classify the
+decision. Interested feedback keeps the job in the queue. The backend combines a
+cached quick screen, explicit preferences, applications, and feedback into an
+explainable shadow recommendation; the frontend renders its Fit, Interest, and
+Company labels but does not calculate or apply ranking. Current job ordering
+remains unchanged while the shadow model is evaluated. The feedback format may
+later receive confirmed preference reasons from an assistant conversation;
+reasonless browser decisions affect only the selected job.
 
 Keep the disposition and posting actions in a persistent action area beside the
 content. In the split pane, the
@@ -411,6 +426,8 @@ The onboarding and dashboard API includes:
 - `GET /api/jobs?search=&work_mode=&date_days=&employment_type=`
 - `GET /api/jobs/{job_id}`
 - `POST /api/jobs/{job_id}/not-interested`
+- `GET /api/jobs/{job_id}/feedback`
+- `POST /api/jobs/{job_id}/feedback`
 - `POST /api/jobs/{job_id}/applied`
 - `GET /api/applications`
 - `GET /api/applications/{application_id}`

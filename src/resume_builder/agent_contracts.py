@@ -13,6 +13,10 @@ class ModelProviderError(RuntimeError):
     """Provider-neutral failure safe to expose without retaining provider content."""
 
 
+class ModelProviderTimeoutError(ModelProviderError):
+    """A model provider did not finish within the caller's bounded deadline."""
+
+
 @dataclass(frozen=True)
 class AgentTool:
     """One explicitly exposed application capability."""

@@ -114,6 +114,62 @@ def test_job_screen_routes_separate_cached_read_from_explicit_run(
     assert response.json() == result
 
 
+def test_job_screen_never_exposes_raw_decoding_errors(tmp_path: Path, monkeypatch) -> None:
+    from resume_builder.web_service import DashboardService
+
+    decoding_error = UnicodeDecodeError("utf-8", b"\xa3", 0, 1, "invalid start byte")
+    monkeypatch.setattr(
+        DashboardService,
+        "screen_job",
+        lambda self, job_id, refresh=False: (_ for _ in ()).throw(decoding_error),
+    )
+    response = _client(tmp_path).post("/api/jobs/legacy-job/screen")
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == (
+        "Job screening could not read one of its inputs. Refresh your jobs and try again."
+    )
+    assert "codec" not in response.text
+
+
+def test_job_feedback_routes_are_backend_owned(tmp_path: Path, monkeypatch) -> None:
+    from resume_builder.web_service import DashboardService
+
+    result = {"job_id": "job-1", "latest": {"action": "interested"}}
+    monkeypatch.setattr(DashboardService, "job_feedback", lambda self, job_id: result)
+    monkeypatch.setattr(
+        DashboardService,
+        "record_job_feedback",
+        lambda self, job_id, action, reasons: result,
+    )
+    client = _client(tmp_path)
+
+    assert client.get("/api/jobs/job-1/feedback").json() == result
+    response = client.post(
+        "/api/jobs/job-1/feedback",
+        json={"action": "interested", "reasons": ["day_to_day"]},
+    )
+    assert response.status_code == 200
+    assert response.json() == result
+
+
+def test_open_posting_route_records_passive_positive_once(tmp_path: Path, monkeypatch) -> None:
+    from resume_builder.web_service import DashboardService
+
+    calls: list[str] = []
+    monkeypatch.setattr(
+        DashboardService,
+        "record_job_open",
+        lambda self, job_id: calls.append(job_id),
+    )
+    client = _client(tmp_path)
+
+    response = client.post("/api/jobs/job-1/opened-posting")
+
+    assert response.status_code == 204
+    assert calls == ["job-1"]
+
+
 @pytest.mark.parametrize("key", ["", "  ", None, 123, "a\nb", "x" * 513])
 def test_openrouter_rejects_invalid_key_input(tmp_path: Path, key: object) -> None:
     client = _client(tmp_path)

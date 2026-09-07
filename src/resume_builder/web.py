@@ -4,8 +4,8 @@ import argparse
 from pathlib import Path
 from typing import Any
 
-from .agent_contracts import ModelProviderError
-from .web_service import DashboardService
+from .agent_contracts import ModelProviderError, ModelProviderTimeoutError
+from .web_service import DashboardService, ScreeningInputError
 from .workspace_state import discover_workspace
 
 
@@ -251,6 +251,11 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
             return service.estimate_job_salary(job_id, refresh=refresh)
         except LookupError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ModelProviderTimeoutError as exc:
+            raise HTTPException(
+                status_code=504,
+                detail="Job screening timed out. Please try again.",
+            ) from exc
         except ModelProviderError as exc:
             raise HTTPException(
                 status_code=502, detail="Salary estimation failed. Please try again."
@@ -293,10 +298,45 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
     def screen_job(job_id: str, refresh: bool = False) -> dict[str, Any]:
         try:
             return service.screen_job(job_id, refresh=refresh)
+        except ScreeningInputError as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        except UnicodeError as exc:
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "Job screening could not read one of its inputs. "
+                    "Refresh your jobs and try again."
+                ),
+            ) from exc
         except ModelProviderError as exc:
             raise HTTPException(
                 status_code=502, detail="Job screening failed. Please try again."
             ) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/api/jobs/{job_id}/feedback")
+    def job_feedback(job_id: str) -> dict[str, Any]:
+        try:
+            return service.job_feedback(job_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.post("/api/jobs/{job_id}/opened-posting", status_code=204)
+    def record_job_open(job_id: str) -> None:
+        try:
+            service.record_job_open(job_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.post("/api/jobs/{job_id}/feedback")
+    def record_job_feedback(job_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        try:
+            return service.record_job_feedback(
+                job_id,
+                payload.get("action"),
+                payload.get("reasons", []),
+            )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 

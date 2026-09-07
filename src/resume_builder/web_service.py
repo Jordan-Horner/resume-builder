@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import re
 import shutil
@@ -12,7 +13,8 @@ import threading
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
+from uuid import uuid4
 
 import httpx
 import yaml
@@ -68,6 +70,12 @@ from .job_onboarding import (
 from .job_onboarding import (
     save_state as save_setup_state,
 )
+from .job_personalization import (
+    extract_preference_traits,
+    extract_seniority,
+    load_feedback_events,
+    score_shadow_job,
+)
 from .job_screening import EligibilityStatus, ScreeningCache, deterministic_ineligible_result
 from .job_setup_defaults import PORTFOLIO_PATH, PREFERENCES_PATH, scaffold_job_search
 from .job_target import parse_target
@@ -102,6 +110,41 @@ ONBOARDING_STATE_PATH = Path("job-search/web-onboarding.json")
 MAX_RESUME_BYTES = 10 * 1024 * 1024
 OPENROUTER_SECRET_PATH = Path("build/secrets/openrouter-key")
 TITLE_GENERATION_CACHE_PATH = Path("build/job-search/title-generation.json")
+JOB_FEEDBACK_PATH = Path("job-search/job-feedback.json")
+JOB_SCREENING_OUTPUT = Path("job-search/new-job-screens.json")
+JOB_FEEDBACK_ACTIONS = frozenset({"interested", "not_interested", "applied"})
+JOB_FEEDBACK_REASONS = frozenset(
+    {
+        "company",
+        "compensation",
+        "customer_facing",
+        "day_to_day",
+        "location",
+        "on_call",
+        "phone_support",
+        "role",
+        "seniority",
+        "travel",
+        "work_mode",
+    }
+)
+LOGGER = logging.getLogger(__name__)
+
+
+class ScreeningInputError(RuntimeError):
+    """A screening input could not be decoded or read safely."""
+
+
+def _raise_screening_input_error(job_id: str, stage: str, exc: UnicodeError) -> NoReturn:
+    LOGGER.warning(
+        "job_screen_failed job_id=%s stage=%s error_category=%s",
+        job_id,
+        stage,
+        exc.__class__.__name__,
+    )
+    raise ScreeningInputError(
+        "Job screening could not read one of its inputs. Refresh your jobs and try again."
+    ) from exc
 
 
 InventoryLoader = Callable[[], list[dict[str, Any]]]
@@ -669,6 +712,8 @@ class DashboardService:
             "onsite_locations": preferences.get("accepted_location_terms") or [],
             "remote_location_terms": profile.get("remote_location_terms") or [],
             "clearance_preference": preferences.get("clearance_preference", "neutral"),
+            "preferred_job_attributes": preferences.get("preferred_job_attributes") or [],
+            "avoided_job_attributes": preferences.get("avoided_job_attributes") or [],
             "compensation": {
                 "skipped": preferences.get("minimum_salary") is None
                 and preferences.get("preferred_salary") is None,
@@ -821,6 +866,8 @@ class DashboardService:
             preferences["salary_currency"] = compensation.currency
             preferences["salary_period"] = compensation.period
             preferences["clearance_preference"] = clearance_preference
+            preferences["preferred_job_attributes"] = payload.get("preferred_job_attributes", [])
+            preferences["avoided_job_attributes"] = payload.get("avoided_job_attributes", [])
             profile = dict(preferences.get("screening_profile") or {})
             profile["intended_work_country"] = country
             profile["remote_location_terms"] = location.remote_location_terms
@@ -971,6 +1018,32 @@ class DashboardService:
         if selected is None and len(baselines) == 1:
             selected = baselines[0]
             kind = "directional"
+        if selected is None:
+            saved_screen = (
+                self.saved_job_screen(job_id)
+                if (self.workspace / PREFERENCES_PATH).is_file()
+                and (self.workspace / DEFAULT_AGENT_CONFIG).is_file()
+                else None
+            )
+            screen_payload = saved_screen.get("result") if saved_screen else None
+            resume_match = (
+                screen_payload.get("resume_match") if isinstance(screen_payload, dict) else None
+            )
+            if isinstance(resume_match, dict):
+                resume_id = resume_match.get("resume_id")
+                expected_hash = resume_match.get("sha256")
+                candidate = self.workspace / str(resume_id)
+                baselines_root = (self.workspace / "resumes" / "baselines").resolve()
+                if (
+                    isinstance(resume_id, str)
+                    and isinstance(expected_hash, str)
+                    and candidate.resolve().is_relative_to(baselines_root)
+                    and candidate.is_file()
+                    and hashlib.sha256(candidate.read_bytes()).hexdigest() == expected_hash
+                ):
+                    selected = candidate
+                    kind = "directional"
+                    match_label = str(resume_match.get("label") or "Unknown match")
 
         if selected is None:
             return {
@@ -1024,6 +1097,198 @@ class DashboardService:
             {"schema_version": 2, "dismissed_job_ids": sorted(values)},
         )
 
+    def _feedback_events(self) -> list[dict[str, Any]]:
+        return load_feedback_events(self.workspace / JOB_FEEDBACK_PATH)
+
+    def _append_feedback_event(
+        self,
+        job: dict[str, Any],
+        action: str,
+        reasons: list[str],
+        screening: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        event = {
+            "id": f"JF-{uuid4()}",
+            "action": action,
+            "reasons": reasons,
+            "created_at": datetime.now(UTC).isoformat(),
+            "job": {
+                "id": job["id"],
+                "title": job["title"],
+                "company": job["company"],
+                "location": job["location"],
+                "work_modes": job["work_modes"],
+                "salary_min": job["salary_min"],
+                "salary_max": job["salary_max"],
+                "salary_currency": job["salary_currency"],
+                "traits": extract_preference_traits(job),
+                "seniority": extract_seniority(job),
+                "description_hash": hashlib.sha256(job["description"].encode()).hexdigest(),
+                "screening": screening,
+            },
+        }
+        events = self._feedback_events()
+        events.append(event)
+        atomic_write_json(
+            self.workspace / JOB_FEEDBACK_PATH,
+            {"schema_version": 1, "events": events},
+        )
+        return event
+
+    def _feedback_screen_snapshot(self, job_id: str) -> dict[str, Any] | None:
+        if not all(
+            (self.workspace / path).is_file()
+            for path in (JOBS_CONFIG, PREFERENCES_PATH, DEFAULT_AGENT_CONFIG)
+        ):
+            return None
+        screen = self.saved_job_screen(job_id)
+        result = screen.get("result") if isinstance(screen, dict) else None
+        if not isinstance(result, dict):
+            return None
+        labels = {
+            str(item.get("criterion_id")): str(item.get("label") or "")
+            for item in result.get("criterion_evidence") or []
+            if isinstance(item, dict)
+        }
+        criteria = [
+            {
+                "label": labels.get(str(item.get("criterion_id")), ""),
+                "outcome": str(item.get("outcome") or "unknown"),
+            }
+            for item in result.get("criterion_assessments") or []
+            if isinstance(item, dict) and labels.get(str(item.get("criterion_id")))
+        ]
+        resume = result.get("resume_match")
+        resume_snapshot = (
+            {
+                key: resume.get(key)
+                for key in ("resume_id", "name", "label")
+                if resume.get(key) is not None
+            }
+            if isinstance(resume, dict)
+            else None
+        )
+        return {
+            "fit": result.get("fit"),
+            "recommendation": result.get("recommendation"),
+            "confidence": result.get("confidence"),
+            "resume_match": resume_snapshot,
+            "criteria": criteria,
+        }
+
+    def record_job_open(self, job_id: str) -> None:
+        """Record one weak positive signal when the original posting is opened."""
+        job = self.get_job(job_id)
+        if job is None:
+            raise ValueError(f"job not found: {job_id}")
+        screening = self._feedback_screen_snapshot(job_id)
+        with self._state_lock:
+            if any(
+                event.get("action") == "opened_posting"
+                and isinstance(event.get("job"), dict)
+                and event["job"].get("id") == job_id
+                for event in self._feedback_events()
+            ):
+                return
+            self._append_feedback_event(job, "opened_posting", [], screening)
+
+    @staticmethod
+    def _validated_feedback(action: object, reasons: object) -> tuple[str, list[str]]:
+        if not isinstance(action, str) or action not in JOB_FEEDBACK_ACTIONS:
+            raise ValueError("unsupported feedback action")
+        if not isinstance(reasons, list) or not all(isinstance(item, str) for item in reasons):
+            raise ValueError("feedback reasons must be a list of names")
+        cleaned = list(dict.fromkeys(reason.strip() for reason in reasons if reason.strip()))
+        unknown = set(cleaned) - JOB_FEEDBACK_REASONS
+        if unknown:
+            raise ValueError("unsupported feedback reason: " + ", ".join(sorted(unknown)))
+        if len(cleaned) > 4:
+            raise ValueError("choose no more than four feedback reasons")
+        return action, cleaned
+
+    def job_feedback(self, job_id: str) -> dict[str, Any]:
+        job = self.get_job(job_id)
+        if job is None:
+            raise ValueError(f"job not found: {job_id}")
+        events = self._feedback_events()
+        latest = next(
+            (
+                event
+                for event in reversed(events)
+                if event.get("action") in JOB_FEEDBACK_ACTIONS
+                and isinstance(event.get("job"), dict)
+                and event["job"].get("id") == job_id
+            ),
+            None,
+        )
+        deterministic: dict[str, Any] = {"interest": {}, "hard_conflicts": []}
+        clearance_preference = "neutral"
+        if (self.workspace / PREFERENCES_PATH).is_file():
+            from .jobs import _load_preferences
+
+            preferences = _load_preferences(self.workspace / PREFERENCES_PATH)
+            clearance_preference = str(preferences.get("clearance_preference", "neutral"))
+        if (self.workspace / JOBS_CONFIG).is_file():
+            packet = self._screening_packet(job_id)
+            prescreen = packet.deterministic_prescreen
+            constraints = prescreen.get("constraints") if isinstance(prescreen, dict) else None
+            deterministic = {
+                "interest": prescreen.get("interest", {}) if isinstance(prescreen, dict) else {},
+                "hard_conflicts": (
+                    constraints.get("hard_conflicts", []) if isinstance(constraints, dict) else []
+                ),
+                "clearance_requirement": (
+                    constraints.get("clearance_requirement", False)
+                    if isinstance(constraints, dict)
+                    else False
+                ),
+            }
+            screen = self.saved_job_screen(job_id)
+        else:
+            screen = None
+        positive_titles = [
+            str(item.get("role") or "") for item in self.list_applications() if item.get("role")
+        ]
+        score = score_shadow_job(
+            {
+                **job,
+                "active": True,
+                "source_order": 0,
+                "preference_traits": extract_preference_traits(job),
+                "deterministic": deterministic,
+                "screening": screen,
+            },
+            positive_titles=positive_titles,
+            clearance_preference=clearance_preference,
+            feedback_events=events,
+        )
+        public_latest = (
+            {
+                "action": latest["action"],
+                "reasons": latest["reasons"],
+                "created_at": latest["created_at"],
+            }
+            if latest
+            else None
+        )
+        return {"job_id": job_id, "latest": public_latest, "personalization": score}
+
+    def record_job_feedback(self, job_id: str, action: object, reasons: object) -> dict[str, Any]:
+        normalized_action, normalized_reasons = self._validated_feedback(action, reasons)
+        if normalized_action == "applied":
+            raise ValueError("applied feedback is recorded by marking the job applied")
+        job = self.get_job(job_id)
+        if job is None:
+            raise ValueError(f"job not found: {job_id}")
+        screening = self._feedback_screen_snapshot(job_id)
+        with self._state_lock:
+            self._append_feedback_event(job, normalized_action, normalized_reasons, screening)
+            if normalized_action == "not_interested":
+                dismissed = self._dismissed_job_ids()
+                dismissed.add(job_id)
+                self._write_dismissed_job_ids(dismissed)
+        return self.job_feedback(job_id)
+
     @staticmethod
     def _serialize_job(job: dict[str, Any]) -> dict[str, Any]:
         modes = [str(mode) for mode in job.get("work_modes", []) if str(mode)]
@@ -1057,6 +1322,65 @@ class DashboardService:
             "providers": providers,
             "url": job.get("url"),
         }
+
+    def _quick_screen_summaries(self) -> dict[str, dict[str, Any]]:
+        path = self.workspace / JOB_SCREENING_OUTPUT
+        if not path.is_file():
+            return {}
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise ValueError(f"invalid job screening output: {path}") from exc
+        raw_jobs = payload.get("jobs") if isinstance(payload, dict) else None
+        if (
+            not isinstance(payload, dict)
+            or payload.get("schema_version") != 1
+            or not isinstance(raw_jobs, list)
+        ):
+            raise ValueError(f"invalid job screening output: {path}")
+        reason_labels = {
+            "hard_constraint_conflict": "Outside required preferences",
+            "incomplete_listing": "Incomplete listing",
+            "no_saved_search_signal": "Outside saved searches",
+        }
+        summaries: dict[str, dict[str, Any]] = {}
+        for item in raw_jobs:
+            if not isinstance(item, dict) or not item.get("id"):
+                continue
+            screen = item.get("screening")
+            if not isinstance(screen, dict) or screen.get("status") not in {
+                "complete",
+                "skipped",
+                "failed",
+            }:
+                continue
+            status = str(screen["status"])
+            raw_result = screen.get("result")
+            result: dict[str, Any] = raw_result if isinstance(raw_result, dict) else {}
+            raw_resume = result.get("resume_match")
+            resume: dict[str, Any] = raw_resume if isinstance(raw_resume, dict) else {}
+            if status == "complete":
+                fit_labels = {
+                    "strong_match": "Strong fit",
+                    "good_match": "Good fit",
+                    "worthwhile_stretch": "Stretch",
+                    "weak_fit": "Weak fit",
+                    "insufficient_information": "Unknown",
+                }
+                label = str(resume.get("label") or "").removesuffix(" match") or fit_labels.get(
+                    str(result.get("fit")), "Unknown"
+                )
+            elif status == "skipped":
+                label = reason_labels.get(str(screen.get("reason")), "Skipped")
+            else:
+                label = "Screen unavailable"
+            summaries[str(item["id"])] = {
+                "status": status,
+                "label": label,
+                "resume_name": resume.get("name") if status == "complete" else None,
+                "generated_at": result.get("generated_at") if status == "complete" else None,
+            }
+        return summaries
 
     def blocked_companies(self) -> list[str]:
         import yaml
@@ -1155,9 +1479,11 @@ class DashboardService:
             for _, record in iter_records(self.workspace / APPLICATIONS_ROOT)
             if record["application"].get("job_id")
         }
+        screen_summaries = self._quick_screen_summaries()
         jobs: list[dict[str, Any]] = []
         for raw in self._inventory_loader():
             job = self._serialize_job(raw)
+            job["quick_screen"] = screen_summaries.get(job["id"])
             if not job["id"] or job["id"] in dismissed or job["id"] in applied:
                 continue
             if normalized_key(str(job["company"])) in blocked:
@@ -1190,9 +1516,12 @@ class DashboardService:
         return jobs
 
     def get_job(self, job_id: str) -> dict[str, Any] | None:
+        screen_summaries = self._quick_screen_summaries()
         for raw in self._inventory_loader():
             if str(raw.get("id")) == job_id:
-                return self._serialize_job(raw)
+                job = self._serialize_job(raw)
+                job["quick_screen"] = screen_summaries.get(job["id"])
+                return job
         return None
 
     def estimate_job_salary(self, job_id: str, *, refresh: bool = False) -> dict[str, Any]:
@@ -1257,6 +1586,14 @@ class DashboardService:
         }
         payload = result.model_dump(mode="json")
         preference_only = payload.get("model") == "local/deterministic"
+        incomplete_screen = (
+            not preference_only
+            and payload.get("fit") == "insufficient_information"
+            and not payload.get("evidence_used")
+            and not payload.get("criterion_evidence")
+        )
+        if payload.get("fit") == "insufficient_information":
+            payload["confidence"] = "low"
         violated_codes = {
             str(item.get("code"))
             for item in payload.get("constraints", [])
@@ -1271,8 +1608,18 @@ class DashboardService:
         }
         payload["screening_label"] = "Preference check" if preference_only else "Quick screen"
         payload["fit_label"] = (
-            "Fit not evaluated" if preference_only else fit_labels[payload["fit"]]
+            "Fit not evaluated"
+            if preference_only
+            else "Screen incomplete"
+            if incomplete_screen
+            else fit_labels[payload["fit"]]
         )
+        if incomplete_screen:
+            payload["reasoning_summary"] = (
+                "This screen did not compare the posting with enough verified career evidence. "
+                "Refresh it to run the criteria-based screen. This is not a judgment that you "
+                "lack the required experience."
+            )
         structured_strengths = payload.get("strengths", [])
         payload["strengths"] = [
             str(item.get("statement"))
@@ -1298,6 +1645,26 @@ class DashboardService:
         else:
             payload["eligibility_label"] = "Eligible"
         payload["recommendation_label"] = recommendation_labels[payload["recommendation"]]
+        assessments = payload.get("preference_assessments", [])
+        matches = [item for item in assessments if item.get("outcome") == "match"]
+        conflicts = [item for item in assessments if item.get("outcome") == "conflict"]
+        unknowns = [item for item in assessments if item.get("outcome") == "unknown"]
+        if not assessments:
+            preference_label = "No job preferences saved"
+        elif matches and conflicts:
+            preference_label = "Mixed"
+        elif conflicts:
+            preference_label = "Probably not for you"
+        elif matches:
+            preference_label = "Looks aligned"
+        else:
+            preference_label = "Not enough information"
+        payload["preference_fit"] = {
+            "label": preference_label,
+            "matches": matches[:2],
+            "conflicts": conflicts[:2],
+            "unknown_count": len(unknowns),
+        }
         return {"status": "complete", "cached": cached, "result": payload}
 
     def _screening_packet(self, job_id: str) -> Any:
@@ -1330,40 +1697,55 @@ class DashboardService:
     def screen_job(self, job_id: str, *, refresh: bool = False) -> dict[str, Any]:
         """Run the existing bounded job screen after an explicit user request."""
         with self._screening_lock:
-            packet = self._screening_packet(job_id)
+            try:
+                packet = self._screening_packet(job_id)
+            except UnicodeError as exc:
+                _raise_screening_input_error(job_id, "screening_packet", exc)
             if packet.eligibility == EligibilityStatus.INELIGIBLE:
                 return self._present_screen(deterministic_ineligible_result(packet), cached=False)
             config_path = self.workspace / DEFAULT_AGENT_CONFIG
             if not config_path.is_file() or not self._openrouter_configured():
                 raise ValueError("Connect OpenRouter in Settings before screening this job")
-            config = load_agent_config(config_path)
-            adapter = OpenRouterAdapter(config, api_key=self._openrouter_key())
+            try:
+                config = load_agent_config(config_path)
+                adapter = OpenRouterAdapter(
+                    config,
+                    api_key=self._openrouter_key(),
+                    timeout_seconds=25,
+                    retries=1,
+                )
+            except UnicodeError as exc:
+                _raise_screening_input_error(job_id, "provider_configuration", exc)
+            cache_path = self.workspace / "build/job-search/screening-cache.sqlite"
             service = ScreeningService(
                 adapter,
-                ScreeningCache(self.workspace / "build/job-search/screening-cache.sqlite"),
+                ScreeningCache(cache_path),
                 interpretation_service=PostingInterpretationService(
-                    adapter,
-                    PostingInterpretationCache(
-                        self.workspace / "build/job-search/screening-cache.sqlite"
-                    ),
+                    adapter, PostingInterpretationCache(cache_path)
                 ),
+                interpretation_model=config.models.fast,
                 vault_root=self.workspace / "vault",
             )
-            result, cached = service.screen(packet, model=config.models.fast, refresh=refresh)
+            packet = enrich_packet_from_cached_interpretation(
+                packet,
+                model=config.models.fast,
+                interpretation_cache=PostingInterpretationCache(cache_path),
+                vault_root=self.workspace / "vault",
+            )
+            try:
+                result, cached = service.screen(packet, model=config.models.fast, refresh=refresh)
+            except UnicodeError as exc:
+                _raise_screening_input_error(job_id, "screening_service", exc)
             return self._present_screen(result, cached=cached)
 
     def mark_not_interested(self, job_id: str) -> None:
-        if self.get_job(job_id) is None:
-            raise ValueError(f"job not found: {job_id}")
-        with self._state_lock:
-            dismissed = self._dismissed_job_ids()
-            dismissed.add(job_id)
-            self._write_dismissed_job_ids(dismissed)
+        self.record_job_feedback(job_id, "not_interested", [])
 
     def mark_applied(self, job_id: str) -> dict[str, Any]:
         job = self.get_job(job_id)
         if job is None:
             raise ValueError(f"job not found: {job_id}")
+        screening = self._feedback_screen_snapshot(job_id)
         with self._state_lock:
             for _, record in iter_records(self.workspace / APPLICATIONS_ROOT):
                 if str(record["application"].get("job_id")) == job_id:
@@ -1376,7 +1758,7 @@ class DashboardService:
             target_value = recommendation.get("target")
             report_value = recommendation.get("match_report")
             match_value = recommendation.get("match")
-            return record_application(
+            record = record_application(
                 self.workspace / APPLICATIONS_ROOT,
                 self.workspace,
                 company=job["company"],
@@ -1392,6 +1774,8 @@ class DashboardService:
                     match_value.get("label") if isinstance(match_value, dict) else None
                 ),
             )
+            self._append_feedback_event(job, "applied", [], screening)
+            return record
 
     def list_applications(self) -> list[dict[str, Any]]:
         applications: list[dict[str, Any]] = []

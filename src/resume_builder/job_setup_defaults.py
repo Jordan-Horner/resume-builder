@@ -35,6 +35,8 @@ def neutral_preferences() -> dict[str, Any]:
         "accepted_work_modes": [],
         "desired_title_terms": [],
         "interest_terms": [],
+        "preferred_job_attributes": [],
+        "avoided_job_attributes": [],
         "excluded_title_terms": [],
         "senior_title_terms": [],
         "accepted_senior_role_terms": [],
