@@ -172,9 +172,10 @@ export function JobDetailPanel({
         <section className="job-preference-card" aria-label="Your job preference">
           <div className="job-preference-heading">
             <div>
-              <strong>{jobScreen ? feedback?.personalization.hot_label ?? "Learning your preferences" : "Teach recommendations"}</strong>
+              <strong>{feedback?.personalization.hot_label ?? "Learning your preferences"}</strong>
               {jobScreen && feedback && <span>Career fit {feedback.personalization.fit_label} · Interest {feedback.personalization.interest_label} · Company {feedback.personalization.company_label}</span>}
-              {!jobScreen && <span>Screen this job to combine career fit with what you like.</span>}
+              {!jobScreen && feedback && <span>Recommended from your saved requirements and interests. Quick screening can promote it to Hot.</span>}
+              {!jobScreen && !feedback && <span>Loading recommendation details…</span>}
             </div>
             <button className="secondary-button interested-button" aria-pressed={feedback?.latest?.action === "interested"} disabled={pendingAction !== null} onClick={() => void markInterested()}>
               {pendingAction === "interested" ? "Saving…" : feedback?.latest?.action === "interested" ? "Interested ✓" : "Interested"}

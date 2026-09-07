@@ -522,7 +522,50 @@ def test_recommended_queue_reuses_the_existing_deterministic_prescreen(
     assert [item["id"] for item in service.list_jobs(queue="recommended")] == ["remote-1"]
 
 
-def test_recommended_queue_excludes_jobs_until_screening_confirms_usable_fit(
+def test_recommended_queue_demotes_a_completed_weak_screen(
+    tmp_path, inventory, monkeypatch
+):
+    preferences_path = tmp_path / "job-search/preferences.yml"
+    preferences_path.parent.mkdir(parents=True)
+    preferences_path.write_text("schema_version: 1\n", encoding="utf-8")
+    monkeypatch.setattr(web_service, "_load_preferences", lambda _path: {"configured": True})
+    monkeypatch.setattr(
+        web_service,
+        "_prescreen",
+        lambda raw, _preferences, _resume_terms: {
+            "queue_state": "ready" if raw["id"] == "hybrid-1" else "hard_conflict",
+            "interest": {
+                "desired_title_terms": ["engineer"] if raw["id"] == "hybrid-1" else [],
+                "interest_terms": [],
+            },
+        },
+    )
+    write_screening_output(tmp_path, ["hybrid-1"], fit="weak_fit", recommendation="deprioritize")
+    service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
+
+    assert service.list_jobs(queue="recommended") == []
+
+
+def test_recommended_queue_keeps_the_deterministic_backlog(tmp_path, monkeypatch):
+    inventory = [job(f"job-{index}", title="Support Engineer", mode="remote") for index in range(15)]
+    preferences_path = tmp_path / "job-search/preferences.yml"
+    preferences_path.parent.mkdir(parents=True)
+    preferences_path.write_text("schema_version: 1\n", encoding="utf-8")
+    monkeypatch.setattr(web_service, "_load_preferences", lambda _path: {"configured": True})
+    monkeypatch.setattr(
+        web_service,
+        "_prescreen",
+        lambda _raw, _preferences, _resume_terms: {
+            "queue_state": "ready",
+            "interest": {"desired_title_terms": ["support engineer"], "interest_terms": []},
+        },
+    )
+    service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
+
+    assert len(service.list_jobs(queue="recommended")) == 15
+
+
+def test_recommended_queue_sorts_screened_hot_jobs_before_the_backlog(
     tmp_path, inventory, monkeypatch
 ):
     preferences_path = tmp_path / "job-search/preferences.yml"
@@ -537,30 +580,13 @@ def test_recommended_queue_excludes_jobs_until_screening_confirms_usable_fit(
             "interest": {"desired_title_terms": ["engineer"], "interest_terms": []},
         },
     )
-    write_screening_output(tmp_path, ["hybrid-1"], fit="weak_fit", recommendation="deprioritize")
+    write_screening_output(tmp_path, ["hybrid-1"])
     service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
 
-    assert service.list_jobs(queue="recommended") == []
+    recommended = service.list_jobs(queue="recommended")
 
-
-def test_recommended_queue_is_capped_to_a_small_shelf(tmp_path, monkeypatch):
-    inventory = [job(f"job-{index}", title="Support Engineer", mode="remote") for index in range(15)]
-    preferences_path = tmp_path / "job-search/preferences.yml"
-    preferences_path.parent.mkdir(parents=True)
-    preferences_path.write_text("schema_version: 1\n", encoding="utf-8")
-    monkeypatch.setattr(web_service, "_load_preferences", lambda _path: {"configured": True})
-    monkeypatch.setattr(
-        web_service,
-        "_prescreen",
-        lambda _raw, _preferences, _resume_terms: {
-            "queue_state": "ready",
-            "interest": {"desired_title_terms": ["support engineer"], "interest_terms": []},
-        },
-    )
-    write_screening_output(tmp_path, [item["id"] for item in inventory])
-    service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
-
-    assert len(service.list_jobs(queue="recommended")) == 12
+    assert recommended[0]["id"] == "hybrid-1"
+    assert recommended[0]["personalization"]["hot"] is True
 
 
 def test_interested_job_moves_out_of_recommended_queue(tmp_path, inventory, monkeypatch):

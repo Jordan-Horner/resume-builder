@@ -203,15 +203,12 @@ def build_screening_queue(
     config_path: Path = DEFAULT_CONFIG,
     preferences_path: Path = DEFAULT_PREFERENCES,
     max_provider_jobs: int = 6,
-    target_recommended: int | None = None,
     allow_provider: bool = False,
     workspace: Path = Path("."),
 ) -> ScreeningQueueSummary:
     """Screen a complete new-job set without allowing any result to hide a job."""
     if not 1 <= max_provider_jobs <= 25:
         raise ValueError("max_provider_jobs must be from 1 to 25")
-    if target_recommended is not None and target_recommended < 1:
-        raise ValueError("target_recommended must be positive")
     payload = json.loads(input_path.read_text(encoding="utf-8"))
     raw_jobs = payload.get("jobs")
     if not isinstance(raw_jobs, list):
@@ -285,7 +282,6 @@ def build_screening_queue(
     input_tokens = 0
     output_tokens = 0
     total_cost = Decimal("0")
-    recommended_count = 0
     for job, item in prepared:
         active = bool(item["active"])
         if not active:
@@ -321,13 +317,6 @@ def build_screening_queue(
         cached = cache.get(packet, model)
         if cached is not None:
             item["screening"] = _result_payload(cached, cached=True)
-            if score_shadow_job(
-                item,
-                positive_titles=positive_titles,
-                clearance_preference=str(preferences.get("clearance_preference", "neutral")),
-                feedback_events=feedback_events,
-            )["hot"]:
-                recommended_count += 1
             items.append(item)
             continue
         if packet.eligibility.value == "ineligible":
@@ -341,13 +330,6 @@ def build_screening_queue(
             item["screening"] = {
                 "status": "unscreened",
                 "reason": "provider_authorization_required",
-            }
-            items.append(item)
-            continue
-        if target_recommended is not None and recommended_count >= target_recommended:
-            item["screening"] = {
-                "status": "unscreened",
-                "reason": "recommendation_target_filled",
             }
             items.append(item)
             continue
@@ -371,13 +353,6 @@ def build_screening_queue(
             output_tokens += outcome.output_tokens
             total_cost += outcome.cost_usd
             item["screening"] = _result_payload(outcome.result, cached=outcome.cached)
-            if score_shadow_job(
-                item,
-                positive_titles=positive_titles,
-                clearance_preference=str(preferences.get("clearance_preference", "neutral")),
-                feedback_events=feedback_events,
-            )["hot"]:
-                recommended_count += 1
         items.append(item)
 
     items.sort(key=lambda item: int(item["source_order"]))

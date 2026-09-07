@@ -13,7 +13,6 @@ from .jobs import DEFAULT_CONFIG, DEFAULT_NEW_OUTPUT, DEFAULT_PREFERENCES
 DEFAULT_SCREENING_CACHE = Path("build/job-search/screening-cache.sqlite")
 DEFAULT_SCREENING_OUTPUT = Path("job-search/new-job-screens.json")
 DEFAULT_OPENROUTER_SECRET = Path("build/secrets/openrouter-key")
-RECOMMENDED_QUEUE_TARGET = 12
 
 
 def _api_key(workspace: Path, env_name: str) -> str:
@@ -61,7 +60,6 @@ def run_background_quick_screening(
         config_path=root / DEFAULT_CONFIG,
         preferences_path=root / DEFAULT_PREFERENCES,
         max_provider_jobs=min(max_jobs, config.limits.max_requests),
-        target_recommended=RECOMMENDED_QUEUE_TARGET,
         allow_provider=True,
         workspace=root,
     )

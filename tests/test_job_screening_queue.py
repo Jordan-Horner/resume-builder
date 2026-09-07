@@ -277,7 +277,7 @@ def test_background_queue_skips_obvious_local_misses_without_provider_work(
     assert adapter.calls == 2
 
 
-def test_recommendation_target_screens_the_best_candidate_first(
+def test_screening_budget_processes_the_best_candidates_first(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = tmp_path / "new.json"
@@ -311,15 +311,14 @@ def test_recommendation_target_screens_the_best_candidate_first(
         input_path=source,
         output_path=output,
         max_provider_jobs=2,
-        target_recommended=1,
         allow_provider=True,
     )
 
     jobs = {item["id"]: item for item in json.loads(output.read_text(encoding="utf-8"))["jobs"]}
     assert screened == ["preferred", "possible"]
     assert jobs["preferred"]["screening"]["status"] == "complete"
-    assert jobs["possible"]["screening"]["reason"] == "recommendation_target_filled"
-    assert summary.provider_calls == 2
+    assert jobs["possible"]["screening"]["status"] == "complete"
+    assert summary.provider_calls == 3
 
 
 def test_legacy_review_flag_cannot_hide_a_job_without_a_disposition(

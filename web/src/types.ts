@@ -132,7 +132,7 @@ export interface JobFeedback {
   job_id: string;
   latest: { action: "interested" | "not_interested" | "applied"; reasons: JobFeedbackReason[]; created_at: string } | null;
   personalization: {
-    hot_label: "Strong recommendation" | "Promising" | "Learning your preferences" | "Low priority";
+    hot_label: "Hot job" | "Recommended" | "Promising" | "Learning your preferences" | "Low priority";
     fit_score: number;
     interest_score: number;
     company_score: number;

@@ -5,6 +5,7 @@ from resume_builder.job_personalization import (
     extract_preference_traits,
     extract_seniority,
     load_shadow_settings,
+    score_shadow_job,
 )
 
 
@@ -82,6 +83,24 @@ def test_clearance_preference_is_a_modest_positive_score_signal():
 
     assert order == ["job-1", "job-2"]
     assert scores["job-1"]["score"] > scores["job-2"]["score"]
+
+
+def test_exact_optional_preferences_refine_deterministic_interest_score():
+    preferred = _item("job-1", "stretch")
+    preferred["deterministic"]["interest"] = {
+        "desired_title_terms": ["operations engineer"],
+        "preferred_job_attributes": ["Complex troubleshooting"],
+    }
+    avoided = _item("job-2", "stretch")
+    avoided["deterministic"]["interest"] = {
+        "desired_title_terms": ["operations engineer"],
+        "avoided_job_attributes": ["Continuous phone queue"],
+    }
+
+    preferred_score = score_shadow_job(preferred, positive_titles=[])
+    avoided_score = score_shadow_job(avoided, positive_titles=[])
+
+    assert preferred_score["interest_score"] > avoided_score["interest_score"]
 
 
 def test_exploration_preserves_complete_set_and_marks_exploration_slot():

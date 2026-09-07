@@ -76,6 +76,20 @@ def test_prescreen_separates_interest_constraints_and_keyword_readiness():
     assert "not an ATS score" in result["keyword_readiness"]["method"]
 
 
+def test_prescreen_records_exact_optional_job_preference_matches():
+    result = _prescreen(
+        job(description_text="Complex troubleshooting without a continuous phone queue."),
+        preferences(
+            preferred_job_attributes=["Complex troubleshooting"],
+            avoided_job_attributes=["Continuous phone queue"],
+        ),
+        set(),
+    )
+
+    assert result["interest"]["preferred_job_attributes"] == ["Complex troubleshooting"]
+    assert result["interest"]["avoided_job_attributes"] == ["Continuous phone queue"]
+
+
 def test_prescreen_keeps_unwanted_and_mode_mismatch_distinct():
     unwanted = _prescreen(
         job(title="Computer Repair Technician"), preferences(), {"computer", "repair"}

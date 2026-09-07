@@ -43,7 +43,7 @@ DEFAULT_NEW_OUTPUT = Path("job-search/new-jobs.json")
 DEFAULT_NEW_REVIEW_OUTPUT = Path("job-search/new-jobs-review.csv")
 DEFAULT_LATEST_REFRESH = Path("job-search/latest-refresh.json")
 DEFAULT_PROVIDER_COMPARISON = Path("job-search/provider-comparison.json")
-PRESCREEN_VERSION = 7
+PRESCREEN_VERSION = 8
 TOKEN = re.compile(r"[a-z][a-z0-9+#.]{2,}")
 PHRASE_TOKEN = re.compile(r"[a-z0-9]+")
 STOPWORDS = {
@@ -406,8 +406,15 @@ def _prescreen(
     title = str(job["title"])
     company = str(job["company"])
     description = str(job["description_text"])
+    posting = f"{title}\n{description}"
     desired = _contains_any(title, preferences.get("desired_title_terms", []))
-    interesting = _contains_any(f"{title}\n{description}", preferences.get("interest_terms", []))
+    interesting = _contains_any(posting, preferences.get("interest_terms", []))
+    preferred_attributes = _contains_phrases(
+        posting, preferences.get("preferred_job_attributes", [])
+    )
+    avoided_attributes = _contains_phrases(
+        posting, preferences.get("avoided_job_attributes", [])
+    )
     excluded_title = _contains_bounded(title, preferences.get("excluded_title_terms", []))
     seniority = _contains_phrases(title, preferences.get("senior_title_terms", []))
     accepted_senior_role = _contains_phrases(
@@ -500,7 +507,12 @@ def _prescreen(
         # Kept for artifact compatibility. Relevance and hard-warning rules no
         # longer suppress jobs; only a durable disposition removes one.
         "review_eligible": not bool(disposition),
-        "interest": {"desired_title_terms": desired, "interest_terms": interesting},
+        "interest": {
+            "desired_title_terms": desired,
+            "interest_terms": interesting,
+            "preferred_job_attributes": preferred_attributes,
+            "avoided_job_attributes": avoided_attributes,
+        },
         "constraints": {
             "work_mode_match": mode_match,
             "location_match": location_match,

@@ -55,12 +55,15 @@ it("adds multiple searchable title bubbles and saves them as active preferences"
 
 it("adds and removes plain-language job preferences", async () => {
   await act(async () => root.render(<SearchPreferencesSection />));
+  const disclosure = host.querySelector(".settings-disclosure") as HTMLDetailsElement;
+  expect(disclosure.open).toBe(false);
+  expect(disclosure.textContent).toContain("2 saved");
   const input = host.querySelector('input[placeholder="e.g. Complex troubleshooting"]') as HTMLInputElement;
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, "Engineering ownership");
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
-  await act(async () => Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "Add preference")?.click());
+  await act(async () => (input.closest("form")?.querySelector("button") as HTMLButtonElement).click());
   expect(host.textContent).toContain("Engineering ownership");
   await act(async () => Array.from(host.querySelectorAll("button")).find((button) => button.getAttribute("aria-label") === "Remove Phone-first support")?.click());
   const save = Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "Save changes") as HTMLButtonElement;

@@ -302,6 +302,14 @@ def score_shadow_job(
             if interesting:
                 interest_score += 0.10
                 reasons.append("The posting matches an explicit interest term.")
+            preferred_attributes = interest.get("preferred_job_attributes") or []
+            avoided_attributes = interest.get("avoided_job_attributes") or []
+            if preferred_attributes:
+                interest_score += min(0.12, 0.04 * len(preferred_attributes))
+                reasons.append("The posting explicitly matches work you prefer.")
+            if avoided_attributes:
+                interest_score -= min(0.18, 0.06 * len(avoided_attributes))
+                reasons.append("The posting explicitly matches work you prefer to avoid.")
         conflicts = deterministic.get("hard_conflicts") or []
         if conflicts:
             fit_score = max(0.0, fit_score - 0.35)
@@ -459,8 +467,10 @@ def score_shadow_job(
         "interest_label": _level(interest_score),
         "company_label": _level(company_score, positive="Positive"),
         "hot_label": (
-            "Strong recommendation"
+            "Hot job"
             if hot
+            else "Recommended"
+            if deterministic_match and not hard_conflict
             else "Promising"
             if fit_score >= 0.55 and interest_score >= 0.5
             else "Learning your preferences"

@@ -212,6 +212,7 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
 .job-screen-status { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 999px; padding: 2px 7px; font-size: 10px; font-weight: 700; letter-spacing: .01em; }
 .job-screen-status.skipped { color: var(--muted); background: var(--surface-control); }
 .job-screen-status.failed { color: var(--warning); background: color-mix(in srgb, var(--warning) 12%, transparent); }
+.job-hot-status { flex: 0 0 auto; color: #7ee787; background: color-mix(in srgb, #2ea043 22%, transparent); border-radius: 999px; padding: 2px 7px; font-size: 10px; font-weight: 700; }
 .queue-tabs { display: flex; gap: 18px; margin: 0 4px 14px; border-bottom: 1px solid var(--line); }
 .queue-tabs button { border: 0; border-bottom: 2px solid transparent; padding: 8px 1px 10px; color: var(--muted); background: transparent; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .queue-tabs button[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--ink); }
@@ -650,6 +651,17 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
 .semantic-preferences li button:hover { color: var(--ink); }
 .semantic-preferences form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
 .semantic-preferences form input { min-width: 0; }
+.settings-disclosure { padding: 20px 0; border-bottom: 1px solid var(--line); }
+.settings-disclosure > summary { display: flex; align-items: center; gap: 24px; padding: 8px 2px; cursor: pointer; list-style: none; }
+.settings-disclosure > summary::-webkit-details-marker { display: none; }
+.settings-disclosure > summary::before { content: "›"; color: var(--muted); font-size: 20px; transform: rotate(0); transition: transform 160ms ease-out; }
+.settings-disclosure[open] > summary::before { transform: rotate(90deg); }
+.settings-disclosure > summary > span { display: grid; gap: 3px; }
+.settings-disclosure > summary strong { font-family: "Avenir Next", Avenir, sans-serif; font-size: 15px; }
+.settings-disclosure > summary small { color: var(--muted); font-size: 12px; }
+.settings-disclosure > summary em { margin-left: auto; color: var(--muted); font-size: 11px; font-style: normal; font-weight: 700; }
+.settings-disclosure-body { padding: 18px 30px 8px; }
+.settings-disclosure-body > p { margin: 0 0 20px; color: var(--muted); font-size: 13px; line-height: 1.5; }
 .semantic-preference-notice { grid-column: 1 / -1; margin: -8px 0 0; }
 .field-label { display: block; margin-bottom: 7px; color: #b1bac4; font-size: 12px; font-weight: 650; }
 .field span em { color: var(--muted); font-style: normal; font-weight: 400; }

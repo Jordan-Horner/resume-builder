@@ -111,7 +111,6 @@ MAX_RESUME_BYTES = 10 * 1024 * 1024
 OPENROUTER_SECRET_PATH = Path("build/secrets/openrouter-key")
 TITLE_GENERATION_CACHE_PATH = Path("build/job-search/title-generation.json")
 JOB_FEEDBACK_PATH = Path("job-search/job-feedback.json")
-RECOMMENDED_QUEUE_LIMIT = 12
 JOB_SCREENING_OUTPUT = Path("job-search/new-job-screens.json")
 JOB_FEEDBACK_ACTIONS = frozenset({"interested", "not_interested", "applied"})
 JOB_FEEDBACK_REASONS = frozenset(
@@ -1347,7 +1346,7 @@ class DashboardService:
         return response
 
     def replenish_recommendations(self) -> None:
-        """Refill the bounded recommendation shelf after a user decision."""
+        """Continue bounded screening of the deterministic recommendation backlog."""
         shortlist = self.workspace / "job-search/shortlist.json"
         schedule_path = self.workspace / "automation/config.yml"
         if not shortlist.is_file() or not schedule_path.is_file():
@@ -1600,8 +1599,9 @@ class DashboardService:
             if (self.workspace / PREFERENCES_PATH).is_file()
             else {}
         )
+        feedback_events = self._feedback_events()
         latest_feedback_by_job: dict[str, dict[str, Any]] = {}
-        for event in self._feedback_events():
+        for event in feedback_events:
             snapshot = event.get("job")
             if (
                 event.get("action") in JOB_FEEDBACK_ACTIONS
@@ -1614,6 +1614,12 @@ class DashboardService:
             for job_id, event in latest_feedback_by_job.items()
             if event.get("action") == "interested"
         }
+        positive_titles = [
+            str(event.get("job", {}).get("title") or "")
+            for event in feedback_events
+            if event.get("action") in {"interested", "applied"}
+            and isinstance(event.get("job"), dict)
+        ]
         jobs: list[dict[str, Any]] = []
         for raw in self._inventory_loader():
             job = self._serialize_job(raw)
@@ -1625,6 +1631,30 @@ class DashboardService:
                 else None
             )
             job["personalization"] = summary.get("personalization") if summary else None
+            if job["personalization"] is None and isinstance(deterministic, dict):
+                constraints = deterministic.get("constraints")
+                job["personalization"] = score_shadow_job(
+                    {
+                        **job,
+                        "active": True,
+                        "source_order": 0,
+                        "preference_traits": extract_preference_traits(job),
+                        "deterministic": {
+                            "interest": deterministic.get("interest", {}),
+                            "hard_conflicts": (
+                                constraints.get("hard_conflicts", [])
+                                if isinstance(constraints, dict)
+                                else []
+                            ),
+                        },
+                        "screening": {"status": "unscreened"},
+                    },
+                    positive_titles=positive_titles,
+                    clearance_preference=str(
+                        preferences.get("clearance_preference", "neutral")
+                    ),
+                    feedback_events=feedback_events,
+                )
             if job["id"] in explicitly_interested:
                 # Manual screens are cached immediately, while the background artifact is
                 # refreshed only after discovery. Read the live cache for explicitly positive
@@ -1639,10 +1669,14 @@ class DashboardService:
             if queue == "recommended" and (
                 not _is_recommended_prescreen(deterministic)
                 or job["id"] in explicitly_interested
-                or not isinstance(summary, dict)
-                or summary.get("status") != "complete"
-                or not isinstance(summary.get("personalization"), dict)
-                or summary["personalization"].get("hot") is not True
+                or (
+                    isinstance(summary, dict)
+                    and summary.get("status") == "complete"
+                    and (
+                        not isinstance(summary.get("personalization"), dict)
+                        or summary["personalization"].get("hot") is not True
+                    )
+                )
             ):
                 continue
             if not matches_view(job, view):
@@ -1672,18 +1706,20 @@ class DashboardService:
             jobs.append(job)
         if queue == "recommended":
 
-            def recommendation_order(job: dict[str, Any]) -> tuple[float, float]:
+            def recommendation_order(job: dict[str, Any]) -> tuple[int, float, float]:
                 personalization = job.get("personalization")
                 score = (
                     float(personalization.get("score", 0.0))
                     if isinstance(personalization, dict)
                     else 0.0
                 )
+                hot = bool(
+                    isinstance(personalization, dict) and personalization.get("hot") is True
+                )
                 posted = _job_timestamp(job)
-                return -score, -(posted.timestamp() if posted else 0.0)
+                return (0 if hot else 1), -score, -(posted.timestamp() if posted else 0.0)
 
             jobs.sort(key=recommendation_order)
-            return jobs[:RECOMMENDED_QUEUE_LIMIT]
         return jobs
 
     def get_job(self, job_id: str) -> dict[str, Any] | None:

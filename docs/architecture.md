@@ -192,18 +192,18 @@ state. The portal may display this metadata, but quick screening never removes
 jobs from the canonical inventory. The backend exposes three views over that same
 inventory. The deterministic prescreen cheaply selects candidates for background
 screening by excluding hard conflicts and requiring a saved role or interest
-signal. Candidates are processed in deterministic preference order, and provider
-work stops when the fixed 12-job shelf is full or the existing per-run cap is
-reached. **Recommended Jobs** is the output of that process: a job appears only
-after its quick screen completes with usable career fit. Unscreened, failed,
-uncertain, and weak-fit candidates remain available in **All jobs** rather than
-being presented as recommendations. **Interested jobs** contains explicit
+signal. Those candidates appear in **Recommended Jobs** immediately and remain a
+backlog rather than a fixed-size shelf. Candidates are screened in deterministic
+preference order until the existing per-run provider cap is reached. A usable
+career-fit result promotes a recommendation to **Hot** and sorts it first; a
+completed weak screen demotes it to **All jobs**. Provider failures do not empty
+the deterministic backlog. **Interested jobs** contains explicit
 positive decisions that have not become applications, and **All jobs** remains the
 complete reviewable inventory. Marking a recommendation Interested moves it from
 Recommended Jobs to Interested jobs; applying or dismissing it removes it from
 both active queues. Current feedback and the current screening cache are combined
 at request time, so these transitions never wait for the next scheduled artifact
-refresh. A decision also schedules the same bounded worker to refill the shelf;
+refresh. A decision also schedules the same bounded worker to continue screening;
 there is no separate recommendation scheduler. The browser only requests and
 renders these backend-owned views.
 

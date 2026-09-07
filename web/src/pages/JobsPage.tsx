@@ -304,10 +304,10 @@ export function JobsPage() {
           ? { title: "No Interested jobs yet", message: "Jobs you mark Interested stay here until you apply or pass on them.", actions: <button className="primary-button" onClick={() => selectQueue("recommended")}>Review recommendations</button> }
           : queueView === "recommended"
             ? recommendationStage === "searching"
-              ? { title: "Finding new jobs…", message: "Your scheduled search is running. Matching jobs will be screened automatically before they appear here.", actions: <button className="primary-button" onClick={() => selectQueue("all")}>Review all jobs</button> }
+              ? { title: "Finding new jobs…", message: "Your scheduled search is running. Strong deterministic matches will appear here immediately.", actions: <button className="primary-button" onClick={() => selectQueue("all")}>Review all jobs</button> }
               : recommendationStage === "screening"
                 ? { title: "Screening recommendations…", message: "The search finished. Career-fit screening is preparing your Recommended Jobs.", actions: <button className="primary-button" onClick={() => selectQueue("all")}>Review all jobs</button> }
-                : { title: "No Recommended Jobs right now", message: "Recommendations use your saved roles, location, work setup, pay, and seniority. New matches are screened automatically.", actions: <button className="primary-button" onClick={() => selectQueue("all")}>Review all jobs</button> }
+                : { title: "No Recommended Jobs right now", message: "Recommendations use your saved roles, location, work setup, pay, and seniority. The strongest matches are screened and promoted to Hot.", actions: <button className="primary-button" onClick={() => selectQueue("all")}>Review all jobs</button> }
         : { title: "No jobs match these filters", message: `${reviewableTotal} reviewable ${reviewableTotal === 1 ? "job is" : "jobs are"} hidden by your current filters.`, actions: <><button className="primary-button" onClick={() => defaults && setFilters({ ...EMPTY_FILTERS, view: defaults })}>Reset filters</button><button className="empty-state-link" onClick={() => setFilters(EMPTY_FILTERS)}>Clear all</button></> };
 
   const hasNoInventory = !loading && !queueError && reviewableTotal === 0;

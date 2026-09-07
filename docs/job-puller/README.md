@@ -62,8 +62,9 @@ scan, or call an AI model. It updates screening preferences only; future search
 query changes remain behind the separate discovery activation workflow.
 Use `preferred_job_attributes` and `avoided_job_attributes` for explicit,
 plain-language characteristics such as production ownership or phone-first
-support. These lists affect only preference fit in quick screens; they never
-establish candidate qualifications or hard eligibility.
+support. Exact posting matches refine deterministic recommendation ranking and
+preference fit in quick screens; they never establish candidate qualifications
+or hard eligibility.
 
 A role-bound capability family can set one transport-neutral `provider_query`,
 `commercial_admission: query_result`, and `commercial_only: true`. This allows

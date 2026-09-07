@@ -129,7 +129,7 @@ it("shows when the scheduled search is still preparing recommendations", async (
   await act(async () => root.render(<JobsPage />));
 
   expect(host.textContent).toContain("Finding new jobs…");
-  expect(host.textContent).toContain("screened automatically before they appear here");
+  expect(host.textContent).toContain("deterministic matches will appear here immediately");
 });
 
 it("describes a failed automatic screen as unavailable, not as a fit judgment", async () => {

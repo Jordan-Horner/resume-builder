@@ -92,6 +92,11 @@ merely because the model provider was unavailable. Notifications report
 recommended, unresolved, additional, and total job counts; every job remains in
 the full queue.
 
+Deterministic matches enter the Recommended Jobs backlog before model screening.
+The bounded screen worker processes the highest-ranked unscreened matches first;
+strong completed screens are promoted to Hot, while completed weak screens return
+to All jobs. Cached jobs are not sent to the provider again.
+
 ATS source resolution is also enrichment rather than a discovery gate. Its
 status and counts are recorded under `source_resolution` in
 `job-search/latest-refresh.json`; an unavailable catalog or ATS endpoint does
