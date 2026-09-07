@@ -233,9 +233,14 @@ improves extraction quality independently without adding another resume-matching
 call or increasing the private context sent to a provider.
 
 Interactive manual quick screens use the already-built posting-wide evidence
-packet in one provider stage. That stage has a hard 15-second wall-clock
-deadline and does not retry automatically. Criterion-driven posting
-interpretation remains separate from this blocking click path. Other agent
+packet in one provider stage and do not retry automatically. The portal queues the existing
+screen and returns immediately, exposes queued/running/failed status separately,
+and polls that lightweight status while the job remains open. Closing the job
+does not cancel the analysis; a successful result is saved in the shared cache.
+Queued portal and scheduled screens have a 25-second provider deadline. The
+blocking CLI command uses a shorter 15-second deadline.
+Criterion-driven posting
+interpretation remains separate from this manual path. Other agent
 workflows keep their normal retry behavior and provider limits.
 
 Quick-screen calibration is a separate offline boundary. Human-reviewed JSON

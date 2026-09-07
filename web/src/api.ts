@@ -1,4 +1,4 @@
-import type { Application, GmailSetup, Integration, Job, JobFeedback, JobFeedbackAction, JobFeedbackReason, JobFilters, JobScreenResult, OnboardingStatus, ResumeLibrary, ResumeRecommendation, SalaryEstimateResult, SearchPreferences, TelegramPairing } from "./types";
+import type { Application, GmailSetup, Integration, Job, JobFeedback, JobFeedbackAction, JobFeedbackReason, JobFilters, JobScreenResult, JobScreenState, OnboardingStatus, ResumeLibrary, ResumeRecommendation, SalaryEstimateResult, SearchPreferences, TelegramPairing } from "./types";
 
 export interface UpdateStatus {
   version: string;
@@ -218,7 +218,10 @@ export function getResumeRecommendation(jobId: string): Promise<ResumeRecommenda
 export async function getSavedJobScreen(jobId: string): Promise<JobScreenResult | null> {
   return (await request<JobScreenResult | null>(`/api/jobs/${encodeURIComponent(jobId)}/screen`)) ?? null;
 }
-export function screenJob(jobId: string): Promise<JobScreenResult> {
+export function getJobScreenStatus(jobId: string): Promise<JobScreenState> {
+  return request(`/api/jobs/${encodeURIComponent(jobId)}/screen-status`);
+}
+export function screenJob(jobId: string): Promise<JobScreenState> {
   return request(`/api/jobs/${encodeURIComponent(jobId)}/screen`, { method: "POST" });
 }
 

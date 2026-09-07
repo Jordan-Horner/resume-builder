@@ -103,15 +103,26 @@ def test_job_screen_routes_separate_cached_read_from_explicit_run(
 ) -> None:
     from resume_builder.web_service import DashboardService
 
-    result = {"status": "complete", "cached": False, "result": {"fit": "good_match"}}
+    result = {"status": "queued", "job_id": "job-1"}
     monkeypatch.setattr(DashboardService, "saved_job_screen", lambda self, job_id: None)
-    monkeypatch.setattr(DashboardService, "screen_job", lambda self, job_id, refresh=False: result)
+    monkeypatch.setattr(DashboardService, "job_screen_status", lambda self, job_id: result)
+    monkeypatch.setattr(
+        DashboardService, "queue_job_screen", lambda self, job_id, refresh=False: result
+    )
+    completed: list[str] = []
+    monkeypatch.setattr(
+        DashboardService,
+        "run_queued_job_screen",
+        lambda self, job_id, refresh=False: completed.append(job_id),
+    )
     client = _client(tmp_path)
 
     assert client.get("/api/jobs/job-1/screen").status_code == 204
+    assert client.get("/api/jobs/job-1/screen-status").json() == result
     response = client.post("/api/jobs/job-1/screen")
-    assert response.status_code == 200
+    assert response.status_code == 202
     assert response.json() == result
+    assert completed == ["job-1"]
 
 
 def test_job_screen_never_exposes_raw_decoding_errors(tmp_path: Path, monkeypatch) -> None:
@@ -120,7 +131,7 @@ def test_job_screen_never_exposes_raw_decoding_errors(tmp_path: Path, monkeypatc
     decoding_error = UnicodeDecodeError("utf-8", b"\xa3", 0, 1, "invalid start byte")
     monkeypatch.setattr(
         DashboardService,
-        "screen_job",
+        "queue_job_screen",
         lambda self, job_id, refresh=False: (_ for _ in ()).throw(decoding_error),
     )
     response = _client(tmp_path).post("/api/jobs/legacy-job/screen")

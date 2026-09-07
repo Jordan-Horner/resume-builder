@@ -72,9 +72,14 @@ from .job_screening_queue import (
 )
 from .jobs import DEFAULT_CONFIG as DEFAULT_JOBS_CONFIG
 from .jobs import DEFAULT_PREFERENCES, get_job_screening_packet
-from .posting_interpretation import PostingInterpretationCache, PostingInterpretationService
+from .posting_interpretation import PostingInterpretationCache
 from .salary_estimation import format_salary_estimate
-from .screening_service import ScreeningService, enrich_packet_from_cached_interpretation
+from .screening_service import (
+    INTERACTIVE_SCREEN_TIMEOUT_SECONDS,
+    QUICK_SCREEN_PROVIDER_RETRIES,
+    ScreeningService,
+    enrich_packet_from_cached_interpretation,
+)
 
 AGENT_INSTRUCTIONS = """\
 You are the private Resume Builder career agent. Be concise and candid.
@@ -705,16 +710,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                         "No unchanged cached screen exists. Preview with --preview-payload, then "
                         "rerun with --confirm-send-private-data to contact the provider."
                     )
-                adapter = OpenRouterAdapter(config)
+                adapter = OpenRouterAdapter(
+                    config,
+                    timeout_seconds=INTERACTIVE_SCREEN_TIMEOUT_SECONDS,
+                    retries=QUICK_SCREEN_PROVIDER_RETRIES,
+                )
                 screen_result, cached = ScreeningService(
                     adapter,
                     cache,
-                    interpretation_service=PostingInterpretationService(
-                        adapter,
-                        PostingInterpretationCache(args.state.with_name("screening-cache.sqlite")),
-                    ),
-                    interpretation_model=config.models.reasoning,
-                    vault_root=args.preferences.expanduser().resolve().parent / "vault",
                 ).screen(packet, model=model, refresh=args.refresh)
             print(
                 screen_result.model_dump_json(indent=2)

@@ -13,7 +13,7 @@ vi.mock("./api", () => ({
   markJobNotInterested: vi.fn(), setCompanyBlocked: vi.fn(), activateJobSearch: vi.fn(),
   getJobSources: vi.fn(), startJobScan: vi.fn(), estimateJobSalary: vi.fn(),
   getSavedJobSalary: vi.fn(),
-  getSavedJobScreen: vi.fn(), screenJob: vi.fn(),
+  getSavedJobScreen: vi.fn(), getJobScreenStatus: vi.fn(), screenJob: vi.fn(),
   getJobFeedback: vi.fn(), saveJobFeedback: vi.fn(), recordJobPostingOpened: vi.fn(),
   getScrapeSchedule: vi.fn(),
 }));
@@ -35,11 +35,12 @@ beforeEach(() => {
   vi.mocked(api.markJobApplied).mockResolvedValue({});
   vi.mocked(api.getSavedJobSalary).mockResolvedValue(null);
   vi.mocked(api.getSavedJobScreen).mockResolvedValue(null);
+  vi.mocked(api.getJobScreenStatus).mockResolvedValue({ status: "idle", job_id: "one" });
   vi.mocked(api.getJobFeedback).mockResolvedValue({ job_id: "one", latest: null, personalization: { hot_label: "Learning your preferences", fit_score: 0.25, interest_score: 0.5, company_score: 0.5, fit_label: "Low", interest_label: "Neutral", company_label: "Neutral", confidence: "unknown", reasons: [], hot: false, hot_reasons: [] } });
   vi.mocked(api.saveJobFeedback).mockResolvedValue({ job_id: "one", latest: { action: "interested", reasons: [], created_at: "2026-09-06T12:00:00Z" }, personalization: { hot_label: "Low priority", fit_score: 0.25, interest_score: 0.85, company_score: 0.5, fit_label: "Low", interest_label: "High", company_label: "Neutral", confidence: "unknown", reasons: ["You marked this job positively."], hot: false, hot_reasons: [] } });
   vi.mocked(api.recordJobPostingOpened).mockResolvedValue(undefined);
 });
-afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); });
+afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.useRealTimers(); vi.restoreAllMocks(); });
 async function click(text: string) {
   await act(async () => [...host.querySelectorAll("button")].find((button) => button.textContent === text)?.click());
 }
@@ -298,6 +299,32 @@ it("screens a job only after the user requests it", async () => {
   expect(host.textContent).toContain("Evidence used");
 });
 
+it("queues a slow screen and renders its background result without blocking the job panel", async () => {
+  const result = { status: "complete" as const, cached: false, result: {
+    job_id: "one", fit: "good_match", fit_label: "Good fit", screening_label: "Quick screen" as const, eligibility: "eligible",
+    eligibility_label: "Eligible", recommendation: "pursue", recommendation_label: "Pursue", confidence: "medium" as const,
+    strengths: [], gaps: [], unknowns: [], stretch_case: null, reasoning_summary: "Relevant support experience.",
+    preference_fit: { label: "No job preferences saved" as const, matches: [], conflicts: [], unknown_count: 0 },
+    evidence_coverage: "good" as const, evidence_strategy: "posting-wide" as const, posting_coverage: "complete" as const, evidence_used: [],
+  } };
+  vi.useFakeTimers();
+  vi.mocked(api.screenJob).mockResolvedValue({ status: "queued", job_id: "one", message: "Analysis queued." });
+  vi.mocked(api.getJobScreenStatus)
+    .mockResolvedValueOnce({ status: "idle", job_id: "one" })
+    .mockResolvedValue(result);
+
+  await openJob();
+  await click("Screen job");
+  expect(host.textContent).toContain("Analysis queued");
+  expect(host.textContent).toContain("keep reviewing");
+
+  await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+
+  expect(api.getJobScreenStatus).toHaveBeenCalledWith("one");
+  expect(host.textContent).toContain("Good fit");
+  expect(host.textContent).toContain("Relevant support experience.");
+});
+
 it("keeps screening state and late results attached to the job that started them", async () => {
   let resolveFirst!: (value: Awaited<ReturnType<typeof api.screenJob>>) => void;
   const secondJob = { ...job, id: "two", title: "Platform Engineer" };
@@ -335,11 +362,11 @@ it("keeps screening state and late results attached to the job that started them
 
   await openJob();
   await click("Screen job");
-  expect(host.textContent).toContain("Screening job…");
+  expect(host.textContent).toContain("Analysis queued");
 
   await act(async () => (host.querySelectorAll(".job-row")[1] as HTMLButtonElement).click());
   expect(host.textContent).toContain("Screen job");
-  expect(host.textContent).not.toContain("Screening job…");
+  expect(host.textContent).not.toContain("Analysis queued");
 
   await click("Screen job");
   expect(api.screenJob).toHaveBeenNthCalledWith(2, "two");

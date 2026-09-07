@@ -217,9 +217,92 @@ def test_interactive_job_screen_uses_one_bounded_candidate_screen(tmp_path, monk
     assert captured["adapter"] == {
         "api_key": "synthetic-test-credential",
         "timeout_seconds": 25,
-        "retries": 1,
+        "retries": 0,
     }
     assert captured["service"] == {}
+
+
+def test_job_screen_runs_behind_non_blocking_status(tmp_path, monkeypatch) -> None:
+    packet = build_screening_packet(
+        job("screen-me", title="Support Engineer", mode="remote"),
+        {"accepted_work_modes": ["remote"], "screening_profile": {}},
+        {},
+    )
+    config_path = tmp_path / DEFAULT_AGENT_CONFIG
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text(render_default_agent_config(), encoding="utf-8")
+    service = DashboardService(tmp_path)
+    monkeypatch.setattr(service, "_inventory_loader", lambda: [{"id": packet.job.id}])
+    monkeypatch.setattr(service, "_openrouter_configured", lambda: True)
+
+    queued = service.queue_job_screen("screen-me")
+
+    assert queued["status"] == "queued"
+    assert service.job_screen_status("screen-me")["status"] == "queued"
+
+    complete = {"status": "complete", "cached": False, "result": {"job_id": "screen-me"}}
+    monkeypatch.setattr(service, "screen_job", lambda _job_id, refresh=False: complete)
+    monkeypatch.setattr(service, "saved_job_screen", lambda _job_id: complete)
+    service.run_queued_job_screen("screen-me")
+
+    assert service.job_screen_status("screen-me") == complete
+
+
+def test_failed_queued_job_screen_surfaces_retryable_state(tmp_path, monkeypatch) -> None:
+    service = DashboardService(tmp_path)
+    service._screening_states["screen-me"] = {"status": "queued", "job_id": "screen-me"}
+    monkeypatch.setattr(
+        service,
+        "screen_job",
+        lambda _job_id, refresh=False: (_ for _ in ()).throw(ValueError("private detail")),
+    )
+
+    service.run_queued_job_screen("screen-me")
+
+    status = service.job_screen_status("screen-me")
+    assert status == {
+        "status": "failed",
+        "job_id": "screen-me",
+        "message": "The background analysis could not finish. You can try again.",
+    }
+    assert "private detail" not in status["message"]
+
+
+def test_background_quick_screen_has_one_short_provider_attempt(tmp_path, monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from resume_builder import background_screening
+
+    captured: dict[str, object] = {}
+    config = SimpleNamespace(
+        api_key_env="OPENROUTER_API_KEY",
+        models=SimpleNamespace(fast="fast-model"),
+        limits=SimpleNamespace(max_requests=6),
+    )
+
+    class FakeAdapter:
+        def __init__(self, supplied_config, **kwargs):
+            captured["config"] = supplied_config
+            captured["adapter"] = kwargs
+
+    expected = SimpleNamespace(completed=0)
+    monkeypatch.setattr(background_screening, "load_agent_config", lambda _path: config)
+    monkeypatch.setattr(background_screening, "_api_key", lambda _root, _env: "test-key")
+    monkeypatch.setattr(background_screening, "OpenRouterAdapter", FakeAdapter)
+    monkeypatch.setattr(
+        background_screening,
+        "build_screening_queue",
+        lambda **kwargs: captured.update({"queue": kwargs}) or expected,
+    )
+
+    result = background_screening.run_background_quick_screening(tmp_path, max_jobs=3)
+
+    assert result is expected
+    assert captured["adapter"] == {
+        "api_key": "test-key",
+        "timeout_seconds": 25,
+        "retries": 0,
+    }
 
 
 def test_interactive_job_screen_wraps_input_decoding_failure(tmp_path, monkeypatch, caplog):

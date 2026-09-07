@@ -215,6 +215,12 @@ resume-builder agent screen <job-id>
 resume-builder agent screen <job-id> --refresh --confirm-send-private-data
 ```
 
+The direct command and portal manual screen use one provider request and no
+automatic provider retry. The blocking command has a 15-second deadline; the
+queued portal screen has a 25-second deadline and never blocks the page. Both
+may reuse an existing candidate-independent posting interpretation from the
+local cache, but never wait for a new interpretation before screening.
+
 Eligibility has four constraint states: `satisfied`, `violated`, `unknown`, and
 `not_configured`. Only an explicit required constraint in the candidate profile
 plus contradictory explicit posting evidence can establish hard ineligibility.

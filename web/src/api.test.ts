@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getJobs,
+  getJobScreenStatus,
   estimateJobSalary,
   getSavedJobSalary,
   getSavedJobScreen,
@@ -68,15 +69,20 @@ describe("dashboard API client", () => {
   it("loads cached screening separately from an explicit screen", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ status: "complete" }), {
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: "queued", job_id: "job-1" }), {
         status: 200, headers: { "Content-Type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: "complete" }), {
+        status: 202, headers: { "Content-Type": "application/json" },
       }));
 
     expect(await getSavedJobScreen("job-1")).toBeNull();
+    await getJobScreenStatus("job-1");
     await screenJob("job-1");
 
     expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/jobs/job-1/screen", undefined);
-    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/jobs/job-1/screen", { method: "POST" });
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/jobs/job-1/screen-status", undefined);
+    expect(fetchMock).toHaveBeenNthCalledWith(3, "/api/jobs/job-1/screen", { method: "POST" });
   });
 
   it("loads and defers onboarding through explicit endpoints", async () => {

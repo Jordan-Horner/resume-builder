@@ -118,6 +118,14 @@ export interface JobScreenResult {
   };
 }
 
+export interface JobScreenProgress {
+  status: "idle" | "queued" | "running" | "failed";
+  job_id: string;
+  message?: string;
+}
+
+export type JobScreenState = JobScreenResult | JobScreenProgress;
+
 export interface JobPreferenceAssessment {
   preference: string;
   direction: "prefer" | "avoid";

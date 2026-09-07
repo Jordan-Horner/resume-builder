@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { getJob, getJobFeedback, getResumeRecommendation, getSavedJobScreen, recordJobPostingOpened, screenJob } from "../api";
+import { getJob, getJobFeedback, getJobScreenStatus, getResumeRecommendation, recordJobPostingOpened, screenJob } from "../api";
 import { ArrowIcon, IconButton } from "../components";
 import { JobSalary } from "../components/JobSalary";
 import { useAssistant } from "../assistant/AssistantProvider";
@@ -60,12 +60,14 @@ export function JobDetailPanel({
   const [recommendationError, setRecommendationError] = useState("");
   const [jobScreen, setJobScreen] = useState<JobScreenResult | null>(null);
   const [screeningJobId, setScreeningJobId] = useState<string | null>(null);
+  const [screeningMessage, setScreeningMessage] = useState("");
   const [screenError, setScreenError] = useState("");
   const [feedback, setFeedback] = useState<JobFeedback | null>(null);
   const [feedbackError, setFeedbackError] = useState("");
   const [description, setDescription] = useState<string | null>(job.description ?? descriptionCache.get(job.id) ?? null);
   const [descriptionError, setDescriptionError] = useState("");
   const currentJobId = useRef(job.id);
+  const screenPollToken = useRef(0);
   currentJobId.current = job.id;
   const screening = screeningJobId === job.id;
 
@@ -75,9 +77,12 @@ export function JobDetailPanel({
 
   useEffect(() => {
     let active = true;
+    const pollToken = ++screenPollToken.current;
     setRecommendation(null);
     setRecommendationError("");
     setJobScreen(null);
+    setScreeningJobId(null);
+    setScreeningMessage("");
     setScreenError("");
     setFeedback(null);
     setFeedbackError("");
@@ -87,12 +92,20 @@ export function JobDetailPanel({
     const descriptionRequest = job.description !== undefined || descriptionCache.has(job.id)
       ? Promise.resolve(null)
       : getJob(job.id, controller.signal);
-    void Promise.allSettled([getResumeRecommendation(job.id), getSavedJobScreen(job.id), getJobFeedback(job.id), descriptionRequest]).then(([resumeResult, screenResult, feedbackResult, descriptionResult]) => {
+    void Promise.allSettled([getResumeRecommendation(job.id), getJobScreenStatus(job.id), getJobFeedback(job.id), descriptionRequest]).then(([resumeResult, screenResult, feedbackResult, descriptionResult]) => {
       if (!active) return;
       if (resumeResult.status === "fulfilled") setRecommendation(resumeResult.value);
       else setRecommendationError(resumeResult.reason instanceof Error ? resumeResult.reason.message : "Could not load the resume recommendation.");
-      if (screenResult.status === "fulfilled") setJobScreen(screenResult.value);
-      else setScreenError(screenResult.reason instanceof Error ? screenResult.reason.message : "Could not load this job screen.");
+      if (screenResult.status === "fulfilled") {
+        if (screenResult.value.status === "complete") setJobScreen(screenResult.value);
+        else if (screenResult.value.status === "queued" || screenResult.value.status === "running") {
+          setScreeningJobId(job.id);
+          setScreeningMessage(screenResult.value.status === "running" ? "Analyzing in background" : "Analysis queued");
+          void pollJobScreen(job.id, pollToken);
+        } else if (screenResult.value.status === "failed") {
+          setScreenError(screenResult.value.message ?? "The background analysis could not finish.");
+        }
+      } else setScreenError(screenResult.reason instanceof Error ? screenResult.reason.message : "Could not load this job screen.");
       if (feedbackResult.status === "fulfilled") setFeedback(feedbackResult.value);
       else setFeedbackError(feedbackResult.reason instanceof Error ? feedbackResult.reason.message : "Could not load your preference for this job.");
       if (descriptionResult.status === "fulfilled" && descriptionResult.value) {
@@ -103,25 +116,75 @@ export function JobDetailPanel({
         setDescriptionError(descriptionResult.reason instanceof Error ? descriptionResult.reason.message : "Could not load the job description.");
       }
     });
-    return () => { active = false; controller.abort(); };
+    return () => { active = false; screenPollToken.current += 1; controller.abort(); };
   }, [job.id]);
 
   async function runJobScreen() {
     if (screening) return;
     const requestedJobId = job.id;
+    const pollToken = ++screenPollToken.current;
     setScreeningJobId(requestedJobId);
+    setScreeningMessage("Analysis queued");
     setScreenError("");
     try {
-      const result = await screenJob(requestedJobId);
-      if (currentJobId.current === requestedJobId) {
-        setJobScreen(result);
-        onScreened(result);
+      const started = await screenJob(requestedJobId);
+      if (currentJobId.current !== requestedJobId) return;
+      if (started.status === "complete") {
+        setJobScreen(started);
+        onScreened(started);
         setFeedback(await getJobFeedback(requestedJobId));
+        setScreeningJobId(null);
+        setScreeningMessage("");
+        return;
       }
+      if (started.status === "failed") {
+        setScreenError(started.message ?? "The background analysis could not finish.");
+        setScreeningJobId(null);
+        setScreeningMessage("");
+        return;
+      }
+      setScreeningMessage(started.status === "running" ? "Analyzing in background" : "Analysis queued");
+      void pollJobScreen(requestedJobId, pollToken);
     } catch (reason) {
       if (currentJobId.current === requestedJobId) setScreenError(reason instanceof Error ? reason.message : "Could not screen this job.");
-    } finally {
       setScreeningJobId((current) => current === requestedJobId ? null : current);
+      setScreeningMessage("");
+    }
+  }
+
+  async function pollJobScreen(requestedJobId: string, pollToken: number) {
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 1000));
+      if (currentJobId.current !== requestedJobId || screenPollToken.current !== pollToken) return;
+      try {
+        const state = await getJobScreenStatus(requestedJobId);
+        if (currentJobId.current !== requestedJobId || screenPollToken.current !== pollToken) return;
+        if (state.status === "complete") {
+          setJobScreen(state);
+          onScreened(state);
+          setFeedback(await getJobFeedback(requestedJobId));
+          setScreeningJobId(null);
+          setScreeningMessage("");
+          return;
+        }
+        if (state.status === "failed") {
+          setScreenError(state.message ?? "The background analysis could not finish.");
+          setScreeningJobId(null);
+          setScreeningMessage("");
+          return;
+        }
+        setScreeningMessage(state.status === "running" ? "Analyzing in background" : "Analysis queued");
+      } catch (reason) {
+        setScreenError(reason instanceof Error ? reason.message : "Could not check the background analysis.");
+        setScreeningJobId(null);
+        setScreeningMessage("");
+        return;
+      }
+    }
+    if (currentJobId.current === requestedJobId && screenPollToken.current === pollToken) {
+      setScreenError("Analysis is still running in the background. You can close this job and return later.");
+      setScreeningJobId(null);
+      setScreeningMessage("");
     }
   }
 
@@ -164,7 +227,13 @@ export function JobDetailPanel({
         {recommendation?.status === "unavailable" && recommendation.message && !jobScreen?.result.resume_match && <p className="recommendation-empty">{recommendation.message}</p>}
         {recommendationError && <p className="recommendation-error" role="status">{recommendationError}</p>}
         <section className="job-screen-card" aria-label="Job screen">
-          {jobScreen ? <>
+          {screening && !jobScreen ? <>
+            <div>
+              <strong>{screeningMessage || "Analysis queued"}</strong>
+              <p>You can close this job and keep reviewing. The result will be saved here.</p>
+            </div>
+            <div className="job-screen-actions"><button className="text-button" onClick={() => assistant.discussJob(job.id, contextName)}>Discuss job</button></div>
+          </> : jobScreen ? <>
             <div className="job-screen-heading">
               <div><span>{jobScreen.result.screening_label}</span><strong>{jobScreen.result.fit_label}</strong></div>
               <em>{jobScreen.result.screening_label === "Quick screen" ? `${jobScreen.result.confidence} confidence · ` : ""}{jobScreen.result.eligibility_label}</em>

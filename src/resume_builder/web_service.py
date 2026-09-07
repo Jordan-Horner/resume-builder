@@ -91,7 +91,12 @@ from .salary_estimation import (
     build_salary_packet,
     has_posted_salary,
 )
-from .screening_service import ScreeningService, enrich_packet_from_cached_interpretation
+from .screening_service import (
+    BACKGROUND_SCREEN_TIMEOUT_SECONDS,
+    QUICK_SCREEN_PROVIDER_RETRIES,
+    ScreeningService,
+    enrich_packet_from_cached_interpretation,
+)
 from .source_import import (
     SUPPORTED,
     apply_import_plan,
@@ -215,6 +220,8 @@ class DashboardService:
         self._state_lock = threading.Lock()
         self._salary_lock = threading.Lock()
         self._screening_lock = threading.Lock()
+        self._screening_state_lock = threading.Lock()
+        self._screening_states: dict[str, dict[str, Any]] = {}
 
     def _onboarding_record(self) -> dict[str, Any]:
         path = self.workspace / ONBOARDING_STATE_PATH
@@ -1363,12 +1370,11 @@ class DashboardService:
                 self.workspace
             ):
                 return
-            with self._screening_lock:
-                run_background_quick_screening(
-                    self.workspace,
-                    max_jobs=schedule.jobs.semantic_screening_max_jobs,
-                    input_path=shortlist,
-                )
+            run_background_quick_screening(
+                self.workspace,
+                max_jobs=schedule.jobs.semantic_screening_max_jobs,
+                input_path=shortlist,
+            )
         except (OSError, RuntimeError, ValueError):
             LOGGER.warning("recommendation refill failed", exc_info=True)
 
@@ -1922,22 +1928,77 @@ class DashboardService:
 
     def saved_job_screen(self, job_id: str) -> dict[str, Any] | None:
         """Return a cached quick screen without invoking a model."""
-        with self._screening_lock:
-            packet = self._screening_packet(job_id)
-            config_path = self.workspace / DEFAULT_AGENT_CONFIG
-            if not config_path.is_file():
-                return None
-            config = load_agent_config(config_path)
-            cache_path = self.workspace / "build/job-search/screening-cache.sqlite"
-            cache = ScreeningCache(cache_path)
-            packet = enrich_packet_from_cached_interpretation(
-                packet,
-                model=config.models.fast,
-                interpretation_cache=PostingInterpretationCache(cache_path),
-                vault_root=self.workspace / "vault",
-            )
-            result = cache.get(packet, config.models.fast)
-            return self._present_screen(result, cached=True) if result else None
+        packet = self._screening_packet(job_id)
+        config_path = self.workspace / DEFAULT_AGENT_CONFIG
+        if not config_path.is_file():
+            return None
+        config = load_agent_config(config_path)
+        cache_path = self.workspace / "build/job-search/screening-cache.sqlite"
+        cache = ScreeningCache(cache_path)
+        packet = enrich_packet_from_cached_interpretation(
+            packet,
+            model=config.models.fast,
+            interpretation_cache=PostingInterpretationCache(cache_path),
+            vault_root=self.workspace / "vault",
+        )
+        result = cache.get(packet, config.models.fast)
+        return self._present_screen(result, cached=True) if result else None
+
+    def job_screen_status(self, job_id: str) -> dict[str, Any]:
+        """Return current asynchronous screen state without waiting on its provider call."""
+        with self._screening_state_lock:
+            state = self._screening_states.get(job_id)
+            if state is not None:
+                return dict(state)
+        saved = self.saved_job_screen(job_id)
+        if saved is not None:
+            return saved
+        return {"status": "idle", "job_id": job_id}
+
+    def queue_job_screen(self, job_id: str, *, refresh: bool = False) -> dict[str, Any]:
+        """Validate and queue one screen without making the caller wait for a provider."""
+        if not any(str(job.get("id") or "") == job_id for job in self._inventory_loader()):
+            raise ValueError(f"job not found: {job_id}")
+        config_path = self.workspace / DEFAULT_AGENT_CONFIG
+        if not config_path.is_file() or not self._openrouter_configured():
+            raise ValueError("Connect OpenRouter in Settings before screening this job")
+        with self._screening_state_lock:
+            current = self._screening_states.get(job_id)
+            if current is not None and current["status"] in {"queued", "running"}:
+                return dict(current)
+            state = {
+                "status": "queued",
+                "job_id": job_id,
+                "message": "Analysis queued. You can keep reviewing jobs.",
+            }
+            self._screening_states[job_id] = state
+            return dict(state)
+
+    def run_queued_job_screen(self, job_id: str, *, refresh: bool = False) -> None:
+        """Complete a queued screen and retain only its public status in memory."""
+        with self._screening_state_lock:
+            current = self._screening_states.get(job_id)
+            if current is None or current["status"] != "queued":
+                return
+            self._screening_states[job_id] = {
+                "status": "running",
+                "job_id": job_id,
+                "message": "Analyzing in the background. You can keep reviewing jobs.",
+            }
+        try:
+            result = self.screen_job(job_id, refresh=refresh)
+        except (ModelProviderError, OSError, RuntimeError, ValueError):
+            LOGGER.warning("queued job screen failed job_id=%s", job_id, exc_info=True)
+            result = {
+                "status": "failed",
+                "job_id": job_id,
+                "message": "The background analysis could not finish. You can try again.",
+            }
+        with self._screening_state_lock:
+            if result["status"] == "complete":
+                self._screening_states.pop(job_id, None)
+            else:
+                self._screening_states[job_id] = result
 
     def screen_job(self, job_id: str, *, refresh: bool = False) -> dict[str, Any]:
         """Run the existing bounded job screen after an explicit user request."""
@@ -1956,8 +2017,8 @@ class DashboardService:
                 adapter = OpenRouterAdapter(
                     config,
                     api_key=self._openrouter_key(),
-                    timeout_seconds=25,
-                    retries=1,
+                    timeout_seconds=BACKGROUND_SCREEN_TIMEOUT_SECONDS,
+                    retries=QUICK_SCREEN_PROVIDER_RETRIES,
                 )
             except UnicodeError as exc:
                 _raise_screening_input_error(job_id, "provider_configuration", exc)

@@ -32,6 +32,9 @@ from .resume_screening import load_directional_resume_candidates
 from .screening_evidence import select_criterion_screening_evidence
 
 LOGGER = logging.getLogger(__name__)
+INTERACTIVE_SCREEN_TIMEOUT_SECONDS = 15
+BACKGROUND_SCREEN_TIMEOUT_SECONDS = 25
+QUICK_SCREEN_PROVIDER_RETRIES = 0
 
 
 class ScreeningProviderError(ModelProviderError):

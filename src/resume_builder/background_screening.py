@@ -9,6 +9,7 @@ from .agent_config import DEFAULT_AGENT_CONFIG, load_agent_config
 from .agent_openrouter import OpenRouterAdapter
 from .job_screening_queue import ScreeningQueueSummary, build_screening_queue
 from .jobs import DEFAULT_CONFIG, DEFAULT_NEW_OUTPUT, DEFAULT_PREFERENCES
+from .screening_service import BACKGROUND_SCREEN_TIMEOUT_SECONDS, QUICK_SCREEN_PROVIDER_RETRIES
 
 DEFAULT_SCREENING_CACHE = Path("build/job-search/screening-cache.sqlite")
 DEFAULT_SCREENING_OUTPUT = Path("job-search/new-job-screens.json")
@@ -51,7 +52,12 @@ def run_background_quick_screening(
     if not key:
         raise ValueError("Connect OpenRouter in Settings before enabling background screening")
     return build_screening_queue(
-        adapter=OpenRouterAdapter(config, api_key=key),
+        adapter=OpenRouterAdapter(
+            config,
+            api_key=key,
+            timeout_seconds=BACKGROUND_SCREEN_TIMEOUT_SECONDS,
+            retries=QUICK_SCREEN_PROVIDER_RETRIES,
+        ),
         model=config.models.fast,
         interpretation_model=config.models.fast,
         cache_path=root / DEFAULT_SCREENING_CACHE,

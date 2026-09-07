@@ -310,10 +310,22 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    @app.post("/api/jobs/{job_id}/screen")
-    def screen_job(job_id: str, refresh: bool = False) -> dict[str, Any]:
+    @app.get("/api/jobs/{job_id}/screen-status")
+    def job_screen_status(job_id: str) -> dict[str, Any]:
         try:
-            return service.screen_job(job_id, refresh=refresh)
+            return service.job_screen_status(job_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.post("/api/jobs/{job_id}/screen", status_code=202)
+    def screen_job(
+        job_id: str, background_tasks: BackgroundTasks, refresh: bool = False
+    ) -> dict[str, Any]:
+        try:
+            result = service.queue_job_screen(job_id, refresh=refresh)
+            if result["status"] == "queued":
+                background_tasks.add_task(service.run_queued_job_screen, job_id, refresh=refresh)
+            return result
         except ScreeningInputError as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         except UnicodeError as exc:
