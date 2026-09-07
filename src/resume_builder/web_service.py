@@ -1488,8 +1488,7 @@ class DashboardService:
                 if include_personalization
                 and (feedback_events or isinstance(item.get("deterministic"), dict))
                 else item.get("shadow_personalization")
-                if include_personalization
-                and isinstance(item.get("shadow_personalization"), dict)
+                if include_personalization and isinstance(item.get("shadow_personalization"), dict)
                 else None
             )
             summaries[str(item["id"])] = {
@@ -1748,7 +1747,9 @@ class DashboardService:
         if _limit is not None:
             jobs = jobs[:_limit]
         if not _include_description:
-            jobs = [{key: value for key, value in job.items() if key != "description"} for job in jobs]
+            jobs = [
+                {key: value for key, value in job.items() if key != "description"} for job in jobs
+            ]
         if _result_counts is not None:
             _result_counts.update(total=total, reviewable=reviewable_count)
         return jobs
