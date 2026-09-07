@@ -96,7 +96,9 @@ resume-builder agent ask "What new jobs are ready to review?"
 
 Use `--model-tier reasoning` or `--model-tier writing` only when the task needs
 the stronger configured model. The default `fast` tier minimizes routine cost
-and uses OpenRouter's `:nitro` provider routing to prioritize throughput.
+and uses OpenRouter's `:nitro` provider routing to prioritize throughput. Known
+app-generated legacy fast-model defaults are resolved to the current default at
+load time; an explicitly configured custom model remains unchanged.
 
 ## Configure private Telegram conversations
 

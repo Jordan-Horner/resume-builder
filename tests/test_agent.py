@@ -62,13 +62,39 @@ def test_default_config_enforces_private_bounded_openrouter_routing(tmp_path: Pa
 
     assert config.provider == "openrouter"
     assert config.api_key_env == "OPENROUTER_API_KEY"
-    assert config.models.fast == "mistralai/mistral-small-2603:nitro"
+    assert config.models.fast == "openai/gpt-4.1-mini:nitro"
     assert config.routing.zero_data_retention is True
     assert config.routing.data_collection == "deny"
     assert config.routing.require_parameters is True
     assert str(config.limits.max_cost_per_turn_usd) == "0.25"
     assert config.channels.telegram.enabled is False
     assert config.channels.telegram.allowed_user_ids == ()
+
+
+@pytest.mark.parametrize(
+    "saved_model",
+    ["deepseek/deepseek-v4-flash", "mistralai/mistral-small-2603:nitro"],
+)
+def test_generated_legacy_fast_models_use_current_default(tmp_path: Path, saved_model: str) -> None:
+    path = config_path(tmp_path)
+    path.write_text(
+        path.read_text(encoding="utf-8").replace("openai/gpt-4.1-mini:nitro", saved_model, 1),
+        encoding="utf-8",
+    )
+
+    assert load_agent_config(path).models.fast == "openai/gpt-4.1-mini:nitro"
+
+
+def test_custom_fast_model_is_preserved(tmp_path: Path) -> None:
+    path = config_path(tmp_path)
+    path.write_text(
+        path.read_text(encoding="utf-8").replace(
+            "openai/gpt-4.1-mini:nitro", "example/custom-model", 1
+        ),
+        encoding="utf-8",
+    )
+
+    assert load_agent_config(path).models.fast == "example/custom-model"
 
 
 def test_config_rejects_unknown_settings(tmp_path: Path) -> None:

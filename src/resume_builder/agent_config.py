@@ -10,6 +10,11 @@ from typing import Any
 import yaml
 
 DEFAULT_AGENT_CONFIG = Path("agent/config.yml")
+DEFAULT_FAST_MODEL = "openai/gpt-4.1-mini:nitro"
+LEGACY_GENERATED_FAST_MODELS = {
+    "deepseek/deepseek-v4-flash",
+    "mistralai/mistral-small-2603:nitro",
+}
 
 
 @dataclass(frozen=True)
@@ -114,6 +119,11 @@ def _integer_list(value: object, label: str, *, positive: bool) -> tuple[int, ..
     return tuple(dict.fromkeys(value))
 
 
+def _fast_model(value: str) -> str:
+    """Move only app-generated legacy defaults to the current reliable default."""
+    return DEFAULT_FAST_MODEL if value in LEGACY_GENERATED_FAST_MODELS else value
+
+
 def load_agent_config(path: Path) -> AgentConfig:
     """Load an agent configuration without reading its API key."""
     try:
@@ -149,7 +159,7 @@ def load_agent_config(path: Path) -> AgentConfig:
     models = _mapping(payload.get("models"), "models")
     _strict_keys(models, {"fast", "reasoning", "writing"}, "models")
     parsed_models = AgentModels(
-        fast=_required_string(models, "fast", "models"),
+        fast=_fast_model(_required_string(models, "fast", "models")),
         reasoning=_required_string(models, "reasoning", "models"),
         writing=_required_string(models, "writing", "models"),
     )
@@ -265,7 +275,7 @@ provider: openrouter
 api_key_env: OPENROUTER_API_KEY
 
 models:
-  fast: mistralai/mistral-small-2603:nitro
+  fast: openai/gpt-4.1-mini:nitro
   reasoning: z-ai/glm-5.2
   writing: z-ai/glm-5.2
 
