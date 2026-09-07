@@ -9,6 +9,12 @@
         "careers_url": "https://jobs.ashbyhq.com/baseten"
       },
       {
+        "id": "Cyberhaven",
+        "name": "Cyberhaven",
+        "enabled": true,
+        "careers_url": "https://jobs.ashbyhq.com/Cyberhaven"
+      },
+      {
         "id": "langchain",
         "name": "LangChain",
         "enabled": true,
@@ -19,6 +25,12 @@
         "name": "Luma AI",
         "enabled": true,
         "careers_url": "https://jobs.ashbyhq.com/lumaai"
+      },
+      {
+        "id": "revenuecat",
+        "name": "RevenueCat",
+        "enabled": true,
+        "careers_url": "https://jobs.ashbyhq.com/revenuecat"
       }
     ],
     "greenhouse": [
@@ -35,10 +47,28 @@
         "careers_url": "https://job-boards.greenhouse.io/blinkhealth"
       },
       {
+        "id": "cloudflare",
+        "name": "Cloudflare",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/cloudflare"
+      },
+      {
         "id": "intercom",
         "name": "Intercom",
         "enabled": true,
         "careers_url": "https://job-boards.greenhouse.io/intercom"
+      },
+      {
+        "id": "obsidiansecurity",
+        "name": "Obsidian Security",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/obsidiansecurity"
+      },
+      {
+        "id": "rebuildmanufacturing",
+        "name": "Re:Build Manufacturing",
+        "enabled": true,
+        "careers_url": "https://job-boards.greenhouse.io/rebuildmanufacturing"
       }
     ],
     "lever": [

@@ -18,12 +18,17 @@ def test_first_party_boards_are_bundled_and_local_entries_override_them(tmp_path
     assert {board.id for board in config.providers.greenhouse.boards} == {
         "axon",
         "blinkhealth",
+        "cloudflare",
         "intercom",
+        "obsidiansecurity",
+        "rebuildmanufacturing",
     }
     assert {board.id for board in config.providers.ashby.boards} == {
         "baseten",
+        "Cyberhaven",
         "langchain",
         "lumaai",
+        "revenuecat",
     }
     assert {board.id for board in config.providers.lever.boards} == {"floqast"}
     assert {board.id for board in config.providers.rippling.boards} == {"riot-platforms-careers"}
@@ -38,7 +43,13 @@ def test_first_party_boards_are_bundled_and_local_entries_override_them(tmp_path
     }
     path.write_text(yaml.safe_dump(raw))
     boards = load_config(path).providers.ashby.boards
-    assert {board.id for board in boards} == {"baseten", "langchain", "lumaai"}
+    assert {board.id for board in boards} == {
+        "baseten",
+        "Cyberhaven",
+        "langchain",
+        "lumaai",
+        "revenuecat",
+    }
     overridden = next(board for board in boards if board.id == "baseten")
     assert overridden.name == "Local override"
     assert overridden.enabled is False
