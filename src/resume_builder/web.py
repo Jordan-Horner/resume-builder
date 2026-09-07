@@ -379,6 +379,13 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    @app.post("/api/integrations/bright-data/enrich")
+    def enrich_bright_data() -> dict[str, Any]:
+        try:
+            return service.enrich_bright_data()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     @app.get("/api/integrations/gmail/setup")
     def gmail_setup() -> dict[str, Any]:
         return integration_service.gmail_setup()

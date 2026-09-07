@@ -269,8 +269,13 @@ and title searches, then requests job details only for exact-title hits. Its CXS
 detail fields—not the generic posting page—supply the location and work mode.
 Requests are bounded and concurrent; no browser, account, cookie, or paid proxy
 service is required. When Bright Data is enabled under **Settings → Integrations**,
-scheduled refreshes send only the still-unresolved LinkedIn URLs through that
-optional provider, subject to its configured per-refresh record cap. A free-path match must have the
+scheduled refreshes send only newly seen LinkedIn jobs that remain unresolved after
+the free pass through that optional provider, subject to its configured per-refresh
+record cap. **Enrich missing details now** processes the existing unresolved backlog
+without rescanning normal job sources. Completed attempts are cached for 30 days;
+temporary failures retry after one day. Each paid batch checks at most one job per
+company. A captured ATS board is saved to the private registry and checked against
+the company's other unresolved jobs before another paid lookup. A free-path match must have the
 same normalized title, at least 85% three-word description coverage, a unique
 best candidate, and an explicit ATS work mode. The ATS observation becomes the
 canonical display source while the LinkedIn observation remains as provenance.

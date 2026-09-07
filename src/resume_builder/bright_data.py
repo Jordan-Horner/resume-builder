@@ -6,6 +6,7 @@ import json
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -21,6 +22,7 @@ from .atomic import atomic_write_json
 
 BRIGHT_DATA_DATASET_ID = "gd_lpfll7v5hcqtkxl6l"
 BRIGHT_DATA_ENDPOINT = "https://api.brightdata.com/datasets/v3/scrape"
+BRIGHT_DATA_PARSER_VERSION = "linkedin-bright-data-v1"
 BRIGHT_DATA_SECRET_PATH = Path("build/secrets/bright-data-key")
 BRIGHT_DATA_SETTINGS_PATH = Path("job-search/bright-data.json")
 
@@ -122,8 +124,75 @@ def _observation(payload: dict[str, Any], target: LinkedInTarget) -> JobObservat
         salary_interval=_interval(salary.get("payment_period")),
         employment_type=str(payload.get("job_employment_type") or "") or None,
         raw_payload={},
-        parser_version="linkedin-bright-data-v1",
+        parser_version=BRIGHT_DATA_PARSER_VERSION,
     )
+
+
+def _record_attempt(
+    database: InventoryDatabase,
+    posting_id: str,
+    outcome: str,
+    *,
+    fields_added: frozenset[str] = frozenset(),
+) -> None:
+    now = datetime.now(UTC)
+    database.put_provider_detail(
+        "bright-data",
+        posting_id,
+        BRIGHT_DATA_PARSER_VERSION,
+        json.dumps({"outcome": outcome, "fields_added": sorted(fields_added)}),
+        now,
+        now + timedelta(days=1 if outcome == "failed" else 30),
+    )
+
+
+def save_captured_boards(
+    database: InventoryDatabase, config_path: Path, *, timeout: float
+) -> dict[str, object]:
+    """Persist recognized Apply-link boards so later jobs use the free ATS path."""
+    from job_puller.boards import (
+        SUPPORTED_PROVIDERS,
+        discover_boards,
+        load_or_empty_registry,
+        merge_registries,
+        write_board_registry,
+    )
+    from job_puller.config import (
+        BoardRegistry,
+        BoardRegistryProviders,
+        load_config,
+        resolve_project_path,
+    )
+
+    config = load_config(config_path)
+    if not config.board_registry_path:
+        return {"added": 0, "boards": []}
+    path = resolve_project_path(config_path, config.board_registry_path)
+    current = load_or_empty_registry(path)
+    discovered, _ = discover_boards(database.active_application_links(), timeout=timeout)
+    additions: list[dict[str, object]] = []
+    new_boards = {}
+    for provider in SUPPORTED_PROVIDERS:
+        known = {board.id.casefold() for board in getattr(config.providers, provider).boards}
+        new_boards[provider] = [
+            board
+            for board in getattr(discovered.providers, provider)
+            if board.id.casefold() not in known
+        ]
+        additions.extend(
+            {
+                "provider": provider,
+                "id": board.id,
+                "name": board.name,
+                "api_url": board.api_url,
+                "careers_url": board.careers_url,
+            }
+            for board in new_boards[provider]
+        )
+    if additions:
+        newly_discovered = BoardRegistry(providers=BoardRegistryProviders(**new_boards))
+        write_board_registry(path, merge_registries(current, newly_discovered))
+    return {"added": len(additions), "boards": additions}
 
 
 def enrich_linkedin_targets(
@@ -134,20 +203,56 @@ def enrich_linkedin_targets(
     limit: int,
     timeout: float = 60,
 ) -> dict[str, object]:
-    selected = [target for target in targets if _linkedin_id(target.source_url)][:limit]
+    candidates = [target for target in targets if _linkedin_id(target.source_url)]
+    now = datetime.now(UTC)
+    eligible = []
+    skipped_cached = 0
+    for target in candidates:
+        cached = database.get_provider_detail(
+            "bright-data",
+            _linkedin_id(target.source_url),
+            BRIGHT_DATA_PARSER_VERSION,
+        )
+        if cached is not None and cached.expires_at > now:
+            skipped_cached += 1
+        else:
+            eligible.append(target)
+    selected: list[LinkedInTarget] = []
+    selected_companies = set()
+    deferred_same_company = 0
+    for target in eligible:
+        company = normalized_key(target.company)
+        if company in selected_companies:
+            deferred_same_company += 1
+        elif len(selected) < limit:
+            selected.append(target)
+            selected_companies.add(company)
     report: dict[str, object] = {
         "status": "complete",
+        "eligible": len(eligible),
         "requested": len(selected),
         "received": 0,
         "applied": 0,
+        "improved": 0,
+        "no_change": 0,
+        "not_found": 0,
         "failed": 0,
+        "skipped_cached": skipped_cached,
+        "deferred_same_company": deferred_same_company,
+        "salary_added": 0,
+        "location_added": 0,
+        "work_mode_added": 0,
+        "apply_links_added": 0,
     }
     if not selected:
         return report
-    by_id = {_linkedin_id(target.source_url): target for target in selected}
     received = 0
     applied = 0
+    improved = 0
+    no_change = 0
+    not_found = 0
     failed = 0
+    field_counts = {field: 0 for field in ("salary", "location", "work_mode", "apply_url")}
     with (
         httpx.Client(timeout=timeout, follow_redirects=False, trust_env=False) as client,
         ThreadPoolExecutor(max_workers=min(5, len(selected))) as executor,
@@ -164,6 +269,8 @@ def enrich_linkedin_targets(
                 )
             ] = request_target
         for future in as_completed(futures):
+            request_target = futures[future]
+            posting_id = _linkedin_id(request_target.source_url)
             try:
                 response = future.result()
                 response.raise_for_status()
@@ -171,24 +278,45 @@ def enrich_linkedin_targets(
                 items = payload if isinstance(payload, list) else [payload]
             except (httpx.HTTPError, ValueError):
                 failed += 1
+                _record_attempt(database, posting_id, "failed")
                 continue
+            matched_item = None
             for item in items:
                 if not isinstance(item, dict):
                     continue
-                posting_id = str(item.get("job_posting_id") or "")
-                matched_target = by_id.get(posting_id)
-                if matched_target is None or normalized_key(
+                if str(item.get("job_posting_id") or "") != posting_id or normalized_key(
                     str(item.get("job_title") or "")
-                ) != normalized_key(matched_target.title):
+                ) != normalized_key(request_target.title):
                     continue
-                received += 1
-                database.apply_linkedin_enrichment(
-                    matched_target.job_id,
-                    matched_target.observation_id,
-                    _observation(item, matched_target),
-                )
-                applied += 1
+                matched_item = item
+                break
+            if matched_item is None:
+                not_found += 1
+                _record_attempt(database, posting_id, "not_found")
+                continue
+            received += 1
+            fields_added = database.apply_linkedin_enrichment(
+                request_target.job_id,
+                request_target.observation_id,
+                _observation(matched_item, request_target),
+            )
+            applied += 1
+            if fields_added:
+                improved += 1
+                for field in fields_added:
+                    field_counts[field] += 1
+                _record_attempt(database, posting_id, "improved", fields_added=fields_added)
+            else:
+                no_change += 1
+                _record_attempt(database, posting_id, "no_change")
     report["received"] = received
     report["applied"] = applied
+    report["improved"] = improved
+    report["no_change"] = no_change
+    report["not_found"] = not_found
     report["failed"] = failed
+    report["salary_added"] = field_counts["salary"]
+    report["location_added"] = field_counts["location"]
+    report["work_mode_added"] = field_counts["work_mode"]
+    report["apply_links_added"] = field_counts["apply_url"]
     return report

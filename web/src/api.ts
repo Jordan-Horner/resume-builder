@@ -90,6 +90,23 @@ export function configureBrightData(apiToken: string, enabled: boolean, maxRecor
   });
 }
 
+export interface BrightDataEnrichment {
+  requested: number;
+  improved: number;
+  no_change: number;
+  failed: number;
+  skipped_cached: number;
+  salary_added: number;
+  location_added: number;
+  work_mode_added: number;
+  apply_links_added: number;
+  message: string;
+}
+
+export function enrichBrightData(): Promise<BrightDataEnrichment> {
+  return request("/api/integrations/bright-data/enrich", { method: "POST" });
+}
+
 export function getGmailSetup(): Promise<GmailSetup> {
   return request("/api/integrations/gmail/setup");
 }

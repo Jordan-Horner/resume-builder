@@ -645,7 +645,10 @@ def test_automatic_source_resolution_uses_enabled_bright_data_after_free_funnel(
             request_timeout_seconds=19,
         ),
     )
-    catalog = SimpleNamespace(boards_for=lambda _company: [])
+    board_discovered = False
+    catalog = SimpleNamespace(
+        boards_for=lambda _company: [object()] if board_discovered else []
+    )
     monkeypatch.setattr(
         resolution_module.AtsCatalog,
         "load",
@@ -672,12 +675,24 @@ def test_automatic_source_resolution_uses_enabled_bright_data_after_free_funnel(
         direct_apply_url="https://jobs.ashbyhq.com/example/job-1",
         source_url=target.source_url,
     )
+    backlog_target = resolution_module.LinkedInTarget(
+        job_id="job-old",
+        observation_id="observation-old",
+        title="Older Platform Engineer",
+        company="Example",
+        location="",
+        description="",
+        posted_at=None,
+        source_url="https://www.linkedin.com/jobs/view/older-platform-engineer-1234567891",
+    )
     target_calls = 0
 
-    def targets(*_args, **_kwargs):
+    def targets(*_args, **kwargs):
         nonlocal target_calls
         target_calls += 1
-        return [captured_target] if target_calls == 4 else [target]
+        if kwargs.get("seen_since") is not None:
+            return [target]
+        return [captured_target, backlog_target] if target_calls == 4 else [target, backlog_target]
 
     monkeypatch.setattr(resolution_module, "linkedin_targets", targets)
     resolve_calls = []
@@ -700,6 +715,12 @@ def test_automatic_source_resolution_uses_enabled_bright_data_after_free_funnel(
         ),
     )
     monkeypatch.setattr(bright_data_module, "bright_data_key", lambda _workspace: "token")
+    def save_boards(*_args, **_kwargs):
+        nonlocal board_discovered
+        board_discovered = True
+        return {"added": 1, "boards": [{"provider": "ashby", "id": "example"}]}
+
+    monkeypatch.setattr(bright_data_module, "save_captured_boards", save_boards)
 
     def enrich(database, targets, **kwargs):
         captured.update(database=database, targets=targets, enrich_kwargs=kwargs)
@@ -726,7 +747,7 @@ def test_automatic_source_resolution_uses_enabled_bright_data_after_free_funnel(
     assert captured["targets"] == [target]
     assert captured["enrich_kwargs"] == {"api_token": "token", "limit": 7, "timeout": 60}
     assert len(resolve_calls) == 2
-    assert resolve_calls[1]["targets"] == [captured_target]
+    assert resolve_calls[1]["targets"] == [captured_target, backlog_target]
     assert resolve_calls[1]["apply"] is True
     assert resolve_calls[1]["max_board_requests"] == 7
 

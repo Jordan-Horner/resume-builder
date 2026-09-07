@@ -725,6 +725,7 @@ def _resolve_sources_after_refresh(
             bright_data_key,
             enrich_linkedin_targets,
             load_bright_data_settings,
+            save_captured_boards,
         )
 
         bright_settings = load_bright_data_settings(workspace)
@@ -736,9 +737,8 @@ def _resolve_sources_after_refresh(
                     "error": "API token is not configured",
                 }
             else:
-                selected_ids = {target.job_id for target in targets}
                 remaining = [
-                    target for target in linkedin_targets(database) if target.job_id in selected_ids
+                    target for target in linkedin_targets(database) if target.job_id in fresh_ids
                 ]
                 try:
                     bright_report = enrich_linkedin_targets(
@@ -749,15 +749,23 @@ def _resolve_sources_after_refresh(
                         timeout=max(60, config.request_timeout_seconds),
                     )
                     payload["bright_data"] = bright_report
+                    board_seeds = save_captured_boards(
+                        database, config_path, timeout=config.request_timeout_seconds
+                    )
+                    bright_report["board_seeds"] = board_seeds
+                    followup_catalog = AtsCatalog.load(
+                        resolve_project_path(config_path, "cache/ats-source-catalog")
+                    ).add_configured_boards(load_config(config_path))
                     captured_targets = [
                         target
                         for target in linkedin_targets(database)
-                        if target.job_id in selected_ids and target.direct_apply_url
+                        if target.direct_apply_url
+                        or followup_catalog.boards_for(target.company)
                     ]
                     if bright_report.get("applied") and captured_targets:
                         bright_report["ats_followup"] = resolve_linkedin_sources(
                             database,
-                            AtsCatalog({}),
+                            followup_catalog,
                             timeout=config.request_timeout_seconds,
                             apply=True,
                             max_board_requests=bright_settings.max_records_per_refresh,

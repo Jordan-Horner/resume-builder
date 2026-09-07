@@ -79,6 +79,25 @@ def test_bright_data_is_configured_from_integrations(tmp_path: Path) -> None:
     assert integration["settings"] == {"enabled": True, "max_records_per_refresh": 75}
 
 
+def test_bright_data_enrichment_has_a_direct_api(tmp_path: Path, monkeypatch) -> None:
+    from resume_builder.web_service import DashboardService
+
+    result = {
+        "requested": 5,
+        "improved": 4,
+        "no_change": 1,
+        "failed": 0,
+        "skipped_cached": 3,
+        "message": "Bright Data checked 5 job(s): 4 improved.",
+    }
+    monkeypatch.setattr(DashboardService, "enrich_bright_data", lambda self: result)
+
+    response = _client(tmp_path).post("/api/integrations/bright-data/enrich")
+
+    assert response.status_code == 200
+    assert response.json() == result
+
+
 def test_job_screen_routes_separate_cached_read_from_explicit_run(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

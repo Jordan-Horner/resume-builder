@@ -19,7 +19,7 @@ import yaml
 from bs4 import BeautifulSoup
 
 from job_puller.compensation import extract_compensation_range
-from job_puller.config import load_config, resolve_database_path
+from job_puller.config import load_config, resolve_database_path, resolve_project_path
 from job_puller.database import InventoryDatabase
 from job_puller.locations import location_key, matching_location_terms
 from job_puller.normalize import normalized_key
@@ -389,6 +389,69 @@ class DashboardService:
             "max_records_per_refresh": max_records_per_refresh,
             "message": "Bright Data integration saved.",
         }
+
+    def enrich_bright_data(self) -> dict[str, Any]:
+        from job_puller.source_resolution import (
+            AtsCatalog,
+            linkedin_targets,
+            resolve_linkedin_sources,
+        )
+
+        from .bright_data import (
+            bright_data_key,
+            enrich_linkedin_targets,
+            load_bright_data_settings,
+            save_captured_boards,
+        )
+
+        settings = load_bright_data_settings(self.workspace)
+        token = bright_data_key(self.workspace)
+        if not settings.enabled or not token:
+            raise ValueError("Connect and enable Bright Data before enriching jobs")
+        config_path = self.workspace / JOBS_CONFIG
+        config = load_config(config_path)
+        database = InventoryDatabase(
+            resolve_database_path(config_path, config.database_path),
+            config.raw_payload_retention_days,
+        )
+        database.migrate()
+        with self._state_lock:
+            targets = linkedin_targets(database)
+            report = enrich_linkedin_targets(
+                database,
+                targets,
+                api_token=token,
+                limit=min(settings.max_records_per_refresh, 25),
+                timeout=max(60, config.request_timeout_seconds),
+            )
+            board_seeds = save_captured_boards(
+                database, config_path, timeout=config.request_timeout_seconds
+            )
+            report["board_seeds"] = board_seeds
+            followup_catalog = AtsCatalog.load(
+                resolve_project_path(config_path, "cache/ats-source-catalog")
+            ).add_configured_boards(load_config(config_path))
+            captured = [
+                target
+                for target in linkedin_targets(database)
+                if target.direct_apply_url or followup_catalog.boards_for(target.company)
+            ]
+            if captured:
+                report["ats_followup"] = resolve_linkedin_sources(
+                    database,
+                    followup_catalog,
+                    timeout=config.request_timeout_seconds,
+                    apply=True,
+                    max_board_requests=25,
+                    workers=config.source_resolution.workers,
+                    targets=captured,
+                ).as_dict()
+        report["message"] = (
+            f"Bright Data checked {report['requested']} job(s): "
+            f"{report['improved']} improved, {report['no_change']} unchanged, "
+            f"{report['failed']} failed, and {report['skipped_cached']} already checked."
+        )
+        return report
 
     def _primary_resume_document(self) -> ResumeDocument:
         layout = VaultLayout.load(self.workspace / "vault")

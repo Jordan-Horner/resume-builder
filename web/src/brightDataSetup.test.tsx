@@ -2,10 +2,10 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { configureBrightData, getIntegrations } from "./api";
+import { configureBrightData, enrichBrightData, getIntegrations } from "./api";
 import { IntegrationsSection } from "./pages/IntegrationsPage";
 
-vi.mock("./api", () => ({ configureBrightData: vi.fn(), getIntegrations: vi.fn() }));
+vi.mock("./api", () => ({ configureBrightData: vi.fn(), enrichBrightData: vi.fn(), getIntegrations: vi.fn() }));
 
 let host: HTMLDivElement;
 let root: Root;
@@ -43,4 +43,23 @@ it("saves Bright Data in Integrations with an explicit cap", async () => {
   expect(configureBrightData).toHaveBeenCalledWith("fixture-token", true, 75);
   expect(token.value).toBe("");
   expect(host.textContent).toContain("Bright Data integration saved.");
+});
+
+it("enriches the existing unresolved inventory without starting a source scan", async () => {
+  vi.mocked(getIntegrations).mockResolvedValue([{
+    id: "bright-data", name: "Bright Data", description: "LinkedIn enrichment",
+    status: "connected", detail: "On", settings: { enabled: true, max_records_per_refresh: 5 },
+  }]);
+  vi.mocked(enrichBrightData).mockResolvedValue({
+    requested: 5, improved: 4, no_change: 1, failed: 0, skipped_cached: 3,
+    salary_added: 4, location_added: 0, work_mode_added: 1, apply_links_added: 1,
+    message: "Bright Data checked 5 job(s): 4 improved.",
+  });
+  await act(async () => root.render(<IntegrationsSection />));
+  await act(async () => host.querySelector<HTMLButtonElement>(".integration-summary")!.click());
+  const button = [...host.querySelectorAll("button")].find((item) => item.textContent === "Enrich missing details now")!;
+  await act(async () => button.click());
+
+  expect(enrichBrightData).toHaveBeenCalledOnce();
+  expect(host.textContent).toContain("Bright Data checked 5 job(s): 4 improved.");
 });

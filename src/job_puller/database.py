@@ -775,15 +775,17 @@ class InventoryDatabase:
         target_job_id: str,
         linkedin_observation_id: str,
         observation: JobObservation,
-    ) -> None:
+    ) -> frozenset[str]:
         """Apply normalized paid enrichment without changing LinkedIn liveness provenance."""
         if observation.provider != "linkedin":
             raise ValueError("LinkedIn enrichment requires a LinkedIn observation")
         with self.transaction() as conn:
             row = conn.execute(
-                """SELECT o.provider_job_id, o.last_seen_at
+                """SELECT o.provider_job_id, o.last_seen_at, j.location, j.work_mode,
+                          j.salary_min, j.salary_max, o.direct_apply_url
                    FROM observations o
                    JOIN job_observation_links l ON l.observation_id=o.id
+                   JOIN jobs j ON j.id=l.job_id
                    WHERE l.job_id=? AND o.id=? AND o.provider='linkedin'""",
                 (target_job_id, linkedin_observation_id),
             ).fetchone()
@@ -832,6 +834,27 @@ class InventoryDatabase:
                     conn, linkedin_observation_id, observation.work_arrangement
                 )
             self._refresh_job(conn, linkedin_observation_id, datetime.fromisoformat(str(row[1])))
+            updated = conn.execute(
+                """SELECT j.location, j.work_mode, j.salary_min, j.salary_max,
+                          o.direct_apply_url
+                   FROM jobs j JOIN observations o ON o.id=? WHERE j.id=?""",
+                (linkedin_observation_id, target_job_id),
+            ).fetchone()
+            assert updated is not None
+            added = set()
+            if not str(row[2]).strip() and str(updated[0]).strip():
+                added.add("location")
+            if str(row[3]) == "unknown" and str(updated[1]) != "unknown":
+                added.add("work_mode")
+            if (
+                row[4] is None
+                and row[5] is None
+                and (updated[2] is not None or updated[3] is not None)
+            ):
+                added.add("salary")
+            if not str(row[6]).strip() and str(updated[4]).strip():
+                added.add("apply_url")
+            return frozenset(added)
 
     def stored_direct_ats_observations(
         self, normalized_companies: set[str]
