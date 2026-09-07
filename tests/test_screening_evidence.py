@@ -106,6 +106,24 @@ def _criterion(
     )
 
 
+def test_screening_evidence_ignores_appledouble_sidecars(tmp_path: Path) -> None:
+    initialize_workspace(tmp_path, git_name="Example", git_email="example@example.invalid")
+    _fact(
+        tmp_path,
+        "KUBE-001",
+        title="Kubernetes production operations",
+        body="Operated Kubernetes services in production.",
+        organization="example",
+    )
+    sidecar = tmp_path / "vault" / "facts" / "skills" / "._SKILL-001.md"
+    sidecar.parent.mkdir(parents=True, exist_ok=True)
+    sidecar.write_bytes(b"\x00\x05\x16\x07\x00\x02\x00\x00Mac OS X\x00\xa3")
+
+    evidence = select_screening_evidence(tmp_path / "vault", _job())
+
+    assert [card.fact_id for card in evidence.cards] == ["KUBE-001"]
+
+
 def test_criterion_retrieval_is_balanced_and_exposes_exact_fact_mappings(tmp_path: Path) -> None:
     initialize_workspace(tmp_path, git_name="Example", git_email="example@example.invalid")
     _fact(

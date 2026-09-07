@@ -238,9 +238,18 @@ def _strength(category: str, fact_type: str) -> EvidenceStrength:
     return EvidenceStrength.DEMONSTRATED
 
 
+def _fact_paths(layout: VaultLayout) -> list[Path]:
+    """Return real Markdown facts, excluding filesystem metadata sidecars."""
+    return [
+        path
+        for path in sorted(layout.facts.rglob("*.md"))
+        if not any(part.startswith("._") or part == ".DS_Store" for part in path.parts)
+    ]
+
+
 def _vault_fingerprint(layout: VaultLayout) -> str:
     records = []
-    for path in sorted(layout.facts.rglob("*.md")):
+    for path in _fact_paths(layout):
         stat = path.stat()
         records.append((layout.relative(path), stat.st_size, stat.st_mtime_ns))
     return hashlib.sha256(json.dumps(records, separators=(",", ":")).encode()).hexdigest()
@@ -251,7 +260,7 @@ def _load_index(vault_root: str, fingerprint: str) -> tuple[_IndexedFact, ...]:
     del fingerprint  # It exists to invalidate the process-local parsed-fact cache.
     layout = VaultLayout.load(Path(vault_root))
     indexed: list[_IndexedFact] = []
-    for path in sorted(layout.facts.rglob("*.md")):
+    for path in _fact_paths(layout):
         metadata, body = parse_frontmatter(path)
         if metadata.get("status") != "confirmed":
             continue
