@@ -761,7 +761,11 @@ class InventoryDatabase:
                      )
                      AND o.provider='linkedin'
                      {recent_clause}
-                   ORDER BY j.id, (o.direct_apply_url<>'') DESC,
+                   ORDER BY
+                            (j.work_mode='unknown'
+                             AND j.salary_min IS NULL
+                             AND j.salary_max IS NULL) DESC,
+                            j.id, (o.direct_apply_url<>'') DESC,
                             LENGTH(o.description_text) DESC, o.last_seen_at DESC""",
                 parameters,
             ).fetchall()

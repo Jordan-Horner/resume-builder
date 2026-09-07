@@ -279,6 +279,30 @@ def test_unresolved_linkedin_targets_include_salary_only_gaps(tmp_path):
     assert db.unresolved_linkedin_targets() == []
 
 
+def test_unresolved_linkedin_targets_prioritize_missing_mode_and_salary(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    salary_only = observation(job_id="salary-only")
+    salary_only.company = "Salary Only, Inc."
+    db.record_result(result(salary_only))
+    missing_both = observation(
+        job_id="missing-both",
+        source="https://linkedin.com/jobs/view/missing-both",
+    )
+    missing_both.company = "Missing Both, Inc."
+    missing_both.work_arrangement = explicit_arrangement(
+        [WorkMode.UNKNOWN], source="linkedin", rule="not_listed"
+    )
+    db.record_result(result(missing_both))
+
+    targets = db.unresolved_linkedin_targets()
+
+    assert [target["company"] for target in targets] == [
+        "Missing Both, Inc.",
+        "Salary Only, Inc.",
+    ]
+
+
 def test_job_ids_include_inactive_canonical_jobs(tmp_path):
     db = InventoryDatabase(tmp_path / "inventory.db")
     db.migrate()
