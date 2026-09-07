@@ -17,6 +17,16 @@ DOLLAR_RANGE = re.compile(
     re.IGNORECASE,
 )
 
+ISO_SUFFIX_ANNUAL_RANGE = re.compile(
+    r"\b(?:base\s+)?(?:salary|pay|compensation)(?:\s+range)?\b[^\d\n]{0,80}"
+    r"(?P<minimum>\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*"
+    r"(?P<currency>USD|CAD|EUR|GBP)\s*"
+    r"(?:-|\u2013|\u2014|to)\s*"
+    r"(?P<maximum>\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*"
+    r"(?P<second_currency>USD|CAD|EUR|GBP)\b",
+    re.IGNORECASE,
+)
+
 MALFORMED_LABELED_ANNUAL_MINIMUM = re.compile(
     r"\b(?:base\s+)?salary\s+range\b[^$\n]{0,80}"
     r"(?P<currency>CA\$|C\$|US\$|\$|€|£)\s*"
@@ -106,4 +116,13 @@ def extract_compensation_range(description: str) -> CompensationRange | None:
         if CURRENCIES[currency_symbol] != CURRENCIES[second_symbol]:
             continue
         return CompensationRange(minimum, maximum, CURRENCIES[currency_symbol], interval)
+    for match in ISO_SUFFIX_ANNUAL_RANGE.finditer(description):
+        minimum = _amount(match.group("minimum"), None)
+        maximum = _amount(match.group("maximum"), None)
+        currency = match.group("currency").upper()
+        if (
+            currency == match.group("second_currency").upper()
+            and 10_000 <= minimum <= maximum <= 2_000_000
+        ):
+            return CompensationRange(minimum, maximum, currency, "yearly")
     return None

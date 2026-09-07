@@ -20,6 +20,22 @@ def test_extracts_labeled_base_salary_as_yearly_compensation():
     )
 
 
+def test_extracts_labeled_annual_range_with_iso_currency_suffixes():
+    description = (
+        "The base salary range is 176,000 USD - 276,000 USD for Level 4, "
+        "and 208,000 USD - 333,500 USD for Level 5."
+    )
+
+    assert extract_compensation_range(description) == (
+        CompensationRange(176_000, 276_000, "USD", "yearly")
+    )
+
+
+def test_rejects_unlabeled_or_mixed_iso_currency_ranges():
+    assert extract_compensation_range("The range is 80,000 USD - 90,000 USD.") is None
+    assert extract_compensation_range("Salary range is 80,000 USD - 90,000 CAD.") is None
+
+
 def test_repairs_truncated_thousands_group_in_labeled_salary_range():
     description = "The base salary range for this role is $143,00 to $210,000."
 
