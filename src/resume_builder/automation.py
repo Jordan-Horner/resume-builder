@@ -995,11 +995,31 @@ def _run_jobs(config: AutomationConfig) -> dict[str, object]:
         matches = _reviewable_jobs(jobs.DEFAULT_NEW_OUTPUT)
         if config.jobs.semantic_screening_enabled:
             try:
+                # Screening the full active shortlist seeds existing installations and
+                # lets cached results advance the bounded provider budget on later runs.
+                with Path(os.devnull).open("w", encoding="utf-8") as null_stream:
+                    with redirect_stdout(null_stream), redirect_stderr(null_stream):
+                        shortlist_code = jobs.main(
+                            ["shortlist", "--limit", str(config.jobs.limit)]
+                        )
+                if shortlist_code != 0:
+                    raise RuntimeError("active job shortlist could not be prepared")
+                workspace = jobs.DEFAULT_NEW_OUTPUT.expanduser().resolve().parent.parent
                 queue_summary = run_background_quick_screening(
-                    jobs.DEFAULT_NEW_OUTPUT.expanduser().resolve().parent.parent,
+                    workspace,
                     max_jobs=config.jobs.semantic_screening_max_jobs,
+                    input_path=workspace / jobs.DEFAULT_OUTPUT,
                 )
-                matches = load_notification_jobs(DEFAULT_SCREENING_OUTPUT)
+                new_job_ids = {
+                    str(value)
+                    for value in manifest.get("new_to_database_job_ids", [])
+                    if isinstance(value, str)
+                }
+                matches = [
+                    item
+                    for item in load_notification_jobs(DEFAULT_SCREENING_OUTPUT)
+                    if str(item.get("id") or "") in new_job_ids
+                ]
                 screening_status = "complete" if queue_summary.failed == 0 else "partial"
                 screened_jobs = queue_summary.completed
                 recommended_jobs = queue_summary.recommended

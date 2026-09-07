@@ -601,7 +601,7 @@ def test_semantic_screening_failure_does_not_turn_collection_into_a_retry(
 
     result = _run_jobs(load_config(config_path))
 
-    assert calls == 1
+    assert calls == 2
     assert result["refresh_status"] == "complete"
     assert result["screening_status"] == "unavailable"
     assert result["needs_review_jobs"] == 1

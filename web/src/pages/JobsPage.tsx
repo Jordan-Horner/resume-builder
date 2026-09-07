@@ -1,7 +1,8 @@
 import { useDeferredValue, useEffect, useRef, useState } from "react";
 import {
   activateJobSearch, getBlockedCompanies, getJobFilterDefaults, getJobs, getJobSources,
-  getSearchPreferences, markJobApplied, saveJobFeedback, setCompanyBlocked, startJobScan,
+  getScrapeSchedule, getSearchPreferences, markJobApplied, saveJobFeedback, setCompanyBlocked,
+  startJobScan,
 } from "../api";
 import { EmptyState, ErrorMessage, LoadingRows, SearchField } from "../components";
 import { JobViewFilters } from "../JobViewFilters";
@@ -18,6 +19,8 @@ const DATE_FILTERS = [
   { label: "Last 2 weeks", value: 14 }, { label: "Last 30 days", value: 30 },
 ] as const;
 const companyKey = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+type JobQueue = "all" | "recommended" | "interested";
+type JobQueuePayload = { jobs: Job[]; count: number; reviewable_count: number };
 
 export function JobsPage() {
   const assistant = useAssistant();
@@ -40,12 +43,64 @@ export function JobsPage() {
   const [queueRevision, setQueueRevision] = useState(0);
   const [pendingAction, setPendingAction] = useState<JobFeedbackAction | "applied" | null>(null);
   const [notice, setNotice] = useState("");
-  const [queueView, setQueueView] = useState<"all" | "hot">("all");
+  const [queueView, setQueueView] = useState<JobQueue>("recommended");
+  const [recommendationStage, setRecommendationStage] = useState<"idle" | "searching" | "screening">("idle");
   const [blockedCompanies, setBlockedCompanies] = useState<string[]>([]);
   const [companyBusy, setCompanyBusy] = useState(false);
   const selectedOrigin = useRef<HTMLButtonElement | null>(null);
   const results = useRef<HTMLElement | null>(null);
   const focusQueueAfterRefresh = useRef(false);
+  const queueCache = useRef(new Map<string, JobQueuePayload>());
+  const queueRequests = useRef(new Map<string, Promise<JobQueuePayload>>());
+
+  function queueKey(queue: JobQueue) {
+    return JSON.stringify([reloadKey, queueRevision, queue, deferredFilters]);
+  }
+
+  function loadQueue(queue: JobQueue) {
+    const key = queueKey(queue);
+    const cached = queueCache.current.get(key);
+    if (cached) return Promise.resolve(cached);
+    const pending = queueRequests.current.get(key);
+    if (pending) return pending;
+    const request = getJobs(deferredFilters, queue).then((payload) => {
+      queueCache.current.set(key, payload);
+      return payload;
+    }).finally(() => queueRequests.current.delete(key));
+    queueRequests.current.set(key, request);
+    return request;
+  }
+
+  function showQueue(payload: JobQueuePayload) {
+    setJobs(payload.jobs);
+    setTotal(payload.count);
+    setReviewableTotal(payload.reviewable_count);
+  }
+
+  function prefetchQueue(queue: JobQueue) {
+    if (!defaults || deferredFilters !== filters || queue === queueView) return;
+    void loadQueue(queue).catch((reason: unknown) => {
+      console.warn(`Could not prefetch the ${queue} job queue`, reason);
+    });
+  }
+
+  function selectQueue(queue: JobQueue) {
+    if (queue === queueView) return;
+    const cached = queueCache.current.get(queueKey(queue));
+    setQueueError("");
+    if (cached) {
+      showQueue(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+      if (deferredFilters === filters) {
+        void loadQueue(queue).catch((reason: unknown) => {
+          console.warn(`Could not start loading the ${queue} job queue`, reason);
+        });
+      }
+    }
+    setQueueView(queue);
+  }
 
   useEffect(() => {
     let active = true;
@@ -90,19 +145,50 @@ export function JobsPage() {
 
   useEffect(() => {
     let active = true;
-    if (!defaults) return;
-    setLoading(true);
+    if (!defaults || deferredFilters !== filters) return;
+    const cached = queueCache.current.get(queueKey(queueView));
     setQueueError("");
-    getJobs(deferredFilters, queueView === "hot").then((payload) => {
+    if (cached) {
+      showQueue(cached);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    loadQueue(queueView).then((payload) => {
       if (!active) return;
-      setJobs(payload.jobs);
-      setTotal(payload.count);
-      setReviewableTotal(payload.reviewable_count);
+      showQueue(payload);
     }).catch((reason: unknown) => {
       if (active) setQueueError(reason instanceof Error ? reason.message : "Could not load jobs");
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [deferredFilters, defaults, reloadKey, queueRevision, queueView]);
+  }, [deferredFilters, defaults, filters, reloadKey, queueRevision, queueView]);
+
+  useEffect(() => {
+    if (queueView !== "recommended") return;
+    let active = true;
+    let timer: number | undefined;
+    let observedRunning = false;
+    const poll = async () => {
+      try {
+        const schedule = await getScrapeSchedule();
+        if (!active) return;
+        setRecommendationStage(schedule.current_stage);
+        if (schedule.current_stage !== "idle") {
+          observedRunning = true;
+          timer = window.setTimeout(() => void poll(), 3000);
+        } else if (observedRunning) {
+          setQueueRevision((value) => value + 1);
+        }
+      } catch (reason) {
+        console.warn("Could not load recommendation progress", reason);
+      }
+    };
+    void poll();
+    return () => {
+      active = false;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [queueView, reloadKey]);
 
   useEffect(() => {
     if (loading || !focusQueueAfterRefresh.current) return;
@@ -183,7 +269,11 @@ export function JobsPage() {
     try {
       if (disposition === "interested") {
         const result = await saveJobFeedback(job.id, disposition, []);
-        setNotice(`Preference saved for ${job.title}.`);
+        setLoading(true);
+        focusQueueAfterRefresh.current = true;
+        setQueueRevision((value) => value + 1);
+        setSelected(null);
+        setNotice(`${job.title} saved to Interested jobs.`);
         return result;
       }
       if (disposition === "applied") await markJobApplied(job.id);
@@ -210,8 +300,14 @@ export function JobsPage() {
     ? { title: "Finish setting up your search", message: "Activate your saved roles before searching.", actions: <button className="primary-button" onClick={() => void finishSetup()}>Finish setup</button> }
     : reviewableTotal === 0
       ? { title: "Find your first jobs", message: "Search your enabled sources using your saved roles and preferences.", actions: <><button className="primary-button" disabled={scanning} onClick={() => void runManualScan()}>{scanning ? "Finding jobs…" : "Find jobs now"}</button><a className="empty-state-link" href="/settings/search-preferences">Edit preferences</a></> }
-      : queueView === "hot"
-        ? { title: "No Hot Jobs yet", message: "Jobs appear here after a good career-fit screen and a clear positive signal from you.", actions: <button className="primary-button" onClick={() => setQueueView("all")}>Review all jobs</button> }
+      : queueView === "interested"
+          ? { title: "No Interested jobs yet", message: "Jobs you mark Interested stay here until you apply or pass on them.", actions: <button className="primary-button" onClick={() => selectQueue("recommended")}>Review recommendations</button> }
+          : queueView === "recommended"
+            ? recommendationStage === "searching"
+              ? { title: "Finding new jobs…", message: "Your scheduled search is running. Matching jobs will be screened automatically before they appear here.", actions: <button className="primary-button" onClick={() => selectQueue("all")}>Review all jobs</button> }
+              : recommendationStage === "screening"
+                ? { title: "Screening recommendations…", message: "The search finished. Career-fit screening is preparing your Recommended Jobs.", actions: <button className="primary-button" onClick={() => selectQueue("all")}>Review all jobs</button> }
+                : { title: "No Recommended Jobs right now", message: "Recommendations use your saved roles, location, work setup, pay, and seniority. New matches are screened automatically.", actions: <button className="primary-button" onClick={() => selectQueue("all")}>Review all jobs</button> }
         : { title: "No jobs match these filters", message: `${reviewableTotal} reviewable ${reviewableTotal === 1 ? "job is" : "jobs are"} hidden by your current filters.`, actions: <><button className="primary-button" onClick={() => defaults && setFilters({ ...EMPTY_FILTERS, view: defaults })}>Reset filters</button><button className="empty-state-link" onClick={() => setFilters(EMPTY_FILTERS)}>Clear all</button></> };
 
   const hasNoInventory = !loading && !queueError && reviewableTotal === 0;
@@ -250,8 +346,9 @@ export function JobsPage() {
             {notice && <p className="first-search-notice" role="status">{notice}</p>}
           </div> : <>
             <div className="queue-tabs" role="tablist" aria-label="Job queues">
-              <button role="tab" aria-selected={queueView === "all"} onClick={() => setQueueView("all")}>All jobs</button>
-              <button role="tab" aria-selected={queueView === "hot"} onClick={() => setQueueView("hot")}>Hot Jobs</button>
+              <button role="tab" aria-selected={queueView === "recommended"} onMouseEnter={() => prefetchQueue("recommended")} onFocus={() => prefetchQueue("recommended")} onClick={() => selectQueue("recommended")}>Recommended Jobs</button>
+              <button role="tab" aria-selected={queueView === "interested"} onMouseEnter={() => prefetchQueue("interested")} onFocus={() => prefetchQueue("interested")} onClick={() => selectQueue("interested")}>Interested jobs</button>
+              <button role="tab" aria-selected={queueView === "all"} onMouseEnter={() => prefetchQueue("all")} onFocus={() => prefetchQueue("all")} onClick={() => selectQueue("all")}>All jobs</button>
             </div>
             <div className="results-heading">
               {defaults?.country && <span title="Country from onboarding applies across all providers, including company boards. Unspecified locations remain available for review.">{defaults.country} · all sources</span>}

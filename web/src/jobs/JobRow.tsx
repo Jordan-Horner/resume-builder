@@ -21,7 +21,7 @@ export function JobRow({ job, selected, onOpen }: Props) {
   return (
     <button className={selected ? "job-row selected" : "job-row"} onClick={(event) => onOpen(event.currentTarget)}>
       <span className="job-row-main">
-        <span className="job-title-line"><strong>{job.title}</strong>{job.personalization?.hot && <span className="job-hot-status">Hot</span>}{screenLabel && <span className={`job-screen-status ${job.quick_screen?.status}`} title={screenTitle}>{screenLabel}</span>}</span>
+        <span className="job-title-line"><strong>{job.title}</strong>{screenLabel && <span className={`job-screen-status ${job.quick_screen?.status}`} title={screenTitle}>{screenLabel}</span>}</span>
         <span className="company">{job.company}</span>
         <span className="job-meta"><span>{job.location}</span><i /><span>{formatWorkModes(job.work_modes)}</span></span>
       </span>

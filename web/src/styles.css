@@ -212,7 +212,6 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
 .job-screen-status { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 999px; padding: 2px 7px; font-size: 10px; font-weight: 700; letter-spacing: .01em; }
 .job-screen-status.skipped { color: var(--muted); background: var(--surface-control); }
 .job-screen-status.failed { color: var(--warning); background: color-mix(in srgb, var(--warning) 12%, transparent); }
-.job-hot-status { color: #f4c76b; background: color-mix(in srgb, #d9972d 18%, transparent); border-radius: 999px; padding: 2px 7px; font-size: 10px; font-weight: 700; }
 .queue-tabs { display: flex; gap: 18px; margin: 0 4px 14px; border-bottom: 1px solid var(--line); }
 .queue-tabs button { border: 0; border-bottom: 2px solid transparent; padding: 8px 1px 10px; color: var(--muted); background: transparent; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .queue-tabs button[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--ink); }

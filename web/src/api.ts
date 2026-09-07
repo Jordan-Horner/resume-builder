@@ -38,14 +38,14 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function getJobs(filters: JobFilters, hotOnly = false): Promise<{ jobs: Job[]; count: number; reviewable_count: number }> {
+export async function getJobs(filters: JobFilters, queue: "all" | "recommended" | "interested" = "all"): Promise<{ jobs: Job[]; count: number; reviewable_count: number }> {
   const params = new URLSearchParams();
   if (filters.view) params.set("view_filters", JSON.stringify({ ...filters.view, roles: [], locations: filters.view.locations.map((item) => item.trim()).filter(Boolean) }));
   if (filters.search.trim()) params.set("search", filters.search.trim());
   if (filters.workMode) params.set("work_mode", filters.workMode);
   if (filters.dateDays) params.set("date_days", String(filters.dateDays));
   if (filters.employmentType) params.set("employment_type", filters.employmentType);
-  if (hotOnly) params.set("hot_only", "true");
+  if (queue !== "all") params.set("queue", queue);
   return request<{ jobs: Job[]; count: number; reviewable_count: number }>(`/api/jobs?${params.toString()}`);
 }
 
@@ -245,6 +245,7 @@ export interface ScrapeSchedule {
   screening_enabled: boolean;
   screening_max_jobs: number;
   screening_available: boolean;
+  current_stage: "idle" | "searching" | "screening";
 }
 export function getScrapeSchedule(): Promise<ScrapeSchedule> { return request("/api/scrape-schedule"); }
 export function saveScrapeSchedule(enabled: boolean, times: string[], screeningEnabled = false, screeningMaxJobs = 6): Promise<ScrapeSchedule> {

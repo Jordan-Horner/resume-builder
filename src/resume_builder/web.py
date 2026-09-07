@@ -11,7 +11,16 @@ from .workspace_state import discover_workspace
 
 def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
     try:
-        from fastapi import FastAPI, File, HTTPException, Query, Request, Response, UploadFile
+        from fastapi import (
+            BackgroundTasks,
+            FastAPI,
+            File,
+            HTTPException,
+            Query,
+            Request,
+            Response,
+            UploadFile,
+        )
         from fastapi.responses import FileResponse, RedirectResponse
         from fastapi.staticfiles import StaticFiles
     except ImportError as exc:
@@ -203,6 +212,7 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         employment_type: str = Query(default="", max_length=20),
         view_filters: str = Query(default="", max_length=12000),
         hot_only: bool = Query(default=False),
+        queue: str = Query(default="all", max_length=20),
         limit: int = Query(default=100, ge=1, le=200),
     ) -> dict[str, Any]:
         try:
@@ -213,6 +223,7 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
                 employment_type=employment_type,
                 view_filters=view_filters,
                 hot_only=hot_only,
+                queue=queue,
             )
             reviewable = service.list_jobs()
         except ValueError as exc:
@@ -332,27 +343,35 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @app.post("/api/jobs/{job_id}/feedback")
-    def record_job_feedback(job_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def record_job_feedback(
+        job_id: str, payload: dict[str, Any], background_tasks: BackgroundTasks
+    ) -> dict[str, Any]:
         try:
-            return service.record_job_feedback(
+            result = service.record_job_feedback(
                 job_id,
                 payload.get("action"),
                 payload.get("reasons", []),
             )
+            background_tasks.add_task(service.replenish_recommendations)
+            return result
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.post("/api/jobs/{job_id}/not-interested")
-    def mark_not_interested(job_id: str) -> dict[str, Any]:
+    def mark_not_interested(job_id: str, background_tasks: BackgroundTasks) -> dict[str, Any]:
         try:
-            return service.mark_not_interested(job_id)
+            result = service.mark_not_interested(job_id)
+            background_tasks.add_task(service.replenish_recommendations)
+            return result
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @app.post("/api/jobs/{job_id}/applied", status_code=201)
-    def mark_applied(job_id: str) -> dict[str, Any]:
+    def mark_applied(job_id: str, background_tasks: BackgroundTasks) -> dict[str, Any]:
         try:
-            return service.mark_applied(job_id)
+            result = service.mark_applied(job_id)
+            background_tasks.add_task(service.replenish_recommendations)
+            return result
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 

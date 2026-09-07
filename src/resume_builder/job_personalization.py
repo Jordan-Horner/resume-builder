@@ -425,6 +425,8 @@ def score_shadow_job(
     result = screen.get("result") if isinstance(screen, dict) else None
     interest = deterministic.get("interest") if isinstance(deterministic, dict) else None
     explicit_target_match = bool(isinstance(interest, dict) and interest.get("desired_title_terms"))
+    explicit_interest_match = bool(isinstance(interest, dict) and interest.get("interest_terms"))
+    deterministic_match = explicit_target_match or explicit_interest_match
     hard_conflict = bool(isinstance(deterministic, dict) and deterministic.get("hard_conflicts"))
     exact_positive = bool(latest and latest.get("action") in {"interested", "applied"})
     fit_is_usable = bool(
@@ -435,17 +437,14 @@ def score_shadow_job(
         and result.get("recommendation") != "do_not_apply"
     )
     learned_match = positive_pattern_matches >= 2
-    hot = bool(
-        not hard_conflict
-        and fit_is_usable
-        and (explicit_target_match or exact_positive or learned_match)
-        and (exact_positive or learned_match)
-    )
+    hot = bool(not hard_conflict and deterministic_match and fit_is_usable)
     hot_reasons: list[str] = []
     if hot:
         hot_reasons.append("career_fit")
         if explicit_target_match:
             hot_reasons.append("saved_target")
+        elif explicit_interest_match:
+            hot_reasons.append("saved_interest")
         if exact_positive:
             hot_reasons.append("exact_interest")
         if learned_match:
@@ -460,7 +459,7 @@ def score_shadow_job(
         "interest_label": _level(interest_score),
         "company_label": _level(company_score, positive="Positive"),
         "hot_label": (
-            "Hot for you"
+            "Strong recommendation"
             if hot
             else "Promising"
             if fit_score >= 0.55 and interest_score >= 0.5

@@ -189,12 +189,23 @@ reconstruction keeps completed criterion-driven screens addressable after the
 job is reopened. Provider calls require explicit private-data confirmation, and
 generated cache records remain outside Git and outside authoritative inventory
 state. The portal may display this metadata, but quick screening never removes
-jobs from the canonical inventory. A derived **Hot Jobs** view may select jobs
-whose completed screen has usable career fit, no hard conflict, and either an
-exact positive decision or at least two structurally similar positive jobs. The
-backend owns that decision and its stable reason codes; the browser only requests
-and renders the derived view. One positive decision never promotes an entire
-title family.
+jobs from the canonical inventory. The backend exposes three views over that same
+inventory. The deterministic prescreen cheaply selects candidates for background
+screening by excluding hard conflicts and requiring a saved role or interest
+signal. Candidates are processed in deterministic preference order, and provider
+work stops when the fixed 12-job shelf is full or the existing per-run cap is
+reached. **Recommended Jobs** is the output of that process: a job appears only
+after its quick screen completes with usable career fit. Unscreened, failed,
+uncertain, and weak-fit candidates remain available in **All jobs** rather than
+being presented as recommendations. **Interested jobs** contains explicit
+positive decisions that have not become applications, and **All jobs** remains the
+complete reviewable inventory. Marking a recommendation Interested moves it from
+Recommended Jobs to Interested jobs; applying or dismissing it removes it from
+both active queues. Current feedback and the current screening cache are combined
+at request time, so these transitions never wait for the next scheduled artifact
+refresh. A decision also schedules the same bounded worker to refill the shelf;
+there is no separate recommendation scheduler. The browser only requests and
+renders these backend-owned views.
 
 The version 5 screening packet also carries the user's bounded explicit
 `preferred_job_attributes` and `avoided_job_attributes`. They are sent in the

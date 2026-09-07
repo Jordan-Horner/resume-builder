@@ -123,8 +123,16 @@ starts the managed job scheduler and Off stops it. Manual **Find jobs now** runs
 remain available while the scheduler is off. Gmail monitoring is managed by a
 separate worker, so pausing scheduled job discovery does not pause application
 reconciliation. The **Background quick screening** control applies the bounded
-first pass after either scheduled or manual searches. Its cached metadata appears
-only after opening a job; it never filters, hides, or reorders the Jobs page.
+first pass after either scheduled or manual searches. It ranks the active inventory
+with the existing local preference score, then attempts the best unscreened jobs
+that pass the title, location, work-mode, seniority, completeness, and compensation
+gates and have a saved role or interest signal. Provider work stops when the
+12-job recommendation shelf is full or the configured per-run cost cap is reached.
+Cached results do not consume the cap. Only completed screens with usable career
+fit populate Recommended Jobs; failures and unfinished screens stay in All jobs.
+Interested, applied, and dismissed decisions immediately re-rank existing results
+and schedule a bounded background refill. The manual Screen button is a retry or
+override, not the normal workflow.
 
 Test exactly one task without starting the service:
 

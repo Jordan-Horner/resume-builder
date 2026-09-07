@@ -161,7 +161,10 @@ export function JobDetailPanel({
             </details>}
             <div className="job-screen-actions"><button className="text-button" onClick={() => void runJobScreen()} disabled={screening}>{screening ? "Screening…" : "Refresh screen"}</button><button className="text-button" onClick={() => assistant.discussJob(job.id, contextName)}>Discuss job</button></div>
           </> : <>
-            <div><strong>No quick screen yet</strong><p>Run the inexpensive first pass for eligibility and résumé fit. Deeper company research is separate.</p></div>
+            <div>
+              <strong>No quick screen yet</strong>
+              <p>Run the inexpensive first pass for eligibility and résumé fit. Deeper company research is separate.</p>
+            </div>
             <div className="job-screen-actions"><button className="secondary-button" onClick={() => void runJobScreen()} disabled={screening}>{screening ? "Screening job…" : "Screen job"}</button><button className="text-button" onClick={() => assistant.discussJob(job.id, contextName)}>Discuss job</button></div>
           </>}
           {screenError && <p className="recommendation-error" role="alert">{screenError}</p>}

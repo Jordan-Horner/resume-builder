@@ -277,6 +277,51 @@ def test_background_queue_skips_obvious_local_misses_without_provider_work(
     assert adapter.calls == 2
 
 
+def test_recommendation_target_screens_the_best_candidate_first(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "new.json"
+    output = tmp_path / "screens.json"
+    _input(source, ["possible", "preferred"])
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    payload["jobs"][0]["prescreen"] = {
+        "queue_state": "ready",
+        "interest": {"desired_title_terms": [], "interest_terms": ["operations"]},
+        "constraints": {"disposition": None},
+    }
+    payload["jobs"][1]["prescreen"] = {
+        "queue_state": "ready",
+        "interest": {"desired_title_terms": ["operations engineer"], "interest_terms": []},
+        "constraints": {"disposition": None},
+    }
+    source.write_text(json.dumps(payload), encoding="utf-8")
+    screened: list[str] = []
+
+    def packet(job_id: str, **_: object):
+        screened.append(job_id)
+        return _packet(job_id)
+
+    monkeypatch.setattr(queue_module, "get_job_screening_packet", packet)
+
+    summary = build_screening_queue(
+        adapter=QueueAdapter(),
+        model="fictional/model",
+        interpretation_model="fictional/public-job-model",
+        cache_path=tmp_path / "cache.sqlite",
+        input_path=source,
+        output_path=output,
+        max_provider_jobs=2,
+        target_recommended=1,
+        allow_provider=True,
+    )
+
+    jobs = {item["id"]: item for item in json.loads(output.read_text(encoding="utf-8"))["jobs"]}
+    assert screened == ["preferred", "possible"]
+    assert jobs["preferred"]["screening"]["status"] == "complete"
+    assert jobs["possible"]["screening"]["reason"] == "recommendation_target_filled"
+    assert summary.provider_calls == 2
+
+
 def test_legacy_review_flag_cannot_hide_a_job_without_a_disposition(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -15,6 +15,7 @@ vi.mock("./api", () => ({
   getSavedJobSalary: vi.fn(),
   getSavedJobScreen: vi.fn(), screenJob: vi.fn(),
   getJobFeedback: vi.fn(), saveJobFeedback: vi.fn(), recordJobPostingOpened: vi.fn(),
+  getScrapeSchedule: vi.fn(),
 }));
 const job: Job = { id: "one", title: "Support Engineer", company: "Example", location: "Remote", employment_type: "fulltime", salary_min: null, salary_max: null, salary_currency: null, salary_interval: null, posted_at: null, first_seen_at: null, description: "Support customers", work_modes: ["remote"], providers: [], url: null };
 let root: Root;
@@ -27,6 +28,7 @@ beforeEach(() => {
   vi.mocked(api.getJobFilterDefaults).mockResolvedValue(EMPTY_VIEW);
   vi.mocked(api.getSearchPreferences).mockResolvedValue({ status: "active", revision: "one", titles: [], country: "US", work_modes: ["remote"], onsite_locations: [], remote_location_terms: [], clearance_preference: "neutral", preferred_job_attributes: [], avoided_job_attributes: [], compensation: { skipped: true, minimum: null, target: null, currency: null, period: null } });
   vi.mocked(api.getBlockedCompanies).mockResolvedValue({ companies: [] });
+  vi.mocked(api.getScrapeSchedule).mockResolvedValue({ configured: true, enabled: true, times: ["08:00"], timezone: "America/New_York", next_run: null, last_run: null, service_status: "online", screening_enabled: true, screening_max_jobs: 15, screening_available: true, current_stage: "idle" });
   vi.mocked(api.getResumeRecommendation).mockResolvedValue({ status: "unavailable", recommended_resume: null, match: null, target: null, message: "None" });
   vi.mocked(api.getJobs).mockResolvedValue({ jobs: [job], count: 1, reviewable_count: 1 });
   vi.mocked(api.markJobApplied).mockResolvedValue({});
@@ -66,12 +68,13 @@ it("refills the page from the backend after removing a result", async () => {
 
 it("records interested feedback without asking the user to classify it", async () => {
   await openJob();
+  vi.mocked(api.getJobs).mockResolvedValue({ jobs: [], count: 0, reviewable_count: 1 });
   await click("Interested");
 
   expect(api.saveJobFeedback).toHaveBeenCalledWith("one", "interested", []);
   expect(host.textContent).not.toContain("What stands out?");
-  expect(host.textContent).toContain("Preference saved");
-  expect(host.textContent).toContain("Support Engineer");
+  expect(host.textContent).toContain("saved to Interested jobs");
+  expect(host.querySelector(".job-detail")).toBeNull();
 });
 
 it("shows completed quick-screen metadata in the queue", async () => {
@@ -86,18 +89,47 @@ it("shows completed quick-screen metadata in the queue", async () => {
   expect(host.querySelector(".job-screen-status")?.textContent).toContain("Strong · Support Engineer");
 });
 
-it("requests the backend-owned Hot Jobs view without hiding the normal queue", async () => {
-  const hotJob = { ...job, personalization: { hot: true, hot_reasons: ["career_fit", "exact_interest"], hot_score: 0.91 } };
-  vi.mocked(api.getJobs).mockResolvedValueOnce({ jobs: [job, hotJob], count: 2, reviewable_count: 2 });
+it("requests the backend-owned recommendation queue without hiding the full inventory", async () => {
+  vi.mocked(api.getJobs).mockResolvedValueOnce({ jobs: [job], count: 1, reviewable_count: 2 });
   await act(async () => root.render(<JobsPage />));
-  vi.mocked(api.getJobs).mockResolvedValue({ jobs: [hotJob], count: 1, reviewable_count: 2 });
-
-  await click("Hot Jobs");
-
-  expect(api.getJobs).toHaveBeenLastCalledWith(expect.any(Object), true);
-  expect(host.querySelector(".job-hot-status")?.textContent).toBe("Hot");
+  expect(api.getJobs).toHaveBeenLastCalledWith(expect.any(Object), "recommended");
+  vi.mocked(api.getJobs).mockResolvedValue({ jobs: [job], count: 1, reviewable_count: 2 });
   await click("All jobs");
-  expect(api.getJobs).toHaveBeenLastCalledWith(expect.any(Object), false);
+  expect(api.getJobs).toHaveBeenLastCalledWith(expect.any(Object), "all");
+});
+
+it("keeps explicitly interested jobs in their own queue", async () => {
+  await act(async () => root.render(<JobsPage />));
+  await click("Interested jobs");
+
+  expect(api.getJobs).toHaveBeenLastCalledWith(expect.any(Object), "interested");
+});
+
+it("reuses a loaded queue when switching back to it", async () => {
+  const allJob = { ...job, id: "two", title: "Platform Engineer" };
+  vi.mocked(api.getJobs).mockImplementation(async (_filters, queue) => ({
+    jobs: queue === "all" ? [allJob] : [job],
+    count: 1,
+    reviewable_count: 2,
+  }));
+  await act(async () => root.render(<JobsPage />));
+
+  await click("All jobs");
+  expect(host.textContent).toContain("Platform Engineer");
+  await click("Recommended Jobs");
+
+  expect(host.textContent).toContain("Support Engineer");
+  expect(api.getJobs).toHaveBeenCalledTimes(2);
+});
+
+it("shows when the scheduled search is still preparing recommendations", async () => {
+  vi.mocked(api.getJobs).mockResolvedValue({ jobs: [], count: 0, reviewable_count: 12 });
+  vi.mocked(api.getScrapeSchedule).mockResolvedValue({ configured: true, enabled: true, times: ["08:00"], timezone: "America/New_York", next_run: null, last_run: null, service_status: "online", screening_enabled: true, screening_max_jobs: 15, screening_available: true, current_stage: "searching" });
+
+  await act(async () => root.render(<JobsPage />));
+
+  expect(host.textContent).toContain("Finding new jobs…");
+  expect(host.textContent).toContain("screened automatically before they appear here");
 });
 
 it("describes a failed automatic screen as unavailable, not as a fit judgment", async () => {
@@ -146,7 +178,7 @@ it("temporarily filters clearance jobs without changing saved preferences", asyn
     expect.objectContaining({
       view: expect.objectContaining({ clearanceMode: "only" }),
     }),
-    false,
+    "recommended",
   );
 });
 it("retries a failed refresh without repeating the successful mutation", async () => {

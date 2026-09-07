@@ -16,6 +16,7 @@ from .job_personalization import (
     build_shadow_order,
     extract_preference_traits,
     load_feedback_events,
+    score_shadow_job,
 )
 from .job_screening import (
     Confidence,
@@ -202,12 +203,15 @@ def build_screening_queue(
     config_path: Path = DEFAULT_CONFIG,
     preferences_path: Path = DEFAULT_PREFERENCES,
     max_provider_jobs: int = 6,
+    target_recommended: int | None = None,
     allow_provider: bool = False,
     workspace: Path = Path("."),
 ) -> ScreeningQueueSummary:
     """Screen a complete new-job set without allowing any result to hide a job."""
     if not 1 <= max_provider_jobs <= 25:
         raise ValueError("max_provider_jobs must be from 1 to 25")
+    if target_recommended is not None and target_recommended < 1:
+        raise ValueError("target_recommended must be positive")
     payload = json.loads(input_path.read_text(encoding="utf-8"))
     raw_jobs = payload.get("jobs")
     if not isinstance(raw_jobs, list):
@@ -223,12 +227,33 @@ def build_screening_queue(
         interpretation_model=interpretation_model,
         vault_root=workspace / "vault",
     )
-    items: list[dict[str, Any]] = []
-    provider_jobs = 0
-    provider_calls = 0
-    input_tokens = 0
-    output_tokens = 0
-    total_cost = Decimal("0")
+    preferences = (
+        _with_application_dispositions(_load_preferences(preferences_path))
+        if preferences_path.exists()
+        else {}
+    )
+    dispositions = preferences.get("job_dispositions") or {}
+    positive_ids = applied_job_ids() | {
+        str(job_id) for job_id, status in dispositions.items() if status == "applied"
+    }
+    positive_titles = (
+        [
+            str(job.get("title") or "")
+            for job in _database(config_path).active_inventory()
+            if str(job.get("id") or "") in positive_ids
+        ]
+        if positive_ids
+        else []
+    )
+    feedback_events = load_feedback_events(workspace / "job-search/job-feedback.json")
+    latest_actions = {
+        str(snapshot["id"]): str(event.get("action"))
+        for event in feedback_events
+        if event.get("action") in {"interested", "not_interested", "applied"}
+        and isinstance((snapshot := event.get("job")), dict)
+        and snapshot.get("id")
+    }
+    prepared: list[tuple[dict[str, Any], dict[str, Any]]] = []
     for source_order, raw in enumerate(raw_jobs):
         if not isinstance(raw, dict):
             raise ValueError("new-job artifact contains a non-object job")
@@ -237,7 +262,32 @@ def build_screening_queue(
         constraints = prescreen.get("constraints") if isinstance(prescreen, dict) else None
         disposition = constraints.get("disposition") if isinstance(constraints, dict) else None
         active = not bool(disposition)
-        item = _job_view(job, source_order=source_order, active=active)
+        prepared.append((job, _job_view(job, source_order=source_order, active=active)))
+    prepared.sort(
+        key=lambda pair: (
+            -float(
+                score_shadow_job(
+                    {**pair[1], "screening": {"status": "unscreened"}},
+                    positive_titles=positive_titles,
+                    clearance_preference=str(
+                        preferences.get("clearance_preference", "neutral")
+                    ),
+                    feedback_events=feedback_events,
+                )["score"]
+            ),
+            int(pair[1]["source_order"]),
+        )
+    )
+
+    items: list[dict[str, Any]] = []
+    provider_jobs = 0
+    provider_calls = 0
+    input_tokens = 0
+    output_tokens = 0
+    total_cost = Decimal("0")
+    recommended_count = 0
+    for job, item in prepared:
+        active = bool(item["active"])
         if not active:
             item["screening"] = {"status": "not_active", "reason": "durable_disposition"}
             items.append(item)
@@ -245,6 +295,14 @@ def build_screening_queue(
         skip_reason = _automatic_skip_reason(job)
         if skip_reason:
             item["screening"] = {"status": "skipped", "reason": skip_reason}
+            items.append(item)
+            continue
+        if latest_actions.get(str(job.get("id") or "")) in {
+            "interested",
+            "not_interested",
+            "applied",
+        }:
+            item["screening"] = {"status": "skipped", "reason": "feedback_disposition"}
             items.append(item)
             continue
 
@@ -263,6 +321,13 @@ def build_screening_queue(
         cached = cache.get(packet, model)
         if cached is not None:
             item["screening"] = _result_payload(cached, cached=True)
+            if score_shadow_job(
+                item,
+                positive_titles=positive_titles,
+                clearance_preference=str(preferences.get("clearance_preference", "neutral")),
+                feedback_events=feedback_events,
+            )["hot"]:
+                recommended_count += 1
             items.append(item)
             continue
         if packet.eligibility.value == "ineligible":
@@ -276,6 +341,13 @@ def build_screening_queue(
             item["screening"] = {
                 "status": "unscreened",
                 "reason": "provider_authorization_required",
+            }
+            items.append(item)
+            continue
+        if target_recommended is not None and recommended_count >= target_recommended:
+            item["screening"] = {
+                "status": "unscreened",
+                "reason": "recommendation_target_filled",
             }
             items.append(item)
             continue
@@ -299,32 +371,22 @@ def build_screening_queue(
             output_tokens += outcome.output_tokens
             total_cost += outcome.cost_usd
             item["screening"] = _result_payload(outcome.result, cached=outcome.cached)
+            if score_shadow_job(
+                item,
+                positive_titles=positive_titles,
+                clearance_preference=str(preferences.get("clearance_preference", "neutral")),
+                feedback_events=feedback_events,
+            )["hot"]:
+                recommended_count += 1
         items.append(item)
 
+    items.sort(key=lambda item: int(item["source_order"]))
     ordered = sorted((item for item in items if item["active"]), key=_priority)
-    preferences = (
-        _with_application_dispositions(_load_preferences(preferences_path))
-        if preferences_path.exists()
-        else {}
-    )
-    dispositions = preferences.get("job_dispositions") or {}
-    positive_ids = applied_job_ids() | {
-        str(job_id) for job_id, status in dispositions.items() if status == "applied"
-    }
-    positive_titles = (
-        [
-            str(job.get("title") or "")
-            for job in _database(config_path).active_inventory()
-            if str(job.get("id") or "") in positive_ids
-        ]
-        if positive_ids
-        else []
-    )
     shadow_order, shadow_scores = build_shadow_order(
         items,
         preferences=preferences,
         positive_titles=positive_titles,
-        feedback_events=load_feedback_events(workspace / "job-search/job-feedback.json"),
+        feedback_events=feedback_events,
     )
     for item in items:
         job_id = str(item.get("id") or "")

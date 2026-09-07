@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 import tempfile
@@ -71,6 +72,38 @@ def _state_status(path: Path) -> tuple[str, dict[str, object] | None]:
     return ("online" if running else "offline"), last_run
 
 
+def _current_job_stage(
+    root: Path,
+    *,
+    screening_enabled: bool,
+    last_run: dict[str, object] | None,
+) -> str:
+    """Infer the live discovery/screening stage from atomic published artifacts."""
+    refresh_path = root / "job-search/latest-refresh.json"
+    if not refresh_path.is_file():
+        return "idle"
+    try:
+        refresh = json.loads(refresh_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return "idle"
+    status = refresh.get("status")
+    if status in {"in_progress", "processing"}:
+        return "searching"
+    if status not in {"complete", "partial"} or not screening_enabled:
+        return "idle"
+    started_at = str(refresh.get("started_at") or "")
+    finished_at = str(last_run.get("finished_at") or "") if last_run else ""
+    if started_at and finished_at >= started_at:
+        return "idle"
+    screen_path = root / "job-search/new-job-screens.json"
+    try:
+        if screen_path.is_file() and screen_path.stat().st_mtime_ns >= refresh_path.stat().st_mtime_ns:
+            return "idle"
+    except OSError:
+        return "idle"
+    return "screening"
+
+
 def schedule_status(
     root: Path,
     *,
@@ -95,6 +128,11 @@ def schedule_status(
         "screening_enabled": config.jobs.semantic_screening_enabled,
         "screening_max_jobs": config.jobs.semantic_screening_max_jobs,
         "screening_available": background_screening_configured(root),
+        "current_stage": _current_job_stage(
+            root,
+            screening_enabled=config.jobs.semantic_screening_enabled,
+            last_run=last_run,
+        ),
     }
 
 

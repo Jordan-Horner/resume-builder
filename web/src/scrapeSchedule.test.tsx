@@ -10,7 +10,7 @@ vi.mock("./api", () => ({
   getScrapeSchedule: vi.fn(), saveScrapeSchedule: vi.fn(),
 }));
 
-const schedule = { configured: true, enabled: true, times: ["08:00"], timezone: "America/New_York", next_run: "2026-09-06T08:00:00-04:00", last_run: null, service_status: "online" as const, screening_enabled: false, screening_max_jobs: 6, screening_available: true };
+const schedule = { configured: true, enabled: true, times: ["08:00"], timezone: "America/New_York", next_run: "2026-09-06T08:00:00-04:00", last_run: null, service_status: "online" as const, screening_enabled: false, screening_max_jobs: 6, screening_available: true, current_stage: "idle" as const };
 let host: HTMLDivElement;
 let root: Root;
 beforeEach(() => {

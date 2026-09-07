@@ -175,10 +175,21 @@ def run_worker(root: Path, snapshot: Path) -> None:
             if schedule_path.is_file():
                 schedule = load_automation(schedule_path)
                 if schedule.jobs.semantic_screening_enabled:
+                    shortlist_code = main(
+                        [
+                            "--config",
+                            str(snapshot),
+                            "shortlist",
+                            "--limit",
+                            str(schedule.jobs.limit),
+                        ]
+                    )
+                    if shortlist_code != 0:
+                        raise RuntimeError("active job shortlist could not be prepared")
                     summary = run_background_quick_screening(
                         root,
                         max_jobs=schedule.jobs.semantic_screening_max_jobs,
-                        input_path=root / "job-search/new-jobs.json",
+                        input_path=root / "job-search/shortlist.json",
                     )
                     screening_status = "complete" if summary.failed == 0 else "partial"
                     screened_jobs = summary.completed
