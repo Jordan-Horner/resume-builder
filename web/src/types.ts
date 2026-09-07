@@ -37,7 +37,7 @@ export interface Job {
   salary_interval: string | null;
   posted_at: string | null;
   first_seen_at: string | null;
-  description: string;
+  description?: string;
   work_modes: string[];
   providers: string[];
   url: string | null;

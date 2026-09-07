@@ -209,17 +209,17 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
 .job-row-main { min-width: 0; display: grid; gap: 3px; }
 .job-title-line { display: flex; align-items: center; gap: 9px; min-width: 0; }
 .job-title-line strong { font-family: "Avenir Next", Avenir, sans-serif; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.job-screen-status { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 999px; padding: 2px 7px; font-size: 10px; font-weight: 700; letter-spacing: .01em; }
-.job-screen-status.skipped { color: var(--muted); background: var(--surface-control); }
-.job-screen-status.failed { color: var(--warning); background: color-mix(in srgb, var(--warning) 12%, transparent); }
-.job-hot-status { flex: 0 0 auto; color: #7ee787; background: color-mix(in srgb, #2ea043 22%, transparent); border-radius: 999px; padding: 2px 7px; font-size: 10px; font-weight: 700; }
+.job-screen-state { white-space: nowrap; font-size: 11px; font-weight: 650; }
+.job-screen-state.complete { color: var(--accent-strong); }
+.job-screen-state.unscreened { color: var(--muted); font-weight: 500; }
+.job-screen-state.failed { color: var(--warning); }
 .queue-tabs { display: flex; gap: 18px; margin: 0 4px 14px; border-bottom: 1px solid var(--line); }
 .queue-tabs button { border: 0; border-bottom: 2px solid transparent; padding: 8px 1px 10px; color: var(--muted); background: transparent; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .queue-tabs button[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--ink); }
 .assistant-context-question { align-items: flex-start; background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
 .new-pill { flex: 0 0 auto; color: #7ee787; background: var(--success-soft); padding: 3px 7px; border-radius: 999px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; }
 .company { font-weight: 600; font-size: 12px; }
-.job-meta { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 7px; }
+.job-meta { color: var(--muted); font-size: 12px; display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
 .job-meta i { width: 3px; height: 3px; border-radius: 50%; background: var(--muted); }
 .job-row-side { color: var(--muted); font-size: 11px; text-align: right; display: grid; grid-template-columns: auto 54px 18px; gap: 10px; align-items: center; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
 .detail-open .row-salary { display: none; }

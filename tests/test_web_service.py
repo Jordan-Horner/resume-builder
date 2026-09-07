@@ -485,13 +485,9 @@ def test_job_queues_use_current_feedback_without_waiting_for_background_rerun(
     monkeypatch.setattr(
         DashboardService,
         "job_feedback",
-        lambda _self, job_id: {
-            "job_id": job_id,
-            "personalization": {
-                "hot": True,
-                "hot_reasons": ["career_fit", "saved_target", "exact_interest"],
-            },
-        },
+        lambda _self, _job_id: (_ for _ in ()).throw(
+            AssertionError("queue construction must not rescan through job_feedback")
+        ),
     )
     service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
 

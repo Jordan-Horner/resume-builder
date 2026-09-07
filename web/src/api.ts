@@ -38,7 +38,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function getJobs(filters: JobFilters, queue: "all" | "recommended" | "interested" = "all"): Promise<{ jobs: Job[]; count: number; reviewable_count: number }> {
+export async function getJobs(filters: JobFilters, queue: "all" | "recommended" | "interested" = "all", signal?: AbortSignal): Promise<{ jobs: Job[]; count: number; reviewable_count: number }> {
   const params = new URLSearchParams();
   if (filters.view) params.set("view_filters", JSON.stringify({ ...filters.view, roles: [], locations: filters.view.locations.map((item) => item.trim()).filter(Boolean) }));
   if (filters.search.trim()) params.set("search", filters.search.trim());
@@ -46,7 +46,11 @@ export async function getJobs(filters: JobFilters, queue: "all" | "recommended" 
   if (filters.dateDays) params.set("date_days", String(filters.dateDays));
   if (filters.employmentType) params.set("employment_type", filters.employmentType);
   if (queue !== "all") params.set("queue", queue);
-  return request<{ jobs: Job[]; count: number; reviewable_count: number }>(`/api/jobs?${params.toString()}`);
+  return request<{ jobs: Job[]; count: number; reviewable_count: number }>(`/api/jobs?${params.toString()}`, signal ? { signal } : undefined);
+}
+
+export function getJob(jobId: string, signal?: AbortSignal): Promise<Job> {
+  return request(`/api/jobs/${encodeURIComponent(jobId)}`, signal ? { signal } : undefined);
 }
 
 export function markJobNotInterested(jobId: string): Promise<JobFeedback> {

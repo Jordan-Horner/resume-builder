@@ -220,15 +220,18 @@ def test_api_filters_before_count_and_limit(tmp_path, monkeypatch):
 
     from resume_builder.web import create_app
 
-    monkeypatch.setattr(
-        DashboardService,
-        "_load_inventory",
-        lambda self: [
+    inventory_loads = 0
+
+    def load_inventory(_self):
+        nonlocal inventory_loads
+        inventory_loads += 1
+        return [
             listing(id="one"),
             listing(id="two"),
             listing(id="three", title="Accountant"),
-        ],
-    )
+        ]
+
+    monkeypatch.setattr(DashboardService, "_load_inventory", load_inventory)
     client = TestClient(create_app(tmp_path))
     response = client.get(
         "/api/jobs",
@@ -240,4 +243,6 @@ def test_api_filters_before_count_and_limit(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert response.json()["count"] == 3
     assert len(response.json()["jobs"]) == 1
+    assert "description" not in response.json()["jobs"][0]
+    assert inventory_loads == 1
     assert client.get("/api/jobs", params={"view_filters": '{"minimumPay":-1}'}).status_code == 400

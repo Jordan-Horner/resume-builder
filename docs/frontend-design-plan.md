@@ -216,7 +216,10 @@ It also returns each canonical skill's evidence and resume usage plus whether th
 existing discovery portfolio currently uses that fact as a search signal. React
 does not infer status, create search terms, or keep a parallel skill registry.
 
-Opening a job asks FastAPI for its recommended resume. The recommendation reuses a
+Job queues return lightweight row data and load the full posting description only
+when a job is opened. Queue requests are debounced, superseded requests are cancelled,
+and a bounded per-filter cache makes recently prefetched tabs switch immediately.
+Opening a job asks FastAPI for its full description and recommended resume. The recommendation reuses a
 preserved target, its direction, a matching tailored resume, and an existing match
 report when those artifacts exist. Without a target, the only directional resume
 may be used as an unscored fallback; multiple baselines are never guessed between.

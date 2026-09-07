@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { getJobFeedback, getResumeRecommendation, getSavedJobScreen, recordJobPostingOpened, screenJob } from "../api";
+import { getJob, getJobFeedback, getResumeRecommendation, getSavedJobScreen, recordJobPostingOpened, screenJob } from "../api";
 import { ArrowIcon, IconButton } from "../components";
 import { JobSalary } from "../components/JobSalary";
 import { useAssistant } from "../assistant/AssistantProvider";
@@ -26,6 +26,23 @@ const criterionOutcomeLabels = {
   apparent_gap: "Possible gap",
 } as const;
 
+const descriptionCache = new Map<string, string>();
+const MAX_DESCRIPTION_CACHE_ENTRIES = 20;
+
+function isAbortError(reason: unknown) {
+  return reason instanceof DOMException && reason.name === "AbortError";
+}
+
+function cacheDescription(jobId: string, description: string) {
+  descriptionCache.delete(jobId);
+  descriptionCache.set(jobId, description);
+  while (descriptionCache.size > MAX_DESCRIPTION_CACHE_ENTRIES) {
+    const oldest = descriptionCache.keys().next().value;
+    if (oldest === undefined) break;
+    descriptionCache.delete(oldest);
+  }
+}
+
 export function JobDetailPanel({
   job,
   companyBlocked,
@@ -46,6 +63,8 @@ export function JobDetailPanel({
   const [screenError, setScreenError] = useState("");
   const [feedback, setFeedback] = useState<JobFeedback | null>(null);
   const [feedbackError, setFeedbackError] = useState("");
+  const [description, setDescription] = useState<string | null>(job.description ?? descriptionCache.get(job.id) ?? null);
+  const [descriptionError, setDescriptionError] = useState("");
   const currentJobId = useRef(job.id);
   currentJobId.current = job.id;
   const screening = screeningJobId === job.id;
@@ -62,7 +81,13 @@ export function JobDetailPanel({
     setScreenError("");
     setFeedback(null);
     setFeedbackError("");
-    void Promise.allSettled([getResumeRecommendation(job.id), getSavedJobScreen(job.id), getJobFeedback(job.id)]).then(([resumeResult, screenResult, feedbackResult]) => {
+    setDescription(job.description ?? descriptionCache.get(job.id) ?? null);
+    setDescriptionError("");
+    const controller = new AbortController();
+    const descriptionRequest = job.description !== undefined || descriptionCache.has(job.id)
+      ? Promise.resolve(null)
+      : getJob(job.id, controller.signal);
+    void Promise.allSettled([getResumeRecommendation(job.id), getSavedJobScreen(job.id), getJobFeedback(job.id), descriptionRequest]).then(([resumeResult, screenResult, feedbackResult, descriptionResult]) => {
       if (!active) return;
       if (resumeResult.status === "fulfilled") setRecommendation(resumeResult.value);
       else setRecommendationError(resumeResult.reason instanceof Error ? resumeResult.reason.message : "Could not load the resume recommendation.");
@@ -70,8 +95,15 @@ export function JobDetailPanel({
       else setScreenError(screenResult.reason instanceof Error ? screenResult.reason.message : "Could not load this job screen.");
       if (feedbackResult.status === "fulfilled") setFeedback(feedbackResult.value);
       else setFeedbackError(feedbackResult.reason instanceof Error ? feedbackResult.reason.message : "Could not load your preference for this job.");
+      if (descriptionResult.status === "fulfilled" && descriptionResult.value) {
+        const loadedDescription = descriptionResult.value.description ?? "";
+        cacheDescription(job.id, loadedDescription);
+        setDescription(loadedDescription);
+      } else if (descriptionResult.status === "rejected" && !isAbortError(descriptionResult.reason)) {
+        setDescriptionError(descriptionResult.reason instanceof Error ? descriptionResult.reason.message : "Could not load the job description.");
+      }
     });
-    return () => { active = false; };
+    return () => { active = false; controller.abort(); };
   }, [job.id]);
 
   async function runJobScreen() {
@@ -101,6 +133,9 @@ export function JobDetailPanel({
 
   const postedSalary = formatPayRange(job);
   const contextName = `${job.title} at ${job.company}`;
+  const recommendationLabel = feedback?.personalization.hot_label === "Hot job"
+    ? "Strong recommendation"
+    : feedback?.personalization.hot_label ?? "Learning your preferences";
   return (
     <aside className="job-detail" aria-labelledby="selected-job-title">
       <div className="detail-summary">
@@ -160,10 +195,28 @@ export function JobDetailPanel({
               <ul>{jobScreen.result.evidence_used.map((item) => <li key={item.fact_id}><strong>{item.title}</strong><span>{item.strength}</span></li>)}</ul>
             </details>}
             <div className="job-screen-actions"><button className="text-button" onClick={() => void runJobScreen()} disabled={screening}>{screening ? "Screening…" : "Refresh screen"}</button><button className="text-button" onClick={() => assistant.discussJob(job.id, contextName)}>Discuss job</button></div>
+          </> : job.quick_screen?.status === "complete" ? <>
+            <div>
+              <strong>Screened in background</strong>
+              <p>The background quick screen completed with a {job.quick_screen.label === "Unknown" ? "unclear" : job.quick_screen.label.toLowerCase()} result. Run it again to view a current evidence check.</p>
+            </div>
+            <div className="job-screen-actions"><button className="secondary-button" onClick={() => void runJobScreen()} disabled={screening}>{screening ? "Screening job…" : "Run screen again"}</button><button className="text-button" onClick={() => assistant.discussJob(job.id, contextName)}>Discuss job</button></div>
+          </> : job.quick_screen?.status === "failed" ? <>
+            <div>
+              <strong>Background screen failed</strong>
+              <p>The automatic screen could not finish. Try again here for a current result.</p>
+            </div>
+            <div className="job-screen-actions"><button className="secondary-button" onClick={() => void runJobScreen()} disabled={screening}>{screening ? "Screening job…" : "Try screening again"}</button><button className="text-button" onClick={() => assistant.discussJob(job.id, contextName)}>Discuss job</button></div>
+          </> : job.quick_screen?.status === "skipped" ? <>
+            <div>
+              <strong>Not screened automatically</strong>
+              <p>This job was skipped by the background screen. You can run a screen now.</p>
+            </div>
+            <div className="job-screen-actions"><button className="secondary-button" onClick={() => void runJobScreen()} disabled={screening}>{screening ? "Screening job…" : "Screen job"}</button><button className="text-button" onClick={() => assistant.discussJob(job.id, contextName)}>Discuss job</button></div>
           </> : <>
             <div>
-              <strong>No quick screen yet</strong>
-              <p>Run the inexpensive first pass for eligibility and résumé fit. Deeper company research is separate.</p>
+              <strong>Not screened yet</strong>
+              <p>Run a quick check for eligibility and résumé fit. Company research is separate.</p>
             </div>
             <div className="job-screen-actions"><button className="secondary-button" onClick={() => void runJobScreen()} disabled={screening}>{screening ? "Screening job…" : "Screen job"}</button><button className="text-button" onClick={() => assistant.discussJob(job.id, contextName)}>Discuss job</button></div>
           </>}
@@ -172,9 +225,9 @@ export function JobDetailPanel({
         <section className="job-preference-card" aria-label="Your job preference">
           <div className="job-preference-heading">
             <div>
-              <strong>{feedback?.personalization.hot_label ?? "Learning your preferences"}</strong>
+              <strong>{recommendationLabel}</strong>
               {jobScreen && feedback && <span>Career fit {feedback.personalization.fit_label} · Interest {feedback.personalization.interest_label} · Company {feedback.personalization.company_label}</span>}
-              {!jobScreen && feedback && <span>Recommended from your saved requirements and interests. Quick screening can promote it to Hot.</span>}
+              {!jobScreen && feedback && <span>Based on your saved requirements and interests.</span>}
               {!jobScreen && !feedback && <span>Loading recommendation details…</span>}
             </div>
             <button className="secondary-button interested-button" aria-pressed={feedback?.latest?.action === "interested"} disabled={pendingAction !== null} onClick={() => void markInterested()}>
@@ -194,7 +247,13 @@ export function JobDetailPanel({
         </div>
       </div>
       <div className="job-description">
-        {job.description ? job.description.split(/\n+/).map((paragraph, index) => paragraph.trim() && <p key={index}>{paragraph}</p>) : <p>No description was included with this listing.</p>}
+        {descriptionError
+          ? <p>{descriptionError}</p>
+          : description === null
+            ? <p>Loading job description…</p>
+            : description
+              ? description.split(/\n+/).map((paragraph, index) => paragraph.trim() && <p key={index}>{paragraph}</p>)
+              : <p>No description was included with this listing.</p>}
       </div>
     </aside>
   );

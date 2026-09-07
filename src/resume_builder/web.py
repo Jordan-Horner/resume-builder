@@ -216,6 +216,7 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         limit: int = Query(default=100, ge=1, le=200),
     ) -> dict[str, Any]:
         try:
+            counts: dict[str, int] = {}
             items = service.list_jobs(
                 search=search,
                 work_mode=work_mode,
@@ -224,14 +225,16 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
                 view_filters=view_filters,
                 hot_only=hot_only,
                 queue=queue,
+                _result_counts=counts,
+                _include_description=False,
+                _limit=limit,
             )
-            reviewable = service.list_jobs()
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {
-            "jobs": items[:limit],
-            "count": len(items),
-            "reviewable_count": len(reviewable),
+            "jobs": items,
+            "count": counts["total"],
+            "reviewable_count": counts["reviewable"],
         }
 
     @app.get("/api/blocked-companies")

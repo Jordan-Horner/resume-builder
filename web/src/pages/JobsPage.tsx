@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   activateJobSearch, getBlockedCompanies, getJobFilterDefaults, getJobs, getJobSources,
   getScrapeSchedule, getSearchPreferences, markJobApplied, saveJobFeedback, setCompanyBlocked,
@@ -21,13 +21,36 @@ const DATE_FILTERS = [
 const companyKey = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 type JobQueue = "all" | "recommended" | "interested";
 type JobQueuePayload = { jobs: Job[]; count: number; reviewable_count: number };
+const MAX_QUEUE_CACHE_ENTRIES = 6;
+
+function textFiltersChanged(previous: JobFilters, next: JobFilters) {
+  return previous.search !== next.search
+    || (previous.view?.locations.join("\n") ?? "") !== (next.view?.locations.join("\n") ?? "");
+}
+
+function useDebouncedFilters(filters: JobFilters, delay = 250) {
+  const [debounced, setDebounced] = useState(filters);
+  useEffect(() => {
+    if (!textFiltersChanged(debounced, filters)) {
+      setDebounced(filters);
+      return;
+    }
+    const timer = window.setTimeout(() => setDebounced(filters), delay);
+    return () => window.clearTimeout(timer);
+  }, [debounced, delay, filters]);
+  return debounced;
+}
+
+function isAbortError(reason: unknown) {
+  return reason instanceof DOMException && reason.name === "AbortError";
+}
 
 export function JobsPage() {
   const assistant = useAssistant();
   const [filters, setFilters] = useState<JobFilters>(EMPTY_FILTERS);
   const [defaults, setDefaults] = useState<ViewFilters | null>(null);
   const [preferencesUpdated, setPreferencesUpdated] = useState(false);
-  const deferredFilters = useDeferredValue(filters);
+  const deferredFilters = useDebouncedFilters(filters);
   const { search, dateDays } = filters;
   const deferredSearch = deferredFilters.search;
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -37,6 +60,7 @@ export function JobsPage() {
   const [scanning, setScanning] = useState(false);
   const [selected, setSelected] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
+  const [queueRefreshing, setQueueRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [queueError, setQueueError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
@@ -50,8 +74,10 @@ export function JobsPage() {
   const selectedOrigin = useRef<HTMLButtonElement | null>(null);
   const results = useRef<HTMLElement | null>(null);
   const focusQueueAfterRefresh = useRef(false);
+  const silentQueueRefresh = useRef(false);
   const queueCache = useRef(new Map<string, JobQueuePayload>());
   const queueRequests = useRef(new Map<string, Promise<JobQueuePayload>>());
+  const queueControllers = useRef(new Map<string, AbortController>());
 
   function queueKey(queue: JobQueue) {
     return JSON.stringify([reloadKey, queueRevision, queue, deferredFilters]);
@@ -63,11 +89,22 @@ export function JobsPage() {
     if (cached) return Promise.resolve(cached);
     const pending = queueRequests.current.get(key);
     if (pending) return pending;
-    const request = getJobs(deferredFilters, queue).then((payload) => {
+    const controller = new AbortController();
+    const request = getJobs(deferredFilters, queue, controller.signal).then((payload) => {
+      queueCache.current.delete(key);
       queueCache.current.set(key, payload);
+      while (queueCache.current.size > MAX_QUEUE_CACHE_ENTRIES) {
+        const oldest = queueCache.current.keys().next().value;
+        if (oldest === undefined) break;
+        queueCache.current.delete(oldest);
+      }
       return payload;
-    }).finally(() => queueRequests.current.delete(key));
+    }).finally(() => {
+      queueRequests.current.delete(key);
+      queueControllers.current.delete(key);
+    });
     queueRequests.current.set(key, request);
+    queueControllers.current.set(key, controller);
     return request;
   }
 
@@ -80,9 +117,16 @@ export function JobsPage() {
   function prefetchQueue(queue: JobQueue) {
     if (!defaults || deferredFilters !== filters || queue === queueView) return;
     void loadQueue(queue).catch((reason: unknown) => {
-      console.warn(`Could not prefetch the ${queue} job queue`, reason);
+      if (!isAbortError(reason)) console.warn(`Could not prefetch the ${queue} job queue`, reason);
     });
   }
+
+  useEffect(() => {
+    for (const controller of queueControllers.current.values()) controller.abort();
+    queueControllers.current.clear();
+    queueRequests.current.clear();
+    queueCache.current.clear();
+  }, [deferredFilters, reloadKey, queueRevision]);
 
   function selectQueue(queue: JobQueue) {
     if (queue === queueView) return;
@@ -146,6 +190,8 @@ export function JobsPage() {
   useEffect(() => {
     let active = true;
     if (!defaults || deferredFilters !== filters) return;
+    const silent = silentQueueRefresh.current;
+    silentQueueRefresh.current = false;
     const cached = queueCache.current.get(queueKey(queueView));
     setQueueError("");
     if (cached) {
@@ -153,13 +199,20 @@ export function JobsPage() {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!silent) setLoading(true);
     loadQueue(queueView).then((payload) => {
       if (!active) return;
       showQueue(payload);
     }).catch((reason: unknown) => {
-      if (active) setQueueError(reason instanceof Error ? reason.message : "Could not load jobs");
-    }).finally(() => { if (active) setLoading(false); });
+      if (!active) return;
+      const message = reason instanceof Error ? reason.message : "Could not load jobs";
+      if (silent) setError(`${message}. Your current queue is still shown.`);
+      else setQueueError(message);
+    }).finally(() => {
+      if (!active) return;
+      setLoading(false);
+      if (silent) setQueueRefreshing(false);
+    });
     return () => { active = false; };
   }, [deferredFilters, defaults, filters, reloadKey, queueRevision, queueView]);
 
@@ -191,10 +244,10 @@ export function JobsPage() {
   }, [queueView, reloadKey]);
 
   useEffect(() => {
-    if (loading || !focusQueueAfterRefresh.current) return;
+    if (loading || queueRefreshing || !focusQueueAfterRefresh.current) return;
     focusQueueAfterRefresh.current = false;
     (results.current?.querySelector<HTMLButtonElement>(".job-row") || results.current)?.focus();
-  }, [jobs, loading]);
+  }, [jobs, loading, queueRefreshing]);
 
   async function changeCompany(company: string, blocked: boolean) {
     if (companyBusy || pendingAction) return;
@@ -260,6 +313,12 @@ export function JobsPage() {
     } : job));
   }
 
+  function removeVisibleJob(jobId: string, removeFromInventory: boolean) {
+    setJobs((current) => current.filter((job) => job.id !== jobId));
+    setTotal((current) => Math.max(0, current - 1));
+    if (removeFromInventory) setReviewableTotal((current) => Math.max(0, current - 1));
+  }
+
   async function dispositionSelected(
     disposition: JobFeedbackAction | "applied",
   ): Promise<JobFeedback | null> {
@@ -269,8 +328,10 @@ export function JobsPage() {
     try {
       if (disposition === "interested") {
         const result = await saveJobFeedback(job.id, disposition, []);
-        setLoading(true);
         focusQueueAfterRefresh.current = true;
+        if (queueView === "recommended") removeVisibleJob(job.id, false);
+        silentQueueRefresh.current = true;
+        setQueueRefreshing(true);
         setQueueRevision((value) => value + 1);
         setSelected(null);
         setNotice(`${job.title} saved to Interested jobs.`);
@@ -284,11 +345,13 @@ export function JobsPage() {
           assistant.discussJob(job.id, `${job.title} at ${job.company}`, followUp.prompt);
         }
       }
-      setLoading(true);
       focusQueueAfterRefresh.current = true;
+      removeVisibleJob(job.id, true);
+      silentQueueRefresh.current = true;
+      setQueueRefreshing(true);
       setQueueRevision((value) => value + 1);
       setSelected(null);
-      setNotice(disposition === "applied" ? `${job.title} moved to Applications.` : `${job.title} removed from your job inventory.`);
+      setNotice(disposition === "applied" ? `${job.title} moved to Applications.` : `${job.title} removed from your job queue.`);
       return null;
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not update this job");
@@ -307,7 +370,7 @@ export function JobsPage() {
               ? { title: "Finding new jobs…", message: "Your scheduled search is running. Strong deterministic matches will appear here immediately.", actions: <button className="primary-button" onClick={() => selectQueue("all")}>Review all jobs</button> }
               : recommendationStage === "screening"
                 ? { title: "Screening recommendations…", message: "The search finished. Career-fit screening is preparing your Recommended Jobs.", actions: <button className="primary-button" onClick={() => selectQueue("all")}>Review all jobs</button> }
-                : { title: "No Recommended Jobs right now", message: "Recommendations use your saved roles, location, work setup, pay, and seniority. The strongest matches are screened and promoted to Hot.", actions: <button className="primary-button" onClick={() => selectQueue("all")}>Review all jobs</button> }
+                : { title: "No Recommended Jobs right now", message: "Recommendations use your saved roles, location, work setup, pay, and seniority. The strongest matches are screened automatically.", actions: <button className="primary-button" onClick={() => selectQueue("all")}>Review all jobs</button> }
         : { title: "No jobs match these filters", message: `${reviewableTotal} reviewable ${reviewableTotal === 1 ? "job is" : "jobs are"} hidden by your current filters.`, actions: <><button className="primary-button" onClick={() => defaults && setFilters({ ...EMPTY_FILTERS, view: defaults })}>Reset filters</button><button className="empty-state-link" onClick={() => setFilters(EMPTY_FILTERS)}>Clear all</button></> };
 
   const hasNoInventory = !loading && !queueError && reviewableTotal === 0;
