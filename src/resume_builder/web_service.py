@@ -436,7 +436,7 @@ class DashboardService:
                 for target in linkedin_targets(database)
                 if target.direct_apply_url or followup_catalog.boards_for(target.company)
             ]
-            if captured:
+            if captured and (board_seeds.get("added") or report.get("apply_links_added")):
                 report["ats_followup"] = resolve_linkedin_sources(
                     database,
                     followup_catalog,
