@@ -403,7 +403,9 @@ original posting is recorded at most once per job and remains a weak signal;
 Interested is stronger and an application is strongest. The portal records
 these actions without asking the user to classify the algorithm. Feedback is
 stored in `job-search/job-feedback.json` with a small job and current-screen
-snapshot, including deterministic seniority and the already-extracted criteria. This lets otherwise-similar
+snapshot, including deterministic seniority and the already-extracted criteria.
+Each event also records whether the job was Hot at decision time and the stable
+reasons behind that recommendation. This lets otherwise-similar
 titles differ by their stated duties without another model call. The format
 also retains optional reasons for future confirmed preferences supplied through
 the agent.
@@ -416,6 +418,10 @@ similar role family only after at least three negative decisions, at least two
 more negative than positive decisions at that level, and at least one Interested
 or Applied decision at another level.
 Historical events derive missing seniority from their saved titles.
+Rejecting a Hot recommendation dismisses it immediately and opens the existing
+assistant with one optional contextual question. Rejecting an ordinary queue job
+stays silent. A response becomes a durable preference only through the existing
+confirmed preference proposal workflow.
 
 The portal job list projects completed, skipped, and failed metadata from this
 same screening artifact. It does not run screening while browsing, and jobs

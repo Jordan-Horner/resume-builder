@@ -8,6 +8,7 @@ import { JobViewFilters } from "../JobViewFilters";
 import { JobDetailPanel } from "../jobs/JobDetailPanel";
 import { formatCompactCurrency, formatWorkModes } from "../jobs/jobFormatters";
 import { JobRow } from "../jobs/JobRow";
+import { useAssistant } from "../assistant/AssistantProvider";
 import type { Job, JobFeedback, JobFeedbackAction, JobFilters, JobScreenResult, SearchPreferences, ViewFilters } from "../types";
 import { EMPTY_FILTERS, persistView, restoreView } from "../viewPreferences";
 
@@ -19,6 +20,7 @@ const DATE_FILTERS = [
 const companyKey = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
 export function JobsPage() {
+  const assistant = useAssistant();
   const [filters, setFilters] = useState<JobFilters>(EMPTY_FILTERS);
   const [defaults, setDefaults] = useState<ViewFilters | null>(null);
   const [preferencesUpdated, setPreferencesUpdated] = useState(false);
@@ -38,6 +40,7 @@ export function JobsPage() {
   const [queueRevision, setQueueRevision] = useState(0);
   const [pendingAction, setPendingAction] = useState<JobFeedbackAction | "applied" | null>(null);
   const [notice, setNotice] = useState("");
+  const [queueView, setQueueView] = useState<"all" | "hot">("all");
   const [blockedCompanies, setBlockedCompanies] = useState<string[]>([]);
   const [companyBusy, setCompanyBusy] = useState(false);
   const selectedOrigin = useRef<HTMLButtonElement | null>(null);
@@ -90,7 +93,7 @@ export function JobsPage() {
     if (!defaults) return;
     setLoading(true);
     setQueueError("");
-    getJobs(deferredFilters).then((payload) => {
+    getJobs(deferredFilters, queueView === "hot").then((payload) => {
       if (!active) return;
       setJobs(payload.jobs);
       setTotal(payload.count);
@@ -99,7 +102,7 @@ export function JobsPage() {
       if (active) setQueueError(reason instanceof Error ? reason.message : "Could not load jobs");
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [deferredFilters, defaults, reloadKey, queueRevision]);
+  }, [deferredFilters, defaults, reloadKey, queueRevision, queueView]);
 
   useEffect(() => {
     if (loading || !focusQueueAfterRefresh.current) return;
@@ -184,7 +187,13 @@ export function JobsPage() {
         return result;
       }
       if (disposition === "applied") await markJobApplied(job.id);
-      else await saveJobFeedback(job.id, disposition, []);
+      else {
+        const result = await saveJobFeedback(job.id, disposition, []);
+        const followUp = result.dismissal_follow_up;
+        if (followUp?.ask_why && followUp.prompt) {
+          assistant.discussJob(job.id, `${job.title} at ${job.company}`, followUp.prompt);
+        }
+      }
       setLoading(true);
       focusQueueAfterRefresh.current = true;
       setQueueRevision((value) => value + 1);
@@ -201,7 +210,9 @@ export function JobsPage() {
     ? { title: "Finish setting up your search", message: "Activate your saved roles before searching.", actions: <button className="primary-button" onClick={() => void finishSetup()}>Finish setup</button> }
     : reviewableTotal === 0
       ? { title: "Find your first jobs", message: "Search your enabled sources using your saved roles and preferences.", actions: <><button className="primary-button" disabled={scanning} onClick={() => void runManualScan()}>{scanning ? "Finding jobs…" : "Find jobs now"}</button><a className="empty-state-link" href="/settings/search-preferences">Edit preferences</a></> }
-      : { title: "No jobs match these filters", message: `${reviewableTotal} reviewable ${reviewableTotal === 1 ? "job is" : "jobs are"} hidden by your current filters.`, actions: <><button className="primary-button" onClick={() => defaults && setFilters({ ...EMPTY_FILTERS, view: defaults })}>Reset filters</button><button className="empty-state-link" onClick={() => setFilters(EMPTY_FILTERS)}>Clear all</button></> };
+      : queueView === "hot"
+        ? { title: "No Hot Jobs yet", message: "Jobs appear here after a good career-fit screen and a clear positive signal from you.", actions: <button className="primary-button" onClick={() => setQueueView("all")}>Review all jobs</button> }
+        : { title: "No jobs match these filters", message: `${reviewableTotal} reviewable ${reviewableTotal === 1 ? "job is" : "jobs are"} hidden by your current filters.`, actions: <><button className="primary-button" onClick={() => defaults && setFilters({ ...EMPTY_FILTERS, view: defaults })}>Reset filters</button><button className="empty-state-link" onClick={() => setFilters(EMPTY_FILTERS)}>Clear all</button></> };
 
   const hasNoInventory = !loading && !queueError && reviewableTotal === 0;
   const savedRoles = searchPreferences?.titles || [];
@@ -238,6 +249,10 @@ export function JobsPage() {
             </div>
             {notice && <p className="first-search-notice" role="status">{notice}</p>}
           </div> : <>
+            <div className="queue-tabs" role="tablist" aria-label="Job queues">
+              <button role="tab" aria-selected={queueView === "all"} onClick={() => setQueueView("all")}>All jobs</button>
+              <button role="tab" aria-selected={queueView === "hot"} onClick={() => setQueueView("hot")}>Hot Jobs</button>
+            </div>
             <div className="results-heading">
               {defaults?.country && <span title="Country from onboarding applies across all providers, including company boards. Unspecified locations remain available for review.">{defaults.country} · all sources</span>}
               <span>{loading ? "Looking…" : `${total} ${total === 1 ? "job" : "jobs"} to review`}</span>{deferredSearch && <span>for “{deferredSearch}”</span>}

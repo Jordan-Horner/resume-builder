@@ -30,11 +30,10 @@ beforeEach(() => {
   vi.mocked(api.getResumeRecommendation).mockResolvedValue({ status: "unavailable", recommended_resume: null, match: null, target: null, message: "None" });
   vi.mocked(api.getJobs).mockResolvedValue({ jobs: [job], count: 1, reviewable_count: 1 });
   vi.mocked(api.markJobApplied).mockResolvedValue({});
-  vi.mocked(api.markJobNotInterested).mockResolvedValue(undefined);
   vi.mocked(api.getSavedJobSalary).mockResolvedValue(null);
   vi.mocked(api.getSavedJobScreen).mockResolvedValue(null);
-  vi.mocked(api.getJobFeedback).mockResolvedValue({ job_id: "one", latest: null, personalization: { hot_label: "Learning your preferences", fit_score: 0.25, interest_score: 0.5, company_score: 0.5, fit_label: "Low", interest_label: "Neutral", company_label: "Neutral", confidence: "unknown", reasons: [] } });
-  vi.mocked(api.saveJobFeedback).mockResolvedValue({ job_id: "one", latest: { action: "interested", reasons: [], created_at: "2026-09-06T12:00:00Z" }, personalization: { hot_label: "Low priority", fit_score: 0.25, interest_score: 0.85, company_score: 0.5, fit_label: "Low", interest_label: "High", company_label: "Neutral", confidence: "unknown", reasons: ["You marked this job positively."] } });
+  vi.mocked(api.getJobFeedback).mockResolvedValue({ job_id: "one", latest: null, personalization: { hot_label: "Learning your preferences", fit_score: 0.25, interest_score: 0.5, company_score: 0.5, fit_label: "Low", interest_label: "Neutral", company_label: "Neutral", confidence: "unknown", reasons: [], hot: false, hot_reasons: [] } });
+  vi.mocked(api.saveJobFeedback).mockResolvedValue({ job_id: "one", latest: { action: "interested", reasons: [], created_at: "2026-09-06T12:00:00Z" }, personalization: { hot_label: "Low priority", fit_score: 0.25, interest_score: 0.85, company_score: 0.5, fit_label: "Low", interest_label: "High", company_label: "Neutral", confidence: "unknown", reasons: ["You marked this job positively."], hot: false, hot_reasons: [] } });
   vi.mocked(api.recordJobPostingOpened).mockResolvedValue(undefined);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); });
@@ -87,6 +86,20 @@ it("shows completed quick-screen metadata in the queue", async () => {
   expect(host.querySelector(".job-screen-status")?.textContent).toContain("Strong · Support Engineer");
 });
 
+it("requests the backend-owned Hot Jobs view without hiding the normal queue", async () => {
+  const hotJob = { ...job, personalization: { hot: true, hot_reasons: ["career_fit", "exact_interest"], hot_score: 0.91 } };
+  vi.mocked(api.getJobs).mockResolvedValueOnce({ jobs: [job, hotJob], count: 2, reviewable_count: 2 });
+  await act(async () => root.render(<JobsPage />));
+  vi.mocked(api.getJobs).mockResolvedValue({ jobs: [hotJob], count: 1, reviewable_count: 2 });
+
+  await click("Hot Jobs");
+
+  expect(api.getJobs).toHaveBeenLastCalledWith(expect.any(Object), true);
+  expect(host.querySelector(".job-hot-status")?.textContent).toBe("Hot");
+  await click("All jobs");
+  expect(api.getJobs).toHaveBeenLastCalledWith(expect.any(Object), false);
+});
+
 it("describes a failed automatic screen as unavailable, not as a fit judgment", async () => {
   vi.mocked(api.getJobs).mockResolvedValue({
     jobs: [{ ...job, quick_screen: { status: "failed", label: "Screen unavailable", resume_name: null, generated_at: null } }],
@@ -133,6 +146,7 @@ it("temporarily filters clearance jobs without changing saved preferences", asyn
     expect.objectContaining({
       view: expect.objectContaining({ clearanceMode: "only" }),
     }),
+    false,
   );
 });
 it("retries a failed refresh without repeating the successful mutation", async () => {

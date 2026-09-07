@@ -1106,12 +1106,17 @@ class DashboardService:
         action: str,
         reasons: list[str],
         screening: dict[str, Any] | None = None,
+        *,
+        was_hot: bool = False,
+        hot_reasons: list[str] | None = None,
     ) -> dict[str, Any]:
         event = {
             "id": f"JF-{uuid4()}",
             "action": action,
             "reasons": reasons,
             "created_at": datetime.now(UTC).isoformat(),
+            "was_hot": was_hot,
+            "hot_reasons": list(hot_reasons or []),
             "job": {
                 "id": job["id"],
                 "title": job["title"],
@@ -1281,13 +1286,34 @@ class DashboardService:
         if job is None:
             raise ValueError(f"job not found: {job_id}")
         screening = self._feedback_screen_snapshot(job_id)
+        before = self.job_feedback(job_id)["personalization"]
+        was_hot = bool(before.get("hot"))
+        hot_reasons = [str(reason) for reason in before.get("hot_reasons", [])]
         with self._state_lock:
-            self._append_feedback_event(job, normalized_action, normalized_reasons, screening)
+            self._append_feedback_event(
+                job,
+                normalized_action,
+                normalized_reasons,
+                screening,
+                was_hot=was_hot,
+                hot_reasons=hot_reasons,
+            )
             if normalized_action == "not_interested":
                 dismissed = self._dismissed_job_ids()
                 dismissed.add(job_id)
                 self._write_dismissed_job_ids(dismissed)
-        return self.job_feedback(job_id)
+        response = self.job_feedback(job_id)
+        response["dismissal_follow_up"] = {
+            "ask_why": normalized_action == "not_interested" and was_hot,
+            "prompt": (
+                "What made this recommendation miss—seniority, duties, compensation, "
+                "company, work setup, or something else?"
+                if normalized_action == "not_interested" and was_hot
+                else None
+            ),
+            "hot_reasons": hot_reasons if was_hot else [],
+        }
+        return response
 
     @staticmethod
     def _serialize_job(job: dict[str, Any]) -> dict[str, Any]:
@@ -1379,6 +1405,11 @@ class DashboardService:
                 "label": label,
                 "resume_name": resume.get("name") if status == "complete" else None,
                 "generated_at": result.get("generated_at") if status == "complete" else None,
+                "personalization": (
+                    item.get("shadow_personalization")
+                    if isinstance(item.get("shadow_personalization"), dict)
+                    else None
+                ),
             }
         return summaries
 
@@ -1454,6 +1485,7 @@ class DashboardService:
         date_days: int = 0,
         employment_type: str = "",
         view_filters: str = "",
+        hot_only: bool = False,
     ) -> list[dict[str, Any]]:
         from .web_filters import ViewFilters, matches_view
 
@@ -1483,10 +1515,20 @@ class DashboardService:
         jobs: list[dict[str, Any]] = []
         for raw in self._inventory_loader():
             job = self._serialize_job(raw)
-            job["quick_screen"] = screen_summaries.get(job["id"])
+            summary = screen_summaries.get(job["id"])
+            job["quick_screen"] = (
+                {key: value for key, value in summary.items() if key != "personalization"}
+                if summary
+                else None
+            )
+            job["personalization"] = summary.get("personalization") if summary else None
             if not job["id"] or job["id"] in dismissed or job["id"] in applied:
                 continue
             if normalized_key(str(job["company"])) in blocked:
+                continue
+            if hot_only and not bool(
+                isinstance(job["personalization"], dict) and job["personalization"].get("hot")
+            ):
                 continue
             if not matches_view(job, view):
                 continue
@@ -1520,7 +1562,13 @@ class DashboardService:
         for raw in self._inventory_loader():
             if str(raw.get("id")) == job_id:
                 job = self._serialize_job(raw)
-                job["quick_screen"] = screen_summaries.get(job["id"])
+                summary = screen_summaries.get(job["id"])
+                job["quick_screen"] = (
+                    {key: value for key, value in summary.items() if key != "personalization"}
+                    if summary
+                    else None
+                )
+                job["personalization"] = summary.get("personalization") if summary else None
                 return job
         return None
 
@@ -1738,8 +1786,8 @@ class DashboardService:
                 _raise_screening_input_error(job_id, "screening_service", exc)
             return self._present_screen(result, cached=cached)
 
-    def mark_not_interested(self, job_id: str) -> None:
-        self.record_job_feedback(job_id, "not_interested", [])
+    def mark_not_interested(self, job_id: str) -> dict[str, Any]:
+        return self.record_job_feedback(job_id, "not_interested", [])
 
     def mark_applied(self, job_id: str) -> dict[str, Any]:
         job = self.get_job(job_id)

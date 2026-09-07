@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { assistantRequest, type Conversation, type Proposal } from "./api";
 
-interface Props { open: boolean; modal?: boolean; target: { kind: "resume" | "job"; id: string; name: string; nonce: number } | null; onClose: () => void }
+interface Props { open: boolean; modal?: boolean; target: { kind: "resume" | "job"; id: string; name: string; nonce: number; openingQuestion?: string } | null; onClose: () => void }
 
 function ProposalView({ proposal, decide }: { proposal: Proposal; decide: (id: string, action: string) => void }) {
   if (proposal.payload.kind === "job_preference") {
@@ -204,7 +204,7 @@ export default function AssistantPanel({ open, modal = false, target, onClose }:
       <button className="text-button" disabled={busy} onClick={() => void start()}>New</button>
       <button ref={header} className="assistant-close" aria-label="Close assistant" onClick={onClose}>×</button>
     </div></header>
-    {pendingTarget && <div className="assistant-context"><span>{target.name}</span><button className="text-button" disabled={busy} onClick={() => { observedTarget.current = target.nonce; void start({ kind: target.kind, id: target.id }); }}>{target.kind === "job" ? "Discuss this job" : "Discuss this résumé"}</button></div>}
+    {pendingTarget && <div className="assistant-context assistant-context-question"><span>{target.openingQuestion || target.name}</span><button className="text-button" disabled={busy} onClick={() => { observedTarget.current = target.nonce; void start({ kind: target.kind, id: target.id }); }}>{target.openingQuestion ? "Answer" : target.kind === "job" ? "Discuss this job" : "Discuss this résumé"}</button></div>}
     {thread?.resume_id && <div className="assistant-context"><small>Working on</small><span>{thread.resume_id.split("/").pop()?.replace(/\.md$/, "").replaceAll("-", " ")}</span></div>}
     {thread?.job_id && <div className="assistant-context"><small>Working on job</small><span>{thread.context_name || thread.job_id}</span></div>}
     {error && <div className="assistant-context" role="alert">{error}<button className="text-button" onClick={() => void refresh()}>Retry</button></div>}

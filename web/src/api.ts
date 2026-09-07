@@ -38,17 +38,18 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function getJobs(filters: JobFilters): Promise<{ jobs: Job[]; count: number; reviewable_count: number }> {
+export async function getJobs(filters: JobFilters, hotOnly = false): Promise<{ jobs: Job[]; count: number; reviewable_count: number }> {
   const params = new URLSearchParams();
   if (filters.view) params.set("view_filters", JSON.stringify({ ...filters.view, roles: [], locations: filters.view.locations.map((item) => item.trim()).filter(Boolean) }));
   if (filters.search.trim()) params.set("search", filters.search.trim());
   if (filters.workMode) params.set("work_mode", filters.workMode);
   if (filters.dateDays) params.set("date_days", String(filters.dateDays));
   if (filters.employmentType) params.set("employment_type", filters.employmentType);
+  if (hotOnly) params.set("hot_only", "true");
   return request<{ jobs: Job[]; count: number; reviewable_count: number }>(`/api/jobs?${params.toString()}`);
 }
 
-export function markJobNotInterested(jobId: string): Promise<void> {
+export function markJobNotInterested(jobId: string): Promise<JobFeedback> {
   return request(`/api/jobs/${encodeURIComponent(jobId)}/not-interested`, { method: "POST" });
 }
 

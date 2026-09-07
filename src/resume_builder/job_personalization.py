@@ -204,6 +204,46 @@ def _positive_event_affinity(item: dict[str, Any], event: dict[str, Any]) -> flo
     return weight * similarity
 
 
+def _positive_pattern_matches(item: dict[str, Any], events: list[dict[str, Any]]) -> int:
+    """Count distinct positive jobs that match role, level, and available duties."""
+    title = str(item.get("title") or "")
+    seniority = extract_seniority(item)
+    criteria = _screening_criteria(item)
+    matches = 0
+    for event in events:
+        if event.get("action") not in {"interested", "applied"}:
+            continue
+        snapshot = event.get("job")
+        if not isinstance(snapshot, dict) or snapshot.get("id") == item.get("id"):
+            continue
+        role_similarity = _role_similarity(title, str(snapshot.get("title") or ""))
+        if role_similarity < 0.5:
+            continue
+        saved_seniority = str(snapshot.get("seniority") or "unknown")
+        if seniority != "unknown" and saved_seniority != "unknown" and seniority != saved_seniority:
+            continue
+        prior_screen = snapshot.get("screening")
+        prior_criteria = prior_screen.get("criteria") if isinstance(prior_screen, dict) else None
+        prior_labels = (
+            " ".join(
+                str(criterion.get("label") or "")
+                for criterion in prior_criteria
+                if isinstance(criterion, dict)
+            )
+            if isinstance(prior_criteria, list)
+            else ""
+        )
+        if criteria or prior_labels:
+            if not criteria or not prior_labels:
+                continue
+            if _terms_similarity(criteria, prior_labels) < 0.25:
+                continue
+        elif role_similarity < 0.67:
+            continue
+        matches += 1
+    return matches
+
+
 def _semantic_score(item: dict[str, Any]) -> tuple[float, list[str]]:
     screen = item.get("screening")
     if not isinstance(screen, dict) or screen.get("status") != "complete":
@@ -343,6 +383,7 @@ def score_shadow_job(
     if positive_affinity:
         interest_score += min(0.2, positive_affinity)
         reasons.append("Similar to jobs you opened or pursued.")
+    positive_pattern_matches = _positive_pattern_matches(item, list(events_by_job.values()))
     same_company = [
         event
         for event in events_by_job.values()
@@ -382,6 +423,33 @@ def score_shadow_job(
     hot_score = min(1.0, max(0.0, fit_score * (0.5 + interest_score) + (company_score - 0.5) * 0.1))
     screen = item.get("screening")
     result = screen.get("result") if isinstance(screen, dict) else None
+    interest = deterministic.get("interest") if isinstance(deterministic, dict) else None
+    explicit_target_match = bool(isinstance(interest, dict) and interest.get("desired_title_terms"))
+    hard_conflict = bool(isinstance(deterministic, dict) and deterministic.get("hard_conflicts"))
+    exact_positive = bool(latest and latest.get("action") in {"interested", "applied"})
+    fit_is_usable = bool(
+        isinstance(screen, dict)
+        and screen.get("status") == "complete"
+        and fit_score >= 0.55
+        and isinstance(result, dict)
+        and result.get("recommendation") != "do_not_apply"
+    )
+    learned_match = positive_pattern_matches >= 2
+    hot = bool(
+        not hard_conflict
+        and fit_is_usable
+        and (explicit_target_match or exact_positive or learned_match)
+        and (exact_positive or learned_match)
+    )
+    hot_reasons: list[str] = []
+    if hot:
+        hot_reasons.append("career_fit")
+        if explicit_target_match:
+            hot_reasons.append("saved_target")
+        if exact_positive:
+            hot_reasons.append("exact_interest")
+        if learned_match:
+            hot_reasons.append("positive_pattern")
     return {
         "score": round(hot_score, 3),
         "hot_score": round(hot_score, 3),
@@ -393,13 +461,15 @@ def score_shadow_job(
         "company_label": _level(company_score, positive="Positive"),
         "hot_label": (
             "Hot for you"
-            if fit_score >= 0.65 and interest_score >= 0.7
+            if hot
             else "Promising"
             if fit_score >= 0.55 and interest_score >= 0.5
             else "Learning your preferences"
             if interest_score == 0.5
             else "Low priority"
         ),
+        "hot": hot,
+        "hot_reasons": hot_reasons,
         "confidence": str(result.get("confidence") or "unknown")
         if isinstance(result, dict)
         else "unknown",
@@ -410,6 +480,7 @@ def score_shadow_job(
             "ignored_jobs_used_as_negative": False,
             "not_interested_without_reason_used_as_rule": bool(seniority_pattern["applied"]),
             "seniority_pattern": seniority_pattern,
+            "positive_pattern_matches": positive_pattern_matches,
         },
     }
 

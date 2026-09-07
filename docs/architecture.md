@@ -188,8 +188,13 @@ call. Screening packets and results are hash-pinned, and a cache-only local
 reconstruction keeps completed criterion-driven screens addressable after the
 job is reopened. Provider calls require explicit private-data confirmation, and
 generated cache records remain outside Git and outside authoritative inventory
-state. The portal may display this metadata, but quick screening never filters,
-hides, or reorders job inventory.
+state. The portal may display this metadata, but quick screening never removes
+jobs from the canonical inventory. A derived **Hot Jobs** view may select jobs
+whose completed screen has usable career fit, no hard conflict, and either an
+exact positive decision or at least two structurally similar positive jobs. The
+backend owns that decision and its stable reason codes; the browser only requests
+and renders the derived view. One positive decision never promotes an entire
+title family.
 
 The version 5 screening packet also carries the user's bounded explicit
 `preferred_job_attributes` and `avoided_job_attributes`. They are sent in the

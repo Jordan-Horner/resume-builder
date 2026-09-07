@@ -202,6 +202,7 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         date_days: int = Query(default=0),
         employment_type: str = Query(default="", max_length=20),
         view_filters: str = Query(default="", max_length=12000),
+        hot_only: bool = Query(default=False),
         limit: int = Query(default=100, ge=1, le=200),
     ) -> dict[str, Any]:
         try:
@@ -211,6 +212,7 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
                 date_days=date_days,
                 employment_type=employment_type,
                 view_filters=view_filters,
+                hot_only=hot_only,
             )
             reviewable = service.list_jobs()
         except ValueError as exc:
@@ -340,10 +342,10 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    @app.post("/api/jobs/{job_id}/not-interested", status_code=204)
-    def mark_not_interested(job_id: str) -> None:
+    @app.post("/api/jobs/{job_id}/not-interested")
+    def mark_not_interested(job_id: str) -> dict[str, Any]:
         try:
-            service.mark_not_interested(job_id)
+            return service.mark_not_interested(job_id)
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 

@@ -325,3 +325,68 @@ def test_seniority_pattern_does_not_cross_role_families():
         "positive_other_level": 0,
         "applied": False,
     }
+
+
+def test_exact_positive_job_becomes_hot_only_after_a_usable_screen():
+    item = _item("job-1", "strong", title="DevOps Engineer")
+    feedback = [{"action": "interested", "job": {"id": "job-1", "title": "DevOps Engineer"}}]
+
+    score = build_shadow_order(
+        [item], preferences={}, positive_titles=[], feedback_events=feedback
+    )[1]["job-1"]
+
+    assert score["hot"] is True
+    assert score["hot_reasons"] == ["career_fit", "exact_interest"]
+
+
+def test_hard_conflict_never_becomes_hot_even_when_explicitly_interested():
+    item = _item("job-1", "strong", title="DevOps Engineer")
+    item["deterministic"]["hard_conflicts"] = ["work_mode"]
+    feedback = [{"action": "interested", "job": {"id": "job-1", "title": "DevOps Engineer"}}]
+
+    score = build_shadow_order(
+        [item], preferences={}, positive_titles=[], feedback_events=feedback
+    )[1]["job-1"]
+
+    assert score["hot"] is False
+    assert score["hot_reasons"] == []
+
+
+def test_one_positive_does_not_promote_a_title_family_but_repeated_structured_matches_do():
+    item = _item("job-1", "strong", title="DevOps Engineer")
+    item["screening"]["result"]["criterion_evidence"] = [
+        {"criterion_id": "current", "label": "Operate Kubernetes infrastructure"}
+    ]
+    one_positive = {
+        "action": "interested",
+        "job": {
+            "id": "old-1",
+            "title": "DevOps Engineer",
+            "seniority": "unknown",
+            "screening": {"criteria": [{"label": "Operate Kubernetes clusters"}]},
+        },
+    }
+    second_positive = {
+        "action": "applied",
+        "job": {
+            "id": "old-2",
+            "title": "DevOps Engineer",
+            "seniority": "unknown",
+            "screening": {"criteria": [{"label": "Kubernetes infrastructure operations"}]},
+        },
+    }
+
+    one = build_shadow_order(
+        [item], preferences={}, positive_titles=[], feedback_events=[one_positive]
+    )[1]["job-1"]
+    repeated = build_shadow_order(
+        [item],
+        preferences={},
+        positive_titles=[],
+        feedback_events=[one_positive, second_positive],
+    )[1]["job-1"]
+
+    assert one["hot"] is False
+    assert repeated["hot"] is True
+    assert repeated["learning_sources"]["positive_pattern_matches"] == 2
+    assert "positive_pattern" in repeated["hot_reasons"]

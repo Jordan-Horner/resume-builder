@@ -365,6 +365,11 @@ def test_job_list_exposes_existing_background_screen_metadata(tmp_path, inventor
                 "jobs": [
                     {
                         "id": "remote-1",
+                        "shadow_personalization": {
+                            "hot": True,
+                            "hot_reasons": ["career_fit", "exact_interest"],
+                            "hot_score": 0.91,
+                        },
                         "screening": {
                             "status": "complete",
                             "result": {
@@ -415,6 +420,8 @@ def test_job_list_exposes_existing_background_screen_metadata(tmp_path, inventor
         "resume_name": None,
         "generated_at": None,
     }
+    assert jobs["remote-1"]["personalization"]["hot"] is True
+    assert [item["id"] for item in service.list_jobs(hot_only=True)] == ["remote-1"]
 
 
 def test_not_interested_feedback_keeps_reason_and_dismisses_job(tmp_path, inventory, monkeypatch):
@@ -441,6 +448,34 @@ def test_not_interested_feedback_records_deterministic_seniority(tmp_path, inven
 
     payload = json.loads((tmp_path / "job-search/job-feedback.json").read_text())
     assert payload["events"][0]["job"]["seniority"] == "new_grad"
+
+
+@pytest.mark.parametrize(("was_hot", "ask_why"), [(True, True), (False, False)])
+def test_only_hot_rejections_request_contextual_follow_up(
+    tmp_path, inventory, monkeypatch, was_hot, ask_why
+):
+    service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
+    monkeypatch.setattr(
+        service,
+        "job_feedback",
+        lambda _job_id: {
+            "job_id": "remote-1",
+            "latest": None,
+            "personalization": {
+                "hot": was_hot,
+                "hot_reasons": ["career_fit", "positive_pattern"] if was_hot else [],
+            },
+        },
+    )
+
+    response = service.record_job_feedback("remote-1", "not_interested", [])
+
+    follow_up = response["dismissal_follow_up"]
+    assert follow_up["ask_why"] is ask_why
+    assert bool(follow_up["prompt"]) is ask_why
+    event = json.loads((tmp_path / "job-search/job-feedback.json").read_text())["events"][0]
+    assert event["was_hot"] is was_hot
+    assert event["hot_reasons"] == (["career_fit", "positive_pattern"] if was_hot else [])
 
 
 def test_job_feedback_rejects_unknown_actions_and_reasons(tmp_path, inventory):

@@ -2,7 +2,7 @@ import { Component, createContext, lazy, Suspense, use, useCallback, useEffect, 
 import "./assistant.css";
 
 const AssistantPanel = lazy(() => import("./AssistantPanel"));
-interface Context { discuss: (id: string, name: string) => void; discussJob: (id: string, name: string) => void }
+interface Context { discuss: (id: string, name: string) => void; discussJob: (id: string, name: string, openingQuestion?: string) => void }
 const AssistantContext = createContext<Context>({ discuss: () => undefined, discussJob: () => undefined });
 export function useAssistant() { return use(AssistantContext); }
 
@@ -31,7 +31,7 @@ class AssistantBoundary extends Component<{ children: ReactNode; onClose: () => 
 export function AssistantProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [visited, setVisited] = useState(false);
-  const [target, setTarget] = useState<{ kind: "resume" | "job"; id: string; name: string; nonce: number } | null>(null);
+  const [target, setTarget] = useState<{ kind: "resume" | "job"; id: string; name: string; nonce: number; openingQuestion?: string } | null>(null);
   const opener = useRef<HTMLElement | null>(null);
   const mobile = useMobileAssistant();
   const rememberOpener = useCallback(() => {
@@ -45,9 +45,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     rememberOpener();
     setTarget({ kind: "resume", id, name, nonce: Date.now() }); setVisited(true); setOpen(true);
   }, [rememberOpener]);
-  const discussJob = useCallback((id: string, name: string) => {
+  const discussJob = useCallback((id: string, name: string, openingQuestion?: string) => {
     rememberOpener();
-    setTarget({ kind: "job", id, name, nonce: Date.now() }); setVisited(true); setOpen(true);
+    setTarget({ kind: "job", id, name, nonce: Date.now(), openingQuestion }); setVisited(true); setOpen(true);
   }, [rememberOpener]);
   return <AssistantContext value={{ discuss, discussJob }}>
     <div className={open ? "assistant-layout is-open" : "assistant-layout"}>

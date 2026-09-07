@@ -47,6 +47,11 @@ export interface Job {
     resume_name: string | null;
     generated_at: string | null;
   } | null;
+  personalization?: {
+    hot?: boolean;
+    hot_reasons?: string[];
+    hot_score: number;
+  } | null;
 }
 
 export interface JobScreenResult {
@@ -136,6 +141,13 @@ export interface JobFeedback {
     company_label: "Positive" | "Neutral" | "Low";
     confidence: "high" | "medium" | "low" | "unknown";
     reasons: string[];
+    hot: boolean;
+    hot_reasons: string[];
+  };
+  dismissal_follow_up?: {
+    ask_why: boolean;
+    prompt: string | null;
+    hot_reasons: string[];
   };
 }
 
