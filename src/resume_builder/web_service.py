@@ -81,7 +81,7 @@ from .job_setup_defaults import PORTFOLIO_PATH, PREFERENCES_PATH, scaffold_job_s
 from .job_target import parse_target
 from .jobs import _load_preferences, _prescreen, get_job_screening_packet
 from .layout import VaultLayout
-from .posting_interpretation import PostingInterpretationCache, PostingInterpretationService
+from .posting_interpretation import PostingInterpretationCache
 from .preferences import _validated as validate_preferences
 from .project_report import project_report
 from .role_policy import MAX_TITLE_LENGTH, MIN_TITLE_LENGTH, check_query_capacity, clean_titles
@@ -1965,11 +1965,6 @@ class DashboardService:
             service = ScreeningService(
                 adapter,
                 ScreeningCache(cache_path),
-                interpretation_service=PostingInterpretationService(
-                    adapter, PostingInterpretationCache(cache_path)
-                ),
-                interpretation_model=config.models.fast,
-                vault_root=self.workspace / "vault",
             )
             packet = enrich_packet_from_cached_interpretation(
                 packet,

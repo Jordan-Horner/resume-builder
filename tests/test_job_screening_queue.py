@@ -189,15 +189,15 @@ def test_queue_keeps_every_job_and_bounds_provider_work(
     assert payload["suggested_order"][0] == "recommended"
     assert summary.active == 3
     assert summary.completed == 1
-    assert summary.provider_calls == 2
+    assert summary.provider_calls == 1
     assert summary.recommended == 1
     assert summary.needs_review == 1
     assert summary.additional == 1
-    assert summary.input_tokens == 200
-    assert summary.output_tokens == 50
-    assert str(summary.cost_usd) == "0.02"
-    assert adapter.calls == 2
-    assert adapter.models == ["fictional/public-job-model", "fictional/model"]
+    assert summary.input_tokens == 100
+    assert summary.output_tokens == 25
+    assert str(summary.cost_usd) == "0.01"
+    assert adapter.calls == 1
+    assert adapter.models == ["fictional/model"]
     assert len(load_notification_jobs(output)) == 3
 
 
@@ -273,8 +273,8 @@ def test_background_queue_skips_obvious_local_misses_without_provider_work(
         "hard_constraint_conflict",
         "no_saved_search_signal",
     ]
-    assert summary.provider_calls == 2
-    assert adapter.calls == 2
+    assert summary.provider_calls == 1
+    assert adapter.calls == 1
 
 
 def test_screening_budget_processes_the_best_candidates_first(
@@ -318,7 +318,7 @@ def test_screening_budget_processes_the_best_candidates_first(
     assert screened == ["preferred", "possible"]
     assert jobs["preferred"]["screening"]["status"] == "complete"
     assert jobs["possible"]["screening"]["status"] == "complete"
-    assert summary.provider_calls == 3
+    assert summary.provider_calls == 2
 
 
 def test_legacy_review_flag_cannot_hide_a_job_without_a_disposition(
@@ -378,7 +378,7 @@ def test_provider_failure_remains_visible_and_consumes_the_attempt_budget(
         for item in json.loads(output.read_text(encoding="utf-8"))["jobs"]
     ]
     assert statuses == ["failed", "unscreened"]
-    assert summary.provider_calls == 2
+    assert summary.provider_calls == 1
     assert summary.failed == 1
     assert summary.needs_review == 2
-    assert adapter.calls == 2
+    assert adapter.calls == 1

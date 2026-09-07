@@ -6,11 +6,7 @@ import pytest
 import yaml
 
 from resume_builder import web_service
-from resume_builder.agent_config import (
-    DEFAULT_AGENT_CONFIG,
-    load_agent_config,
-    render_default_agent_config,
-)
+from resume_builder.agent_config import DEFAULT_AGENT_CONFIG, render_default_agent_config
 from resume_builder.job_screening import (
     Confidence,
     build_screening_packet,
@@ -187,9 +183,7 @@ def test_shallow_insufficient_screen_is_presented_as_incomplete() -> None:
     assert "not a judgment" in presented["reasoning_summary"]
 
 
-def test_interactive_job_screen_uses_criterion_extraction_before_candidate_screen(
-    tmp_path, monkeypatch
-) -> None:
+def test_interactive_job_screen_uses_one_bounded_candidate_screen(tmp_path, monkeypatch) -> None:
     packet = build_screening_packet(
         job("screen-me", title="Support Engineer", mode="remote"),
         {"accepted_work_modes": ["remote"], "screening_profile": {}},
@@ -225,9 +219,7 @@ def test_interactive_job_screen_uses_criterion_extraction_before_candidate_scree
         "timeout_seconds": 25,
         "retries": 1,
     }
-    assert captured["service"]["interpretation_service"] is not None
-    assert captured["service"]["interpretation_model"] == load_agent_config(config_path).models.fast
-    assert captured["service"]["vault_root"] == tmp_path / "vault"
+    assert captured["service"] == {}
 
 
 def test_interactive_job_screen_wraps_input_decoding_failure(tmp_path, monkeypatch, caplog):

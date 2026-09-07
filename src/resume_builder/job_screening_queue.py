@@ -34,7 +34,7 @@ from .jobs import (
     _with_application_dispositions,
     get_job_screening_packet,
 )
-from .posting_interpretation import PostingInterpretationCache, PostingInterpretationService
+from .posting_interpretation import PostingInterpretationCache
 from .salary_estimation import SalaryEstimate, format_salary_estimate
 from .screening_service import ScreeningService, enrich_packet_from_cached_interpretation
 
@@ -218,11 +218,6 @@ def build_screening_queue(
     service = ScreeningService(
         adapter,
         cache,
-        interpretation_service=PostingInterpretationService(
-            adapter, PostingInterpretationCache(cache_path)
-        ),
-        interpretation_model=interpretation_model,
-        vault_root=workspace / "vault",
     )
     preferences = (
         _with_application_dispositions(_load_preferences(preferences_path))

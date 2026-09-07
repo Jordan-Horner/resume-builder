@@ -58,15 +58,11 @@ jobs:
 Semantic screening is disabled by default. Enabling it is explicit ongoing
 authorization for scheduled and portal-started searches to send bounded posting
 and candidate-evidence packets to the provider configured in `agent/config.yml`.
-For a new or changed posting, the service first makes a separate
-candidate-independent shadow interpretation request containing public job data
-only. It extracts source-backed criteria and accounts for every bounded posting
-section. The interpretation is cached by posting content, schema, rubric, and
-model. Its output is diagnostic in this phase: it cannot change the visible
-quick screen, hide or reorder a job, or create a durable target. An uncached job
-therefore normally uses two structured provider requests: one posting-only
-interpretation and one bounded candidate-evidence screen. Either cache can be
-reused independently.
+The quick screen uses one structured provider request. A previously cached,
+candidate-independent posting interpretation can improve the locally selected
+evidence, but the quick screen never waits for a separate interpretation call.
+Richer posting interpretation remains available to deeper analysis without
+doubling the latency and cost of queue triage.
 Candidate evidence is selected locally from confirmed canonical vault facts,
 with no more than 20 privacy-scrubbed cards and 6,000 candidate-evidence
 characters sent per job. Interest terms remain search hints rather than proof.
@@ -75,13 +71,12 @@ to the provider when no relevant confirmed evidence can be retrieved.
 This is the inexpensive first-pass screen only; it does not run deeper company,
 compensation, or quality-of-life research. The per-run maximum bounds jobs that
 may contact the provider. Cached results do not consume that job allowance, and
-provider-call telemetry counts both structured requests. Jobs with
+provider-call telemetry counts the single structured request. Jobs with
 hard local conflicts, incomplete listings, or no saved title search signal
 are skipped before any provider call and remain available for a manual screen.
 Provider-backed jobs run serially, so `max_jobs_per_run` is a total allowance,
-not a concurrency setting. Structured screening responses are capped at 1,000
-tokens. If the optional posting interpretation fails, screening falls back to
-the existing posting-wide evidence path instead of discarding the job.
+not a concurrency setting. Each quick-screen response is capped at 1,000
+tokens.
 
 Provider output is validated against both its structural schema and the exact
 posting packet while the provider retry loop is still active. This includes

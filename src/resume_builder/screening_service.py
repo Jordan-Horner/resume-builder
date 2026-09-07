@@ -19,7 +19,6 @@ from .job_screening import (
     deterministic_insufficient_evidence_result,
     finalize_screen,
     screening_prompt,
-    semantic_screen_output_type,
     with_directional_resumes,
     with_screening_evidence,
 )
@@ -240,7 +239,7 @@ class ScreeningService:
                     prompt=screening_prompt(packet),
                     instructions=SCREENING_INSTRUCTIONS,
                     model=model,
-                    output_type=semantic_screen_output_type(packet),
+                    output_type=SemanticScreen,
                     max_output_tokens=1_000,
                 )
             )
