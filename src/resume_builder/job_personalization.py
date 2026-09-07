@@ -437,15 +437,15 @@ def score_shadow_job(
     deterministic_match = explicit_target_match or explicit_interest_match
     hard_conflict = bool(isinstance(deterministic, dict) and deterministic.get("hard_conflicts"))
     exact_positive = bool(latest and latest.get("action") in {"interested", "applied"})
-    fit_is_usable = bool(
+    fit_is_strong = bool(
         isinstance(screen, dict)
         and screen.get("status") == "complete"
-        and fit_score >= 0.55
         and isinstance(result, dict)
+        and result.get("fit") == "strong_match"
         and result.get("recommendation") != "do_not_apply"
     )
     learned_match = positive_pattern_matches >= 2
-    hot = bool(not hard_conflict and deterministic_match and fit_is_usable)
+    hot = bool(not hard_conflict and deterministic_match and fit_is_strong)
     hot_reasons: list[str] = []
     if hot:
         hot_reasons.append("career_fit")

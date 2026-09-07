@@ -94,7 +94,7 @@ the full queue.
 
 Deterministic matches enter the Recommended Jobs backlog before model screening.
 The bounded screen worker processes the highest-ranked unscreened matches first;
-strong completed screens are promoted to Hot, while completed weak screens return
+strong completed screens that pass the other recommendation requirements are promoted to Hot, while completed non-strong screens return
 to All jobs. Cached jobs are not sent to the provider again.
 
 ATS source resolution is also enrichment rather than a discovery gate. Its
@@ -133,8 +133,9 @@ with the existing local preference score, then attempts the best unscreened jobs
 that pass the title, location, work-mode, seniority, completeness, and compensation
 gates and have a saved role or interest signal. Provider work stops when the
 12-job recommendation shelf is full or the configured per-run cost cap is reached.
-Cached results do not consume the cap. Only completed screens with usable career
-fit populate Recommended Jobs; failures and unfinished screens stay in All jobs.
+Cached results do not consume the cap. Deterministic candidates populate Recommended Jobs
+immediately; only completed Strong fits earn Hot, and completed non-strong screens return
+to All jobs. Failures and unfinished screens remain in the recommendation backlog.
 Interested, applied, and dismissed decisions immediately re-rank existing results
 and schedule a bounded background refill. The manual Screen button is a retry or
 override, not the normal workflow.

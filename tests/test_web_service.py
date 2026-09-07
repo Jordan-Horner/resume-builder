@@ -43,7 +43,7 @@ def job(job_id: str, *, title: str, mode: str, company: str = "Example") -> dict
 
 
 def write_screening_output(
-    workspace, job_ids: list[str], *, fit: str = "good_match", recommendation: str = "pursue"
+    workspace, job_ids: list[str], *, fit: str = "strong_match", recommendation: str = "pursue"
 ) -> None:
     output = workspace / web_service.JOB_SCREENING_OUTPUT
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -518,7 +518,17 @@ def test_recommended_queue_reuses_the_existing_deterministic_prescreen(
     assert [item["id"] for item in service.list_jobs(queue="recommended")] == ["remote-1"]
 
 
-def test_recommended_queue_demotes_a_completed_weak_screen(tmp_path, inventory, monkeypatch):
+@pytest.mark.parametrize(
+    ("fit", "recommendation"),
+    [
+        ("good_match", "pursue"),
+        ("worthwhile_stretch", "pursue_as_stretch"),
+        ("weak_fit", "deprioritize"),
+    ],
+)
+def test_recommended_queue_demotes_a_completed_non_strong_screen(
+    tmp_path, inventory, monkeypatch, fit, recommendation
+):
     preferences_path = tmp_path / "job-search/preferences.yml"
     preferences_path.parent.mkdir(parents=True)
     preferences_path.write_text("schema_version: 1\n", encoding="utf-8")
@@ -534,7 +544,7 @@ def test_recommended_queue_demotes_a_completed_weak_screen(tmp_path, inventory, 
             },
         },
     )
-    write_screening_output(tmp_path, ["hybrid-1"], fit="weak_fit", recommendation="deprioritize")
+    write_screening_output(tmp_path, ["hybrid-1"], fit=fit, recommendation=recommendation)
     service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
 
     assert service.list_jobs(queue="recommended") == []

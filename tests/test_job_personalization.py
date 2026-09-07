@@ -12,6 +12,7 @@ from resume_builder.job_personalization import (
 def _item(job_id: str, score_kind: str, *, title: str = "Operations Engineer"):
     results = {
         "strong": ("strong_match", "pursue", "medium"),
+        "good": ("good_match", "pursue", "medium"),
         "stretch": ("worthwhile_stretch", "pursue_as_stretch", "medium"),
         "weak": ("weak_fit", "deprioritize", "high"),
     }
@@ -346,7 +347,7 @@ def test_seniority_pattern_does_not_cross_role_families():
     }
 
 
-def test_deterministic_match_becomes_hot_after_a_usable_screen_without_feedback():
+def test_deterministic_match_becomes_hot_after_a_strong_screen_without_feedback():
     item = _item("job-1", "strong", title="DevOps Engineer")
     item["deterministic"]["interest"] = {
         "desired_title_terms": ["devops engineer"],
@@ -357,6 +358,19 @@ def test_deterministic_match_becomes_hot_after_a_usable_screen_without_feedback(
 
     assert score["hot"] is True
     assert score["hot_reasons"] == ["career_fit", "saved_target"]
+
+
+def test_deterministic_match_is_not_hot_without_a_strong_screen():
+    item = _item("job-1", "good", title="DevOps Engineer")
+    item["deterministic"]["interest"] = {
+        "desired_title_terms": ["devops engineer"],
+        "interest_terms": [],
+    }
+
+    score = build_shadow_order([item], preferences={}, positive_titles=[])[1]["job-1"]
+
+    assert score["hot"] is False
+    assert score["hot_reasons"] == []
 
 
 def test_hard_conflict_never_becomes_hot_even_when_explicitly_interested():

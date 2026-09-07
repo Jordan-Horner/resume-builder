@@ -93,17 +93,32 @@ it("records interested feedback without asking the user to classify it", async (
   expect(host.querySelector(".job-detail")).toBeNull();
 });
 
-it("shows completed quick-screen metadata in the queue", async () => {
+it("shows Hot without exposing screening metadata in the queue", async () => {
   vi.mocked(api.getJobs).mockResolvedValue({
-    jobs: [{ ...job, quick_screen: { status: "complete", label: "Strong", resume_name: "Support Engineer", generated_at: "2026-09-06T12:00:00Z" } }],
+    jobs: [{ ...job, personalization: { hot: true, hot_reasons: ["career_fit"], hot_score: 0.9 }, quick_screen: { status: "complete", label: "Strong", resume_name: "Support Engineer", generated_at: "2026-09-06T12:00:00Z" } }],
     count: 1,
     reviewable_count: 1,
   });
 
   await act(async () => root.render(<JobsPage />));
 
-  expect(host.querySelector(".job-screen-state")?.textContent).toBe("Screened: Strong");
-  expect(host.textContent).not.toContain("Strong · Support Engineer");
+  expect(host.querySelector(".job-hot-status")?.textContent).toBe("Hot");
+  expect(host.querySelector(".job-screen-state")).toBeNull();
+  expect(host.textContent).not.toContain("Screened");
+  expect(host.textContent).not.toContain("Support Engineer · Support Engineer");
+});
+
+it("does not label a recommended job Hot without a completed Strong fit", async () => {
+  vi.mocked(api.getJobs).mockResolvedValue({
+    jobs: [{ ...job, personalization: { hot: false, hot_reasons: [], hot_score: 0.7 }, quick_screen: { status: "complete", label: "Good", resume_name: "Support Engineer", generated_at: "2026-09-06T12:00:00Z" } }],
+    count: 1,
+    reviewable_count: 1,
+  });
+
+  await act(async () => root.render(<JobsPage />));
+
+  expect(host.querySelector(".job-hot-status")).toBeNull();
+  expect(host.textContent).not.toContain("Screened");
 });
 
 it("requests the backend-owned recommendation queue without hiding the full inventory", async () => {
@@ -149,7 +164,7 @@ it("shows when the scheduled search is still preparing recommendations", async (
   expect(host.textContent).toContain("deterministic matches will appear here immediately");
 });
 
-it("describes a failed automatic screen without implying a fit judgment", async () => {
+it("keeps failed automatic-screen metadata out of the queue", async () => {
   vi.mocked(api.getJobs).mockResolvedValue({
     jobs: [{ ...job, quick_screen: { status: "failed", label: "Screen unavailable", resume_name: null, generated_at: null } }],
     count: 1,
@@ -158,8 +173,8 @@ it("describes a failed automatic screen without implying a fit judgment", async 
 
   await act(async () => root.render(<JobsPage />));
 
-  expect(host.querySelector(".job-screen-state")?.textContent).toBe("Screen failed");
-  expect(host.textContent).not.toContain("Unknown");
+  expect(host.querySelector(".job-screen-state")).toBeNull();
+  expect(host.textContent).not.toContain("Screen failed");
 });
 
 it("does not call a completed background screen unscreened in job details", async () => {
@@ -268,10 +283,13 @@ it("screens a job only after the user requests it", async () => {
   expect(api.screenJob).toHaveBeenCalledWith("one");
   expect(host.textContent).toContain("Good fit");
   expect(host.textContent).toContain("Strong production support evidence.");
-  expect(host.textContent).toContain("Based on 1 verified career fact.");
+  expect(host.querySelector<HTMLDetailsElement>(".job-screen-rationale")?.open).toBe(false);
+  expect(host.querySelector(".job-screen-coverage")?.textContent).toContain("1Verified fact");
+  expect(host.querySelector(".job-screen-coverage")?.textContent).toContain("1Criterion checked");
   expect(host.textContent).toContain("Incident response: Supported");
-  expect(host.textContent).toContain("Resume matchStrong matchProduction Support Engineer");
-  expect(host.textContent).toContain("Strongest overlap: Incident response");
+  expect(host.querySelector(".job-resume-heading > a")?.textContent).toBe("Production Support Engineer");
+  expect(host.querySelector(".job-resume-heading > strong")?.textContent).toBe("Strong match");
+  expect(host.querySelector(".job-resume-signals dd")?.textContent).toBe("Incident response");
   expect(host.querySelector<HTMLAnchorElement>('.job-resume-match a')?.getAttribute("href")).toContain("resumes%2Fbaselines%2Fsupport.md");
   expect(host.textContent).toContain("Verified incident leadership directly supports this requirement.");
   expect(host.textContent).toContain("What you wantLooks aligned");
