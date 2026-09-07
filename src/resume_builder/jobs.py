@@ -759,8 +759,7 @@ def _resolve_sources_after_refresh(
                     captured_targets = [
                         target
                         for target in linkedin_targets(database)
-                        if target.direct_apply_url
-                        or followup_catalog.boards_for(target.company)
+                        if target.direct_apply_url or followup_catalog.boards_for(target.company)
                     ]
                     if bright_report.get("applied") and captured_targets:
                         bright_report["ats_followup"] = resolve_linkedin_sources(

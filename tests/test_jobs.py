@@ -646,9 +646,7 @@ def test_automatic_source_resolution_uses_enabled_bright_data_after_free_funnel(
         ),
     )
     board_discovered = False
-    catalog = SimpleNamespace(
-        boards_for=lambda _company: [object()] if board_discovered else []
-    )
+    catalog = SimpleNamespace(boards_for=lambda _company: [object()] if board_discovered else [])
     monkeypatch.setattr(
         resolution_module.AtsCatalog,
         "load",
@@ -715,6 +713,7 @@ def test_automatic_source_resolution_uses_enabled_bright_data_after_free_funnel(
         ),
     )
     monkeypatch.setattr(bright_data_module, "bright_data_key", lambda _workspace: "token")
+
     def save_boards(*_args, **_kwargs):
         nonlocal board_discovered
         board_discovered = True
