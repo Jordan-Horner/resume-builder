@@ -277,7 +277,10 @@ scheduled refreshes send only newly seen LinkedIn jobs that remain unresolved af
 the free pass through that optional provider, subject to its configured per-refresh
 record cap. **Enrich missing details now** processes the existing unresolved backlog
 without rescanning normal job sources. Completed attempts are cached for 30 days;
-temporary failures retry after one day. Each paid batch checks at most one job per
+temporary failures retry after one day, and exact-ID misses retry after seven days.
+For LinkedIn-only jobs at least 14 days old, the first exact-ID miss marks the job
+possibly closed and a second later miss closes it; any later successful result
+reopens it. Each paid batch checks at most one job per
 company and prioritizes jobs missing both work mode and salary. A captured ATS board
 is saved to the private registry and checked against
 the company's other unresolved jobs before another paid lookup. A free-path match must have the

@@ -15,6 +15,7 @@ from urllib.parse import urlsplit
 import httpx
 
 from job_puller.database import InventoryDatabase
+from job_puller.detail_cache import CachedProviderDetail
 from job_puller.models import JobObservation
 from job_puller.normalize import html_to_text, normalized_key
 from job_puller.source_resolution import LinkedInTarget
@@ -137,14 +138,26 @@ def _record_attempt(
     fields_added: frozenset[str] = frozenset(),
 ) -> None:
     now = datetime.now(UTC)
+    cache_days = 1 if outcome == "failed" else 7 if outcome == "not_found" else 30
     database.put_provider_detail(
         "bright-data",
         posting_id,
         BRIGHT_DATA_PARSER_VERSION,
         json.dumps({"outcome": outcome, "fields_added": sorted(fields_added)}),
         now,
-        now + timedelta(days=1 if outcome == "failed" else 30),
+        now + timedelta(days=cache_days),
     )
+
+
+def _attempt_expires_at(cached: CachedProviderDetail) -> datetime:
+    expires_at = cached.expires_at
+    try:
+        payload = json.loads(cached.response_body)
+    except (json.JSONDecodeError, TypeError):
+        return expires_at
+    if isinstance(payload, dict) and payload.get("outcome") == "not_found":
+        return min(expires_at, cached.fetched_at + timedelta(days=7))
+    return expires_at
 
 
 def _response_items(
@@ -253,7 +266,7 @@ def enrich_linkedin_targets(
             _linkedin_id(target.source_url),
             BRIGHT_DATA_PARSER_VERSION,
         )
-        if cached is not None and cached.expires_at > now:
+        if cached is not None and _attempt_expires_at(cached) > now:
             skipped_cached += 1
         else:
             eligible.append(target)
@@ -276,6 +289,8 @@ def enrich_linkedin_targets(
         "improved": 0,
         "no_change": 0,
         "not_found": 0,
+        "possibly_closed": 0,
+        "closed": 0,
         "failed": 0,
         "skipped_cached": skipped_cached,
         "deferred_same_company": deferred_same_company,
@@ -291,6 +306,8 @@ def enrich_linkedin_targets(
     improved = 0
     no_change = 0
     not_found = 0
+    possibly_closed = 0
+    closed = 0
     failed = 0
     field_counts = {field: 0 for field in ("salary", "location", "work_mode", "apply_url")}
     with (
@@ -324,17 +341,31 @@ def enrich_linkedin_targets(
                 _record_attempt(database, posting_id, "failed")
                 continue
             matched_item = None
+            posting_seen = False
             for item in items:
                 if not isinstance(item, dict):
                     continue
-                if str(item.get("job_posting_id") or "") != posting_id or normalized_key(
-                    str(item.get("job_title") or "")
-                ) != normalized_key(request_target.title):
+                if str(item.get("job_posting_id") or "") != posting_id:
+                    continue
+                posting_seen = True
+                if normalized_key(str(item.get("job_title") or "")) != normalized_key(
+                    request_target.title
+                ):
                     continue
                 matched_item = item
                 break
             if matched_item is None:
                 not_found += 1
+                status = database.record_linkedin_liveness_result(
+                    request_target.job_id,
+                    request_target.observation_id,
+                    found=posting_seen,
+                    checked_at=datetime.now(UTC),
+                )
+                if status == "possibly_closed":
+                    possibly_closed += 1
+                elif status == "closed":
+                    closed += 1
                 _record_attempt(database, posting_id, "not_found")
                 continue
             received += 1
@@ -344,6 +375,12 @@ def enrich_linkedin_targets(
                 _observation(matched_item, request_target),
             )
             applied += 1
+            database.record_linkedin_liveness_result(
+                request_target.job_id,
+                request_target.observation_id,
+                found=True,
+                checked_at=datetime.now(UTC),
+            )
             if fields_added:
                 improved += 1
                 for field in fields_added:
@@ -357,6 +394,8 @@ def enrich_linkedin_targets(
     report["improved"] = improved
     report["no_change"] = no_change
     report["not_found"] = not_found
+    report["possibly_closed"] = possibly_closed
+    report["closed"] = closed
     report["failed"] = failed
     report["salary_added"] = field_counts["salary"]
     report["location_added"] = field_counts["location"]

@@ -739,11 +739,19 @@ class InventoryDatabase:
         return inserted, updated
 
     def unresolved_linkedin_targets(
-        self, *, seen_since: datetime | None = None
+        self,
+        *,
+        seen_since: datetime | None = None,
+        include_possibly_closed: bool = False,
     ) -> list[dict[str, object]]:
         """Return one strong LinkedIn observation for each job missing core enrichment."""
         recent_clause = " AND o.last_seen_at >= ?" if seen_since is not None else ""
         parameters = (_iso(seen_since),) if seen_since is not None else ()
+        statuses = (
+            "('active','reopened','possibly_closed')"
+            if include_possibly_closed
+            else "('active','reopened')"
+        )
         with self.connect() as conn:
             rows = conn.execute(
                 f"""SELECT j.id AS job_id, o.id AS observation_id, o.title_raw AS title,
@@ -753,7 +761,7 @@ class InventoryDatabase:
                    FROM jobs j
                    JOIN job_observation_links l ON l.job_id=j.id
                    JOIN observations o ON o.id=l.observation_id
-                   WHERE j.status IN ('active','reopened')
+                   WHERE j.status IN {statuses}
                      AND (
                        j.work_mode='unknown'
                        OR TRIM(j.location)=''
@@ -786,6 +794,56 @@ class InventoryDatabase:
                 "source_url": str(row[8]),
             }
         return list(selected.values())
+
+    def record_linkedin_liveness_result(
+        self,
+        target_job_id: str,
+        linkedin_observation_id: str,
+        *,
+        found: bool,
+        checked_at: datetime,
+        minimum_age_days: int = 14,
+    ) -> str:
+        """Track conservative exact-ID liveness without trusting a single stale miss."""
+        with self.transaction() as conn:
+            row = conn.execute(
+                """SELECT j.status, COALESCE(j.posted_at, j.first_seen_at), o.missing_streak
+                   FROM jobs j
+                   JOIN job_observation_links l ON l.job_id=j.id
+                   JOIN observations o ON o.id=l.observation_id
+                   WHERE j.id=? AND o.id=? AND o.provider='linkedin'""",
+                (target_job_id, linkedin_observation_id),
+            ).fetchone()
+            if row is None:
+                raise ValueError("LinkedIn observation does not belong to the target job")
+            if found:
+                conn.execute(
+                    "UPDATE observations SET missing_streak=0 WHERE id=?",
+                    (linkedin_observation_id,),
+                )
+                if str(row[0]) == "possibly_closed":
+                    conn.execute(
+                        "UPDATE jobs SET status='reopened', closed_at=NULL WHERE id=?",
+                        (target_job_id,),
+                    )
+                    return "reopened"
+                return str(row[0])
+            observed_at = datetime.fromisoformat(str(row[1]))
+            if checked_at - observed_at < timedelta(days=minimum_age_days):
+                return str(row[0])
+            streak = int(row[2]) + 1
+            status = "closed" if streak >= 2 else "possibly_closed"
+            conn.execute(
+                "UPDATE observations SET missing_streak=? WHERE id=?",
+                (streak, linkedin_observation_id),
+            )
+            conn.execute(
+                """UPDATE jobs SET status=?,
+                   closed_at=CASE WHEN ?='closed' THEN ? ELSE closed_at END
+                   WHERE id=?""",
+                (status, status, _iso(checked_at), target_job_id),
+            )
+            return status
 
     def apply_linkedin_enrichment(
         self,

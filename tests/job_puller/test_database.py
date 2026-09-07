@@ -303,6 +303,58 @@ def test_unresolved_linkedin_targets_prioritize_missing_mode_and_salary(tmp_path
     ]
 
 
+def test_old_linkedin_job_closes_only_after_two_exact_id_misses(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    first_seen = datetime(2026, 8, 1, tzinfo=UTC)
+    linkedin = observation()
+    linkedin.work_arrangement = explicit_arrangement(
+        [WorkMode.UNKNOWN], source="linkedin", rule="not_listed"
+    )
+    db.record_result(result(linkedin, when=first_seen))
+    target = db.unresolved_linkedin_targets()[0]
+
+    first_status = db.record_linkedin_liveness_result(
+        str(target["job_id"]),
+        str(target["observation_id"]),
+        found=False,
+        checked_at=first_seen + timedelta(days=14),
+    )
+
+    assert first_status == "possibly_closed"
+    assert db.active_inventory() == []
+    retry = db.unresolved_linkedin_targets(include_possibly_closed=True)
+    assert len(retry) == 1
+
+    second_status = db.record_linkedin_liveness_result(
+        str(target["job_id"]),
+        str(target["observation_id"]),
+        found=False,
+        checked_at=first_seen + timedelta(days=21),
+    )
+
+    assert second_status == "closed"
+    assert db.unresolved_linkedin_targets(include_possibly_closed=True) == []
+
+
+def test_recent_linkedin_miss_does_not_change_liveness(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    first_seen = datetime(2026, 8, 1, tzinfo=UTC)
+    db.record_result(result(observation(), when=first_seen))
+    target = db.unresolved_linkedin_targets()[0]
+
+    status = db.record_linkedin_liveness_result(
+        str(target["job_id"]),
+        str(target["observation_id"]),
+        found=False,
+        checked_at=first_seen + timedelta(days=13),
+    )
+
+    assert status == "active"
+    assert len(db.active_inventory()) == 1
+
+
 def test_job_ids_include_inactive_canonical_jobs(tmp_path):
     db = InventoryDatabase(tmp_path / "inventory.db")
     db.migrate()

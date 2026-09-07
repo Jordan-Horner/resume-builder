@@ -393,6 +393,7 @@ def linkedin_targets(
     *,
     seen_since: datetime | None = None,
     limit: int | None = None,
+    include_possibly_closed: bool = False,
 ) -> list[LinkedInTarget]:
     """Load the bounded target set before any catalog or ATS network work."""
     targets = [
@@ -407,7 +408,13 @@ def linkedin_targets(
             direct_apply_url=str(item.get("direct_apply_url") or ""),
             source_url=str(item.get("source_url") or ""),
         )
-        for item in database.unresolved_linkedin_targets(seen_since=seen_since)
+        for item in database.unresolved_linkedin_targets(
+            **(
+                {"seen_since": seen_since, "include_possibly_closed": True}
+                if include_possibly_closed
+                else {"seen_since": seen_since}
+            )
+        )
     ]
     return targets[:limit] if limit is not None else targets
 

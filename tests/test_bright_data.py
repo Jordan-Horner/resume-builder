@@ -1,10 +1,22 @@
 from datetime import UTC, datetime, timedelta
 
 from job_puller.database import InventoryDatabase
+from job_puller.detail_cache import CachedProviderDetail
 from job_puller.models import JobObservation, ProviderResult
 from job_puller.source_resolution import linkedin_targets
 from job_puller.work_modes import WorkMode, explicit_arrangement
 from resume_builder import bright_data
+
+
+def test_legacy_not_found_attempt_retries_after_seven_days():
+    fetched_at = datetime(2026, 9, 1, tzinfo=UTC)
+    cached = CachedProviderDetail(
+        response_body='{"outcome":"not_found","fields_added":[]}',
+        fetched_at=fetched_at,
+        expires_at=fetched_at + timedelta(days=30),
+    )
+
+    assert bright_data._attempt_expires_at(cached) == fetched_at + timedelta(days=7)
 
 
 def test_bright_data_enriches_exact_linkedin_job(monkeypatch, tmp_path):
@@ -101,6 +113,8 @@ def test_bright_data_enriches_exact_linkedin_job(monkeypatch, tmp_path):
         "improved": 1,
         "no_change": 0,
         "not_found": 0,
+        "possibly_closed": 0,
+        "closed": 0,
         "failed": 0,
         "skipped_cached": 0,
         "deferred_same_company": 0,
@@ -153,6 +167,9 @@ def test_bright_data_checks_only_one_job_per_company(monkeypatch):
 
         def apply_linkedin_enrichment(self, *_args):
             return frozenset()
+
+        def record_linkedin_liveness_result(self, *_args, **_kwargs):
+            return "active"
 
     class Response:
         status_code = 200

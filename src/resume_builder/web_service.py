@@ -459,7 +459,7 @@ class DashboardService:
         )
         database.migrate()
         with self._state_lock:
-            targets = linkedin_targets(database)
+            targets = linkedin_targets(database, include_possibly_closed=True)
             report = enrich_linkedin_targets(
                 database,
                 targets,
