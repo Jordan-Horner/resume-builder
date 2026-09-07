@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from time import monotonic, sleep
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -22,7 +23,7 @@ from .atomic import atomic_write_json
 
 BRIGHT_DATA_DATASET_ID = "gd_lpfll7v5hcqtkxl6l"
 BRIGHT_DATA_ENDPOINT = "https://api.brightdata.com/datasets/v3/scrape"
-BRIGHT_DATA_PARSER_VERSION = "linkedin-bright-data-v1"
+BRIGHT_DATA_PARSER_VERSION = "linkedin-bright-data-v2"
 BRIGHT_DATA_SECRET_PATH = Path("build/secrets/bright-data-key")
 BRIGHT_DATA_SETTINGS_PATH = Path("job-search/bright-data.json")
 
@@ -146,6 +147,45 @@ def _record_attempt(
     )
 
 
+def _response_items(
+    client: httpx.Client,
+    response: httpx.Response,
+    *,
+    api_token: str,
+    timeout: float,
+) -> list[object]:
+    """Return immediate results or finish Bright Data's documented 202 fallback."""
+    response.raise_for_status()
+    payload = response.json()
+    if response.status_code != 202:
+        return payload if isinstance(payload, list) else [payload]
+    snapshot_id = str(payload.get("snapshot_id") or "") if isinstance(payload, dict) else ""
+    if not snapshot_id:
+        raise ValueError("Bright Data returned 202 without a snapshot ID")
+    headers = {"Authorization": f"Bearer {api_token}"}
+    deadline = monotonic() + max(timeout, 300)
+    while monotonic() < deadline:
+        progress = client.get(
+            f"https://api.brightdata.com/datasets/v3/progress/{snapshot_id}",
+            headers=headers,
+        )
+        progress.raise_for_status()
+        status = str(progress.json().get("status") or "")
+        if status == "ready":
+            completed = client.get(
+                f"https://api.brightdata.com/datasets/v3/snapshot/{snapshot_id}",
+                params={"format": "json"},
+                headers=headers,
+            )
+            completed.raise_for_status()
+            result = completed.json()
+            return result if isinstance(result, list) else [result]
+        if status == "failed":
+            raise ValueError("Bright Data snapshot failed")
+        sleep(5)
+    raise ValueError("Bright Data snapshot did not finish in time")
+
+
 def save_captured_boards(
     database: InventoryDatabase, config_path: Path, *, timeout: float
 ) -> dict[str, object]:
@@ -254,7 +294,7 @@ def enrich_linkedin_targets(
     failed = 0
     field_counts = {field: 0 for field in ("salary", "location", "work_mode", "apply_url")}
     with (
-        httpx.Client(timeout=timeout, follow_redirects=False, trust_env=False) as client,
+        httpx.Client(timeout=max(timeout, 120), follow_redirects=False, trust_env=False) as client,
         ThreadPoolExecutor(max_workers=min(5, len(selected))) as executor,
     ):
         futures = {}
@@ -263,7 +303,12 @@ def enrich_linkedin_targets(
                 executor.submit(
                     client.post,
                     BRIGHT_DATA_ENDPOINT,
-                    params={"dataset_id": BRIGHT_DATA_DATASET_ID, "include_errors": "true"},
+                    params={
+                        "dataset_id": BRIGHT_DATA_DATASET_ID,
+                        "notify": "false",
+                        "include_errors": "true",
+                        "format": "json",
+                    },
                     headers={"Authorization": f"Bearer {api_token}"},
                     json={"input": [{"url": request_target.source_url}]},
                 )
@@ -273,9 +318,7 @@ def enrich_linkedin_targets(
             posting_id = _linkedin_id(request_target.source_url)
             try:
                 response = future.result()
-                response.raise_for_status()
-                payload = response.json()
-                items = payload if isinstance(payload, list) else [payload]
+                items = _response_items(client, response, api_token=api_token, timeout=timeout)
             except (httpx.HTTPError, ValueError):
                 failed += 1
                 _record_attempt(database, posting_id, "failed")

@@ -35,6 +35,8 @@ def test_bright_data_enriches_exact_linkedin_job(monkeypatch, tmp_path):
     )
 
     class Response:
+        status_code = 200
+
         def raise_for_status(self):
             return None
 
@@ -69,6 +71,12 @@ def test_bright_data_enriches_exact_linkedin_job(monkeypatch, tmp_path):
             calls.append(kwargs["json"])
             assert url == bright_data.BRIGHT_DATA_ENDPOINT
             assert kwargs["headers"] == {"Authorization": "Bearer fixture-token"}
+            assert kwargs["params"] == {
+                "dataset_id": bright_data.BRIGHT_DATA_DATASET_ID,
+                "notify": "false",
+                "include_errors": "true",
+                "format": "json",
+            }
             assert kwargs["json"]["input"] == [
                 {"url": "https://www.linkedin.com/jobs/view/4462886742"}
             ]
@@ -147,6 +155,8 @@ def test_bright_data_checks_only_one_job_per_company(monkeypatch):
             return frozenset()
 
     class Response:
+        status_code = 200
+
         def raise_for_status(self):
             return None
 
@@ -173,3 +183,40 @@ def test_bright_data_checks_only_one_job_per_company(monkeypatch):
     assert report["requested"] == 1
     assert report["deferred_same_company"] == 1
     assert len(calls) == 1
+
+
+def test_bright_data_downloads_a_slow_synchronous_snapshot():
+    class Response:
+        def __init__(self, payload, status_code=200):
+            self.payload = payload
+            self.status_code = status_code
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self.payload
+
+    class Client:
+        def __init__(self):
+            self.calls = []
+
+        def get(self, url, **kwargs):
+            self.calls.append((url, kwargs))
+            if "/progress/" in url:
+                return Response({"status": "ready"})
+            return Response([{"job_posting_id": "123", "job_title": "Engineer"}])
+
+    client = Client()
+    result = bright_data._response_items(
+        client,
+        Response({"snapshot_id": "snapshot-1"}, status_code=202),
+        api_token="fixture-token",
+        timeout=60,
+    )
+
+    assert result == [{"job_posting_id": "123", "job_title": "Engineer"}]
+    assert [url for url, _kwargs in client.calls] == [
+        "https://api.brightdata.com/datasets/v3/progress/snapshot-1",
+        "https://api.brightdata.com/datasets/v3/snapshot/snapshot-1",
+    ]
