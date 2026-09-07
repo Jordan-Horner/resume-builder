@@ -254,6 +254,20 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    @app.get("/api/jobs/screening-backfill")
+    def screening_backfill_status() -> dict[str, Any]:
+        return service.screening_backfill_status()
+
+    @app.post("/api/jobs/screening-backfill", status_code=202)
+    def start_screening_backfill(background_tasks: BackgroundTasks) -> dict[str, Any]:
+        try:
+            started, status = service.queue_screening_backfill()
+            if started:
+                background_tasks.add_task(service.run_queued_screening_backfill)
+            return status
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     @app.get("/api/jobs/{job_id}")
     def job(job_id: str) -> dict[str, Any]:
         item = service.get_job(job_id)

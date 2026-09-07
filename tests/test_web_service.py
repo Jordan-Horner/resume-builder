@@ -1,6 +1,8 @@
 import hashlib
 import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -76,6 +78,118 @@ def write_screening_output(
         ),
         encoding="utf-8",
     )
+
+
+def test_screening_backfill_rebuilds_current_inventory_without_source_refresh(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from resume_builder import background_screening
+    from resume_builder.automation import DEFAULT_CONFIG, render_default_config
+
+    automation_path = tmp_path / DEFAULT_CONFIG
+    automation_path.parent.mkdir(parents=True)
+    raw = yaml.safe_load(
+        render_default_config("America/New_York", jobs_enabled=True, gmail_enabled=False)
+    )
+    raw["jobs"]["semantic_screening"] = {"enabled": True, "max_jobs_per_run": 10}
+    automation_path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+    shortlist = tmp_path / "job-search/shortlist.json"
+    calls: list[tuple[str, object]] = []
+    monkeypatch.setattr(background_screening, "background_screening_configured", lambda _root: True)
+    monkeypatch.setattr(
+        background_screening,
+        "prepare_background_screening_input",
+        lambda root, *, display_limit: (
+            calls.append(("prepare", (root, display_limit))) or shortlist
+        ),
+    )
+    monkeypatch.setattr(
+        background_screening,
+        "run_background_quick_screening",
+        lambda root, *, max_jobs, input_path: (
+            calls.append(("screen", (root, max_jobs, input_path)))
+            or SimpleNamespace(
+                failed=0,
+                provider_calls=4,
+                cached=6,
+                recommended=8,
+                needs_review=2,
+            )
+        ),
+    )
+
+    service = DashboardService(tmp_path, inventory_loader=lambda: [])
+    started, queued = service.queue_screening_backfill()
+    service.run_queued_screening_backfill()
+
+    assert started is True
+    assert queued["status"] == "running"
+    assert calls == [
+        ("prepare", (tmp_path, raw["jobs"]["limit"])),
+        ("screen", (tmp_path, 10, shortlist)),
+    ]
+    assert not (tmp_path / "job-search/latest-refresh.json").exists()
+    status = service.screening_backfill_status()
+    assert status["status"] == "complete"
+    assert status["screened_jobs"] == 4
+
+
+def test_screening_backfill_deduplicates_overlapping_requests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    service = DashboardService(tmp_path, inventory_loader=lambda: [])
+    monkeypatch.setattr(
+        service,
+        "screening_backfill_status",
+        lambda: {
+            **service._screening_backfill_state,
+            "enabled": True,
+            "available": True,
+            "max_jobs": 10,
+        },
+    )
+
+    first, _ = service.queue_screening_backfill()
+    second, state = service.queue_screening_backfill()
+
+    assert first is True
+    assert second is False
+    assert state["status"] == "running"
+
+
+def test_screening_backfill_input_is_built_only_from_local_inventory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from resume_builder import background_screening
+    from resume_builder.jobs import DEFAULT_CONFIG, DEFAULT_OUTPUT, DEFAULT_PREFERENCES
+
+    calls: list[tuple[Path, Path, int, Path, Path]] = []
+
+    def fake_shortlist(
+        config_path: Path,
+        preferences_path: Path,
+        limit: int,
+        *,
+        output_path: Path,
+        review_output_path: Path,
+    ) -> int:
+        calls.append((config_path, preferences_path, limit, output_path, review_output_path))
+        return 0
+
+    monkeypatch.setattr(background_screening, "_shortlist", fake_shortlist)
+
+    result = background_screening.prepare_background_screening_input(tmp_path, display_limit=75)
+
+    assert result == tmp_path / DEFAULT_OUTPUT
+    assert calls == [
+        (
+            tmp_path / DEFAULT_CONFIG,
+            tmp_path / DEFAULT_PREFERENCES,
+            75,
+            tmp_path / DEFAULT_OUTPUT,
+            tmp_path / "job-search/jobs-review.csv",
+        )
+    ]
 
 
 def test_local_preference_conflict_does_not_claim_candidate_is_unqualified() -> None:

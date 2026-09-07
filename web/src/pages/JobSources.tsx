@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import {
-  getJobSources, getScrapeSchedule, saveScrapeSchedule, setJobSource, startJobScan,
-  type JobSourcesState, type ScrapeSchedule,
+  getJobSources, getScrapeSchedule, getScreeningBackfill, saveScrapeSchedule,
+  setJobSource, startJobScan, startScreeningBackfill,
+  type JobSourcesState, type ScrapeSchedule, type ScreeningBackfillState,
 } from "../api";
 
 type Frequency = "once" | "twice" | "custom";
@@ -42,6 +43,8 @@ function ScheduleEditor() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [backfill, setBackfill] = useState<ScreeningBackfillState | null>(null);
+  const [backfillBusy, setBackfillBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -59,6 +62,50 @@ function ScheduleEditor() {
     });
     return () => { active = false; };
   }, [retry]);
+
+  useEffect(() => {
+    let active = true;
+    let timer: number | undefined;
+    const refresh = async () => {
+      try {
+        const result = await getScreeningBackfill();
+        if (!active) return;
+        setBackfill(result);
+        if (result.status === "running") timer = window.setTimeout(refresh, 2000);
+      } catch (reason) {
+        if (active) {
+          setBackfill(null);
+          setError(reason instanceof Error ? reason.message : "Could not load screening status");
+        }
+      }
+    };
+    void refresh();
+    return () => { active = false; if (timer !== undefined) window.clearTimeout(timer); };
+  }, []);
+
+  async function runBackfill() {
+    if (backfillBusy || backfill?.status === "running") return;
+    setBackfillBusy(true);
+    setError("");
+    try {
+      const result = await startScreeningBackfill();
+      setBackfill(result);
+      const poll = async () => {
+        try {
+          const next = await getScreeningBackfill();
+          setBackfill(next);
+          if (next.status === "running") window.setTimeout(() => void poll(), 2000);
+        } catch (reason) {
+          setError(reason instanceof Error ? reason.message : "Could not read screening progress");
+        }
+      };
+      if (result.status === "running") window.setTimeout(() => void poll(), 1000);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not start screening");
+    } finally {
+      setBackfillBusy(false);
+    }
+  }
 
   function chooseFrequency(next: Frequency) {
     setFrequency(next);
@@ -146,12 +193,14 @@ function ScheduleEditor() {
     <div className="background-screening">
       <div>
         <strong>Background quick screening</strong>
-        <p>Use the inexpensive first pass on up to {screeningMaxJobs} eligible new jobs after each search. Obvious conflicts and jobs with no saved search signal are skipped. This never hides or reorders jobs.</p>
+        <p>Screen up to {screeningMaxJobs} eligible recommendations per run. This uses jobs already in your library and never contacts job sources.</p>
         {!saved.screening_available && <p className="screening-setup-note"><a href="/settings/integrations">Connect OpenRouter</a> to turn this on.</p>}
+        {backfill && backfill.status !== "idle" && <p className="screening-backfill-status" role="status">{backfill.message}{backfill.failed_jobs ? ` ${backfill.failed_jobs} still need another attempt.` : ""}</p>}
       </div>
       <div className="background-screening-controls">
-        <label><span>Per scrape</span><select aria-label="Quick screens per scrape" value={screeningMaxJobs} disabled={busy || !screeningEnabled} onChange={(event) => setScreeningMaxJobs(Number(event.target.value))}>{[3, 6, 10, 15].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+        <label><span>Per run</span><select aria-label="Quick screens per run" value={screeningMaxJobs} disabled={busy || !screeningEnabled} onChange={(event) => setScreeningMaxJobs(Number(event.target.value))}>{[3, 6, 10, 15, 25].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
         <label className="source-toggle"><span>{screeningEnabled ? "On" : "Off"}</span><input type="checkbox" role="switch" aria-label="Background quick screening" checked={screeningEnabled} disabled={busy || !saved.screening_available} onChange={(event) => { setScreeningEnabled(event.target.checked); setNotice(""); }} /></label>
+        <button className="secondary-button" disabled={busy || backfillBusy || backfill?.status === "running" || !saved.screening_available || !saved.screening_enabled} onClick={() => void runBackfill()}>{backfill?.status === "running" ? "Screening…" : "Screen recommendations now"}</button>
       </div>
     </div>
     {error && <p role="alert" className="onboarding-error">{error}</p>}

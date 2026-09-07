@@ -241,6 +241,23 @@ export function setJobSource(id: string, enabled: boolean): Promise<JobSourcesSt
 }
 export function startJobScan(): Promise<JobSourcesState> { return request("/api/job-sources/scan", { method: "POST" }); }
 
+export interface ScreeningBackfillState {
+  status: "idle" | "running" | "complete" | "partial" | "failed";
+  message: string;
+  enabled: boolean;
+  available: boolean;
+  max_jobs: number;
+  screened_jobs?: number;
+  cached_jobs?: number;
+  failed_jobs?: number;
+  recommended_jobs?: number;
+  needs_review_jobs?: number;
+  started_at?: string;
+  finished_at?: string;
+}
+export function getScreeningBackfill(): Promise<ScreeningBackfillState> { return request("/api/jobs/screening-backfill"); }
+export function startScreeningBackfill(): Promise<ScreeningBackfillState> { return request("/api/jobs/screening-backfill", { method: "POST" }); }
+
 export interface ScrapeSchedule {
   configured: boolean;
   enabled: boolean;

@@ -577,9 +577,11 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
 .background-screening strong { display: block; margin-bottom: 5px; }
 .background-screening p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
 .background-screening .screening-setup-note { margin-top: 6px; }
+.background-screening .screening-backfill-status { margin-top: 8px; color: var(--ink); }
 .background-screening-controls { display: flex; align-items: flex-end; gap: 18px; flex: 0 0 auto; }
 .background-screening-controls > label:first-child { display: grid; gap: 6px; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
 .background-screening select { min-height: 36px; padding: 0 30px 0 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); font: inherit; }
+.background-screening-controls .secondary-button { white-space: nowrap; }
 .provider-heading { align-items: center; margin-bottom: 10px; }
 .provider-heading .onboarding-primary { width: auto; white-space: nowrap; }
 .job-source-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); gap: 16px; }

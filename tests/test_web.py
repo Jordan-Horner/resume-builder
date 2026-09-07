@@ -164,6 +164,38 @@ def test_job_feedback_routes_are_backend_owned(tmp_path: Path, monkeypatch) -> N
     assert response.json() == result
 
 
+def test_screening_backfill_route_starts_standalone_worker(tmp_path: Path, monkeypatch) -> None:
+    from resume_builder.web_service import DashboardService
+
+    calls: list[str] = []
+    state = {
+        "status": "running",
+        "message": "Screening the next recommended jobs…",
+        "enabled": True,
+        "available": True,
+        "max_jobs": 10,
+    }
+    monkeypatch.setattr(DashboardService, "screening_backfill_status", lambda self: state)
+    monkeypatch.setattr(
+        DashboardService,
+        "queue_screening_backfill",
+        lambda self: (True, state),
+    )
+    monkeypatch.setattr(
+        DashboardService,
+        "run_queued_screening_backfill",
+        lambda self: calls.append("screen"),
+    )
+    client = _client(tmp_path)
+
+    assert client.get("/api/jobs/screening-backfill").json() == state
+    response = client.post("/api/jobs/screening-backfill")
+
+    assert response.status_code == 202
+    assert response.json() == state
+    assert calls == ["screen"]
+
+
 def test_open_posting_route_records_passive_positive_once(tmp_path: Path, monkeypatch) -> None:
     from resume_builder.web_service import DashboardService
 

@@ -222,6 +222,10 @@ class DashboardService:
         self._screening_lock = threading.Lock()
         self._screening_state_lock = threading.Lock()
         self._screening_states: dict[str, dict[str, Any]] = {}
+        self._screening_backfill_state: dict[str, Any] = {
+            "status": "idle",
+            "message": "Screening is ready.",
+        }
 
     def _onboarding_record(self) -> dict[str, Any]:
         path = self.workspace / ONBOARDING_STATE_PATH
@@ -1352,31 +1356,111 @@ class DashboardService:
         }
         return response
 
-    def replenish_recommendations(self) -> None:
-        """Continue bounded screening of the deterministic recommendation backlog."""
-        shortlist = self.workspace / "job-search/shortlist.json"
+    def screening_backfill_status(self) -> dict[str, Any]:
+        """Return content-free progress for the standalone recommendation backfill."""
         schedule_path = self.workspace / "automation/config.yml"
-        if not shortlist.is_file() or not schedule_path.is_file():
-            return
+        enabled = False
+        max_jobs = 0
+        if schedule_path.is_file():
+            try:
+                from .automation import load_config as load_automation
+
+                schedule = load_automation(schedule_path)
+                enabled = schedule.jobs.semantic_screening_enabled
+                max_jobs = schedule.jobs.semantic_screening_max_jobs
+            except (OSError, ValueError):
+                pass
+        from .background_screening import background_screening_configured
+
+        with self._screening_state_lock:
+            state = dict(self._screening_backfill_state)
+        return {
+            **state,
+            "enabled": enabled,
+            "available": background_screening_configured(self.workspace),
+            "max_jobs": max_jobs,
+        }
+
+    def queue_screening_backfill(self) -> tuple[bool, dict[str, Any]]:
+        """Reserve one standalone backfill without starting provider discovery."""
+        status = self.screening_backfill_status()
+        if not status["enabled"]:
+            raise ValueError("Turn on background quick screening before starting a backfill")
+        if not status["available"]:
+            raise ValueError("Connect OpenRouter before starting a screening backfill")
+        with self._screening_state_lock:
+            if self._screening_backfill_state.get("status") == "running":
+                already_running = True
+            else:
+                already_running = False
+                self._screening_backfill_state = {
+                    "status": "running",
+                    "message": "Screening the next recommended jobs…",
+                    "started_at": datetime.now(UTC).isoformat(),
+                }
+        if already_running:
+            return False, self.screening_backfill_status()
+        return True, self.screening_backfill_status()
+
+    def run_queued_screening_backfill(self) -> None:
+        """Screen a bounded batch from current inventory; never refresh job sources."""
+        self._screening_lock.acquire()
+        started_at = datetime.now(UTC)
         try:
             from .automation import load_config as load_automation
             from .background_screening import (
-                background_screening_configured,
+                prepare_background_screening_input,
                 run_background_quick_screening,
             )
 
-            schedule = load_automation(schedule_path)
-            if not schedule.jobs.semantic_screening_enabled or not background_screening_configured(
-                self.workspace
-            ):
-                return
-            run_background_quick_screening(
+            schedule = load_automation(self.workspace / "automation/config.yml")
+            shortlist = prepare_background_screening_input(
+                self.workspace,
+                display_limit=schedule.jobs.limit,
+            )
+            summary = run_background_quick_screening(
                 self.workspace,
                 max_jobs=schedule.jobs.semantic_screening_max_jobs,
                 input_path=shortlist,
             )
+            status = "complete" if summary.failed == 0 else "partial"
+            message = (
+                f"Screened {summary.provider_calls} recommended jobs."
+                if summary.provider_calls
+                else "Recommended jobs are already up to date."
+            )
+            with self._screening_state_lock:
+                self._screening_backfill_state = {
+                    "status": status,
+                    "message": message,
+                    "started_at": started_at.isoformat(),
+                    "finished_at": datetime.now(UTC).isoformat(),
+                    "screened_jobs": summary.provider_calls,
+                    "cached_jobs": summary.cached,
+                    "failed_jobs": summary.failed,
+                    "recommended_jobs": summary.recommended,
+                    "needs_review_jobs": summary.needs_review,
+                }
         except (OSError, RuntimeError, ValueError):
-            LOGGER.warning("recommendation refill failed", exc_info=True)
+            LOGGER.warning("recommendation screening backfill failed", exc_info=True)
+            with self._screening_state_lock:
+                self._screening_backfill_state = {
+                    "status": "failed",
+                    "message": "Screening could not finish. Try again.",
+                    "started_at": started_at.isoformat(),
+                    "finished_at": datetime.now(UTC).isoformat(),
+                }
+        finally:
+            self._screening_lock.release()
+
+    def replenish_recommendations(self) -> None:
+        """Continue the current-inventory backlog after a user decision."""
+        try:
+            started, _ = self.queue_screening_backfill()
+        except ValueError:
+            return
+        if started:
+            self.run_queued_screening_backfill()
 
     @staticmethod
     def _serialize_job(job: dict[str, Any]) -> dict[str, Any]:

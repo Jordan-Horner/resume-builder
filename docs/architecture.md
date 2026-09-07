@@ -204,8 +204,11 @@ Recommended Jobs to Interested jobs; applying or dismissing it removes it from
 both active queues. Current feedback and the current screening cache are combined
 at request time, so these transitions never wait for the next scheduled artifact
 refresh. A decision also schedules the same bounded worker to continue screening;
-there is no separate recommendation scheduler. The browser only requests and
-renders these backend-owned views.
+the Settings portal can start that worker directly against the current inventory.
+The standalone backfill rebuilds the local shortlist and never invokes LinkedIn,
+Indeed, ATS resolution, or another discovery provider. Source refresh and screening
+therefore have independent failure and retry boundaries. The browser only requests
+and renders these backend-owned views.
 
 The version 5 screening packet also carries the user's bounded explicit
 `preferred_job_attributes` and `avoided_job_attributes`. They are sent in the

@@ -8,9 +8,11 @@ import {
   getOnboardingStatus,
   getSystemStatus,
   getScrapeSchedule,
+  getScreeningBackfill,
   markJobApplied,
   markJobNotInterested,
   screenJob,
+  startScreeningBackfill,
   skipOnboarding,
   uploadResume,
 } from "./api";
@@ -18,6 +20,23 @@ import {
 afterEach(() => vi.restoreAllMocks());
 
 describe("dashboard API client", () => {
+  it("starts a screening backfill without starting job discovery", async () => {
+    const payload = { status: "running", message: "Screening…" };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+      new Response(JSON.stringify(payload), {
+        status: 202,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await startScreeningBackfill();
+    await getScreeningBackfill();
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/jobs/screening-backfill", { method: "POST" });
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/jobs/screening-backfill", undefined);
+    expect(fetchMock).not.toHaveBeenCalledWith("/api/job-sources/scan", expect.anything());
+  });
+
   it("sends search and normalized work-mode filters", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ jobs: [] }), {

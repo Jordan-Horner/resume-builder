@@ -2,12 +2,13 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { getJobSources, getScrapeSchedule, saveScrapeSchedule } from "./api";
+import { getJobSources, getScrapeSchedule, getScreeningBackfill, saveScrapeSchedule, startScreeningBackfill } from "./api";
 import { JobSources } from "./pages/JobSources";
 
 vi.mock("./api", () => ({
   getJobSources: vi.fn(), setJobSource: vi.fn(), startJobScan: vi.fn(),
   getScrapeSchedule: vi.fn(), saveScrapeSchedule: vi.fn(),
+  getScreeningBackfill: vi.fn(), startScreeningBackfill: vi.fn(),
 }));
 
 const schedule = { configured: true, enabled: true, times: ["08:00"], timezone: "America/New_York", next_run: "2026-09-06T08:00:00-04:00", last_run: null, service_status: "online" as const, screening_enabled: false, screening_max_jobs: 6, screening_available: true, current_stage: "idle" as const };
@@ -19,6 +20,8 @@ beforeEach(() => {
   vi.mocked(getJobSources).mockResolvedValue({ providers: [], scan: { status: "idle" } });
   vi.mocked(getScrapeSchedule).mockResolvedValue(schedule);
   vi.mocked(saveScrapeSchedule).mockResolvedValue(schedule);
+  vi.mocked(getScreeningBackfill).mockResolvedValue({ status: "idle", message: "Screening is ready.", enabled: false, available: true, max_jobs: 6 });
+  vi.mocked(startScreeningBackfill).mockResolvedValue({ status: "complete", message: "Screened 4 recommended jobs.", enabled: true, available: true, max_jobs: 6, screened_jobs: 4 });
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); });
 
@@ -61,9 +64,20 @@ it("enables capped quick screening without implying that jobs are filtered", asy
   await act(async () => toggle.click());
   await act(async () => [...host.querySelectorAll("button")].find((button) => button.textContent === "Save schedule")?.click());
 
-  expect(host.textContent).toContain("eligible new jobs");
-  expect(host.textContent).toContain("never hides or reorders");
+  expect(host.textContent).toContain("jobs already in your library");
+  expect(host.textContent).toContain("never contacts job sources");
   expect(saveScrapeSchedule).toHaveBeenCalledWith(true, ["08:00"], true, 6);
+});
+
+it("starts screening without starting a source search", async () => {
+  vi.mocked(getScrapeSchedule).mockResolvedValue({ ...schedule, screening_enabled: true });
+  await act(async () => root.render(<JobSources />));
+  const button = [...host.querySelectorAll("button")].find((item) => item.textContent === "Screen recommendations now") as HTMLButtonElement;
+
+  await act(async () => button.click());
+
+  expect(startScreeningBackfill).toHaveBeenCalledOnce();
+  expect(host.textContent).toContain("Screened 4 recommended jobs.");
 });
 
 it("cannot mutate a schedule while its saved state is pending or unavailable", async () => {

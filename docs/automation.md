@@ -128,8 +128,11 @@ there is no second web-only scheduler. The On/Off switch acts immediately: On
 starts the managed job scheduler and Off stops it. Manual **Find jobs now** runs
 remain available while the scheduler is off. Gmail monitoring is managed by a
 separate worker, so pausing scheduled job discovery does not pause application
-reconciliation. The **Background quick screening** control applies the bounded
-first pass after either scheduled or manual searches. It ranks the active inventory
+reconciliation. The **Background quick screening** control sets the bounded
+first-pass allowance. **Screen recommendations now** runs that pass directly from
+the current local inventory without refreshing LinkedIn, Indeed, or company boards.
+Search completion and feedback decisions may also ask the same independent worker
+to continue the backlog. It ranks the active inventory
 with the existing local preference score, then attempts the best unscreened jobs
 that pass the title, location, work-mode, seniority, completeness, and compensation
 gates and have a saved role or interest signal. Provider work stops when the
@@ -138,8 +141,9 @@ Cached results do not consume the cap. Deterministic candidates populate Recomme
 immediately; only completed Strong fits earn Hot, and completed non-strong screens return
 to All jobs. Failures and unfinished screens remain in the recommendation backlog.
 Interested, applied, and dismissed decisions immediately re-rank existing results
-and schedule a bounded background refill. The manual Screen button is a retry or
-override, not the normal workflow.
+and schedule a bounded background refill. Discovery failures do not require or
+trigger a repeated source refresh before that backlog can continue. The manual
+per-job Screen button is a retry or override, not the normal workflow.
 
 Test exactly one task without starting the service:
 
