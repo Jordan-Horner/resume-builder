@@ -248,6 +248,7 @@ def test_openrouter_adapter_does_not_require_parallel_tool_call_support(
     assert isinstance(structured.output, SemanticScreen)
     assert structured.output.fit == FitOutcome.GOOD_MATCH
     assert captured_settings["timeout"] == 7
+    assert captured_settings["max_tokens"] == config.limits.max_output_tokens
     assert captured_settings["openrouter_reasoning"] == {
         "effort": "none",
         "exclude": True,

@@ -78,6 +78,10 @@ may contact the provider. Cached results do not consume that job allowance, and
 provider-call telemetry counts both structured requests. Jobs with
 hard local conflicts, incomplete listings, or no saved title search signal
 are skipped before any provider call and remain available for a manual screen.
+Provider-backed jobs run serially, so `max_jobs_per_run` is a total allowance,
+not a concurrency setting. Structured screening responses are capped at 1,000
+tokens. If the optional posting interpretation fails, screening falls back to
+the existing posting-wide evidence path instead of discarding the job.
 
 Provider output is validated against both its structural schema and the exact
 posting packet while the provider retry loop is still active. This includes

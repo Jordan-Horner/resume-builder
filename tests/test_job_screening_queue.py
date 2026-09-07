@@ -378,7 +378,7 @@ def test_provider_failure_remains_visible_and_consumes_the_attempt_budget(
         for item in json.loads(output.read_text(encoding="utf-8"))["jobs"]
     ]
     assert statuses == ["failed", "unscreened"]
-    assert summary.provider_calls == 1
+    assert summary.provider_calls == 2
     assert summary.failed == 1
     assert summary.needs_review == 2
-    assert adapter.calls == 1
+    assert adapter.calls == 2

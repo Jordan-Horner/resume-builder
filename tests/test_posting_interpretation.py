@@ -7,7 +7,11 @@ from pathlib import Path
 
 import pytest
 
-from resume_builder.agent_contracts import StructuredModelReply, StructuredModelRequest
+from resume_builder.agent_contracts import (
+    ModelProviderError,
+    StructuredModelReply,
+    StructuredModelRequest,
+)
 from resume_builder.job_screening import (
     CitedFinding,
     Confidence,
@@ -637,6 +641,54 @@ def test_invalid_shadow_interpretation_cannot_change_current_screen(
     assert outcome.result.fit == FitOutcome.GOOD_MATCH
     assert outcome.posting_interpretation is None
     assert outcome.posting_interpretation_error == "ValueError"
+    assert outcome.requests == 2
+    assert len(adapter.requests) == 2
+    assert "posting_interpretation_failed" in caplog.text
+
+
+def test_provider_shadow_failure_falls_back_to_current_screen(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    packet = build_screening_packet(
+        {
+            "id": "provider-shadow-failure",
+            "title": "Platform Engineer",
+            "company": "Fictional Systems",
+            "location": "Remote",
+            "work_modes": ["remote"],
+            "description_text": "Responsibilities\nOperate production systems.",
+            "url": "https://example.invalid/jobs/provider-shadow-failure",
+        },
+        {
+            "accepted_work_modes": ["remote"],
+            "include_unknown_locations": True,
+            "screening_profile": {"supported_capabilities": ["production operations"]},
+        },
+        {},
+    )
+
+    class ProviderShadowFailureAdapter(InvalidShadowAdapter):
+        def run_structured(self, request: StructuredModelRequest) -> StructuredModelReply:
+            if issubclass(request.output_type, ProposedPostingInterpretation):
+                self.requests.append(request)
+                raise ModelProviderError("provider unavailable")
+            return super().run_structured(request)
+
+    adapter = ProviderShadowFailureAdapter()
+    cache_path = tmp_path / "screens.sqlite"
+    service = ScreeningService(
+        adapter,
+        ScreeningCache(cache_path),
+        interpretation_service=PostingInterpretationService(
+            adapter, PostingInterpretationCache(cache_path)
+        ),
+    )
+
+    outcome = service.screen_detailed(packet, model="fictional/fast")
+
+    assert outcome.result.fit == FitOutcome.GOOD_MATCH
+    assert outcome.posting_interpretation is None
+    assert outcome.posting_interpretation_error == "ModelProviderError"
     assert outcome.requests == 2
     assert len(adapter.requests) == 2
     assert "posting_interpretation_failed" in caplog.text

@@ -339,7 +339,7 @@ def build_screening_queue(
         try:
             outcome = service.screen_detailed(packet, model=model)
         except (ModelProviderError, ValueError) as exc:
-            provider_calls += 1
+            provider_calls += int(getattr(exc, "requests", 1))
             item["screening"] = {
                 "status": "failed",
                 "reason": "provider_error",

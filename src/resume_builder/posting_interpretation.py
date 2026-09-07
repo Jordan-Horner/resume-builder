@@ -541,6 +541,8 @@ criteria merely to match it. Use concise labels and descriptions, two to five re
 section-review reasons under 15 words, and at most three limitations.
 Set criteria_complete false whenever posting_coverage is partial or the posting is ambiguous.
 Keep retrieval terms concise and grounded in the cited posting language or obvious spelling variants.
+Keep the complete response under 1,000 tokens. Omit optional limitations unless they materially affect
+the interpretation.
 """
 
 
@@ -765,6 +767,7 @@ class PostingInterpretationService:
                 instructions=INTERPRETATION_INSTRUCTIONS,
                 model=model,
                 output_type=posting_interpretation_output_type(packet),
+                max_output_tokens=1_000,
             )
         )
         interpretation = validate_interpretation(

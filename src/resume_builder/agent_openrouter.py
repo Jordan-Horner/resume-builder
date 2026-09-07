@@ -47,9 +47,10 @@ class OpenRouterAdapter(ModelAdapter):
         provider_options: dict[str, Any],
         *,
         disable_reasoning: bool = False,
+        max_output_tokens: int | None = None,
     ) -> Any:
         values: dict[str, Any] = {
-            "max_tokens": self.config.limits.max_output_tokens,
+            "max_tokens": max_output_tokens or self.config.limits.max_output_tokens,
             "openrouter_provider": cast(Any, provider_options),
         }
         if self._timeout_seconds is not None:
@@ -208,6 +209,7 @@ class OpenRouterAdapter(ModelAdapter):
             OpenRouterModelSettings,
             provider_options,
             disable_reasoning=request.model == self.config.models.fast,
+            max_output_tokens=request.max_output_tokens,
         )
         model = OpenRouterModel(
             request.model,

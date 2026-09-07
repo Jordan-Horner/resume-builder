@@ -69,6 +69,7 @@ class StructuredModelRequest:
     instructions: str
     model: str
     output_type: type[BaseModel]
+    max_output_tokens: int | None = None
 
 
 @dataclass(frozen=True)

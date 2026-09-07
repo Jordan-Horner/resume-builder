@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 
-from .agent_contracts import ModelAdapter, StructuredModelRequest
+from .agent_contracts import ModelAdapter, ModelProviderError, StructuredModelRequest
 from .job_screening import (
     SCREENING_INSTRUCTIONS,
     EligibilityStatus,
@@ -33,6 +33,14 @@ from .resume_screening import load_directional_resume_candidates
 from .screening_evidence import select_criterion_screening_evidence
 
 LOGGER = logging.getLogger(__name__)
+
+
+class ScreeningProviderError(ModelProviderError):
+    """Retain only content-free request-count telemetry across a failed screen."""
+
+    def __init__(self, message: str, *, requests: int):
+        super().__init__(message)
+        self.requests = requests
 
 
 @dataclass(frozen=True)
@@ -161,7 +169,7 @@ class ScreeningService:
                         model=self.interpretation_model or model,
                         refresh=refresh,
                     )
-                except ValueError as exc:
+                except (ModelProviderError, ValueError) as exc:
                     interpretation_error = exc.__class__.__name__
                     interpretation_requests = 1
                     LOGGER.warning(
@@ -226,14 +234,21 @@ class ScreeningService:
                     posting_interpretation_cached=interpretation_cached,
                     posting_interpretation_error=interpretation_error,
                 )
-        reply = self.adapter.run_structured(
-            StructuredModelRequest(
-                prompt=screening_prompt(packet),
-                instructions=SCREENING_INSTRUCTIONS,
-                model=model,
-                output_type=semantic_screen_output_type(packet),
+        try:
+            reply = self.adapter.run_structured(
+                StructuredModelRequest(
+                    prompt=screening_prompt(packet),
+                    instructions=SCREENING_INSTRUCTIONS,
+                    model=model,
+                    output_type=semantic_screen_output_type(packet),
+                    max_output_tokens=1_000,
+                )
             )
-        )
+        except ModelProviderError as exc:
+            raise ScreeningProviderError(
+                "candidate screening provider failed",
+                requests=interpretation_requests + 1,
+            ) from exc
         semantic = SemanticScreen.model_validate(reply.output)
         result = finalize_screen(packet, semantic, model=reply.model)
         self.cache.put(packet, result)

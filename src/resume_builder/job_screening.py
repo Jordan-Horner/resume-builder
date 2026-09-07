@@ -922,6 +922,8 @@ Keep the result concise, specific, and grounded in fields present in the packet.
 When salary_context is present, also return salary_estimate using only that context.
 When salary_context is null, return null salary_estimate; the posting already has pay data.
 Keep salary estimates out of career fit, strengths, gaps and eligibility recommendations.
+Keep the complete response under 1,000 tokens. Use short, direct assessment explanations and a
+reasoning summary under 100 words.
 Salary estimation rules:
 """
     + SALARY_INSTRUCTIONS
