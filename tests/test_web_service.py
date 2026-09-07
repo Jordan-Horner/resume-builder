@@ -522,9 +522,7 @@ def test_recommended_queue_reuses_the_existing_deterministic_prescreen(
     assert [item["id"] for item in service.list_jobs(queue="recommended")] == ["remote-1"]
 
 
-def test_recommended_queue_demotes_a_completed_weak_screen(
-    tmp_path, inventory, monkeypatch
-):
+def test_recommended_queue_demotes_a_completed_weak_screen(tmp_path, inventory, monkeypatch):
     preferences_path = tmp_path / "job-search/preferences.yml"
     preferences_path.parent.mkdir(parents=True)
     preferences_path.write_text("schema_version: 1\n", encoding="utf-8")
@@ -547,7 +545,9 @@ def test_recommended_queue_demotes_a_completed_weak_screen(
 
 
 def test_recommended_queue_keeps_the_deterministic_backlog(tmp_path, monkeypatch):
-    inventory = [job(f"job-{index}", title="Support Engineer", mode="remote") for index in range(15)]
+    inventory = [
+        job(f"job-{index}", title="Support Engineer", mode="remote") for index in range(15)
+    ]
     preferences_path = tmp_path / "job-search/preferences.yml"
     preferences_path.parent.mkdir(parents=True)
     preferences_path.write_text("schema_version: 1\n", encoding="utf-8")
@@ -622,7 +622,10 @@ def test_interested_job_moves_out_of_recommended_queue(tmp_path, inventory, monk
     )
     service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
 
-    assert [item["id"] for item in service.list_jobs(queue="recommended")] == ["hybrid-1", "onsite-1"]
+    assert [item["id"] for item in service.list_jobs(queue="recommended")] == [
+        "hybrid-1",
+        "onsite-1",
+    ]
     assert [item["id"] for item in service.list_jobs(queue="interested")] == ["remote-1"]
 
 

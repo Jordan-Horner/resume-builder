@@ -97,7 +97,10 @@ def _current_job_stage(
         return "idle"
     screen_path = root / "job-search/new-job-screens.json"
     try:
-        if screen_path.is_file() and screen_path.stat().st_mtime_ns >= refresh_path.stat().st_mtime_ns:
+        if (
+            screen_path.is_file()
+            and screen_path.stat().st_mtime_ns >= refresh_path.stat().st_mtime_ns
+        ):
             return "idle"
     except OSError:
         return "idle"

@@ -999,9 +999,7 @@ def _run_jobs(config: AutomationConfig) -> dict[str, object]:
                 # lets cached results advance the bounded provider budget on later runs.
                 with Path(os.devnull).open("w", encoding="utf-8") as null_stream:
                     with redirect_stdout(null_stream), redirect_stderr(null_stream):
-                        shortlist_code = jobs.main(
-                            ["shortlist", "--limit", str(config.jobs.limit)]
-                        )
+                        shortlist_code = jobs.main(["shortlist", "--limit", str(config.jobs.limit)])
                 if shortlist_code != 0:
                     raise RuntimeError("active job shortlist could not be prepared")
                 workspace = jobs.DEFAULT_NEW_OUTPUT.expanduser().resolve().parent.parent

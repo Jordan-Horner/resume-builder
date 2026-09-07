@@ -412,9 +412,7 @@ def _prescreen(
     preferred_attributes = _contains_phrases(
         posting, preferences.get("preferred_job_attributes", [])
     )
-    avoided_attributes = _contains_phrases(
-        posting, preferences.get("avoided_job_attributes", [])
-    )
+    avoided_attributes = _contains_phrases(posting, preferences.get("avoided_job_attributes", []))
     excluded_title = _contains_bounded(title, preferences.get("excluded_title_terms", []))
     seniority = _contains_phrases(title, preferences.get("senior_title_terms", []))
     accepted_senior_role = _contains_phrases(

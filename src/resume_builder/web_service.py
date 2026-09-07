@@ -1359,9 +1359,8 @@ class DashboardService:
             )
 
             schedule = load_automation(schedule_path)
-            if (
-                not schedule.jobs.semantic_screening_enabled
-                or not background_screening_configured(self.workspace)
+            if not schedule.jobs.semantic_screening_enabled or not background_screening_configured(
+                self.workspace
             ):
                 return
             with self._screening_lock:
@@ -1650,9 +1649,7 @@ class DashboardService:
                         "screening": {"status": "unscreened"},
                     },
                     positive_titles=positive_titles,
-                    clearance_preference=str(
-                        preferences.get("clearance_preference", "neutral")
-                    ),
+                    clearance_preference=str(preferences.get("clearance_preference", "neutral")),
                     feedback_events=feedback_events,
                 )
             if job["id"] in explicitly_interested:
@@ -1713,9 +1710,7 @@ class DashboardService:
                     if isinstance(personalization, dict)
                     else 0.0
                 )
-                hot = bool(
-                    isinstance(personalization, dict) and personalization.get("hot") is True
-                )
+                hot = bool(isinstance(personalization, dict) and personalization.get("hot") is True)
                 posted = _job_timestamp(job)
                 return (0 if hot else 1), -score, -(posted.timestamp() if posted else 0.0)
 

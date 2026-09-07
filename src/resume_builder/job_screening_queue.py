@@ -266,9 +266,7 @@ def build_screening_queue(
                 score_shadow_job(
                     {**pair[1], "screening": {"status": "unscreened"}},
                     positive_titles=positive_titles,
-                    clearance_preference=str(
-                        preferences.get("clearance_preference", "neutral")
-                    ),
+                    clearance_preference=str(preferences.get("clearance_preference", "neutral")),
                     feedback_events=feedback_events,
                 )["score"]
             ),
