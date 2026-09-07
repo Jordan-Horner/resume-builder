@@ -46,7 +46,6 @@ class OpenRouterAdapter(ModelAdapter):
         settings_type: type,
         provider_options: dict[str, Any],
         *,
-        disable_reasoning: bool = False,
         max_output_tokens: int | None = None,
     ) -> Any:
         values: dict[str, Any] = {
@@ -55,8 +54,6 @@ class OpenRouterAdapter(ModelAdapter):
         }
         if self._timeout_seconds is not None:
             values["timeout"] = self._timeout_seconds
-        if disable_reasoning:
-            values["openrouter_reasoning"] = {"effort": "none", "exclude": True}
         return settings_type(**values)
 
     def _provider(self, provider_type: Any, client_type: type, api_key: str) -> Any:
@@ -208,7 +205,6 @@ class OpenRouterAdapter(ModelAdapter):
         settings = self._model_settings(
             OpenRouterModelSettings,
             provider_options,
-            disable_reasoning=request.model == self.config.models.fast,
             max_output_tokens=request.max_output_tokens,
         )
         model = OpenRouterModel(

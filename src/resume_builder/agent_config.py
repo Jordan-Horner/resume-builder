@@ -10,7 +10,7 @@ from typing import Any
 import yaml
 
 DEFAULT_AGENT_CONFIG = Path("agent/config.yml")
-DEFAULT_FAST_MODEL = "openai/gpt-4.1-mini:nitro"
+DEFAULT_FAST_MODEL = "deepseek/deepseek-v4-flash:nitro"
 LEGACY_GENERATED_FAST_MODELS = {
     "deepseek/deepseek-v4-flash",
     "mistralai/mistral-small-2603:nitro",
@@ -275,7 +275,7 @@ provider: openrouter
 api_key_env: OPENROUTER_API_KEY
 
 models:
-  fast: openai/gpt-4.1-mini:nitro
+  fast: deepseek/deepseek-v4-flash:nitro
   reasoning: z-ai/glm-5.2
   writing: z-ai/glm-5.2
 
