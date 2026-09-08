@@ -666,6 +666,56 @@ def test_jobs_are_searchable_filterable_and_only_leave_after_disposition(
     assert state == {"schema_version": 2, "dismissed_job_ids": ["hybrid-1"]}
 
 
+def test_lightweight_job_rows_are_reused_until_workspace_state_changes(
+    tmp_path, inventory, monkeypatch
+):
+    monkeypatch.setattr(web_service, "iter_records", lambda _root: [])
+    loads = 0
+
+    def load_inventory():
+        nonlocal loads
+        loads += 1
+        return inventory
+
+    service = DashboardService(tmp_path, inventory_loader=load_inventory)
+    revision = [("inventory", 1, 1)]
+    monkeypatch.setattr(service, "_job_rows_revision", lambda: tuple(revision))
+
+    first = service.list_job_rows()
+    second = service.list_job_rows()
+
+    assert first == second
+    assert loads == 1
+
+    revision[0] = ("inventory", 2, 1)
+    service.list_job_rows()
+
+    assert loads == 2
+
+
+def test_lightweight_job_rows_normalize_equivalent_view_filters(
+    tmp_path, inventory, monkeypatch
+):
+    monkeypatch.setattr(web_service, "iter_records", lambda _root: [])
+    loads = 0
+
+    def load_inventory():
+        nonlocal loads
+        loads += 1
+        return inventory
+
+    service = DashboardService(tmp_path, inventory_loader=load_inventory)
+    monkeypatch.setattr(service, "_job_rows_revision", lambda: ())
+
+    first = service.list_job_rows(view_filters='{"country":"United States"}')
+    second = service.list_job_rows(
+        view_filters='{"country": "United States", "roles": []}'
+    )
+
+    assert first == second
+    assert loads == 1
+
+
 def test_explicit_job_feedback_is_durable_and_interest_does_not_hide_job(
     tmp_path, inventory, monkeypatch
 ):

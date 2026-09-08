@@ -218,7 +218,11 @@ does not infer status, create search terms, or keep a parallel skill registry.
 
 Job queues return lightweight row data and load the full posting description only
 when a job is opened. Queue requests are debounced, superseded requests are cancelled,
-and a bounded per-filter cache makes recently prefetched tabs switch immediately.
+and a bounded per-filter cache makes recently prefetched tabs switch immediately. The
+server also reuses lightweight queue projections across browser refreshes and rebuilds
+them when inventory, screening, preferences, feedback, applications, or dismissals
+change. It prepares the default Recommended projection during server startup because
+that queue is the landing view.
 Opening a job asks FastAPI for its full description and recommended resume. The recommendation reuses a
 preserved target, its direction, a matching tailored resume, and an existing match
 report when those artifacts exist. Without a target, the only directional resume

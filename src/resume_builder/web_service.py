@@ -14,6 +14,7 @@ from collections import Counter
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, NoReturn
 from uuid import uuid4
@@ -233,6 +234,7 @@ class DashboardService:
             "status": "idle",
             "message": "Screening is ready.",
         }
+        self._cached_job_rows = lru_cache(maxsize=12)(self._build_job_rows)
 
     def _onboarding_record(self) -> dict[str, Any]:
         path = self.workspace / ONBOARDING_STATE_PATH
@@ -1780,6 +1782,93 @@ class DashboardService:
                 else "all"
             ),
         ).model_dump()
+
+    def _job_rows_revision(self) -> tuple[tuple[str, int, int], ...]:
+        """Fingerprint files that can change the lightweight job queues."""
+        config_path = self.workspace / JOBS_CONFIG
+        paths = [
+            config_path,
+            self.workspace / PREFERENCES_PATH,
+            self.workspace / JOB_FEEDBACK_PATH,
+            self.workspace / JOB_SCREENING_OUTPUT,
+            self.workspace / STATE_PATH,
+            self.workspace / APPLICATIONS_ROOT,
+        ]
+        if config_path.is_file():
+            try:
+                config = load_config(config_path)
+                paths.append(resolve_database_path(config_path, config.database_path))
+            except (OSError, ValueError):
+                pass
+        revision = []
+        for path in paths:
+            try:
+                stat = path.stat()
+            except OSError:
+                revision.append((str(path), 0, 0))
+            else:
+                revision.append((str(path), stat.st_mtime_ns, stat.st_size))
+        return tuple(revision)
+
+    def list_job_rows(
+        self,
+        *,
+        search: str = "",
+        work_mode: str = "",
+        date_days: int = 0,
+        employment_type: str = "",
+        view_filters: str = "",
+        hot_only: bool = False,
+        queue: str = "all",
+        limit: int = 100,
+    ) -> dict[str, Any]:
+        """Return a reusable lightweight queue projection for browser refreshes."""
+        if view_filters:
+            from .web_filters import ViewFilters
+
+            view_filters = ViewFilters.model_validate_json(view_filters).model_dump_json()
+        return self._cached_job_rows(
+            self._job_rows_revision(),
+            search,
+            work_mode,
+            date_days,
+            employment_type,
+            view_filters,
+            hot_only,
+            queue,
+            limit,
+        )
+
+    def _build_job_rows(
+        self,
+        _revision: tuple[tuple[str, int, int], ...],
+        search: str,
+        work_mode: str,
+        date_days: int,
+        employment_type: str,
+        view_filters: str,
+        hot_only: bool,
+        queue: str,
+        limit: int,
+    ) -> dict[str, Any]:
+        counts: dict[str, int] = {}
+        items = self.list_jobs(
+            search=search,
+            work_mode=work_mode,
+            date_days=date_days,
+            employment_type=employment_type,
+            view_filters=view_filters,
+            hot_only=hot_only,
+            queue=queue,
+            _result_counts=counts,
+            _include_description=False,
+            _limit=limit,
+        )
+        return {
+            "jobs": items,
+            "count": counts["total"],
+            "reviewable_count": counts["reviewable"],
+        }
 
     def list_jobs(
         self,

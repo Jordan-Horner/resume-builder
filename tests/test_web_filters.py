@@ -244,5 +244,12 @@ def test_api_filters_before_count_and_limit(tmp_path, monkeypatch):
     assert response.json()["count"] == 3
     assert len(response.json()["jobs"]) == 1
     assert "description" not in response.json()["jobs"][0]
+    assert client.get(
+        "/api/jobs",
+        params={
+            "view_filters": ViewFilters(roles=["Support Engineer"]).model_dump_json(),
+            "limit": 1,
+        },
+    ).json() == response.json()
     assert inventory_loads == 1
     assert client.get("/api/jobs", params={"view_filters": '{"minimumPay":-1}'}).status_code == 400

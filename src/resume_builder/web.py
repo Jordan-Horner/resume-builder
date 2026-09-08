@@ -1,11 +1,13 @@
 """Local web server for the Resume Builder dashboard."""
 
 import argparse
+import asyncio
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
 from .agent_contracts import ModelProviderError, ModelProviderTimeoutError
-from .web_service import DashboardService, ScreeningInputError
+from .web_service import JOBS_CONFIG, DashboardService, ScreeningInputError
 from .workspace_state import discover_workspace
 
 
@@ -40,7 +42,26 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
     from .web_schedule import save_schedule, schedule_status
     from .web_system import system_status
 
-    app = FastAPI(title="Resume Builder", docs_url="/api/docs", redoc_url=None)
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> Any:
+        from .web_filters import ViewFilters
+
+        if (workspace / JOBS_CONFIG).is_file():
+            defaults = service.job_filter_defaults()
+            defaults.update(roles=[], locations=[])
+            await asyncio.to_thread(
+                service.list_job_rows,
+                queue="recommended",
+                view_filters=ViewFilters.model_validate(defaults).model_dump_json(),
+            )
+        yield
+
+    app = FastAPI(
+        title="Resume Builder",
+        docs_url="/api/docs",
+        redoc_url=None,
+        lifespan=lifespan,
+    )
     from .web_agent import install_assistant
 
     install_assistant(app, workspace)
@@ -216,8 +237,7 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         limit: int = Query(default=100, ge=1, le=200),
     ) -> dict[str, Any]:
         try:
-            counts: dict[str, int] = {}
-            items = service.list_jobs(
+            return service.list_job_rows(
                 search=search,
                 work_mode=work_mode,
                 date_days=date_days,
@@ -225,17 +245,10 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
                 view_filters=view_filters,
                 hot_only=hot_only,
                 queue=queue,
-                _result_counts=counts,
-                _include_description=False,
-                _limit=limit,
+                limit=limit,
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return {
-            "jobs": items,
-            "count": counts["total"],
-            "reviewable_count": counts["reviewable"],
-        }
 
     @app.get("/api/blocked-companies")
     def blocked_companies() -> dict[str, Any]:

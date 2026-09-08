@@ -5,11 +5,32 @@ from pathlib import Path
 import pytest
 
 from resume_builder.web import create_app
+from resume_builder.web_service import JOBS_CONFIG, DashboardService
 from resume_builder.workspace import initialize_workspace
 
 testclient = pytest.importorskip("fastapi.testclient")
 pytest.importorskip("multipart")
 TestClient = testclient.TestClient
+
+
+def test_active_job_search_prepares_recommended_queue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = tmp_path / JOBS_CONFIG
+    config.parent.mkdir(parents=True)
+    config.write_text("{}", encoding="utf-8")
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        DashboardService,
+        "list_job_rows",
+        lambda _self, **kwargs: calls.append(kwargs) or {},
+    )
+
+    with TestClient(create_app(tmp_path)):
+        pass
+
+    assert calls[0]["queue"] == "recommended"
+    assert isinstance(calls[0]["view_filters"], str)
 
 
 def _client(tmp_path: Path) -> TestClient:
