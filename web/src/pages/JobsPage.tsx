@@ -22,6 +22,7 @@ const companyKey = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g,
 type JobQueue = "all" | "recommended" | "interested";
 type JobQueuePayload = { jobs: Job[]; count: number; reviewable_count: number };
 const MAX_QUEUE_CACHE_ENTRIES = 6;
+const NOTICE_DURATION_MS = 8000;
 
 function textFiltersChanged(previous: JobFilters, next: JobFilters) {
   return previous.search !== next.search
@@ -249,6 +250,12 @@ export function JobsPage() {
     (results.current?.querySelector<HTMLButtonElement>(".job-row") || results.current)?.focus();
   }, [jobs, loading, queueRefreshing]);
 
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(""), NOTICE_DURATION_MS);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
   async function changeCompany(company: string, blocked: boolean) {
     if (companyBusy || pendingAction) return;
     setCompanyBusy(true); setError("");
@@ -382,6 +389,10 @@ export function JobsPage() {
   const compensationSummary = compensation && !compensation.skipped && compensation.minimum
     ? `${formatCompactCurrency(compensation.minimum, compensation.currency || "USD")}+ minimum` : "Any compensation";
   const selectedCompanyBlocked = !!selected && blockedCompanies.some((company) => companyKey(company) === companyKey(selected.company));
+  const noticeContent = notice && <>
+    <span role="status">{notice}</span>
+    <button className="notice-dismiss" type="button" aria-label="Dismiss notification" onClick={() => setNotice("")}>&times;</button>
+  </>;
 
   return (
     <div className="page jobs-page">
@@ -406,7 +417,7 @@ export function JobsPage() {
               {searchPreferences?.status === "ready_to_activate" ? <button className="primary-button" onClick={() => void finishSetup()}>Finish setup</button> : <button className="primary-button" disabled={scanning} onClick={() => void runManualScan()}>{scanning ? "Searching sources…" : "Find jobs now"}</button>}
               <a className="empty-state-link" href="/settings/search-preferences">Review search settings</a>
             </div>
-            {notice && <p className="first-search-notice" role="status">{notice}</p>}
+            {notice && <div className="first-search-notice transient-notice">{noticeContent}</div>}
           </div> : <>
             <div className="queue-tabs" role="tablist" aria-label="Job queues">
               <button role="tab" aria-selected={queueView === "recommended"} onMouseEnter={() => prefetchQueue("recommended")} onFocus={() => prefetchQueue("recommended")} onClick={() => selectQueue("recommended")}>Recommended Jobs</button>
@@ -417,7 +428,7 @@ export function JobsPage() {
               {defaults?.country && <span title="Country from onboarding applies across all providers, including company boards. Unspecified locations remain available for review.">{defaults.country} · all sources</span>}
               <span>{loading ? "Looking…" : `${total} ${total === 1 ? "job" : "jobs"} to review`}</span>{deferredSearch && <span>for “{deferredSearch}”</span>}
             </div>
-            {notice && <p className="action-notice" role="status">{notice}</p>}
+            {notice && <div className="action-notice transient-notice">{noticeContent}</div>}
             {error && <ErrorMessage message={error} retry={() => { setError(""); setReloadKey((key) => key + 1); }} />}
             {queueError && <ErrorMessage message={queueError} retry={() => setQueueRevision((value) => value + 1)} />}
             {loading ? <LoadingRows label="Loading jobs" /> : queueError ? null : jobs.length ? <div className="job-list">

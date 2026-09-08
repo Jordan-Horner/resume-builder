@@ -251,6 +251,24 @@ it("retries a failed refresh without repeating the successful mutation", async (
   expect(host.textContent).toContain("Build your job queue");
 });
 
+it("automatically clears action confirmations after eight seconds", async () => {
+  await openJob();
+  vi.useFakeTimers();
+  await click("Mark as applied");
+
+  expect(host.textContent).toContain("moved to Applications");
+  await act(async () => vi.advanceTimersByTime(8000));
+  expect(host.textContent).not.toContain("moved to Applications");
+});
+
+it("lets the user dismiss an action confirmation immediately", async () => {
+  await openJob();
+  await click("Mark as applied");
+
+  await act(async () => (host.querySelector('[aria-label="Dismiss notification"]') as HTMLButtonElement).click());
+  expect(host.textContent).not.toContain("moved to Applications");
+});
+
 it("offers salary estimation only inside the opened job description", async () => {
   await act(async () => root.render(<JobsPage />));
   expect(host.textContent).not.toContain("Estimate Salary");
