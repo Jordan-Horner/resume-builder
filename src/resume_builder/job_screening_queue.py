@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from .agent_contracts import ModelAdapter, ModelProviderError
+from .applications import DEFAULT_ROOT as DEFAULT_APPLICATIONS_ROOT
 from .applications import applied_job_ids
 from .atomic import atomic_write_json, atomic_write_text
 from .job_personalization import (
@@ -37,6 +38,7 @@ from .jobs import (
     get_job_screening_packet,
 )
 from .posting_interpretation import PostingInterpretationCache
+from .resume_screening import load_directional_resume_candidates
 from .screening_service import ScreeningService, enrich_packet_from_cached_interpretation
 
 LOGGER = logging.getLogger(__name__)
@@ -235,10 +237,13 @@ def build_screening_queue(
         cache,
     )
     preferences = (
-        _with_application_dispositions(_load_preferences(preferences_path))
+        _with_application_dispositions(
+            _load_preferences(preferences_path), workspace / DEFAULT_APPLICATIONS_ROOT
+        )
         if preferences_path.exists()
         else {}
     )
+    directional_resumes = load_directional_resume_candidates(workspace)
     dispositions = preferences.get("job_dispositions") or {}
     positive_ids = applied_job_ids() | {
         str(job_id) for job_id, status in dispositions.items() if status == "applied"
@@ -323,12 +328,19 @@ def build_screening_queue(
             config_path=config_path,
             preferences_path=preferences_path,
             workspace=workspace,
+            prepared_job=job,
+            prepared_preferences=preferences,
+            prepared_prescreen=(
+                prescreen if isinstance((prescreen := job.get("prescreen")), dict) else None
+            ),
+            prepared_directional_resumes=directional_resumes,
         )
         packet = enrich_packet_from_cached_interpretation(
             packet,
             model=interpretation_model or model,
             interpretation_cache=PostingInterpretationCache(cache_path),
             vault_root=workspace / "vault",
+            directional_resumes=directional_resumes,
         )
         cached = cache.get(packet, model)
         if cached is not None:

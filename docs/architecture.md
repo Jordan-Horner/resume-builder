@@ -217,23 +217,23 @@ feedback signals; they are not reclassified by the model. Salary estimation is
 also a separate, explicit public-posting-only request. This keeps the private
 fit request focused on the judgment the model uniquely provides.
 
-The same criterion-driven screen recommends the closest active directional
-resume without another provider request. The service intersects each validated
-criterion judgment with the canonical fact IDs visibly cited by each resume,
-then passes the resulting criterion matrix to the same gate-first classifier
-used by formal CLI matching. Missing bounded retrieval remains `Unknown match`;
-it is never converted into a weak resume or an assertion that the candidate
-lacks experience. Resume paths and content hashes are part of the screen cache
-identity, so editing or retiring a direction invalidates its old recommendation.
-Applying pins the selected path, hash, and match label at that moment. A minted
-same-job tailored resume still takes precedence.
+The quick screen can recommend the closest active directional resume without
+another provider request. When a cached criterion interpretation exists, the
+service intersects each validated criterion judgment with the canonical fact IDs
+visibly cited by each resume and passes that matrix to the same gate-first
+classifier used by formal CLI matching. A posting-wide screen instead compares
+only the fact IDs the fit model cited: it names a resume only when one direction
+has strictly greater cited-evidence overlap than every other active direction.
+It abstains on ties or zero overlap rather than inventing precision. Resume paths
+and content hashes are part of the screen cache identity, so editing or retiring
+a direction invalidates its old recommendation. Applying pins the selected path,
+hash, and match label at that moment. A minted same-job tailored resume still
+takes precedence.
 
-Posting interpretation and private fit use separate model routes. The
-candidate-independent interpretation uses the configured reasoning model and
-contains only public posting text. The bounded fit request uses the configured
-fast model and is the only stage that receives private candidate evidence. This
-improves extraction quality independently without adding another resume-matching
-call or increasing the private context sent to a provider.
+Posting interpretation and private fit use separate model routes when deeper
+analysis requests an interpretation. The candidate-independent interpretation
+contains only public posting text. Normal queue triage uses the configured fast
+fit model in one provider call and never waits for that deeper stage.
 
 Interactive manual quick screens use the already-built posting-wide evidence
 packet in one provider stage and do not retry automatically. The portal queues the existing

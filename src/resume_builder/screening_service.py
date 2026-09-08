@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -36,7 +37,7 @@ from .posting_interpretation import (
     PostingInterpretationService,
     build_interpretation_packet,
 )
-from .resume_screening import load_directional_resume_candidates
+from .resume_screening import DirectionalResumeCandidate, load_directional_resume_candidates
 from .screening_evidence import select_criterion_screening_evidence
 
 LOGGER = logging.getLogger(__name__)
@@ -97,6 +98,7 @@ def enrich_packet_from_cached_interpretation(
     model: str,
     interpretation_cache: PostingInterpretationCache,
     vault_root: Path,
+    directional_resumes: Sequence[DirectionalResumeCandidate] | None = None,
 ) -> ScreeningPacket:
     """Recreate a criterion-driven packet locally so its screen cache remains addressable."""
     resolved_vault = vault_root.expanduser().resolve()
@@ -122,8 +124,12 @@ def enrich_packet_from_cached_interpretation(
             interpretation,
         )
         packet = with_screening_evidence(packet, evidence)
+        candidates = directional_resumes
+        if candidates is None:
+            candidates = load_directional_resume_candidates(resolved_vault.parent)
         return with_directional_resumes(
-            packet, load_directional_resume_candidates(resolved_vault.parent)
+            packet,
+            candidates,
         )
     except (OSError, ValueError) as exc:
         LOGGER.warning(

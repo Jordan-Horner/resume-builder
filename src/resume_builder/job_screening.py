@@ -30,6 +30,7 @@ from .resume_screening import (
     DirectionalResumeCandidate,
     ResumeMatchSummary,
     classify_directional_resumes,
+    match_directional_resumes_by_cited_facts,
     resume_revision,
 )
 from .screening_evidence import (
@@ -1115,6 +1116,17 @@ def finalize_screen(
         recommendation = Recommendation.PURSUE_AS_STRETCH
     else:
         recommendation = Recommendation.NEEDS_MORE_EVIDENCE
+    resume_match = classify_directional_resumes(
+        packet.directional_resumes,
+        packet.criterion_evidence,
+        criterion_assessments,
+        posting_complete=packet.posting_coverage == "complete",
+    )
+    if resume_match is None and not packet.criterion_evidence:
+        resume_match = match_directional_resumes_by_cited_facts(
+            packet.directional_resumes,
+            semantic.supporting_fact_ids,
+        )
     return ScreeningResult(
         job_id=packet.job.id,
         packet_hash=packet.packet_hash,
@@ -1136,12 +1148,7 @@ def finalize_screen(
         evidence_strategy=packet.evidence_strategy,
         criterion_evidence=packet.criterion_evidence,
         criterion_assessments=criterion_assessments,
-        resume_match=classify_directional_resumes(
-            packet.directional_resumes,
-            packet.criterion_evidence,
-            criterion_assessments,
-            posting_complete=packet.posting_coverage == "complete",
-        ),
+        resume_match=resume_match,
     )
 
 

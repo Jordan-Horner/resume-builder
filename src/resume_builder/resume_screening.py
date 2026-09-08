@@ -199,3 +199,40 @@ def classify_directional_resumes(
         primary_gap=primary_gap,
         alternative=alternative,
     )
+
+
+def match_directional_resumes_by_cited_facts(
+    candidates: Sequence[DirectionalResumeCandidate],
+    supporting_fact_ids: Sequence[str],
+) -> ResumeMatchSummary | None:
+    """Name a posting-wide closest resume only when cited evidence has one clear winner."""
+    cited = set(supporting_fact_ids)
+    if not candidates or not cited:
+        return None
+    ranked = sorted(
+        ((len(cited & set(candidate.fact_ids)), candidate) for candidate in candidates),
+        key=lambda item: (-item[0], item[1].resume_id),
+    )
+    top_overlap, winner = ranked[0]
+    if top_overlap == 0 or (len(ranked) > 1 and ranked[1][0] == top_overlap):
+        return None
+
+    def label(overlap: int) -> ResumeMatchLabel:
+        return "Strong match" if overlap == len(cited) and len(cited) >= 2 else "Partial match"
+
+    alternative = None
+    if len(ranked) > 1 and ranked[1][0] > 0:
+        runner_overlap, runner_up = ranked[1]
+        if len(ranked) == 2 or ranked[2][0] != runner_overlap:
+            alternative = ResumeMatchAlternative(
+                resume_id=runner_up.resume_id,
+                name=runner_up.name,
+                label=label(runner_overlap),
+            )
+    return ResumeMatchSummary(
+        resume_id=winner.resume_id,
+        name=winner.name,
+        sha256=winner.sha256,
+        label=label(top_overlap),
+        alternative=alternative,
+    )

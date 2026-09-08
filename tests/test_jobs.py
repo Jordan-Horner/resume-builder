@@ -33,6 +33,18 @@ def test_resume_corpus_skips_legacy_non_utf8_markdown(tmp_path, caplog):
     assert "resume_corpus_skipped_non_utf8_file" in caplog.text
 
 
+def test_resume_corpus_ignores_macos_metadata_without_warning(tmp_path, caplog):
+    baselines = tmp_path / "resumes" / "baselines"
+    baselines.mkdir(parents=True)
+    (baselines / "valid.md").write_text("# Platform Engineer", encoding="utf-8")
+    (baselines / "._valid.md").write_bytes(b"\x00\xa3metadata")
+
+    text, _revision = _resume_corpus({}, tmp_path)
+
+    assert text == "# Platform Engineer"
+    assert "resume_corpus_skipped_non_utf8_file" not in caplog.text
+
+
 def job(**updates):
     payload = {
         "title": "Senior Production Support Engineer",
@@ -479,6 +491,43 @@ screening_profile:
     assert packet.job.id == "fictional-shared"
     assert packet.job.description_hash == "fictional-hash"
     assert packet.profile.supported_capabilities == ["incident response"]
+
+
+def test_shared_screening_packet_reuses_prepared_batch_inputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    prepared_job = job(
+        id="prepared-job",
+        location="Remote",
+        url="https://example.invalid/jobs/prepared",
+        description_hash="prepared-hash",
+    )
+    candidate = jobs_module.DirectionalResumeCandidate(
+        resume_id="resumes/baselines/sre.md",
+        name="Site Reliability Engineer",
+        sha256="a" * 64,
+        fact_ids=[],
+    )
+
+    def unexpected(*_args, **_kwargs):
+        raise AssertionError("prepared batch inputs must avoid repeated workspace scans")
+
+    monkeypatch.setattr(jobs_module, "_database", unexpected)
+    monkeypatch.setattr(jobs_module, "_load_preferences", unexpected)
+    monkeypatch.setattr(jobs_module, "_resume_corpus", unexpected)
+    monkeypatch.setattr(jobs_module, "load_directional_resume_candidates", unexpected)
+
+    packet = get_job_screening_packet(
+        "prepared-job",
+        workspace=tmp_path,
+        prepared_job=prepared_job,
+        prepared_preferences={"accepted_work_modes": ["remote"]},
+        prepared_prescreen={"queue_state": "ready"},
+        prepared_directional_resumes=[candidate],
+    )
+
+    assert packet.job.id == "prepared-job"
+    assert packet.directional_resumes == [candidate]
 
 
 class FakeInventory:

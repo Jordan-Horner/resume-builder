@@ -873,6 +873,57 @@ def test_finalize_screen_includes_shared_resume_match() -> None:
     assert result.resume_match.resume_id == "resumes/baselines/sre.md"
 
 
+def test_finalize_posting_wide_screen_uses_unique_cited_resume_match() -> None:
+    packet = build_screening_packet(
+        {
+            "id": "posting-wide-resume-match",
+            "title": "Reliability Engineer",
+            "company": "Example",
+            "location": "Remote",
+            "work_modes": ["remote"],
+            "description_text": "Lead incident response.",
+            "url": "https://example.invalid/posting-wide-resume-match",
+        },
+        {
+            "accepted_work_modes": ["remote"],
+            "screening_profile": {"supported_capabilities": ["incident response"]},
+        },
+        {},
+    )
+    fact_id = packet.candidate_evidence[0].fact_id
+    enriched = with_directional_resumes(
+        packet,
+        [
+            DirectionalResumeCandidate(
+                resume_id="resumes/baselines/sre.md",
+                name="Site Reliability Engineer",
+                sha256="a" * 64,
+                fact_ids=[fact_id],
+            ),
+            DirectionalResumeCandidate(
+                resume_id="resumes/baselines/backend.md",
+                name="Backend Engineer",
+                sha256="b" * 64,
+                fact_ids=[],
+            ),
+        ],
+    )
+    semantic = SemanticScreen(
+        fit=FitOutcome.GOOD_MATCH,
+        confidence=Confidence.MEDIUM,
+        supporting_fact_ids=[fact_id],
+        gaps=[],
+        unknowns=[],
+        reasoning_summary="Confirmed evidence supports the core work.",
+    )
+
+    result = finalize_screen(enriched, semantic, model="fictional/model")
+
+    assert result.resume_match is not None
+    assert result.resume_match.resume_id == "resumes/baselines/sre.md"
+    assert result.resume_match.label == "Partial match"
+
+
 def test_campus_hire_is_deprioritized_for_established_work_history() -> None:
     packet = build_screening_packet(
         {

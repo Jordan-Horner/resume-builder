@@ -228,37 +228,19 @@ Missing salary or sponsorship language stays unknown. Skill, tooling, domain,
 title, and years-of-experience gaps belong to career fit and may produce a
 positive `worthwhile_stretch` result.
 
-For an authorized new or refreshed screen, the service first runs a separate
-posting-only shadow interpretation. It sections the bounded posting into stable
-sentence-or-list-item source units, extracts four to eight source-backed criteria
-when supported, and requires every section to be accounted for. This request
-contains no candidate profile or vault facts. Its versioned SQLite cache shares
-the screening database file but a separate table and cache key. The model returns
-source-unit IDs rather than copied quotations. The server rejects unknown or
-cross-section IDs, derives the exact source text locally, and requires a lexical
-anchor to the criterion label or retrieval terms. Section
-dispositions and partial-posting completeness are derived locally rather than
-trusted as model judgments. Preference and lifestyle cross-fields are also
-normalized locally in the conservative direction. After local validation, each
-resume-evaluable criterion independently retrieves up to three candidate facts
-from the canonical vault. Required and role-defining criteria are processed
-first, but selection is round-robin and globally capped at twelve cards so one
-broad criterion cannot crowd out the rest. The fit model receives the
-criterion-to-fact mapping and every positive finding must cite a fact under the
-criterion that retrieved it. The server rejects unknown or cross-criterion
-citations. The fit model must assess every resume-evaluable criterion as
-supported, partially supported, transferable, unknown, or an apparent gap. The
-server rejects missing assessments, facts borrowed across criteria, and gap claims
-based only on retrieval silence. Required uncertainty caps an otherwise strong
-result, while preferred uncertainty never becomes an eligibility blocker. An
-empty required/core retrieval set produces a local
-`needs_more_evidence` result without paying for the private fit request; it does
-not mean the candidate lacks the skill. Invalid shadow output is logged by
-category and falls back to the existing posting-wide evidence screen. A
-provider transport failure still surfaces normally rather than immediately
-repeating the same failing provider call. Cached interpretations can recreate
-the criterion-driven packet locally, so reopening a job finds its saved screen
-without another provider request.
+Normal authorized quick screens use the posting-wide evidence packet in one
+provider call. The model may cite up to five supplied fact IDs, and the server
+rejects any citation outside that packet. Those cited IDs also support a local
+closest-direction check: a résumé is named only when its visible canonical facts
+beat every other active direction on cited-evidence overlap. A tie or zero overlap
+leaves the closest résumé unset.
+
+A separately requested posting-only interpretation can still section the
+bounded posting into source-backed criteria without candidate data. Its cached
+result may later enrich a quick screen locally with criterion-specific retrieval
+and the formal gate-first résumé classifier. The quick screen never waits for a
+new interpretation, and a provider transport failure is surfaced rather than
+immediately repeated.
 
 Before using quick screens to change ordering, build a reviewed calibration set
 from real saved postings and stable interpreted criterion IDs. First create a

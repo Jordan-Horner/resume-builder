@@ -9,6 +9,7 @@ from resume_builder.resume_screening import (
     DirectionalResumeCandidate,
     classify_directional_resumes,
     load_directional_resume_candidates,
+    match_directional_resumes_by_cited_facts,
 )
 from resume_builder.screening_evidence import (
     CriterionEvidenceMatch,
@@ -156,3 +157,45 @@ Operates reliable production services. <!-- evidence: FACT-SRE -->
     assert candidates[0].name == "Site Reliability Engineer"
     assert candidates[0].fact_ids == ["FACT-SRE"]
     assert len(candidates[0].sha256) == 64
+
+
+def test_posting_wide_match_selects_only_unique_evidence_winner() -> None:
+    candidates = [
+        DirectionalResumeCandidate(
+            resume_id="resumes/baselines/sre.md",
+            name="Site Reliability Engineer",
+            sha256="a" * 64,
+            fact_ids=["FACT-INCIDENT", "FACT-TERRAFORM"],
+        ),
+        DirectionalResumeCandidate(
+            resume_id="resumes/baselines/support.md",
+            name="Technical Support Engineer",
+            sha256="b" * 64,
+            fact_ids=["FACT-INCIDENT"],
+        ),
+    ]
+
+    result = match_directional_resumes_by_cited_facts(
+        candidates,
+        ["FACT-INCIDENT", "FACT-TERRAFORM"],
+    )
+
+    assert result is not None
+    assert result.resume_id == "resumes/baselines/sre.md"
+    assert result.label == "Strong match"
+    assert result.alternative is not None
+    assert result.alternative.resume_id == "resumes/baselines/support.md"
+
+
+def test_posting_wide_match_abstains_when_multiple_resumes_tie() -> None:
+    candidates = [
+        DirectionalResumeCandidate(
+            resume_id=f"resumes/baselines/{name}.md",
+            name=name.title(),
+            sha256=character * 64,
+            fact_ids=["FACT-SHARED"],
+        )
+        for name, character in (("sre", "a"), ("support", "b"))
+    ]
+
+    assert match_directional_resumes_by_cited_facts(candidates, ["FACT-SHARED"]) is None

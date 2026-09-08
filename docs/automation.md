@@ -68,6 +68,11 @@ with no more than 20 privacy-scrubbed cards and 6,000 candidate-evidence
 characters sent per job. Interest terms remain search hints rather than proof.
 The model must cite the fact IDs behind positive findings, and a job is not sent
 to the provider when no relevant confirmed evidence can be retrieved.
+The active directional résumé set is loaded once per batch. A posting-wide result
+names the closest résumé only when one direction has a unique lead in cited-fact
+overlap; ties remain unnamed. Résumé content is excluded from the provider
+request. Prepared preferences, jobs, prescreens, and résumé candidates are reused
+throughout the batch instead of rescanning the workspace for every queue item.
 This is the inexpensive first-pass screen only; it does not run deeper company,
 compensation, or quality-of-life research. The per-run maximum bounds jobs that
 may contact the provider. Cached results do not consume that job allowance, and
