@@ -5,12 +5,14 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+AMOUNT = r"(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?"
+
 DOLLAR_RANGE = re.compile(
     r"(?P<currency>CA\$|C\$|US\$|\$|€|£)\s*"
-    r"(?P<minimum>\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*(?P<minimum_k>[kK])?\s*"
+    rf"(?P<minimum>{AMOUNT})\s*(?P<minimum_k>[kK])?\s*"
     r"(?:-|\u2013|\u2014|to)\s*"
     r"(?:(?P<second_currency>CA\$|C\$|US\$|\$|€|£)\s*)?"
-    r"(?P<maximum>\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*(?P<maximum_k>[kK])?\s*"
+    rf"(?P<maximum>{AMOUNT})\s*(?P<maximum_k>[kK])?\s*"
     r"(?:(?P<interval>per\s+(?:year|annum|hour|month|week|day)|"
     r"annually|yearly|hourly|monthly|weekly|daily|/(?:year|yr|hour|hr|month|week|day))|"
     r"(?P<base_salary>base\s+salary))?\b",
@@ -19,10 +21,10 @@ DOLLAR_RANGE = re.compile(
 
 ISO_SUFFIX_ANNUAL_RANGE = re.compile(
     r"\b(?:base\s+)?(?:salary|pay|compensation)(?:\s+range)?\b[^\d\n]{0,80}"
-    r"(?P<minimum>\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*"
+    rf"(?P<minimum>{AMOUNT})\s*"
     r"(?P<currency>USD|CAD|EUR|GBP)\s*"
     r"(?:-|\u2013|\u2014|to)\s*"
-    r"(?P<maximum>\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*"
+    rf"(?P<maximum>{AMOUNT})\s*"
     r"(?P<second_currency>USD|CAD|EUR|GBP)\b",
     re.IGNORECASE,
 )
