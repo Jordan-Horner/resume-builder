@@ -193,14 +193,14 @@ function ScheduleEditor() {
     <div className="background-screening">
       <div>
         <strong>Background quick screening</strong>
-        <p>Screen up to {screeningMaxJobs} eligible recommendations per run. This uses jobs already in your library and never contacts job sources.</p>
+        <p>Automatic runs screen up to {screeningMaxJobs} eligible recommendations. A manual backfill continues in safe batches until the eligible backlog is clear.</p>
         {!saved.screening_available && <p className="screening-setup-note"><a href="/settings/integrations">Connect OpenRouter</a> to turn this on.</p>}
-        {backfill && backfill.status !== "idle" && <p className="screening-backfill-status" role="status">{backfill.message}{backfill.failed_jobs ? ` ${backfill.failed_jobs} still need another attempt.` : ""}</p>}
+        {backfill && backfill.status !== "idle" && <p className="screening-backfill-status" role="status">{backfill.message}{backfill.status !== "running" && backfill.pending_screening_jobs ? ` ${backfill.pending_screening_jobs} could not be completed automatically.` : ""}</p>}
       </div>
       <div className="background-screening-controls">
         <label><span>Per run</span><select aria-label="Quick screens per run" value={screeningMaxJobs} disabled={busy || !screeningEnabled} onChange={(event) => setScreeningMaxJobs(Number(event.target.value))}>{[3, 6, 10, 15, 25].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
         <label className="source-toggle"><span>{screeningEnabled ? "On" : "Off"}</span><input type="checkbox" role="switch" aria-label="Background quick screening" checked={screeningEnabled} disabled={busy || !saved.screening_available} onChange={(event) => { setScreeningEnabled(event.target.checked); setNotice(""); }} /></label>
-        <button className="secondary-button" disabled={busy || backfillBusy || backfill?.status === "running" || !saved.screening_available || !saved.screening_enabled} onClick={() => void runBackfill()}>{backfill?.status === "running" ? "Screening…" : "Screen recommendations now"}</button>
+        <button className="secondary-button" disabled={busy || backfillBusy || backfill?.status === "running" || !saved.screening_available || !saved.screening_enabled} onClick={() => void runBackfill()}>{backfill?.status === "running" ? "Screening…" : "Screen all eligible jobs"}</button>
       </div>
     </div>
     {error && <p role="alert" className="onboarding-error">{error}</p>}

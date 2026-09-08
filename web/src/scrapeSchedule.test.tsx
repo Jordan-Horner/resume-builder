@@ -64,15 +64,15 @@ it("enables capped quick screening without implying that jobs are filtered", asy
   await act(async () => toggle.click());
   await act(async () => [...host.querySelectorAll("button")].find((button) => button.textContent === "Save schedule")?.click());
 
-  expect(host.textContent).toContain("jobs already in your library");
-  expect(host.textContent).toContain("never contacts job sources");
+  expect(host.textContent).toContain("eligible recommendations");
+  expect(host.textContent).toContain("safe batches");
   expect(saveScrapeSchedule).toHaveBeenCalledWith(true, ["08:00"], true, 6);
 });
 
 it("starts screening without starting a source search", async () => {
   vi.mocked(getScrapeSchedule).mockResolvedValue({ ...schedule, screening_enabled: true });
   await act(async () => root.render(<JobSources />));
-  const button = [...host.querySelectorAll("button")].find((item) => item.textContent === "Screen recommendations now") as HTMLButtonElement;
+  const button = [...host.querySelectorAll("button")].find((item) => item.textContent === "Screen all eligible jobs") as HTMLButtonElement;
 
   await act(async () => button.click());
 

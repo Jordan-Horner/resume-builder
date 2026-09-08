@@ -108,12 +108,15 @@ def test_screening_backfill_rebuilds_current_inventory_without_source_refresh(
         "run_background_quick_screening",
         lambda root, *, max_jobs, input_path: (
             calls.append(("screen", (root, max_jobs, input_path)))
-            or SimpleNamespace(
-                failed=0,
-                failure_categories={},
-                attempted=5,
-                succeeded=4,
-                provider_calls=5,
+                or SimpleNamespace(
+                    active=11,
+                    failed=0,
+                    failure_categories={},
+                    attempted=5,
+                    succeeded=4,
+                    completed=9,
+                    pending=0,
+                    provider_calls=5,
                 cached=6,
                 recommended=8,
                 needs_review=2,
@@ -169,6 +172,142 @@ def test_screening_backfill_deduplicates_overlapping_requests(
     assert first is True
     assert second is False
     assert state["status"] == "running"
+
+
+def test_screening_backfill_drains_bounded_batches_and_stops_without_progress(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from resume_builder import background_screening
+    from resume_builder.automation import DEFAULT_CONFIG, render_default_config
+
+    automation_path = tmp_path / DEFAULT_CONFIG
+    automation_path.parent.mkdir(parents=True)
+    raw = yaml.safe_load(
+        render_default_config("America/New_York", jobs_enabled=True, gmail_enabled=False)
+    )
+    raw["jobs"]["semantic_screening"] = {"enabled": True, "max_jobs_per_run": 25}
+    automation_path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+    shortlist = tmp_path / "job-search/shortlist.json"
+    monkeypatch.setattr(background_screening, "background_screening_configured", lambda _root: True)
+    monkeypatch.setattr(
+        background_screening,
+        "prepare_background_screening_input",
+        lambda _root, *, display_limit: shortlist,
+    )
+    summaries = iter(
+        [
+            SimpleNamespace(
+                active=60,
+                attempted=25,
+                succeeded=24,
+                completed=24,
+                cached=24,
+                failed=1,
+                pending=36,
+                failure_categories={"invalid_response": 1},
+                provider_calls=25,
+                recommended=20,
+                needs_review=40,
+                input_tokens=100,
+                output_tokens=10,
+                cost_usd="0.01",
+                duration_seconds=10.0,
+            ),
+            SimpleNamespace(
+                active=60,
+                attempted=25,
+                succeeded=25,
+                completed=49,
+                cached=49,
+                failed=0,
+                pending=11,
+                failure_categories={},
+                provider_calls=25,
+                recommended=40,
+                needs_review=20,
+                input_tokens=100,
+                output_tokens=10,
+                cost_usd="0.01",
+                duration_seconds=10.0,
+            ),
+            SimpleNamespace(
+                active=60,
+                attempted=11,
+                succeeded=9,
+                completed=58,
+                cached=58,
+                failed=2,
+                pending=2,
+                failure_categories={"invalid_response": 2},
+                provider_calls=11,
+                recommended=48,
+                needs_review=12,
+                input_tokens=50,
+                output_tokens=5,
+                cost_usd="0.005",
+                duration_seconds=5.0,
+            ),
+            SimpleNamespace(
+                active=60,
+                attempted=2,
+                succeeded=0,
+                completed=58,
+                cached=58,
+                failed=2,
+                pending=2,
+                failure_categories={"invalid_response": 2},
+                provider_calls=2,
+                recommended=48,
+                needs_review=12,
+                input_tokens=0,
+                output_tokens=0,
+                cost_usd="0",
+                duration_seconds=2.0,
+            ),
+        ]
+    )
+    calls: list[int] = []
+
+    def run_batch(_root: Path, *, max_jobs: int, input_path: Path) -> SimpleNamespace:
+        assert input_path == shortlist
+        calls.append(max_jobs)
+        return next(summaries)
+
+    monkeypatch.setattr(background_screening, "run_background_quick_screening", run_batch)
+    service = DashboardService(tmp_path, inventory_loader=lambda: [])
+
+    started, _ = service.queue_screening_backfill()
+    service.run_queued_screening_backfill()
+
+    assert started is True
+    assert calls == [25, 25, 25, 25]
+    status = service.screening_backfill_status()
+    assert status["status"] == "partial"
+    assert status["batch_count"] == 4
+    assert status["attempted_jobs"] == 63
+    assert status["screened_jobs"] == 58
+    assert status["pending_screening_jobs"] == 2
+    assert status["failed_jobs"] == 2
+    assert status["failure_categories"] == {"invalid_response": 5}
+    assert status["provider_requests"] == 63
+    assert status["cost_usd"] == "0.025"
+
+
+def test_recommendation_replenishment_runs_only_one_bounded_batch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    service = DashboardService(tmp_path, inventory_loader=lambda: [])
+    calls: list[bool] = []
+    monkeypatch.setattr(service, "queue_screening_backfill", lambda *, drain: (True, {}))
+    monkeypatch.setattr(
+        service,
+        "run_queued_screening_backfill",
+        lambda *, drain: calls.append(drain),
+    )
+
+    service.replenish_recommendations()
+
+    assert calls == [False]
 
 
 def test_screening_backfill_input_is_built_only_from_local_inventory(

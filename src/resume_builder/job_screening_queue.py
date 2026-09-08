@@ -71,6 +71,7 @@ class ScreeningQueueSummary:
     provider_calls: int
     recommended: int
     needs_review: int
+    pending: int
     additional: int
     failed: int
     failure_categories: dict[str, int]
@@ -188,6 +189,7 @@ def _summary(
         + recommendations[Recommendation.VERIFY_ELIGIBILITY.value]
         + recommendations[Recommendation.NEEDS_MORE_EVIDENCE.value]
     )
+    pending = statuses["unscreened"] + statuses["failed"]
     return ScreeningQueueSummary(
         total=len(items),
         active=len(active_items),
@@ -198,6 +200,7 @@ def _summary(
         provider_calls=provider_calls,
         recommended=recommended,
         needs_review=needs_review,
+        pending=pending,
         additional=max(0, len(active_items) - recommended - needs_review),
         failed=statuses["failed"],
         failure_categories=dict(sorted(failure_categories.items())),

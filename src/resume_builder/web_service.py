@@ -10,8 +10,10 @@ import re
 import shutil
 import tempfile
 import threading
+from collections import Counter
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, NoReturn
 from uuid import uuid4
@@ -1381,7 +1383,7 @@ class DashboardService:
             "max_jobs": max_jobs,
         }
 
-    def queue_screening_backfill(self) -> tuple[bool, dict[str, Any]]:
+    def queue_screening_backfill(self, *, drain: bool = True) -> tuple[bool, dict[str, Any]]:
         """Reserve one standalone backfill without starting provider discovery."""
         status = self.screening_backfill_status()
         if not status["enabled"]:
@@ -1395,15 +1397,20 @@ class DashboardService:
                 already_running = False
                 self._screening_backfill_state = {
                     "status": "running",
-                    "message": "Screening the next recommended jobs…",
+                    "message": (
+                        "Screening all eligible recommendations…"
+                        if drain
+                        else "Screening the next recommended jobs…"
+                    ),
                     "started_at": datetime.now(UTC).isoformat(),
+                    "batch_count": 0,
                 }
         if already_running:
             return False, self.screening_backfill_status()
         return True, self.screening_backfill_status()
 
-    def run_queued_screening_backfill(self) -> None:
-        """Screen a bounded batch from current inventory; never refresh job sources."""
+    def run_queued_screening_backfill(self, *, drain: bool = True) -> None:
+        """Screen current inventory in bounded batches; never refresh job sources."""
         self._screening_lock.acquire()
         started_at = datetime.now(UTC)
         try:
@@ -1418,19 +1425,70 @@ class DashboardService:
                 self.workspace,
                 display_limit=schedule.jobs.limit,
             )
-            summary = run_background_quick_screening(
-                self.workspace,
-                max_jobs=schedule.jobs.semantic_screening_max_jobs,
-                input_path=shortlist,
-            )
-            status = "complete" if summary.failed == 0 else "partial"
-            attempted_jobs = int(getattr(summary, "attempted", summary.provider_calls))
-            screened_jobs = int(
-                getattr(summary, "succeeded", max(0, attempted_jobs - summary.failed))
-            )
-            duration_seconds = round(float(getattr(summary, "duration_seconds", 0.0)), 3)
+            batch_limit = schedule.jobs.semantic_screening_max_jobs
+            attempted_jobs = 0
+            screened_jobs = 0
+            provider_requests = 0
+            input_tokens = 0
+            output_tokens = 0
+            cost_usd = Decimal("0")
+            duration_seconds = 0.0
+            failure_attempts: Counter[str] = Counter()
+            previous_completed: int | None = None
+            batch_count = 0
+            max_batches: int | None = None
+            while True:
+                summary = run_background_quick_screening(
+                    self.workspace,
+                    max_jobs=batch_limit,
+                    input_path=shortlist,
+                )
+                batch_count += 1
+                batch_attempted = int(getattr(summary, "attempted", summary.provider_calls))
+                batch_screened = int(
+                    getattr(summary, "succeeded", max(0, batch_attempted - summary.failed))
+                )
+                attempted_jobs += batch_attempted
+                screened_jobs += batch_screened
+                provider_requests += summary.provider_calls
+                input_tokens += int(getattr(summary, "input_tokens", 0))
+                output_tokens += int(getattr(summary, "output_tokens", 0))
+                cost_usd += Decimal(str(getattr(summary, "cost_usd", "0")))
+                duration_seconds += float(getattr(summary, "duration_seconds", 0.0))
+                failure_attempts.update(getattr(summary, "failure_categories", {}))
+                pending_jobs = int(getattr(summary, "pending", 0))
+                completed_jobs = int(getattr(summary, "completed", summary.cached))
+                if max_batches is None:
+                    max_batches = max(1, (int(summary.active) + batch_limit - 1) // batch_limit + 1)
+                made_progress = previous_completed is None or completed_jobs > previous_completed
+                previous_completed = completed_jobs
+                with self._screening_state_lock:
+                    self._screening_backfill_state = {
+                        "status": "running",
+                        "message": (
+                            f"Screened {screened_jobs} jobs across {batch_count} "
+                            f"{'batch' if batch_count == 1 else 'batches'}; "
+                            f"{pending_jobs} still pending…"
+                        ),
+                        "started_at": started_at.isoformat(),
+                        "attempted_jobs": attempted_jobs,
+                        "screened_jobs": screened_jobs,
+                        "batch_count": batch_count,
+                        "pending_screening_jobs": pending_jobs,
+                    }
+                if (
+                    not drain
+                    or pending_jobs == 0
+                    or not made_progress
+                    or batch_count >= max_batches
+                ):
+                    break
+            duration_seconds = round(duration_seconds, 3)
+            final_pending_jobs = int(getattr(summary, "pending", 0))
+            status = "complete" if final_pending_jobs == 0 else "partial"
             message = (
-                f"Screened {screened_jobs} recommended jobs."
+                f"Screened {screened_jobs} recommended jobs across {batch_count} "
+                f"{'batch' if batch_count == 1 else 'batches'}."
                 if attempted_jobs
                 else "Recommended jobs are already up to date."
             )
@@ -1442,13 +1500,15 @@ class DashboardService:
                     "finished_at": datetime.now(UTC).isoformat(),
                     "attempted_jobs": attempted_jobs,
                     "screened_jobs": screened_jobs,
+                    "batch_count": batch_count,
                     "cached_jobs": summary.cached,
                     "failed_jobs": summary.failed,
-                    "failure_categories": dict(getattr(summary, "failure_categories", {})),
-                    "provider_requests": summary.provider_calls,
-                    "input_tokens": int(getattr(summary, "input_tokens", 0)),
-                    "output_tokens": int(getattr(summary, "output_tokens", 0)),
-                    "cost_usd": str(getattr(summary, "cost_usd", "0")),
+                    "pending_screening_jobs": final_pending_jobs,
+                    "failure_categories": dict(sorted(failure_attempts.items())),
+                    "provider_requests": provider_requests,
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "cost_usd": str(cost_usd),
                     "duration_seconds": duration_seconds,
                     "average_seconds_per_attempt": (
                         round(duration_seconds / attempted_jobs, 3) if attempted_jobs else 0.0
@@ -1471,12 +1531,12 @@ class DashboardService:
                 screened_jobs,
                 summary.cached,
                 summary.failed,
-                summary.provider_calls,
-                int(getattr(summary, "input_tokens", 0)),
-                int(getattr(summary, "output_tokens", 0)),
-                str(getattr(summary, "cost_usd", "0")),
+                provider_requests,
+                input_tokens,
+                output_tokens,
+                str(cost_usd),
                 json.dumps(
-                    getattr(summary, "failure_categories", {}),
+                    dict(sorted(failure_attempts.items())),
                     sort_keys=True,
                     separators=(",", ":"),
                 ),
@@ -1498,11 +1558,11 @@ class DashboardService:
     def replenish_recommendations(self) -> None:
         """Continue the current-inventory backlog after a user decision."""
         try:
-            started, _ = self.queue_screening_backfill()
+            started, _ = self.queue_screening_backfill(drain=False)
         except ValueError:
             return
         if started:
-            self.run_queued_screening_backfill()
+            self.run_queued_screening_backfill(drain=False)
 
     @staticmethod
     def _serialize_job(job: dict[str, Any]) -> dict[str, Any]:

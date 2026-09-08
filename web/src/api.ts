@@ -249,6 +249,8 @@ export interface ScreeningBackfillState {
   max_jobs: number;
   attempted_jobs?: number;
   screened_jobs?: number;
+  batch_count?: number;
+  pending_screening_jobs?: number;
   cached_jobs?: number;
   failed_jobs?: number;
   failure_categories?: Record<string, number>;

@@ -98,6 +98,14 @@ logs. The latest aggregate metrics are also returned by
 `GET /api/jobs/screening-backfill` so administrators can tune the batch limit
 without needing container-log access.
 
+A manual portal backfill drains the eligible current-inventory backlog through
+sequential batches of `max_jobs_per_run`. It stops when no automatic screens are
+pending, when a retry makes no progress, or at a shortlist-derived safety bound.
+Scheduled collection and recommendation replenishment remain single bounded
+batches. Backfill status reports `pending_screening_jobs` separately from
+`needs_review_jobs`, because the latter also includes completed screens whose
+result requires a human eligibility or evidence decision.
+
 Provider output is validated against both its structural schema and the exact
 posting packet while the provider retry loop is still active. This includes
 source-unit grounding, complete criterion coverage, and evidence-citation

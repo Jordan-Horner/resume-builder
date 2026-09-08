@@ -189,6 +189,7 @@ def test_queue_keeps_every_job_and_bounds_provider_work(
     assert summary.provider_calls == 1
     assert summary.recommended == 1
     assert summary.needs_review == 1
+    assert summary.pending == 1
     assert summary.additional == 1
     assert summary.input_tokens == 100
     assert summary.output_tokens == 25
@@ -225,6 +226,7 @@ def test_queue_without_authorization_uses_no_provider_and_marks_all_unknowns(
 
     assert adapter.calls == 0
     assert summary.needs_review == 2
+    assert summary.pending == 2
     assert all(
         item["screening"]["status"] == "unscreened"
         for item in json.loads(output.read_text(encoding="utf-8"))["jobs"]
@@ -276,6 +278,7 @@ def test_background_queue_skips_obvious_local_misses_without_provider_work(
         "no_saved_search_signal",
     ]
     assert summary.provider_calls == 1
+    assert summary.pending == 0
     assert adapter.calls == 1
 
 
@@ -386,4 +389,5 @@ def test_provider_failure_remains_visible_and_consumes_the_attempt_budget(
     assert summary.failed == 1
     assert summary.failure_categories == {"provider_error": 1}
     assert summary.needs_review == 2
+    assert summary.pending == 2
     assert adapter.calls == 1
