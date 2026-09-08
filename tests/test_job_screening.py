@@ -1177,6 +1177,43 @@ def test_required_transferable_assessment_prevents_strong_match() -> None:
     assert [card.fact_id for card in result.evidence_used] == [fact_id]
 
 
+def test_uncited_criterion_assessment_degrades_to_unknown() -> None:
+    packet = _criterion_screen_packet()
+    semantic = SemanticScreen(
+        fit=FitOutcome.GOOD_MATCH,
+        confidence=Confidence.MEDIUM,
+        criterion_assessments=[
+            CriterionAssessment(
+                criterion_id="kubernetes",
+                outcome=CriterionAssessmentOutcome.TRANSFERABLE,
+                confidence=Confidence.MEDIUM,
+                fact_ids=[],
+                explanation="The model claimed a fit without citing evidence.",
+                materially_affects_recommendation=True,
+            ),
+            CriterionAssessment(
+                criterion_id="incident-response",
+                outcome=CriterionAssessmentOutcome.UNKNOWN,
+                confidence=Confidence.LOW,
+                fact_ids=[],
+                explanation="No relevant evidence was retrieved.",
+            ),
+        ],
+        reasoning_summary="The role may be a fit.",
+    )
+
+    result = finalize_screen(packet, semantic, model="fictional/model")
+
+    repaired = next(
+        item for item in result.criterion_assessments if item.criterion_id == "kubernetes"
+    )
+    assert repaired.outcome == CriterionAssessmentOutcome.UNKNOWN
+    assert repaired.confidence == Confidence.LOW
+    assert repaired.fact_ids == []
+    assert repaired.explanation == "The supplied evidence does not establish this criterion."
+    assert repaired.materially_affects_recommendation is False
+
+
 def test_all_required_criteria_unknown_forces_local_abstention_semantics() -> None:
     packet = _criterion_screen_packet()
     packet = packet.model_copy(

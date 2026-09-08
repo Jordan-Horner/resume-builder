@@ -82,11 +82,32 @@ it("renders assistant markdown as readable, safe content", async () => {
   expect(host.querySelector(".assistant-markdown code")?.textContent).toBe("Checking job matches");
   expect(host.querySelector(".assistant-markdown script")).toBeNull();
 });
-it("does not silently switch the attached resume", async () => {
-  await act(async () => root.render(<AssistantPanel open target={{ kind: "resume", id: "resumes/baselines/cloud.md", name: "Cloud", nonce: 1 }} onClose={() => undefined} />));
-  expect(host.textContent).toContain("Discuss this résumé");
-  expect(host.textContent).toContain("support");
-  expect(assistantRequest).not.toHaveBeenCalledWith("/threads", expect.objectContaining({ method: "POST" }));
+it("automatically switches to the visible job context", async () => {
+  const jobThread: Conversation = {
+    ...thread, id: "job-thread", resume_id: null, job_id: "job-one",
+    title: "New conversation", messages: [], proposals: [],
+  };
+  vi.mocked(assistantRequest).mockImplementation(async (path, init) => {
+    if (path === "/status") return { configured: true, online: true };
+    if (path === "/threads" && init?.method === "POST") return jobThread;
+    if (path === "/threads") return { threads: [thread] };
+    if (path === "/threads/job-thread") return jobThread;
+    return thread;
+  });
+
+  await act(async () => {
+    root.render(<AssistantPanel open target={{ kind: "job", id: "job-one", name: "Application Support Specialist at Sirona Medical" }} onClose={() => undefined} />);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  expect(assistantRequest).toHaveBeenCalledWith("/threads", {
+    method: "POST",
+    body: JSON.stringify({ job_id: "job-one" }),
+  });
+  expect(host.textContent).toContain("Working on job");
+  expect(host.textContent).toContain("Application Support Specialist at Sirona Medical");
+  expect(host.textContent).not.toContain("Switching to");
+  expect(host.textContent).not.toContain("Discuss this job");
 });
 
 async function submitMessage() {

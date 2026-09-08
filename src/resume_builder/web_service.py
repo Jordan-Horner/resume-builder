@@ -2141,6 +2141,10 @@ class DashboardService:
                 _employment_categories(job["employment_type"])
             ):
                 continue
+            if set(view.excludedEmploymentTypes).intersection(
+                _employment_categories(job["employment_type"])
+            ):
+                continue
             if normalized_mode and normalized_mode not in job["work_modes"]:
                 continue
             if normalized_type and normalized_type not in _employment_categories(

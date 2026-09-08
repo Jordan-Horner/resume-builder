@@ -63,4 +63,13 @@ describe("onboarding filter defaults", () => {
     localStorage.setItem("resume-builder.job-view.v6", JSON.stringify({ filters: { ...EMPTY_FILTERS, view: oldView }, previous: oldDefault }));
     expect(restoreView(defaults).filters.view?.clearanceMode).toBe("exclude");
   });
+  it("migrates saved filters without exclusion lists", () => {
+    const oldView = { ...EMPTY_VIEW } as Partial<typeof EMPTY_VIEW>;
+    delete oldView.excludedWorkModes;
+    delete oldView.excludedEmploymentTypes;
+    localStorage.setItem("resume-builder.job-view.v7", JSON.stringify({ filters: { ...EMPTY_FILTERS, view: oldView }, previous: oldView }));
+    const restored = restoreView(defaults).filters.view;
+    expect(restored?.excludedWorkModes).toEqual([]);
+    expect(restored?.excludedEmploymentTypes).toEqual([]);
+  });
 });

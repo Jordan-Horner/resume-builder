@@ -18,11 +18,17 @@ class ViewFilters(BaseModel):
     model_config = ConfigDict(extra="forbid")
     roles: list[FilterTerm] = Field(default_factory=list, max_length=22)
     workModes: list[Literal["remote", "hybrid", "onsite"]] = Field(default_factory=list)
+    excludedWorkModes: list[Literal["remote", "hybrid", "onsite"]] = Field(
+        default_factory=list
+    )
     country: str = Field(default="", max_length=100)
     locations: list[FilterTerm] = Field(default_factory=list, max_length=50)
     employmentTypes: list[Literal["fulltime", "parttime", "contract", "temporary"]] = Field(
         default_factory=list
     )
+    excludedEmploymentTypes: list[
+        Literal["fulltime", "parttime", "contract", "temporary"]
+    ] = Field(default_factory=list)
     minimumPay: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     currency: str = Field(default="USD", pattern=r"^[A-Z]{3}$")
     period: Literal["year", "hour"] = "year"
@@ -43,6 +49,14 @@ class ViewFilters(BaseModel):
         migrated.setdefault("clearanceMode", "all" if legacy else "exclude")
         return migrated
 
+    @model_validator(mode="after")
+    def selections_must_not_overlap(self) -> ViewFilters:
+        if set(self.workModes).intersection(self.excludedWorkModes):
+            raise ValueError("work modes cannot be both included and excluded")
+        if set(self.employmentTypes).intersection(self.excludedEmploymentTypes):
+            raise ValueError("employment types cannot be both included and excluded")
+        return self
+
 
 def matches_view(job: dict[str, Any], filters: ViewFilters) -> bool:
     # Legacy clients may still send roles. Discovery owns roles, not this view.
@@ -55,6 +69,8 @@ def matches_view(job: dict[str, Any], filters: ViewFilters) -> bool:
         if filters.clearanceMode == "only" and not requires_clearance:
             return False
     modes = set(job["work_modes"]) & {"remote", "hybrid", "onsite"}
+    if modes.intersection(filters.excludedWorkModes):
+        return False
     if filters.workModes and not modes.intersection(filters.workModes):
         if modes or not filters.includeUnknownMode:
             return False

@@ -186,6 +186,37 @@ it("keeps explicitly interested jobs in their own queue", async () => {
   expect(api.getJobs).toHaveBeenLastCalledWith(expect.any(Object), "interested", expect.any(AbortSignal));
 });
 
+it("closes the open job details when switching queues", async () => {
+  await openJob();
+
+  expect(host.querySelector(".job-detail")).not.toBeNull();
+  await click("All jobs");
+
+  expect(host.querySelector(".job-detail")).toBeNull();
+});
+
+it("supports arrow-key navigation across the job queues", async () => {
+  await act(async () => root.render(<JobsPage />));
+  const recommended = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((tab) => tab.textContent === "Recommended Jobs")!;
+  const interested = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((tab) => tab.textContent === "Interested jobs")!;
+
+  await act(async () => {
+    recommended.focus();
+    recommended.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+  });
+
+  expect(document.activeElement).toBe(interested);
+  expect(interested.getAttribute("aria-selected")).toBe("true");
+  expect(interested.tabIndex).toBe(0);
+  expect(recommended.tabIndex).toBe(-1);
+});
+
+it("names the clearance filter independently from the All jobs queue", async () => {
+  await act(async () => root.render(<JobsPage />));
+
+  expect((host.querySelector('.clearance-filter option[value="all"]') as HTMLOptionElement).textContent).toBe("Any clearance");
+});
+
 it("reuses a loaded queue when switching back to it", async () => {
   const allJob = { ...job, id: "two", title: "Platform Engineer" };
   vi.mocked(api.getJobs).mockImplementation(async (_filters, queue) => ({
@@ -384,6 +415,45 @@ it("queues a slow screen and renders its background result without blocking the 
   expect(api.getJobScreenStatus).toHaveBeenCalledWith("one");
   expect(host.textContent).toContain("Good fit");
   expect(host.textContent).toContain("Relevant support experience.");
+});
+
+it("restores an in-progress screen when the job is reopened before other details finish loading", async () => {
+  vi.useFakeTimers();
+  vi.mocked(api.screenJob).mockResolvedValue({ status: "queued", job_id: "one", message: "Analysis queued." });
+  vi.mocked(api.getJobScreenStatus)
+    .mockResolvedValueOnce({ status: "idle", job_id: "one" })
+    .mockResolvedValue({ status: "running", job_id: "one", message: "Analyzing in the background." });
+
+  await openJob();
+  await click("Screen job");
+  await act(async () => (host.querySelector('[aria-label="Close job details"]') as HTMLButtonElement).click());
+  vi.mocked(api.getResumeRecommendation).mockImplementationOnce(() => new Promise(() => {}));
+  await act(async () => (host.querySelector(".job-row") as HTMLButtonElement).click());
+
+  expect(host.textContent).toContain("Analyzing in background");
+  expect([...host.querySelectorAll("button")].some((button) => button.textContent === "Screen job")).toBe(false);
+  expect(api.screenJob).toHaveBeenCalledTimes(1);
+});
+
+it("keeps a long-running screen visibly active past the old polling cutoff", async () => {
+  vi.useFakeTimers();
+  let statusChecks = 0;
+  vi.mocked(api.screenJob).mockResolvedValue({ status: "queued", job_id: "one", message: "Analysis queued." });
+  vi.mocked(api.getJobScreenStatus).mockImplementation(async () => {
+    statusChecks += 1;
+    return statusChecks === 1
+      ? { status: "idle", job_id: "one" }
+      : { status: "running", job_id: "one", message: "Analyzing in the background." };
+  });
+
+  await openJob();
+  await click("Screen job");
+  await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+
+  expect(host.textContent).toContain("Analyzing in background");
+  expect(host.textContent).not.toContain("You can try again");
+  expect([...host.querySelectorAll("button")].some((button) => button.textContent === "Screen job")).toBe(false);
+  expect(api.screenJob).toHaveBeenCalledTimes(1);
 });
 
 it("keeps screening state and late results attached to the job that started them", async () => {

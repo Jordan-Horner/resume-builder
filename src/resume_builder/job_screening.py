@@ -961,6 +961,24 @@ def _early_career_criterion_ids(packet: ScreeningPacket) -> set[str]:
 def finalize_screen(
     packet: ScreeningPacket, semantic: SemanticScreen, *, model: str
 ) -> ScreeningResult:
+    semantic = semantic.model_copy(
+        update={
+            "criterion_assessments": [
+                assessment.model_copy(
+                    update={
+                        "outcome": CriterionAssessmentOutcome.UNKNOWN,
+                        "confidence": Confidence.LOW,
+                        "explanation": "The supplied evidence does not establish this criterion.",
+                        "materially_affects_recommendation": False,
+                    }
+                )
+                if assessment.outcome != CriterionAssessmentOutcome.UNKNOWN
+                and not assessment.fact_ids
+                else assessment
+                for assessment in semantic.criterion_assessments
+            ]
+        }
+    )
     cards = {card.fact_id: card for card in packet.candidate_evidence}
     assessment_cited_ids = {
         fact_id for assessment in semantic.criterion_assessments for fact_id in assessment.fact_ids

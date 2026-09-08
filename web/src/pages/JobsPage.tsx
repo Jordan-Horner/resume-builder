@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useRef, useState } from "react";
 import {
   activateJobSearch, getBlockedCompanies, getJobFilterDefaults, getJobs, getJobSources,
   getScrapeSchedule, getSearchPreferences, hideJobPosting, markJobApplied, saveJobFeedback, setCompanyBlocked,
@@ -131,6 +131,8 @@ export function JobsPage() {
 
   function selectQueue(queue: JobQueue) {
     if (queue === queueView) return;
+    setSelected(null);
+    selectedOrigin.current = null;
     const cached = queueCache.current.get(queueKey(queue));
     setQueueError("");
     if (cached) {
@@ -145,6 +147,21 @@ export function JobsPage() {
       }
     }
     setQueueView(queue);
+  }
+
+  function navigateQueueTabs(event: ReactKeyboardEvent<HTMLButtonElement>) {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    const tabs = Array.from(event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? []);
+    const currentIndex = tabs.indexOf(event.currentTarget);
+    if (currentIndex < 0 || tabs.length === 0) return;
+    event.preventDefault();
+    const nextIndex = event.key === "Home"
+      ? 0
+      : event.key === "End"
+        ? tabs.length - 1
+        : (currentIndex + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+    tabs[nextIndex]?.focus();
+    tabs[nextIndex]?.click();
   }
 
   useEffect(() => {
@@ -307,6 +324,18 @@ export function JobsPage() {
     window.requestAnimationFrame(() => selectedOrigin.current?.focus());
   }
 
+  const selectedJobId = selected?.id;
+  const selectedJobTitle = selected?.title;
+  const selectedJobCompany = selected?.company;
+  useEffect(() => {
+    if (!selectedJobId || !selectedJobTitle || !selectedJobCompany) return;
+    assistant.setWindowContext({
+      kind: "job",
+      id: selectedJobId,
+      name: `${selectedJobTitle} at ${selectedJobCompany}`,
+    });
+  }, [assistant.setWindowContext, selectedJobCompany, selectedJobId, selectedJobTitle]);
+
   function updateQuickScreen(screen: JobScreenResult) {
     const resume = screen.result.resume_match;
     setJobs((current) => current.map((job) => job.id === screen.result.job_id ? {
@@ -440,9 +469,9 @@ export function JobsPage() {
             {notice && <div className="first-search-notice transient-notice">{noticeContent}</div>}
           </div> : <>
             <div className="queue-tabs" role="tablist" aria-label="Job queues">
-              <button role="tab" aria-selected={queueView === "recommended"} onMouseEnter={() => prefetchQueue("recommended")} onFocus={() => prefetchQueue("recommended")} onClick={() => selectQueue("recommended")}>Recommended Jobs</button>
-              <button role="tab" aria-selected={queueView === "interested"} onMouseEnter={() => prefetchQueue("interested")} onFocus={() => prefetchQueue("interested")} onClick={() => selectQueue("interested")}>Interested jobs</button>
-              <button role="tab" aria-selected={queueView === "all"} onMouseEnter={() => prefetchQueue("all")} onFocus={() => prefetchQueue("all")} onClick={() => selectQueue("all")}>All jobs</button>
+              <button role="tab" tabIndex={queueView === "recommended" ? 0 : -1} aria-selected={queueView === "recommended"} onKeyDown={navigateQueueTabs} onMouseEnter={() => prefetchQueue("recommended")} onFocus={() => prefetchQueue("recommended")} onClick={() => selectQueue("recommended")}>Recommended Jobs</button>
+              <button role="tab" tabIndex={queueView === "interested" ? 0 : -1} aria-selected={queueView === "interested"} onKeyDown={navigateQueueTabs} onMouseEnter={() => prefetchQueue("interested")} onFocus={() => prefetchQueue("interested")} onClick={() => selectQueue("interested")}>Interested jobs</button>
+              <button role="tab" tabIndex={queueView === "all" ? 0 : -1} aria-selected={queueView === "all"} onKeyDown={navigateQueueTabs} onMouseEnter={() => prefetchQueue("all")} onFocus={() => prefetchQueue("all")} onClick={() => selectQueue("all")}>All jobs</button>
             </div>
             <div className="results-heading">
               {defaults?.country && <span title="Country from onboarding applies across all providers, including company boards. Unspecified locations remain available for review.">{defaults.country} · all sources</span>}

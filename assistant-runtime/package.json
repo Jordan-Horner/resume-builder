@@ -4,8 +4,11 @@
   "type": "module",
   "scripts": { "start": "node server.mjs", "test": "node --test" },
   "dependencies": {
-    "@copilotkit/runtime": "1.70.1",
     "@ag-ui/client": "0.0.59",
-    "@hono/node-server": "1.19.11"
+    "@copilotkit/runtime": "1.70.1",
+    "@hono/node-server": "1.19.17"
+  },
+  "overrides": {
+    "qs": "6.16.0"
   }
 }

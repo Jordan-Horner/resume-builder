@@ -29,9 +29,10 @@ an authenticated reverse proxy.
 ## Capabilities
 
 Open Assistant for job-queue questions, select **Discuss job** on a job, or select
-**Discuss résumé** on a directional resume. Context is explicit and does not silently
-follow navigation. History survives
-refresh; Stop cancels a response. The UI is lazy-loaded and uses the portal dark theme.
+**Discuss résumé** on a directional resume. When a job detail or directional résumé is
+visible, the assistant automatically follows that window context and reuses its existing
+conversation when available. Context changes never submit a message or perform a write.
+History survives refresh; Stop cancels a response. The UI is lazy-loaded and uses the portal dark theme.
 On desktop and tablet it floats at the bottom right (400px wide, up to 620px tall),
 without resizing or hiding the workspace. Only phone viewports up to 480px use
 a full-screen chat surface. Closing the window preserves the conversation.

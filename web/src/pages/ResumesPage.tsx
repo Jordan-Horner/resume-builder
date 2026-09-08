@@ -26,6 +26,12 @@ export function ResumesPage() {
   const [restoring, setRestoring] = useState<string | null>(null);
   const load = () => { setError(""); getResumes().then(setLibrary).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Could not load resumes.")); };
   useEffect(load, []);
+  const selectedResumeId = selected?.kind === "directional" ? selected.id : null;
+  const selectedResumeName = selected?.kind === "directional" ? selected.name : null;
+  useEffect(() => {
+    if (!selectedResumeId || !selectedResumeName) return;
+    assistant.setWindowContext({ kind: "resume", id: selectedResumeId, name: selectedResumeName });
+  }, [assistant.setWindowContext, selectedResumeId, selectedResumeName]);
   if (error) return <section className="page"><ErrorMessage message={error} retry={load} /></section>;
   if (!library) return <section className="page" role="status">Loading resumes…</section>;
   function open(resume: CareerResume) {

@@ -13,9 +13,11 @@ export interface JobFilters {
 export interface ViewFilters {
   roles: string[];
   workModes: WorkMode[];
+  excludedWorkModes: WorkMode[];
   country: string;
   locations: string[];
   employmentTypes: EmploymentType[];
+  excludedEmploymentTypes: EmploymentType[];
   minimumPay: number | null;
   currency: string;
   period: "year" | "hour";

@@ -124,7 +124,11 @@ filter can temporarily override visibility without deleting inventory. Matching
 recognizes explicit clearance signals such as TS/SCI, Secret, Public Trust,
 polygraph, and eligibility to obtain a clearance while preserving postings that
 explicitly say no clearance is required.
-Work-mode and salary labels show actual selections. Menus dismiss outside or with Escape.
+Work-mode and job-type menus support explicit include, exclude, and neutral states;
+an included option shows a check and an excluded option shows an X. Exclusions take
+precedence for postings that carry more than one work mode. Filter labels summarize
+both kinds of selection. Salary labels show the actual threshold. Menus dismiss
+outside or with Escape.
 `/api/jobs` accepts a validated `view_filters` JSON query in addition to legacy
 search/date parameters; filtering precedes counting and pagination. These are
 read-only viewing settings and never rewrite collection preferences.

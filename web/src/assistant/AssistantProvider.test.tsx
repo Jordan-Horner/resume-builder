@@ -5,12 +5,12 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { AssistantProvider, useAssistant } from "./AssistantProvider";
 
 vi.mock("./AssistantPanel", () => ({
-  default: ({ modal, onClose, target }: { modal: boolean; onClose: () => void; target?: { openingQuestion?: string } | null }) => <aside data-modal={modal} data-question={target?.openingQuestion}><button onClick={onClose}>Close panel</button></aside>,
+  default: ({ modal, onClose, target }: { modal: boolean; onClose: () => void; target?: { id?: string; openingQuestion?: string } | null }) => <aside data-modal={modal} data-target={target?.id} data-question={target?.openingQuestion}><button onClick={onClose}>Close panel</button></aside>,
 }));
 
 function Harness() {
   const assistant = useAssistant();
-  return <><button onClick={() => assistant.discussJob("job-one", "Example job")}>Discuss</button><button onClick={() => assistant.discussJob("job-one", "Example job", "Why was this a miss?")}>Reject Hot</button></>;
+  return <><button onClick={() => assistant.discussJob("job-one", "Example job")}>Discuss</button><button onClick={() => assistant.discussJob("job-one", "Example job", "Why was this a miss?")}>Reject Hot</button><button onClick={() => assistant.setWindowContext({ kind: "job", id: "job-two", name: "Next job" })}>Open next job</button></>;
 }
 
 let host: HTMLDivElement;
@@ -34,6 +34,14 @@ it("passes a Hot rejection question into the existing assistant", async () => {
   await act(async () => [...host.querySelectorAll("button")].find((button) => button.textContent === "Reject Hot")?.click());
 
   expect(host.querySelector("[data-question]")?.getAttribute("data-question")).toBe("Why was this a miss?");
+});
+
+it("tracks a newly visible job without requiring another assistant action", async () => {
+  await act(async () => root.render(<AssistantProvider><Harness /></AssistantProvider>));
+  await act(async () => [...host.querySelectorAll("button")].find((button) => button.textContent === "Discuss")?.click());
+  await act(async () => [...host.querySelectorAll("button")].find((button) => button.textContent === "Open next job")?.click());
+
+  expect(host.querySelector("[data-target]")?.getAttribute("data-target")).toBe("job-two");
 });
 
 afterEach(async () => {

@@ -36,6 +36,13 @@ def test_legacy_roles_do_not_hide_jobs_and_modes_use_any_selected_option():
     )
 
 
+def test_work_modes_can_be_explicitly_excluded_and_exclusion_wins():
+    view = ViewFilters(workModes=["remote"], excludedWorkModes=["onsite"])
+    assert matches_view(listing(work_modes=["remote"]), view)
+    assert not matches_view(listing(work_modes=["onsite"]), view)
+    assert not matches_view(listing(work_modes=["remote", "onsite"]), view)
+
+
 def test_locations_use_aliases_and_cities_do_not_exclude_remote():
     view = ViewFilters(country="United States", locations=["Boston"])
     assert matches_view(listing(location="U.S.A."), view)
@@ -114,6 +121,29 @@ def test_multiple_employment_types_filter_inventory(tmp_path):
         "one",
         "two",
     ]
+
+
+def test_employment_types_can_be_explicitly_excluded(tmp_path):
+    service = DashboardService(
+        tmp_path,
+        inventory_loader=lambda: [
+            listing(),
+            listing(id="two", employment_type="contract"),
+            listing(id="three", employment_type="parttime"),
+        ],
+    )
+    view = ViewFilters(excludedEmploymentTypes=["contract", "temporary"])
+    assert [item["id"] for item in service.list_jobs(view_filters=view.model_dump_json())] == [
+        "one",
+        "three",
+    ]
+
+
+def test_filter_options_cannot_be_both_included_and_excluded():
+    with pytest.raises(ValueError, match="work modes cannot be both included and excluded"):
+        ViewFilters(workModes=["remote"], excludedWorkModes=["remote"])
+    with pytest.raises(ValueError, match="employment types cannot be both included and excluded"):
+        ViewFilters(employmentTypes=["contract"], excludedEmploymentTypes=["contract"])
 
 
 def test_country_scope_applies_to_all_providers_and_cannot_be_cleared(tmp_path, monkeypatch):

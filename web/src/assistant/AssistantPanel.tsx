@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { assistantRequest, type Conversation, type Proposal } from "./api";
 
-interface Props { open: boolean; modal?: boolean; target: { kind: "resume" | "job"; id: string; name: string; nonce: number; openingQuestion?: string } | null; onClose: () => void }
+interface Props { open: boolean; modal?: boolean; target: { kind: "resume" | "job"; id: string; name: string; openingQuestion?: string } | null; onClose: () => void }
 
 function ProposalView({ proposal, decide }: { proposal: Proposal; decide: (id: string, action: string) => void }) {
   if (proposal.payload.kind === "job_preference") {
@@ -144,11 +144,13 @@ export default function AssistantPanel({ open, modal = false, target, onClose }:
   const [thread, setThread] = useState<Conversation | null>(null);
   const [threads, setThreads] = useState<Conversation[]>([]);
   const [history, setHistory] = useState(false);
+  const [switching, setSwitching] = useState(false);
   const [status, setStatus] = useState<{ configured: boolean; online: boolean } | null>(null);
   const [error, setError] = useState("");
   const header = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLElement>(null);
-  const observedTarget = useRef<number | null>(null);
+  const switchSequence = useRef(0);
+  const knownThreads = useRef<Conversation[]>([]);
   const active = useRef<Conversation | null>(null);
   const update = useRef((next: Conversation) => { active.current = next; setThread(next); }).current;
 
@@ -161,7 +163,10 @@ export default function AssistantPanel({ open, modal = false, target, onClose }:
     try {
       const body = context?.kind === "job" ? { job_id: context.id } : { resume_id: context?.id ?? null };
       const next = await assistantRequest<Conversation>("/threads", { method: "POST", body: JSON.stringify(body) });
-      await select(next.id);
+      knownThreads.current = [next, ...knownThreads.current.filter((item) => item.id !== next.id)];
+      setThreads(knownThreads.current);
+      update(next); setHistory(false);
+      try { localStorage.setItem("resume-builder.assistant.v1", next.id); } catch { console.warn("Assistant history preference could not be saved; server history remains available."); }
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not start conversation."); }
   }
   async function refresh() {
@@ -170,6 +175,7 @@ export default function AssistantPanel({ open, modal = false, target, onClose }:
         assistantRequest<{ configured: boolean; online: boolean }>("/status"),
         assistantRequest<{ threads: Conversation[] }>("/threads"),
       ]);
+      knownThreads.current = list.threads;
       setStatus(health); setThreads(list.threads); setError("");
       if (!active.current) {
         let saved: string | null = null;
@@ -181,9 +187,36 @@ export default function AssistantPanel({ open, modal = false, target, onClose }:
   }
   useEffect(() => { void refresh(); }, []);
   useEffect(() => { if (open) header.current?.focus(); }, [open]);
-  const busy = active.current?.runs.some((run) => run.status === "running") || active.current?.proposals.some((proposal) => proposal.status === "applying");
+  const operationBusy = active.current?.runs.some((run) => run.status === "running") || active.current?.proposals.some((proposal) => proposal.status === "applying");
   const activeTargetId = target?.kind === "job" ? thread?.job_id : thread?.resume_id;
-  const pendingTarget = target && observedTarget.current !== target.nonce && target.id !== activeTargetId;
+  const busy = switching || operationBusy;
+
+  useEffect(() => {
+    if (!open || !status?.online || !target || operationBusy) return;
+    if (target.id === activeTargetId) return;
+    const sequence = ++switchSequence.current;
+    setSwitching(true); setError("");
+    const existing = knownThreads.current.find((item) => target.kind === "job"
+      ? item.job_id === target.id
+      : item.resume_id === target.id);
+    const request = existing
+      ? assistantRequest<Conversation>(`/threads/${existing.id}`)
+      : assistantRequest<Conversation>("/threads", {
+          method: "POST",
+          body: JSON.stringify(target.kind === "job" ? { job_id: target.id } : { resume_id: target.id }),
+        });
+    void request.then((next) => {
+      knownThreads.current = [next, ...knownThreads.current.filter((item) => item.id !== next.id)];
+      setThreads(knownThreads.current);
+      if (switchSequence.current !== sequence) return;
+      update(next); setHistory(false);
+      try { localStorage.setItem("resume-builder.assistant.v1", next.id); } catch { console.warn("Assistant history preference could not be saved; server history remains available."); }
+    }).catch((reason: unknown) => {
+      if (switchSequence.current === sequence) setError(reason instanceof Error ? reason.message : "Could not switch assistant context.");
+    }).finally(() => {
+      if (switchSequence.current === sequence) setSwitching(false);
+    });
+  }, [activeTargetId, open, operationBusy, status?.online, target?.id, target?.kind, update]);
 
   function handlePanelKeyDown(event: React.KeyboardEvent<HTMLElement>) {
     if (event.key === "Escape") {
@@ -208,17 +241,18 @@ export default function AssistantPanel({ open, modal = false, target, onClose }:
   return <aside ref={panel} className="assistant-panel" role={modal ? "dialog" : undefined} aria-modal={modal ? true : undefined} aria-label="Career assistant" onKeyDown={handlePanelKeyDown}>
     <header className="assistant-header"><strong>Assistant</strong><div>
       <button className="text-button" disabled={busy} onClick={() => { setHistory(!history); void refresh(); }}>History</button>
-      <button className="text-button" disabled={busy} onClick={() => void start()}>New</button>
+      <button className="text-button" disabled={busy} onClick={() => void start(target ? { kind: target.kind, id: target.id } : undefined)}>New</button>
       <button ref={header} className="assistant-close" aria-label="Close assistant" onClick={onClose}>×</button>
     </div></header>
-    {pendingTarget && <div className="assistant-context assistant-context-question"><span>{target.openingQuestion || target.name}</span><button className="text-button" disabled={busy} onClick={() => { observedTarget.current = target.nonce; void start({ kind: target.kind, id: target.id }); }}>{target.openingQuestion ? "Answer" : target.kind === "job" ? "Discuss this job" : "Discuss this résumé"}</button></div>}
+    {target?.openingQuestion && <div className="assistant-context assistant-context-question"><span>{target.openingQuestion}</span></div>}
     {thread?.resume_id && <div className="assistant-context"><small>Working on</small><span>{thread.resume_id.split("/").pop()?.replace(/\.md$/, "").replaceAll("-", " ")}</span></div>}
-    {thread?.job_id && <div className="assistant-context"><small>Working on job</small><span>{thread.context_name || thread.job_id}</span></div>}
+    {thread?.job_id && <div className="assistant-context"><small>Working on job</small><span>{thread.context_name || (target?.kind === "job" && target.id === thread.job_id ? target.name : thread.job_id)}</span></div>}
     {error && <div className="assistant-context" role="alert">{error}<button className="text-button" onClick={() => void refresh()}>Retry</button></div>}
     {history ? <div className="assistant-history">{threads.map((item) => <button key={item.id} onClick={() => { select(item.id).catch((reason: Error) => setError(reason.message)); }}>{item.title}<small>{new Date(item.updated_at).toLocaleDateString()}</small></button>)}</div>
       : !status ? <p className="assistant-context" role="status">Connecting…</p>
       : !status.configured ? <div className="assistant-intro"><h3>Connect your AI provider</h3><p>The assistant uses your existing model settings.</p><a href="/settings/integrations">Configure AI →</a><button className="text-button" onClick={() => void refresh()}>Check again</button></div>
       : !status.online ? <div className="assistant-intro"><h3>Assistant temporarily unavailable</h3><p>Your workspace is still available. Try reconnecting shortly.</p><button className="secondary-button" onClick={() => void refresh()}>Reconnect</button></div>
+      : switching ? <p className="assistant-context" role="status">Switching to {target?.name}…</p>
       : thread && <ConversationView key={thread.id} initial={thread} changed={update} open={open} />}
   </aside>;
 }
