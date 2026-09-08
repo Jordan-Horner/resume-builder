@@ -1159,9 +1159,7 @@ def test_mark_applied_pins_the_only_directional_resume_when_no_target_exists(tmp
     assert application["resume_attribution"] == "directional"
 
 
-def test_resume_recommendation_reports_no_match_when_directional_resumes_exist(
-    tmp_path, inventory
-):
+def test_resume_recommendation_reports_no_match_when_directional_resumes_exist(tmp_path, inventory):
     folder = tmp_path / "resumes" / "baselines"
     folder.mkdir(parents=True)
     (folder / "support.md").write_text("# Support\n", encoding="utf-8")
