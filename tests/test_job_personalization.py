@@ -29,6 +29,7 @@ def _item(job_id: str, score_kind: str, *, title: str = "Operations Engineer"):
                 "fit": fit,
                 "recommendation": recommendation,
                 "confidence": confidence,
+                "evidence_used": [{"fact_id": "FACT-001"}],
             },
         },
     }
@@ -371,6 +372,25 @@ def test_deterministic_match_is_not_hot_without_a_strong_screen():
 
     assert score["hot"] is False
     assert score["hot_reasons"] == []
+
+
+def test_strong_screen_is_not_hot_without_usable_confidence_and_cited_evidence():
+    without_evidence = _item("job-1", "strong", title="DevOps Engineer")
+    low_confidence = _item("job-2", "strong", title="DevOps Engineer")
+    for item in (without_evidence, low_confidence):
+        item["deterministic"]["interest"] = {
+            "desired_title_terms": ["devops engineer"],
+            "interest_terms": [],
+        }
+    without_evidence["screening"]["result"]["evidence_used"] = []
+    low_confidence["screening"]["result"]["confidence"] = "low"
+
+    scores = build_shadow_order(
+        [without_evidence, low_confidence], preferences={}, positive_titles=[]
+    )[1]
+
+    assert scores["job-1"]["hot"] is False
+    assert scores["job-2"]["hot"] is False
 
 
 def test_hard_conflict_never_becomes_hot_even_when_explicitly_interested():

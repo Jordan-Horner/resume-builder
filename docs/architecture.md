@@ -195,8 +195,9 @@ screening by excluding hard conflicts and requiring a saved role or interest
 signal. Those candidates appear in **Recommended Jobs** immediately and remain a
 backlog rather than a fixed-size shelf. Candidates are screened in deterministic
 preference order until the existing per-run provider cap is reached. A strong
-career-fit result promotes an otherwise eligible recommendation to **Hot** and sorts it first; any
-completed non-strong screen demotes it to **All jobs**. Provider failures do not empty
+career-fit result with medium-or-high confidence and cited candidate evidence promotes
+an otherwise eligible recommendation to **Hot** and sorts it first; any completed
+non-strong screen demotes it to **All jobs**. Provider failures do not empty
 the deterministic backlog. **Interested jobs** contains explicit
 positive decisions that have not become applications, and **All jobs** remains the
 complete reviewable inventory. Marking a recommendation Interested moves it from

@@ -1077,7 +1077,11 @@ class DashboardService:
                 if target_path
                 else None,
                 "match": None,
-                "message": "Build a directional resume before attaching one to applications.",
+                "message": (
+                    "No matching directional resume was identified for this job."
+                    if baselines
+                    else "Build a directional resume before attaching one to applications."
+                ),
             }
         return {
             "status": "available",

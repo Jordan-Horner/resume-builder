@@ -68,6 +68,7 @@ def write_screening_output(
                                 "recommendation": recommendation,
                                 "confidence": "medium",
                                 "generated_at": "2026-09-06T12:00:00+00:00",
+                                "evidence_used": [{"fact_id": "FACT-001"}],
                                 "resume_match": {"name": "Support Engineer"},
                             },
                         },
@@ -1081,6 +1082,22 @@ def test_mark_applied_pins_the_only_directional_resume_when_no_target_exists(tmp
     assert application["resume"]["kind"] == "directional"
     assert application["resume"]["detail"] == "Closest directional resume"
     assert application["resume_attribution"] == "directional"
+
+
+def test_resume_recommendation_reports_no_match_when_directional_resumes_exist(
+    tmp_path, inventory
+):
+    folder = tmp_path / "resumes" / "baselines"
+    folder.mkdir(parents=True)
+    (folder / "support.md").write_text("# Support\n", encoding="utf-8")
+    (folder / "platform.md").write_text("# Platform\n", encoding="utf-8")
+
+    result = DashboardService(
+        tmp_path, inventory_loader=lambda: inventory
+    ).job_resume_recommendation("remote-1")
+
+    assert result["status"] == "unavailable"
+    assert result["message"] == "No matching directional resume was identified for this job."
 
 
 def test_mark_applied_does_not_guess_between_multiple_directional_resumes(tmp_path, inventory):

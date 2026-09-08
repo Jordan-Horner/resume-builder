@@ -164,8 +164,9 @@ that pass the title, location, work-mode, seniority, completeness, and compensat
 gates and have a saved role or interest signal. Provider work stops when the
 12-job recommendation shelf is full or the configured per-run cost cap is reached.
 Cached results do not consume the cap. Deterministic candidates populate Recommended Jobs
-immediately; only completed Strong fits earn Hot, and completed non-strong screens return
-to All jobs. Failures and unfinished screens remain in the recommendation backlog.
+immediately; only completed Strong fits with medium-or-high confidence and cited candidate
+evidence earn Hot, and completed non-strong screens return to All jobs. Failures and
+unfinished screens remain in the recommendation backlog.
 Interested, applied, and dismissed decisions immediately re-rank existing results
 and schedule a bounded background refill. Discovery failures do not require or
 trigger a repeated source refresh before that backlog can continue. The manual
