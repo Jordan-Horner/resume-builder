@@ -19,6 +19,7 @@ from typing import Any
 import yaml
 
 from job_puller.cli import main as puller_main
+from job_puller.compensation import convert_compensation_period
 from job_puller.config import load_config, resolve_database_path, resolve_project_path
 from job_puller.database import InventoryDatabase
 from job_puller.liveness import verify_job_liveness
@@ -46,7 +47,7 @@ DEFAULT_NEW_OUTPUT = Path("job-search/new-jobs.json")
 DEFAULT_NEW_REVIEW_OUTPUT = Path("job-search/new-jobs-review.csv")
 DEFAULT_LATEST_REFRESH = Path("job-search/latest-refresh.json")
 DEFAULT_PROVIDER_COMPARISON = Path("job-search/provider-comparison.json")
-PRESCREEN_VERSION = 8
+PRESCREEN_VERSION = 9
 TOKEN = re.compile(r"[a-z][a-z0-9+#.]{2,}")
 PHRASE_TOKEN = re.compile(r"[a-z0-9]+")
 STOPWORDS = {
@@ -451,12 +452,27 @@ def _prescreen(
     job_terms = _terms(f"{title}\n{description}")
     matched_terms = sorted(job_terms & resume_terms)
     readiness = round(100 * len(matched_terms) / max(1, len(job_terms)))
-    salary_min = job.get("salary_min")
+    salary_ceiling = job.get("salary_max") or job.get("salary_min")
     minimum_salary = preferences.get("minimum_salary")
+    comparable_salary_ceiling = (
+        convert_compensation_period(
+            float(salary_ceiling),
+            str(job.get("salary_interval") or ""),
+            str(preferences.get("salary_period") or "year"),
+        )
+        if isinstance(salary_ceiling, (int, float))
+        else None
+    )
+    salary_currency = str(job.get("salary_currency") or "")
+    preferred_currency = str(preferences.get("salary_currency") or "")
+    currency_matches = (
+        not salary_currency or not preferred_currency or salary_currency == preferred_currency
+    )
     salary_below = bool(
         minimum_salary is not None
-        and isinstance(salary_min, (int, float))
-        and salary_min < minimum_salary
+        and comparable_salary_ceiling is not None
+        and currency_matches
+        and comparable_salary_ceiling < minimum_salary
     )
     screening_profile = preferences.get("screening_profile") or {}
     mode_required = screening_profile.get("work_mode_strength", "required") == "required"

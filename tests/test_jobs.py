@@ -88,6 +88,25 @@ def test_prescreen_separates_interest_constraints_and_keyword_readiness():
     assert "not an ATS score" in result["keyword_readiness"]["method"]
 
 
+def test_prescreen_compares_hourly_pay_with_annual_minimum():
+    result = _prescreen(
+        job(salary_min=21, salary_max=24, salary_interval="hourly"),
+        preferences(minimum_salary=80_000, salary_period="year"),
+        set(),
+    )
+
+    assert result["queue_state"] == "hard_conflict"
+    assert result["constraints"]["salary_below_minimum"] is True
+    assert "salary" in result["constraints"]["hard_conflicts"]
+
+    overlapping = _prescreen(
+        job(salary_min=40, salary_max=60, salary_interval="hourly"),
+        preferences(minimum_salary=100_000, salary_period="year"),
+        set(),
+    )
+    assert overlapping["constraints"]["salary_below_minimum"] is False
+
+
 def test_prescreen_records_exact_optional_job_preference_matches():
     result = _prescreen(
         job(description_text="Complex troubleshooting without a continuous phone queue."),

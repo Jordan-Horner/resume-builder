@@ -22,6 +22,7 @@ from pydantic import (
 )
 from pydantic.json_schema import SkipJsonSchema
 
+from job_puller.compensation import convert_compensation_period
 from job_puller.locations import location_key, matches_search_location, matching_location_terms
 
 from .job_personalization import extract_seniority
@@ -43,8 +44,8 @@ from .screening_evidence import (
     ScreeningEvidenceSelection,
 )
 
-SCREENING_SCHEMA_VERSION = 5
-SCREENING_RUBRIC_VERSION = 5
+SCREENING_SCHEMA_VERSION = 6
+SCREENING_RUBRIC_VERSION = 6
 MAX_DESCRIPTION_CHARS = 16_000
 MAX_CAPABILITIES = 40
 ProfileTerm = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
@@ -152,6 +153,7 @@ class ScreeningJob(StrictModel):
     salary_min: float | None = None
     salary_max: float | None = None
     salary_currency: str | None = None
+    salary_interval: str | None = None
     url: str
     description: str
     description_truncated: bool
@@ -159,8 +161,8 @@ class ScreeningJob(StrictModel):
 
 
 class ScreeningPacket(StrictModel):
-    schema_version: Literal[5] = 5
-    rubric_version: Literal[5] = 5
+    schema_version: Literal[6] = 6
+    rubric_version: Literal[6] = 6
     job: ScreeningJob
     profile: CandidateScreeningProfile
     deterministic_prescreen: dict[str, Any]
@@ -252,7 +254,7 @@ class PostingWideSemanticScreen(SemanticScreen):
 
 
 class ScreeningResult(StrictModel):
-    schema_version: Literal[5] = 5
+    schema_version: Literal[6] = 6
     job_id: str
     packet_hash: str
     eligibility: EligibilityStatus
@@ -264,7 +266,7 @@ class ScreeningResult(StrictModel):
     gaps: list[str]
     unknowns: list[str]
     reasoning_summary: str
-    rubric_version: Literal[5] = 5
+    rubric_version: Literal[6] = 6
     model: str
     generated_at: str
     evidence_coverage: EvidenceCoverage
@@ -648,20 +650,38 @@ def _legacy_constraints(
 
     minimum = preferences.get("minimum_salary")
     salary_min = job.get("salary_min")
+    salary_max = job.get("salary_max")
+    salary_ceiling = salary_max or salary_min
+    comparable_salary_ceiling = (
+        convert_compensation_period(
+            float(salary_ceiling),
+            str(job.get("salary_interval") or ""),
+            str(preferences.get("salary_period") or "year"),
+        )
+        if isinstance(salary_ceiling, (int, float))
+        else None
+    )
+    salary_currency = str(job.get("salary_currency") or "")
+    preferred_currency = str(preferences.get("salary_currency") or "")
+    currency_matches = (
+        not salary_currency or not preferred_currency or salary_currency == preferred_currency
+    )
     if minimum is None:
         salary_state = ConstraintState.NOT_CONFIGURED
         salary_explanation = "No required minimum salary is configured."
-    elif not isinstance(salary_min, (int, float)):
+    elif comparable_salary_ceiling is None or not currency_matches:
         salary_state = ConstraintState.UNKNOWN
         salary_explanation = (
-            "The candidate has a minimum salary, but the posting omits its minimum."
+            "The posting does not provide compensation comparable with the configured requirement."
         )
-    elif float(salary_min) < float(minimum):
+    elif comparable_salary_ceiling < float(minimum):
         salary_state = ConstraintState.VIOLATED
-        salary_explanation = "The posting's stated minimum is below the configured requirement."
+        salary_explanation = (
+            "The posting's entire stated range is below the configured requirement."
+        )
     else:
         salary_state = ConstraintState.SATISFIED
-        salary_explanation = "The posting's stated minimum meets the configured requirement."
+        salary_explanation = "The posting's stated range reaches the configured requirement."
     results.append(
         ConstraintResult(
             code="minimum_salary",
@@ -670,7 +690,10 @@ def _legacy_constraints(
             explanation=salary_explanation,
             candidate_evidence=f"minimum_salary={minimum}" if minimum is not None else None,
             posting_evidence=(
-                f"salary_min={salary_min}" if isinstance(salary_min, (int, float)) else None
+                f"salary_min={salary_min}; salary_max={salary_max}; "
+                f"salary_interval={job.get('salary_interval')}"
+                if isinstance(salary_ceiling, (int, float))
+                else None
             ),
         )
     )
@@ -759,6 +782,7 @@ def build_screening_packet(
         salary_min=float(salary_min) if isinstance(salary_min, (int, float)) else None,
         salary_max=float(salary_max) if isinstance(salary_max, (int, float)) else None,
         salary_currency=(str(job["salary_currency"]) if job.get("salary_currency") else None),
+        salary_interval=(str(job["salary_interval"]) if job.get("salary_interval") else None),
         url=str(job.get("url") or "")[:2_000],
         description=bounded_description,
         description_truncated=description_truncated,

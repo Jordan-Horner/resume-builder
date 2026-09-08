@@ -57,7 +57,15 @@ def test_minimum_uses_range_ceiling_and_explicit_unknown_policy():
     strict = view.model_copy(update={"includeUnknownPay": False})
     assert not matches_view(listing(salary_min=None, salary_max=None), strict)
     assert not matches_view(listing(salary_currency="CAD"), strict)
-    assert not matches_view(listing(salary_interval="hourly"), strict)
+    assert not matches_view(listing(salary_interval="contract"), strict)
+    assert not matches_view(
+        listing(salary_min=21, salary_max=24, salary_interval="hourly"),
+        ViewFilters(minimumPay=80_000),
+    )
+    assert matches_view(
+        listing(salary_min=50, salary_max=60, salary_interval="hourly"),
+        ViewFilters(minimumPay=100_000),
+    )
     assert matches_view(
         listing(salary_min=40, salary_max=60, salary_interval="hourly"),
         ViewFilters(minimumPay=50, period="hour"),

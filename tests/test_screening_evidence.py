@@ -464,7 +464,7 @@ def test_shared_screening_packet_retrieves_evidence_from_the_workspace_vault(
         workspace=tmp_path,
     )
 
-    assert packet.schema_version == 5
+    assert packet.schema_version == 6
     assert packet.candidate_evidence[0].fact_id == "OPS-001"
     assert packet.evidence_coverage == EvidenceCoverage.PARTIAL
     assert packet.profile.supported_capabilities == []

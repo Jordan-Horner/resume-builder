@@ -48,6 +48,14 @@ CURRENCIES = {
     "£": "GBP",
 }
 
+PERIODS_PER_YEAR = {
+    "yearly": 1,
+    "monthly": 12,
+    "weekly": 52,
+    "daily": 260,
+    "hourly": 2_080,
+}
+
 
 @dataclass(frozen=True, slots=True)
 class CompensationRange:
@@ -73,6 +81,37 @@ def _interval(value: str) -> str:
     if normalized in {"week", "weekly"}:
         return "weekly"
     return "daily"
+
+
+def convert_compensation_period(
+    amount: float, source_interval: str | None, target_interval: str | None
+) -> float | None:
+    """Convert stated pay for comparisons, using a full-time annual ceiling."""
+    aliases = {
+        "year": "yearly",
+        "yr": "yearly",
+        "annual": "yearly",
+        "annually": "yearly",
+        "yearly": "yearly",
+        "month": "monthly",
+        "monthly": "monthly",
+        "week": "weekly",
+        "weekly": "weekly",
+        "day": "daily",
+        "daily": "daily",
+        "hour": "hourly",
+        "hr": "hourly",
+        "hourly": "hourly",
+    }
+    source = aliases.get(str(source_interval or "").strip().casefold())
+    target = aliases.get(str(target_interval or "").strip().casefold())
+    if source is None and not str(source_interval or "").strip() and amount >= 10_000:
+        source = "yearly"
+    if target is None:
+        return None
+    if source is None:
+        return None
+    return amount * PERIODS_PER_YEAR[source] / PERIODS_PER_YEAR[target]
 
 
 def _repair_labeled_annual_minimum(description: str) -> str:

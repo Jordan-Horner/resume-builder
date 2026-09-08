@@ -1,4 +1,8 @@
-from job_puller.compensation import CompensationRange, extract_compensation_range
+from job_puller.compensation import (
+    CompensationRange,
+    convert_compensation_period,
+    extract_compensation_range,
+)
 from job_puller.models import JobObservation
 
 
@@ -12,6 +16,13 @@ def test_extracts_compact_hourly_compensation_range():
     assert extract_compensation_range("Compensation range: US$45 to $65 per hour") == (
         CompensationRange(45, 65, "USD", "hourly")
     )
+
+
+def test_converts_hourly_and_yearly_compensation_for_comparison():
+    assert convert_compensation_period(24, "hourly", "year") == 49_920
+    assert convert_compensation_period(104_000, "yearly", "hour") == 50
+    assert convert_compensation_period(24, None, "year") is None
+    assert convert_compensation_period(104_000, None, "year") == 104_000
 
 
 def test_extracts_labeled_base_salary_as_yearly_compensation():

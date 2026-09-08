@@ -62,6 +62,48 @@ def test_location_screening_uses_country_aliases_and_boundaries() -> None:
     )
 
 
+def test_salary_screening_compares_hourly_pay_with_annual_requirement() -> None:
+    result = _legacy_constraints(
+        {
+            "location": "USA",
+            "salary_min": 21,
+            "salary_max": 24,
+            "salary_currency": "USD",
+            "salary_interval": "hourly",
+        },
+        {
+            "minimum_salary": 80_000,
+            "salary_currency": "USD",
+            "salary_period": "year",
+        },
+        CandidateScreeningProfile(),
+    )
+
+    salary = next(item for item in result if item.code == "minimum_salary")
+    assert salary.state == ConstraintState.VIOLATED
+    assert salary.posting_evidence == "salary_min=21; salary_max=24; salary_interval=hourly"
+
+    overlapping = _legacy_constraints(
+        {
+            "location": "USA",
+            "salary_min": 40,
+            "salary_max": 60,
+            "salary_currency": "USD",
+            "salary_interval": "hourly",
+        },
+        {
+            "minimum_salary": 100_000,
+            "salary_currency": "USD",
+            "salary_period": "year",
+        },
+        CandidateScreeningProfile(),
+    )
+    assert (
+        next(item for item in overlapping if item.code == "minimum_salary").state
+        == ConstraintState.SATISFIED
+    )
+
+
 @pytest.mark.parametrize(
     "description",
     [

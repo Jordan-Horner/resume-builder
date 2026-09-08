@@ -6,6 +6,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
+from job_puller.compensation import convert_compensation_period
 from job_puller.locations import matches_local_location, matches_search_location
 
 from .job_screening import has_clearance_requirement
@@ -74,21 +75,15 @@ def matches_view(job: dict[str, Any], filters: ViewFilters) -> bool:
     if filters.minimumPay is not None:
         upper = job.get("salary_max") or job.get("salary_min")
         interval = str(job.get("salary_interval") or "").lower()
-        periods = {
-            "year": "year",
-            "yearly": "year",
-            "annual": "year",
-            "hour": "hour",
-            "hourly": "hour",
-        }
-        comparable = (
-            upper is not None
-            and job.get("salary_currency") == filters.currency
-            and periods.get(interval) == filters.period
+        converted_upper = (
+            convert_compensation_period(float(upper), interval, filters.period)
+            if isinstance(upper, (int, float))
+            else None
         )
-        # Do not invent currency conversion or hours worked per year.
-        if upper is None or not comparable:
+        # Unknown currencies and periods remain visible unless the user chose
+        # the strict unknown-pay policy.
+        if converted_upper is None or job.get("salary_currency") != filters.currency:
             return filters.includeUnknownPay
-        if upper < filters.minimumPay:
+        if converted_upper < filters.minimumPay:
             return False
     return True
