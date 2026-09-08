@@ -423,7 +423,7 @@ def test_background_quick_screen_has_one_short_provider_attempt(tmp_path, monkey
         lambda **kwargs: captured.update({"queue": kwargs}) or expected,
     )
 
-    result = background_screening.run_background_quick_screening(tmp_path, max_jobs=3)
+    result = background_screening.run_background_quick_screening(tmp_path, max_jobs=25)
 
     assert result is expected
     assert captured["adapter"] == {
@@ -431,6 +431,7 @@ def test_background_quick_screen_has_one_short_provider_attempt(tmp_path, monkey
         "timeout_seconds": 25,
         "retries": 0,
     }
+    assert captured["queue"]["max_provider_jobs"] == 25
 
 
 def test_interactive_job_screen_wraps_input_decoding_failure(tmp_path, monkeypatch, caplog):

@@ -88,7 +88,10 @@ def run_background_quick_screening(
         output_path=root / DEFAULT_SCREENING_OUTPUT,
         config_path=root / DEFAULT_CONFIG,
         preferences_path=root / DEFAULT_PREFERENCES,
-        max_provider_jobs=min(max_jobs, config.limits.max_requests),
+        # Background screening has its own explicit, user-configured batch budget.
+        # AgentLimits.max_requests bounds one conversational agent turn; applying it
+        # here silently reduced a 25-job backfill to the default six requests.
+        max_provider_jobs=max_jobs,
         allow_provider=True,
         workspace=root,
     )

@@ -443,9 +443,12 @@ canonical job identities, separates shared from unique provider contributions,
 and counts useful unique jobs only when a completed semantic screen is
 available. It does not contact either provider or claim exhaustive recall.
 
-Each uncached eligible job is a separate bounded provider request. The command
-will not exceed the lower of `--max-provider-jobs` and
-`agent/config.yml`'s `limits.max_requests`. Its summary records provider
+Each uncached eligible job is a separate bounded provider request. Interactive
+agent commands do not exceed the lower of `--max-provider-jobs` and
+`agent/config.yml`'s `limits.max_requests`. Scheduled and portal-started
+background screening instead use the independently configured
+`automation/config.yml` `semantic_screening.max_jobs_per_run` budget, so the
+value shown in Settings is the actual batch ceiling. Summaries record provider
 attempts and total reported cost without storing credentials or unvalidated
 provider responses.
 
