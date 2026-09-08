@@ -108,15 +108,15 @@ def test_screening_backfill_rebuilds_current_inventory_without_source_refresh(
         "run_background_quick_screening",
         lambda root, *, max_jobs, input_path: (
             calls.append(("screen", (root, max_jobs, input_path)))
-                or SimpleNamespace(
-                    active=11,
-                    failed=0,
-                    failure_categories={},
-                    attempted=5,
-                    succeeded=4,
-                    completed=9,
-                    pending=0,
-                    provider_calls=5,
+            or SimpleNamespace(
+                active=11,
+                failed=0,
+                failure_categories={},
+                attempted=5,
+                succeeded=4,
+                completed=9,
+                pending=0,
+                provider_calls=5,
                 cached=6,
                 recommended=8,
                 needs_review=2,
