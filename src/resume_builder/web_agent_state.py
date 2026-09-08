@@ -24,7 +24,7 @@ class WebAgentState(AgentState):
             db.executescript("""
                 CREATE TABLE IF NOT EXISTS web_threads(
                     id TEXT PRIMARY KEY, resume_id TEXT, title TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
+                    updated_at TEXT NOT NULL, job_id TEXT, context_name TEXT
                 );
                 CREATE TABLE IF NOT EXISTS web_runs(
                     id TEXT NOT NULL, thread_id TEXT NOT NULL REFERENCES web_threads(id)
@@ -43,15 +43,31 @@ class WebAgentState(AgentState):
             columns = {row[1] for row in db.execute("PRAGMA table_info(web_threads)")}
             if "job_id" not in columns:
                 db.execute("ALTER TABLE web_threads ADD COLUMN job_id TEXT")
+            if "context_name" not in columns:
+                db.execute("ALTER TABLE web_threads ADD COLUMN context_name TEXT")
 
-    def create_thread(self, resume_id: str | None, *, job_id: str | None = None) -> dict[str, Any]:
+    def create_thread(
+        self,
+        resume_id: str | None,
+        *,
+        job_id: str | None = None,
+        context_name: str | None = None,
+    ) -> dict[str, Any]:
         identity = str(uuid4())
         with self._connect() as db:
             db.execute(
-                "INSERT INTO web_threads(id,resume_id,title,updated_at,job_id) VALUES (?, ?, ?, ?, ?)",
-                (identity, resume_id, "New conversation", _now(), job_id),
+                "INSERT INTO web_threads(id,resume_id,title,updated_at,job_id,context_name) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (identity, resume_id, "New conversation", _now(), job_id, context_name),
             )
         return self.thread(identity)
+
+    def set_context_name(self, identity: str, context_name: str) -> None:
+        with self._connect() as db:
+            db.execute(
+                "UPDATE web_threads SET context_name=? WHERE id=? AND job_id IS NOT NULL",
+                (context_name, identity),
+            )
 
     def list_threads(self) -> list[dict[str, Any]]:
         with self._connect() as db:

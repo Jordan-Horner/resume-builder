@@ -21,7 +21,7 @@ services:
       JOB_PULLER_LINKEDIN_RESULTS_WANTED: ${JOB_PULLER_LINKEDIN_RESULTS_WANTED:-}
       TZ: ${RESUME_BUILDER_TIMEZONE:-America/New_York}
     ports:
-      - "${RESUME_BUILDER_WEB_BIND:-127.0.0.1}:${RESUME_BUILDER_WEB_PORT:-8766}:8765"
+      - "${RESUME_BUILDER_WEB_BIND:-127.0.0.1}:8766:8765"
     logging:
       driver: json-file
       options:

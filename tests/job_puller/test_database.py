@@ -69,6 +69,20 @@ def test_active_inventory_exposes_stable_consumer_projection(tmp_path):
     assert inventory[0]["url"] == "https://example.com/apply/1"
 
 
+def test_active_job_identity_uses_canonical_job_id(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    db.record_result(result(observation()))
+    job_id = next(iter(db.job_ids()))
+
+    assert db.active_job_identity(job_id) == {
+        "id": job_id,
+        "title": "Senior Production Support Engineer",
+        "company": "Example, Inc.",
+    }
+    assert db.active_job_identity("missing") is None
+
+
 def test_active_inventory_decodes_legacy_windows_1252_posting_text(tmp_path):
     db = InventoryDatabase(tmp_path / "inventory.db")
     db.migrate()

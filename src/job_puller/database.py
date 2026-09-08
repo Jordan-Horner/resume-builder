@@ -1569,6 +1569,16 @@ class InventoryDatabase:
         with self.connect() as conn:
             return {str(row[0]) for row in conn.execute("SELECT id FROM jobs")}
 
+    def active_job_identity(self, job_id: str) -> dict[str, object] | None:
+        """Return display identity for one active job by its primary key."""
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT id, display_title AS title, display_company AS company
+                   FROM jobs WHERE id=? AND status IN ('active','reopened')""",
+                (job_id,),
+            ).fetchone()
+        return dict(row) if row else None
+
     def active_job_ids_first_seen_since(self, started_at: datetime) -> set[str]:
         """Return active canonical jobs first created after an interrupted refresh began."""
         with self.connect() as conn:

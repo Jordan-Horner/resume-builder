@@ -35,6 +35,28 @@ def test_assistant_rejects_unknown_job_context(client: TestClient) -> None:
     assert response.json()["detail"] == "Choose an existing job"
 
 
+def test_assistant_resolves_job_context_once_when_attached(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RESUME_BUILDER_AGENT_STATE", str(tmp_path / "agent.sqlite"))
+    lookups = 0
+
+    def identity(_self: DashboardService, job_id: str) -> dict[str, object]:
+        nonlocal lookups
+        lookups += 1
+        return {"id": job_id, "title": "DevOps Engineer", "company": "Zoom"}
+
+    monkeypatch.setattr(DashboardService, "get_job_identity", identity)
+    local_client = TestClient(create_app(tmp_path))
+
+    created = local_client.post("/api/assistant/threads", json={"job_id": "job-123"}).json()
+    restored = local_client.get(f"/api/assistant/threads/{created['id']}").json()
+
+    assert created["context_name"] == "DevOps Engineer at Zoom"
+    assert restored["context_name"] == "DevOps Engineer at Zoom"
+    assert lookups == 1
+
+
 def test_cross_origin_writes_and_direct_agent_access_are_rejected(client: TestClient) -> None:
     assert (
         client.post(

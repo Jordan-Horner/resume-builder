@@ -25,6 +25,7 @@ from .web_service import DashboardService
 
 def install_assistant(app: FastAPI, workspace: Path) -> None:
     router = APIRouter(prefix="/api/assistant")
+    dashboard = DashboardService(workspace)
     # Initialize lazily: merely serving unrelated portal routes must not create private state.
     state: WebAgentState | None = None
     processes: dict[str, asyncio.subprocess.Process] = {}
@@ -52,9 +53,7 @@ def install_assistant(app: FastAPI, workspace: Path) -> None:
         return state
 
     def configured() -> bool:
-        return (workspace / DEFAULT_AGENT_CONFIG).is_file() and DashboardService(
-            workspace
-        )._openrouter_configured()
+        return (workspace / DEFAULT_AGENT_CONFIG).is_file() and dashboard._openrouter_configured()
 
     @app.middleware("http")
     async def assistant_boundary(request: Request, call_next: Any) -> Any:
@@ -70,10 +69,11 @@ def install_assistant(app: FastAPI, workspace: Path) -> None:
         try:
             result = store().thread(identity)
             job_id = result.get("job_id")
-            if job_id:
-                job = DashboardService(workspace).get_job(job_id)
+            if job_id and not result.get("context_name"):
+                job = dashboard.get_job_identity(job_id)
                 if job:
                     result["context_name"] = f"{job['title']} at {job['company']}"
+                    store().set_context_name(identity, result["context_name"])
             return result
         except LookupError as exc:
             raise HTTPException(404, "Conversation not found") from exc
@@ -165,12 +165,16 @@ def install_assistant(app: FastAPI, workspace: Path) -> None:
             raise HTTPException(400, "Choose either a resume or a job")
         if selected_job is not None:
             try:
-                found = DashboardService(workspace).get_job(selected_job)
+                found = dashboard.get_job_identity(selected_job)
             except (ValueError, TypeError):
                 found = None
             if found is None:
                 raise HTTPException(400, "Choose an existing job")
-            return store().create_thread(None, job_id=selected_job)
+            return store().create_thread(
+                None,
+                job_id=selected_job,
+                context_name=f"{found['title']} at {found['company']}",
+            )
         try:
             if selected is not None:
                 resume_path(workspace, selected)

@@ -695,6 +695,11 @@ def test_jobs_are_searchable_filterable_and_only_leave_after_disposition(
         "top_workplace": False,
         "sources": ["fortune-500-2026"],
     }
+    assert service.get_job_identity("hybrid-1") == {
+        "id": "hybrid-1",
+        "title": "Platform Engineer",
+        "company": "Acme",
+    }
     assert [item["id"] for item in service.list_jobs()] == [
         "remote-1",
         "hybrid-1",

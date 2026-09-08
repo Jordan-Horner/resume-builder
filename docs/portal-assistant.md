@@ -22,6 +22,8 @@ by the web frontend or required for frontend health.
 
 Conversation history and pending wording proposals live in the existing agent SQLite
 state file (`RESUME_BUILDER_AGENT_STATE`, `/state/agent-state.sqlite` in Docker).
+Attached job threads also keep their resolved display label, so polling conversation state
+does not repeatedly reload job inventory; older threads backfill the label when first opened.
 Persist `/state` alongside the career workspace. This is a single-user private portal,
 not a multi-tenant authentication boundary. Keep it behind your private network or
 an authenticated reverse proxy.

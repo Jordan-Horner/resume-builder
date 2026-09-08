@@ -257,6 +257,7 @@ class DashboardService:
     ) -> None:
         self.workspace = workspace.expanduser().resolve()
         self._inventory_loader = inventory_loader or self._load_inventory
+        self._uses_inventory_database = inventory_loader is None
         self._state_lock = threading.Lock()
         self._salary_lock = threading.Lock()
         self._screening_lock = threading.Lock()
@@ -2199,6 +2200,20 @@ class DashboardService:
                 job["personalization"] = summary.get("personalization") if summary else None
                 return job
         return None
+
+    def get_job_identity(self, job_id: str) -> dict[str, object] | None:
+        if self._uses_inventory_database:
+            return self._inventory_database().active_job_identity(job_id)
+        raw = next(
+            (item for item in self._inventory_loader() if str(item.get("id")) == job_id), None
+        )
+        if raw is None:
+            return None
+        return {
+            "id": job_id,
+            "title": str(raw.get("title") or "Untitled role"),
+            "company": str(raw.get("company") or "Unknown company"),
+        }
 
     def estimate_job_salary(self, job_id: str, *, refresh: bool = False) -> dict[str, Any]:
         """Run only on an explicit estimate request; browsing never calls the model."""

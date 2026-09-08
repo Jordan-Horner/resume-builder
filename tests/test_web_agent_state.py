@@ -21,12 +21,24 @@ def test_threads_and_turns_survive_reopening(tmp_path: Path) -> None:
 
 def test_thread_can_persist_an_explicit_job_context(tmp_path: Path) -> None:
     path = tmp_path / "agent.sqlite"
-    thread = WebAgentState(path).create_thread(None, job_id="job-123")
+    thread = WebAgentState(path).create_thread(
+        None, job_id="job-123", context_name="Support Engineer at Example"
+    )
 
     restored = WebAgentState(path).thread(thread["id"])
 
     assert restored["resume_id"] is None
     assert restored["job_id"] == "job-123"
+    assert restored["context_name"] == "Support Engineer at Example"
+
+
+def test_legacy_job_thread_context_is_backfilled(tmp_path: Path) -> None:
+    state = WebAgentState(tmp_path / "agent.sqlite")
+    thread = state.create_thread(None, job_id="job-123")
+
+    state.set_context_name(thread["id"], "Support Engineer at Example")
+
+    assert state.thread(thread["id"])["context_name"] == "Support Engineer at Example"
 
 
 def test_only_one_turn_and_proposal_claim_can_run(tmp_path: Path) -> None:

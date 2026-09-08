@@ -88,6 +88,7 @@ def test_local_compose_is_one_container_with_shared_workspace_and_state():
     assert service["environment"]["RESUME_BUILDER_WORKSPACE"] == "/workspace"
     assert service["environment"]["RESUME_BUILDER_AUTOMATION_STATE"].startswith("/state/")
     assert service["environment"]["RESUME_BUILDER_AGENT_STATE"].startswith("/state/")
+    assert service["ports"] == ["${RESUME_BUILDER_WEB_BIND:-127.0.0.1}:8766:8765"]
     assert service["volumes"] == [
         "${RESUME_BUILDER_WORKSPACE_PATH:?Set RESUME_BUILDER_WORKSPACE_PATH}:/workspace",
         "${RESUME_BUILDER_RUNTIME_PATH:?Set RESUME_BUILDER_RUNTIME_PATH}:/state",

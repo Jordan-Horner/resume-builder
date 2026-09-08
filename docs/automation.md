@@ -265,8 +265,8 @@ docker compose up -d
 docker compose logs -f resume-builder
 ```
 
-Open `http://127.0.0.1:8766`. `RESUME_BUILDER_WEB_PORT` changes the host port,
-and `RESUME_BUILDER_WEB_BIND` changes the bind address. Keep the default loopback
+Open `http://127.0.0.1:8766`. Local Compose keeps that host port fixed;
+`RESUME_BUILDER_WEB_BIND` changes the bind address. Keep the default loopback
 binding unless the portal is protected by a trusted private network or reverse
 proxy. For a trusted TrueNAS LAN address, set `RESUME_BUILDER_WEB_BIND=0.0.0.0`
 and open `http://<truenas-address>:8766`.
