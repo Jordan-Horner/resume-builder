@@ -283,9 +283,7 @@ class ScreeningService:
                     instructions=SCREENING_INSTRUCTIONS,
                     model=model,
                     output_type=(
-                        SemanticScreen
-                        if packet.criterion_evidence
-                        else PostingWideSemanticScreen
+                        SemanticScreen if packet.criterion_evidence else PostingWideSemanticScreen
                     ),
                     max_output_tokens=800,
                 )

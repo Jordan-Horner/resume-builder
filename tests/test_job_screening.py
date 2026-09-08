@@ -348,8 +348,7 @@ def test_screening_prompt_contains_only_fit_inputs() -> None:
     assert "salary_estimate" not in SemanticScreen.model_json_schema()["properties"]
     assert "preference_assessments" not in SemanticScreen.model_json_schema()["properties"]
     assert (
-        "criterion_assessments"
-        not in PostingWideSemanticScreen.model_json_schema()["properties"]
+        "criterion_assessments" not in PostingWideSemanticScreen.model_json_schema()["properties"]
     )
 
 
