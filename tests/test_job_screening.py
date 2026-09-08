@@ -448,7 +448,10 @@ class FakeStructuredAdapter:
         )
 
 
-def test_screening_service_uses_validated_output_and_content_hash_cache(tmp_path: Path) -> None:
+def test_screening_service_uses_validated_output_and_content_hash_cache(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level("INFO", logger="resume_builder.screening_service")
     packet = build_screening_packet(
         {
             "id": "fictional-cache",
@@ -479,6 +482,10 @@ def test_screening_service_uses_validated_output_and_content_hash_cache(tmp_path
     assert first_cached is False
     assert second_cached is True
     assert len(adapter.requests) == 1
+    assert "screening_provider_request_started" in caplog.text
+    assert "screening_provider_request_completed" in caplog.text
+    assert "Support production operations" not in caplog.text
+    assert "Fictional Operations" not in caplog.text
 
 
 def test_screening_service_never_sends_confirmed_hard_conflicts(tmp_path: Path) -> None:

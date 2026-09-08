@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import time
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 
-from .agent_contracts import ModelAdapter, ModelProviderError, StructuredModelRequest
+from .agent_contracts import (
+    ModelAdapter,
+    ModelProviderError,
+    ModelProviderTimeoutError,
+    StructuredModelRequest,
+)
 from .job_screening import (
     SCREENING_INSTRUCTIONS,
     EligibilityStatus,
@@ -40,9 +47,34 @@ QUICK_SCREEN_PROVIDER_RETRIES = 0
 class ScreeningProviderError(ModelProviderError):
     """Retain only content-free request-count telemetry across a failed screen."""
 
-    def __init__(self, message: str, *, requests: int):
+    def __init__(self, message: str, *, requests: int, category: str):
         super().__init__(message)
         self.requests = requests
+        self.category = category
+
+
+def provider_error_category(error: BaseException) -> str:
+    """Classify a provider failure from exception types without retaining its text."""
+    current: BaseException | None = error
+    while current is not None:
+        name = current.__class__.__name__.casefold()
+        if isinstance(current, (ModelProviderTimeoutError, TimeoutError)) or "timeout" in name:
+            return "timeout"
+        if "ratelimit" in name or "too many requests" in name:
+            return "rate_limited"
+        if "authentication" in name or "permission" in name:
+            return "authentication"
+        if "connection" in name or "network" in name:
+            return "connection"
+        if "validation" in name or "unexpectedmodelbehavior" in name:
+            return "invalid_response"
+        current = current.__cause__
+    return "provider_error"
+
+
+def _telemetry_job_id(job_id: object) -> str:
+    """Return a stable opaque identifier without putting source data in logs."""
+    return hashlib.sha256(str(job_id or "").encode("utf-8")).hexdigest()[:12]
 
 
 @dataclass(frozen=True)
@@ -236,6 +268,13 @@ class ScreeningService:
                     posting_interpretation_cached=interpretation_cached,
                     posting_interpretation_error=interpretation_error,
                 )
+        request_started = time.monotonic()
+        telemetry_id = _telemetry_job_id(packet.job.id)
+        LOGGER.info(
+            "screening_provider_request_started job=%s model=%s",
+            telemetry_id,
+            model,
+        )
         try:
             reply = self.adapter.run_structured(
                 StructuredModelRequest(
@@ -247,10 +286,30 @@ class ScreeningService:
                 )
             )
         except ModelProviderError as exc:
+            category = provider_error_category(exc)
+            LOGGER.warning(
+                "screening_provider_request_failed job=%s model=%s duration_ms=%d category=%s",
+                telemetry_id,
+                model,
+                round((time.monotonic() - request_started) * 1000),
+                category,
+            )
             raise ScreeningProviderError(
                 "candidate screening provider failed",
                 requests=interpretation_requests + 1,
+                category=category,
             ) from exc
+        LOGGER.info(
+            "screening_provider_request_completed job=%s model=%s duration_ms=%d requests=%d "
+            "input_tokens=%d output_tokens=%d cost_usd=%s",
+            telemetry_id,
+            model,
+            round((time.monotonic() - request_started) * 1000),
+            reply.requests,
+            reply.input_tokens,
+            reply.output_tokens,
+            reply.cost_usd or "0",
+        )
         semantic = SemanticScreen.model_validate(reply.output)
         result = finalize_screen(packet, semantic, model=reply.model)
         self.cache.put(packet, result)

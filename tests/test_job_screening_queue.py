@@ -204,7 +204,6 @@ def test_queue_keeps_every_job_and_bounds_provider_work(
     assert adapter.models == ["fictional/model"]
     assert len(load_notification_jobs(output)) == 3
     assert "screening_batch_started" in caplog.text
-    assert "screening_job_completed" in caplog.text
     assert "screening_batch_completed" in caplog.text
     assert "Support production operations" not in caplog.text
     assert "Fictional Company" not in caplog.text
@@ -391,5 +390,6 @@ def test_provider_failure_remains_visible_and_consumes_the_attempt_budget(
     assert summary.attempted == 1
     assert summary.succeeded == 0
     assert summary.failed == 1
+    assert summary.failure_categories == {"provider_error": 1}
     assert summary.needs_review == 2
     assert adapter.calls == 1

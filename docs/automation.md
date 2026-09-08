@@ -82,9 +82,12 @@ retry it without blocking the recommendation queue.
 
 Each standalone backfill records privacy-safe operational telemetry: total batch
 duration, attempted/successful/cached/failed jobs, provider request count, token
-usage, estimated cost, recommendation totals, and average time per attempt. The
-service logs the same batch summary plus each provider attempt's duration and
-outcome under an opaque hashed job identifier. Job titles, descriptions, résumé
+usage, estimated cost, failure categories, recommendation totals, and average
+time per attempt. Failures are grouped as timeout, rate limiting,
+authentication, connection, invalid response, or a generic provider failure. The
+service logs the same batch summary, while the shared screening service logs
+each manual or batch provider request's duration, outcome, model, usage, and safe
+error category under an opaque hashed job identifier. Job titles, descriptions, résumé
 text, candidate evidence, and provider response prose are never written to these
 logs. The latest aggregate metrics are also returned by
 `GET /api/jobs/screening-backfill` so administrators can tune the batch limit

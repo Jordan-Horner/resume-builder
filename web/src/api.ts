@@ -251,6 +251,7 @@ export interface ScreeningBackfillState {
   screened_jobs?: number;
   cached_jobs?: number;
   failed_jobs?: number;
+  failure_categories?: Record<string, number>;
   provider_requests?: number;
   input_tokens?: number;
   output_tokens?: number;

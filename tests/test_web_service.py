@@ -110,6 +110,7 @@ def test_screening_backfill_rebuilds_current_inventory_without_source_refresh(
             calls.append(("screen", (root, max_jobs, input_path)))
             or SimpleNamespace(
                 failed=0,
+                failure_categories={},
                 attempted=5,
                 succeeded=4,
                 provider_calls=5,
@@ -140,6 +141,7 @@ def test_screening_backfill_rebuilds_current_inventory_without_source_refresh(
     assert status["attempted_jobs"] == 5
     assert status["screened_jobs"] == 4
     assert status["provider_requests"] == 5
+    assert status["failure_categories"] == {}
     assert status["duration_seconds"] == 12.5
     assert status["average_seconds_per_attempt"] == 2.5
     assert status["success_rate"] == 0.8

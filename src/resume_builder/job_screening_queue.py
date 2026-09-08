@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import time
@@ -73,15 +72,11 @@ class ScreeningQueueSummary:
     needs_review: int
     additional: int
     failed: int
+    failure_categories: dict[str, int]
     input_tokens: int
     output_tokens: int
     cost_usd: Decimal
     duration_seconds: float
-
-
-def _telemetry_job_id(job_id: object) -> str:
-    """Return a stable opaque identifier without putting source data in logs."""
-    return hashlib.sha256(str(job_id or "").encode("utf-8")).hexdigest()[:12]
 
 
 def _result_payload(result: ScreeningResult, *, cached: bool) -> dict[str, Any]:
@@ -169,6 +164,7 @@ def _summary(
     items: list[dict[str, Any]],
     attempted: int,
     duration_seconds: float,
+    failure_categories: Counter[str],
     provider_calls: int,
     input_tokens: int,
     output_tokens: int,
@@ -203,6 +199,7 @@ def _summary(
         needs_review=needs_review,
         additional=max(0, len(active_items) - recommended - needs_review),
         failed=statuses["failed"],
+        failure_categories=dict(sorted(failure_categories.items())),
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         cost_usd=cost,
@@ -301,6 +298,7 @@ def build_screening_queue(
     input_tokens = 0
     output_tokens = 0
     total_cost = Decimal("0")
+    failure_categories: Counter[str] = Counter()
     for job, item in prepared:
         active = bool(item["active"])
         if not active:
@@ -357,43 +355,24 @@ def build_screening_queue(
             items.append(item)
             continue
         provider_jobs += 1
-        job_started = time.monotonic()
-        telemetry_id = _telemetry_job_id(job.get("id"))
         try:
             outcome = service.screen_detailed(packet, model=model)
         except (ModelProviderError, ValueError) as exc:
             requests = int(getattr(exc, "requests", 1))
+            category = str(getattr(exc, "category", exc.__class__.__name__))
             provider_calls += requests
+            failure_categories[category] += 1
             item["screening"] = {
                 "status": "failed",
                 "reason": "provider_error",
-                "error_category": exc.__class__.__name__,
+                "error_category": category,
             }
-            LOGGER.warning(
-                "screening_job_failed job=%s duration_ms=%d requests=%d category=%s",
-                telemetry_id,
-                round((time.monotonic() - job_started) * 1000),
-                requests,
-                exc.__class__.__name__,
-            )
         else:
             provider_calls += outcome.requests
             input_tokens += outcome.input_tokens
             output_tokens += outcome.output_tokens
             total_cost += outcome.cost_usd
             item["screening"] = _result_payload(outcome.result, cached=outcome.cached)
-            LOGGER.info(
-                "screening_job_completed job=%s duration_ms=%d requests=%d "
-                "input_tokens=%d output_tokens=%d recommendation=%s fit=%s confidence=%s",
-                telemetry_id,
-                round((time.monotonic() - job_started) * 1000),
-                outcome.requests,
-                outcome.input_tokens,
-                outcome.output_tokens,
-                outcome.result.recommendation.value,
-                outcome.result.fit.value,
-                outcome.result.confidence.value,
-            )
         items.append(item)
 
     items.sort(key=lambda item: int(item["source_order"]))
@@ -412,6 +391,7 @@ def build_screening_queue(
         items,
         provider_jobs,
         time.monotonic() - batch_started,
+        failure_categories,
         provider_calls,
         input_tokens,
         output_tokens,
@@ -420,7 +400,7 @@ def build_screening_queue(
     LOGGER.info(
         "screening_batch_completed duration_seconds=%.3f attempted_jobs=%d succeeded_jobs=%d "
         "cached_jobs=%d failed_jobs=%d provider_requests=%d input_tokens=%d output_tokens=%d "
-        "cost_usd=%s recommended_jobs=%d needs_review_jobs=%d",
+        "cost_usd=%s failure_categories=%s recommended_jobs=%d needs_review_jobs=%d",
         summary.duration_seconds,
         summary.attempted,
         summary.succeeded,
@@ -430,6 +410,7 @@ def build_screening_queue(
         summary.input_tokens,
         summary.output_tokens,
         summary.cost_usd,
+        json.dumps(summary.failure_categories, sort_keys=True, separators=(",", ":")),
         summary.recommended,
         summary.needs_review,
     )

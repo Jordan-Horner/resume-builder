@@ -1444,6 +1444,7 @@ class DashboardService:
                     "screened_jobs": screened_jobs,
                     "cached_jobs": summary.cached,
                     "failed_jobs": summary.failed,
+                    "failure_categories": dict(getattr(summary, "failure_categories", {})),
                     "provider_requests": summary.provider_calls,
                     "input_tokens": int(getattr(summary, "input_tokens", 0)),
                     "output_tokens": int(getattr(summary, "output_tokens", 0)),
@@ -1461,7 +1462,8 @@ class DashboardService:
             LOGGER.info(
                 "screening_backfill_completed status=%s duration_seconds=%.3f attempted_jobs=%d "
                 "screened_jobs=%d cached_jobs=%d failed_jobs=%d provider_requests=%d "
-                "input_tokens=%d output_tokens=%d cost_usd=%s recommended_jobs=%d "
+                "input_tokens=%d output_tokens=%d cost_usd=%s failure_categories=%s "
+                "recommended_jobs=%d "
                 "needs_review_jobs=%d",
                 status,
                 duration_seconds,
@@ -1473,6 +1475,11 @@ class DashboardService:
                 int(getattr(summary, "input_tokens", 0)),
                 int(getattr(summary, "output_tokens", 0)),
                 str(getattr(summary, "cost_usd", "0")),
+                json.dumps(
+                    getattr(summary, "failure_categories", {}),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
                 summary.recommended,
                 summary.needs_review,
             )
