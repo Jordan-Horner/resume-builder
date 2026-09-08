@@ -218,6 +218,8 @@ export function JobDetailPanel({
           <span>{formatWorkModes(job.work_modes)}</span>
           <span>{job.location}</span>
           {postedSalary ? <span>{postedSalary}</span> : <JobSalary key={job.id} job={job} />}
+          {job.company_recognition?.top_workplace && <span className="recognition-badge top-workplace">Top workplace</span>}
+          {job.company_recognition?.major_employer && <span className="recognition-badge major-employer">Major employer</span>}
         </div>
         {recommendation?.recommended_resume && !jobScreen?.result.resume_match && <div className="resume-recommendation">
           <span>Recommended resume</span>

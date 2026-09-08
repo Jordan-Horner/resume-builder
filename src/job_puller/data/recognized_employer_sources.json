@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "curated_at": "2026-09-08",
+  "sources": [
+    {
+      "id": "fortune-500-2026",
+      "url": "https://fortune.com/ranking/fortune500/2026/",
+      "accessible_rows_url": "https://www.sheetsteps.com/data/fortune-500-companies-2026",
+      "companies_reviewed": 500
+    },
+    {
+      "id": "great-place-to-work-2026",
+      "url": "https://www.greatplacetowork.com/best-workplaces/100-best/2026",
+      "companies_reviewed": 99
+    },
+    {
+      "id": "linkedin-top-companies-2026",
+      "url": "https://www.linkedin.com/hubs/top-companies/us/",
+      "companies_reviewed": 49
+    },
+    {
+      "id": "computerworld-best-it-2026",
+      "url": "https://www.computerworld.com/article/4074844/computerworld-best-places-to-work-in-it-2026.html",
+      "companies_reviewed": 100
+    },
+    {
+      "id": "glassdoor-best-places-2026",
+      "url": "https://www.glassdoor.com/blog/glassdoor-announces-best-places-to-work-2026/",
+      "companies_reviewed": 10
+    }
+  ],
+  "discovery_feed": {
+    "repository": "https://github.com/Feashliaa/job-board-data",
+    "manifest_url": "https://feashliaa.github.io/job-board-data/data/chunks/jobs_manifest.json",
+    "last_updated": "2026-09-08T13:06:35.158732Z",
+    "jobs_scanned": 1461006
+  },
+  "results": {
+    "normalized_employer_identities": 682,
+    "matched_feed_jobs": 163398,
+    "candidate_supported_boards": 320,
+    "verified_bundled_boards": 318,
+    "unsupported_ats_jobs": {
+      "bamboohr": 26,
+      "icims": 6223,
+      "paylocity": 8
+    }
+  }
+}

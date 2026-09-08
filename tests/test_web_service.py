@@ -16,7 +16,12 @@ from resume_builder.job_screening import (
     deterministic_ineligible_result,
     deterministic_insufficient_evidence_result,
 )
-from resume_builder.web_service import DashboardService, ScreeningInputError, _clean_description
+from resume_builder.web_service import (
+    DashboardService,
+    ScreeningInputError,
+    _clean_description,
+    _company_recognition,
+)
 from resume_builder.workspace import initialize_workspace
 
 
@@ -39,6 +44,34 @@ def job(job_id: str, *, title: str, mode: str, company: str = "Example") -> dict
         "providers": ["linkedin"],
         "url": f"https://example.com/{job_id}",
     }
+
+
+def test_company_recognition_keeps_major_employer_and_workplace_awards_distinct():
+    recognition = _company_recognition(
+        ["linkedin:ignored"],
+        {
+            "workday:example": {
+                "fortune-500-2026",
+                "great-place-to-work-2026",
+                "recognized-employer",
+            }
+        },
+        company="Example, Inc.",
+        company_tags={
+            "example inc": {
+                "fortune-500-2026",
+                "great-place-to-work-2026",
+                "recognized-employer",
+            }
+        },
+    )
+
+    assert recognition == {
+        "major_employer": True,
+        "top_workplace": True,
+        "sources": ["fortune-500-2026", "great-place-to-work-2026"],
+    }
+    assert _company_recognition(["linkedin:ignored"], {}) is None
 
 
 def write_screening_output(
@@ -647,12 +680,21 @@ def test_jobs_are_searchable_filterable_and_only_leave_after_disposition(
     tmp_path, inventory, monkeypatch
 ):
     monkeypatch.setattr(web_service, "iter_records", lambda _root: [])
+    inventory[1]["company_recognition"] = {
+        "major_employer": True,
+        "top_workplace": False,
+        "sources": ["fortune-500-2026"],
+    }
     service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
 
     assert [item["id"] for item in service.list_jobs(work_mode="hybrid")] == ["hybrid-1"]
     assert [item["id"] for item in service.list_jobs(search="acme")] == ["hybrid-1"]
 
-    assert service.get_job("hybrid-1") is not None
+    assert service.get_job("hybrid-1")["company_recognition"] == {
+        "major_employer": True,
+        "top_workplace": False,
+        "sources": ["fortune-500-2026"],
+    }
     assert [item["id"] for item in service.list_jobs()] == [
         "remote-1",
         "hybrid-1",

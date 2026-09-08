@@ -448,6 +448,14 @@ def score_shadow_job(
     )
     company_score += min(0.3, company_positive * 0.12)
     company_score -= min(0.3, company_negative * 0.15)
+    company_recognition = item.get("company_recognition")
+    if isinstance(company_recognition, dict):
+        if company_recognition.get("top_workplace") is True:
+            company_score += 0.10
+            reasons.append("The employer has recent workplace recognition.")
+        if company_recognition.get("major_employer") is True:
+            company_score += 0.05
+            reasons.append("The employer is a Fortune 500 company.")
     for trait in sorted(current_traits & LEARNABLE_TRAITS):
         matching = [
             event

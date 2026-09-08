@@ -1692,6 +1692,10 @@ class InventoryDatabase:
                           j.description_text, j.description_hash, j.description_quality,
                           COALESCE(GROUP_CONCAT(DISTINCT wm.mode), 'unknown') AS work_modes,
                           COALESCE(GROUP_CONCAT(DISTINCT o.provider), '') AS providers,
+                          COALESCE(GROUP_CONCAT(DISTINCT CASE
+                              WHEN o.provider_board_id<>''
+                              THEN o.provider || ':' || o.provider_board_id
+                          END), '') AS provider_boards,
                           COALESCE(NULLIF(j.canonical_apply_url, ''),
                                    MAX(NULLIF(o.direct_apply_url, '')),
                                    MAX(o.source_url), '') AS url
@@ -1708,6 +1712,9 @@ class InventoryDatabase:
             item = dict(row)
             item["work_modes"] = sorted(set(str(item["work_modes"]).split(",")))
             item["providers"] = sorted(filter(None, set(str(item["providers"]).split(","))))
+            item["provider_boards"] = sorted(
+                filter(None, set(str(item["provider_boards"]).split(",")))
+            )
             inventory.append(item)
         return inventory
 

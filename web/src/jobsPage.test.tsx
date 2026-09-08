@@ -109,6 +109,26 @@ it("shows Hot without exposing screening metadata in the queue", async () => {
   expect(host.textContent).not.toContain("Support Engineer · Support Engineer");
 });
 
+it("shows backend-provided employer recognition in the row and job details", async () => {
+  const recognizedJob: Job = {
+    ...job,
+    company_recognition: {
+      major_employer: true,
+      top_workplace: true,
+      sources: ["fortune-500-2026", "great-place-to-work-2026"],
+    },
+  };
+  vi.mocked(api.getJobs).mockResolvedValue({ jobs: [recognizedJob], count: 1, reviewable_count: 1 });
+  vi.mocked(api.getJob).mockResolvedValue(recognizedJob);
+
+  await openJob();
+
+  expect(host.querySelector(".job-row .top-workplace")?.textContent).toBe("Top workplace");
+  expect(host.querySelector(".job-row .major-employer")?.textContent).toBe("Major employer");
+  expect(host.querySelector(".job-detail .top-workplace")?.textContent).toBe("Top workplace");
+  expect(host.querySelector(".job-detail .major-employer")?.textContent).toBe("Major employer");
+});
+
 it("does not label a recommended job Hot without a completed Strong fit", async () => {
   vi.mocked(api.getJobs).mockResolvedValue({
     jobs: [{ ...job, personalization: { hot: false, hot_reasons: [], hot_score: 0.7 }, quick_screen: { status: "complete", label: "Good", resume_name: "Support Engineer", generated_at: "2026-09-06T12:00:00Z" } }],

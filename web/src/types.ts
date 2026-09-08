@@ -41,6 +41,11 @@ export interface Job {
   work_modes: string[];
   providers: string[];
   url: string | null;
+  company_recognition?: {
+    major_employer: boolean;
+    top_workplace: boolean;
+    sources: string[];
+  } | null;
   quick_screen?: {
     status: "complete" | "skipped" | "failed";
     label: string;

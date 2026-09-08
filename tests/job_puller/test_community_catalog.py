@@ -38,6 +38,7 @@ def test_catalog_audit_is_capped_read_only_and_resumes_from_cursor(
                 provider_job_id=f"{self.board.id}-1",
                 title="Site Reliability Engineer",
                 company=self.board.name,
+                location="Remote, US",
                 source_url=f"https://example.test/{self.board.id}",
             )
             return ProviderResult(
@@ -75,6 +76,13 @@ def test_catalog_audit_is_capped_read_only_and_resumes_from_cursor(
     assert first["totals"]["promotion_ready"] == 2
     assert first["providers"][0]["boards"][0]["possible_false_negatives"] == [
         {"title": "reliability analyst", "count": 1, "shared_terms": ["reliability"]}
+    ]
+    assert first["providers"][0]["boards"][0]["accepted_job_examples"] == [
+        {
+            "title": "Site Reliability Engineer",
+            "location": "Remote, US",
+            "work_modes": ["remote"],
+        }
     ]
     assert first["providers"][0]["boards"][0]["board"]["enabled"] is False
     assert first["providers"][0]["boards"][0]["filter_accounting"]["valid"] is True

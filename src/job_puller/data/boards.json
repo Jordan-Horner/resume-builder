@@ -1,141 +1,3326 @@
 {
-  "schema_version": 1,
   "providers": {
-    "ashby": [
+    "rippling": [
       {
-        "id": "baseten",
-        "name": "Baseten",
-        "enabled": true,
-        "careers_url": "https://jobs.ashbyhq.com/baseten"
-      },
-      {
-        "id": "Cyberhaven",
-        "name": "Cyberhaven",
-        "enabled": true,
-        "careers_url": "https://jobs.ashbyhq.com/Cyberhaven"
-      },
-      {
-        "id": "langchain",
-        "name": "LangChain",
-        "enabled": true,
-        "careers_url": "https://jobs.ashbyhq.com/langchain"
-      },
-      {
-        "id": "lumaai",
-        "name": "Luma AI",
-        "enabled": true,
-        "careers_url": "https://jobs.ashbyhq.com/lumaai"
-      },
-      {
-        "id": "revenuecat",
-        "name": "RevenueCat",
-        "enabled": true,
-        "careers_url": "https://jobs.ashbyhq.com/revenuecat"
+        "id": "riot-platforms-careers",
+        "name": "Riot Platforms, Inc.",
+        "careers_url": "https://ats.rippling.com/riot-platforms-careers/jobs"
       }
     ],
     "greenhouse": [
       {
         "id": "axon",
         "name": "Axon",
-        "enabled": true,
         "careers_url": "https://job-boards.greenhouse.io/axon"
       },
       {
         "id": "blinkhealth",
         "name": "BlinkRx",
-        "enabled": true,
         "careers_url": "https://job-boards.greenhouse.io/blinkhealth"
       },
       {
         "id": "cloudflare",
         "name": "Cloudflare",
-        "enabled": true,
         "careers_url": "https://job-boards.greenhouse.io/cloudflare"
       },
       {
         "id": "intercom",
         "name": "Intercom",
-        "enabled": true,
         "careers_url": "https://job-boards.greenhouse.io/intercom"
       },
       {
         "id": "obsidiansecurity",
         "name": "Obsidian Security",
-        "enabled": true,
         "careers_url": "https://job-boards.greenhouse.io/obsidiansecurity"
       },
       {
         "id": "rebuildmanufacturing",
         "name": "Re:Build Manufacturing",
-        "enabled": true,
         "careers_url": "https://job-boards.greenhouse.io/rebuildmanufacturing"
+      },
+      {
+        "id": "bitgo",
+        "name": "Bitgo Holdings",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "careers_url": "https://job-boards.greenhouse.io/bitgo"
+      },
+      {
+        "id": "enova",
+        "name": "Enova",
+        "tags": [
+          "computerworld-best-it-2026",
+          "recognized-employer"
+        ],
+        "careers_url": "https://job-boards.greenhouse.io/enova"
+      },
+      {
+        "id": "knowbe4",
+        "name": "KnowBe4",
+        "tags": [
+          "computerworld-best-it-2026",
+          "recognized-employer"
+        ],
+        "careers_url": "https://job-boards.greenhouse.io/knowbe4"
+      },
+      {
+        "id": "shieldshealthsolutions",
+        "name": "Shields Health Solutions",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "careers_url": "https://job-boards.greenhouse.io/shieldshealthsolutions"
       }
     ],
     "lever": [
       {
         "id": "floqast",
         "name": "FloQast",
-        "enabled": true,
         "careers_url": "https://jobs.lever.co/floqast"
+      },
+      {
+        "id": "extremenetworks",
+        "name": "Extreme Networks",
+        "tags": [
+          "computerworld-best-it-2026",
+          "recognized-employer"
+        ],
+        "careers_url": "https://jobs.lever.co/extremenetworks"
+      },
+      {
+        "id": "metlife",
+        "name": "MetLife",
+        "tags": [
+          "fortune-500-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "careers_url": "https://jobs.lever.co/metlife"
+      },
+      {
+        "id": "sophos",
+        "name": "Sophos Ltd.",
+        "tags": [
+          "computerworld-best-it-2026",
+          "recognized-employer"
+        ],
+        "careers_url": "https://jobs.lever.co/sophos"
       }
     ],
-    "rippling": [
+    "ashby": [
       {
-        "id": "riot-platforms-careers",
-        "name": "Riot Platforms, Inc.",
-        "enabled": true,
-        "careers_url": "https://ats.rippling.com/riot-platforms-careers/jobs"
+        "id": "baseten",
+        "name": "Baseten",
+        "careers_url": "https://jobs.ashbyhq.com/baseten"
+      },
+      {
+        "id": "Cyberhaven",
+        "name": "Cyberhaven",
+        "careers_url": "https://jobs.ashbyhq.com/Cyberhaven"
+      },
+      {
+        "id": "langchain",
+        "name": "LangChain",
+        "careers_url": "https://jobs.ashbyhq.com/langchain"
+      },
+      {
+        "id": "lumaai",
+        "name": "Luma AI",
+        "careers_url": "https://jobs.ashbyhq.com/lumaai"
+      },
+      {
+        "id": "revenuecat",
+        "name": "RevenueCat",
+        "careers_url": "https://jobs.ashbyhq.com/revenuecat"
+      },
+      {
+        "id": "mosaic",
+        "name": "Mosaic",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "careers_url": "https://jobs.ashbyhq.com/mosaic"
       }
     ],
     "workday": [
       {
         "id": "alliantenergy-alliant",
         "name": "Alliant Energy",
-        "enabled": true,
         "api_url": "https://alliantenergy.wd1.myworkdayjobs.com/wday/cxs/alliantenergy/alliant/jobs",
         "careers_url": "https://alliantenergy.wd1.myworkdayjobs.com/alliant"
       },
       {
         "id": "blueorigin-blueorigin",
         "name": "Blue Origin",
-        "enabled": true,
         "api_url": "https://blueorigin.wd5.myworkdayjobs.com/wday/cxs/blueorigin/BlueOrigin/jobs",
         "careers_url": "https://blueorigin.wd5.myworkdayjobs.com/en-US/BlueOrigin"
       },
       {
         "id": "cohesity-cohesity_careers",
         "name": "Cohesity",
-        "enabled": true,
         "api_url": "https://cohesity.wd5.myworkdayjobs.com/wday/cxs/cohesity/Cohesity_Careers/jobs",
         "careers_url": "https://cohesity.wd5.myworkdayjobs.com/Cohesity_Careers"
       },
       {
         "id": "crowdstrike-crowdstrikecareers",
         "name": "CrowdStrike",
-        "enabled": true,
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
         "api_url": "https://crowdstrike.wd5.myworkdayjobs.com/wday/cxs/crowdstrike/crowdstrikecareers/jobs",
         "careers_url": "https://crowdstrike.wd5.myworkdayjobs.com/crowdstrikecareers"
       },
       {
         "id": "nvidia-nvidiaexternalcareersite",
         "name": "NVIDIA",
-        "enabled": true,
+        "tags": [
+          "fortune-500-2026",
+          "glassdoor-best-places-2026",
+          "great-place-to-work-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
         "api_url": "https://nvidia.wd5.myworkdayjobs.com/wday/cxs/nvidia/NVIDIAExternalCareerSite/jobs",
         "careers_url": "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite"
       },
       {
         "id": "prologis-prologis_external_careers",
         "name": "Prologis",
-        "enabled": true,
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
         "api_url": "https://prologis.wd5.myworkdayjobs.com/wday/cxs/prologis/Prologis_External_Careers/jobs",
         "careers_url": "https://prologis.wd5.myworkdayjobs.com/Prologis_External_Careers"
       },
       {
         "id": "salesforce-external_career_site",
         "name": "Salesforce",
-        "enabled": true,
+        "tags": [
+          "fortune-500-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
         "api_url": "https://salesforce.wd12.myworkdayjobs.com/wday/cxs/salesforce/External_Career_Site/jobs",
         "careers_url": "https://salesforce.wd12.myworkdayjobs.com/External_Career_Site"
+      },
+      {
+        "id": "abbott-abbottcareers",
+        "name": "Abbott",
+        "tags": [
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://abbott.wd5.myworkdayjobs.com/wday/cxs/abbott/abbottcareers/jobs",
+        "careers_url": "https://abbott.wd5.myworkdayjobs.com/abbottcareers"
+      },
+      {
+        "id": "abbott-abbottcareers2",
+        "name": "Abbott",
+        "tags": [
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://abbott.wd5.myworkdayjobs.com/wday/cxs/abbott/abbottcareers2/jobs",
+        "careers_url": "https://abbott.wd5.myworkdayjobs.com/abbottcareers2"
+      },
+      {
+        "id": "abbott-agency",
+        "name": "Abbott",
+        "tags": [
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://abbott.wd5.myworkdayjobs.com/wday/cxs/abbott/agency/jobs",
+        "careers_url": "https://abbott.wd5.myworkdayjobs.com/agency"
+      },
+      {
+        "id": "accenture-accenturecareers",
+        "name": "Accenture",
+        "tags": [
+          "great-place-to-work-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://accenture.wd103.myworkdayjobs.com/wday/cxs/accenture/accenturecareers/jobs",
+        "careers_url": "https://accenture.wd103.myworkdayjobs.com/accenturecareers"
+      },
+      {
+        "id": "accenture-avanadecareers",
+        "name": "Accenture",
+        "tags": [
+          "great-place-to-work-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://accenture.wd103.myworkdayjobs.com/wday/cxs/accenture/avanadecareers/jobs",
+        "careers_url": "https://accenture.wd103.myworkdayjobs.com/avanadecareers"
+      },
+      {
+        "id": "acehardware-ahhs_external",
+        "name": "Ace Hardware",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://acehardware.wd1.myworkdayjobs.com/wday/cxs/acehardware/ahhs_external/jobs",
+        "careers_url": "https://acehardware.wd1.myworkdayjobs.com/ahhs_external"
+      },
+      {
+        "id": "acehardware-arg_external",
+        "name": "Ace Hardware",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://acehardware.wd1.myworkdayjobs.com/wday/cxs/acehardware/arg_external/jobs",
+        "careers_url": "https://acehardware.wd1.myworkdayjobs.com/arg_external"
+      },
+      {
+        "id": "acehardware-ejdexternal",
+        "name": "Ace Hardware",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://acehardware.wd1.myworkdayjobs.com/wday/cxs/acehardware/ejdexternal/jobs",
+        "careers_url": "https://acehardware.wd1.myworkdayjobs.com/ejdexternal"
+      },
+      {
+        "id": "acehardware-external",
+        "name": "Ace Hardware",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://acehardware.wd1.myworkdayjobs.com/wday/cxs/acehardware/external/jobs",
+        "careers_url": "https://acehardware.wd1.myworkdayjobs.com/external"
+      },
+      {
+        "id": "adobe-external_experienced",
+        "name": "Adobe",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://adobe.wd5.myworkdayjobs.com/wday/cxs/adobe/external_experienced/jobs",
+        "careers_url": "https://adobe.wd5.myworkdayjobs.com/external_experienced"
+      },
+      {
+        "id": "adventhealth-ah_external_career_site",
+        "name": "AdventHealth",
+        "tags": [
+          "computerworld-best-it-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://adventhealth.wd12.myworkdayjobs.com/wday/cxs/adventhealth/ah_external_career_site/jobs",
+        "careers_url": "https://adventhealth.wd12.myworkdayjobs.com/ah_external_career_site"
+      },
+      {
+        "id": "aes-aes_andes",
+        "name": "AES",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://aes.wd1.myworkdayjobs.com/wday/cxs/aes/aes_andes/jobs",
+        "careers_url": "https://aes.wd1.myworkdayjobs.com/aes_andes"
+      },
+      {
+        "id": "aes-aes_asa",
+        "name": "AES",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://aes.wd1.myworkdayjobs.com/wday/cxs/aes/aes_asa/jobs",
+        "careers_url": "https://aes.wd1.myworkdayjobs.com/aes_asa"
+      },
+      {
+        "id": "aes-aes_chile",
+        "name": "AES",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://aes.wd1.myworkdayjobs.com/wday/cxs/aes/aes_chile/jobs",
+        "careers_url": "https://aes.wd1.myworkdayjobs.com/aes_chile"
+      },
+      {
+        "id": "aes-aes_clean_energy",
+        "name": "AES",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://aes.wd1.myworkdayjobs.com/wday/cxs/aes/aes_clean_energy/jobs",
+        "careers_url": "https://aes.wd1.myworkdayjobs.com/aes_clean_energy"
+      },
+      {
+        "id": "aes-aes_colombia",
+        "name": "AES",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://aes.wd1.myworkdayjobs.com/wday/cxs/aes/aes_colombia/jobs",
+        "careers_url": "https://aes.wd1.myworkdayjobs.com/aes_colombia"
+      },
+      {
+        "id": "aes-aes_dominicanrepublic",
+        "name": "AES",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://aes.wd1.myworkdayjobs.com/wday/cxs/aes/aes_dominicanrepublic/jobs",
+        "careers_url": "https://aes.wd1.myworkdayjobs.com/aes_dominicanrepublic"
+      },
+      {
+        "id": "aes-aes_elsalvador",
+        "name": "AES",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://aes.wd1.myworkdayjobs.com/wday/cxs/aes/aes_elsalvador/jobs",
+        "careers_url": "https://aes.wd1.myworkdayjobs.com/aes_elsalvador"
+      },
+      {
+        "id": "aes-aes_mcac",
+        "name": "AES",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://aes.wd1.myworkdayjobs.com/wday/cxs/aes/aes_mcac/jobs",
+        "careers_url": "https://aes.wd1.myworkdayjobs.com/aes_mcac"
+      },
+      {
+        "id": "aes-aes_mexico",
+        "name": "AES",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://aes.wd1.myworkdayjobs.com/wday/cxs/aes/aes_mexico/jobs",
+        "careers_url": "https://aes.wd1.myworkdayjobs.com/aes_mexico"
+      },
+      {
+        "id": "aes-aes_panama",
+        "name": "AES",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://aes.wd1.myworkdayjobs.com/wday/cxs/aes/aes_panama/jobs",
+        "careers_url": "https://aes.wd1.myworkdayjobs.com/aes_panama"
+      },
+      {
+        "id": "aes-aes_puertorico",
+        "name": "AES",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://aes.wd1.myworkdayjobs.com/wday/cxs/aes/aes_puertorico/jobs",
+        "careers_url": "https://aes.wd1.myworkdayjobs.com/aes_puertorico"
+      },
+      {
+        "id": "aes-aes_us",
+        "name": "AES",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://aes.wd1.myworkdayjobs.com/wday/cxs/aes/aes_us/jobs",
+        "careers_url": "https://aes.wd1.myworkdayjobs.com/aes_us"
+      },
+      {
+        "id": "aig-aig",
+        "name": "AIG",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://aig.wd1.myworkdayjobs.com/wday/cxs/aig/aig/jobs",
+        "careers_url": "https://aig.wd1.myworkdayjobs.com/aig"
+      },
+      {
+        "id": "aig-early_careers",
+        "name": "AIG",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://aig.wd1.myworkdayjobs.com/wday/cxs/aig/early_careers/jobs",
+        "careers_url": "https://aig.wd1.myworkdayjobs.com/early_careers"
+      },
+      {
+        "id": "aig-japan",
+        "name": "AIG",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://aig.wd1.myworkdayjobs.com/wday/cxs/aig/japan/jobs",
+        "careers_url": "https://aig.wd1.myworkdayjobs.com/japan"
+      },
+      {
+        "id": "aig-privatejobpostings",
+        "name": "AIG",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://aig.wd1.myworkdayjobs.com/wday/cxs/aig/privatejobpostings/jobs",
+        "careers_url": "https://aig.wd1.myworkdayjobs.com/privatejobpostings"
+      },
+      {
+        "id": "alcoa-careers",
+        "name": "Alcoa",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://alcoa.wd5.myworkdayjobs.com/wday/cxs/alcoa/careers/jobs",
+        "careers_url": "https://alcoa.wd5.myworkdayjobs.com/careers"
+      },
+      {
+        "id": "allstate-agent",
+        "name": "Allstate",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://allstate.wd5.myworkdayjobs.com/wday/cxs/allstate/agent/jobs",
+        "careers_url": "https://allstate.wd5.myworkdayjobs.com/agent"
+      },
+      {
+        "id": "allstate-allstate_careers",
+        "name": "Allstate",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://allstate.wd5.myworkdayjobs.com/wday/cxs/allstate/allstate_careers/jobs",
+        "careers_url": "https://allstate.wd5.myworkdayjobs.com/allstate_careers"
+      },
+      {
+        "id": "allstate-sourcing_event",
+        "name": "Allstate",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://allstate.wd5.myworkdayjobs.com/wday/cxs/allstate/sourcing_event/jobs",
+        "careers_url": "https://allstate.wd5.myworkdayjobs.com/sourcing_event"
+      },
+      {
+        "id": "ameren-collegiate",
+        "name": "Ameren",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://ameren.wd1.myworkdayjobs.com/wday/cxs/ameren/collegiate/jobs",
+        "careers_url": "https://ameren.wd1.myworkdayjobs.com/collegiate"
+      },
+      {
+        "id": "ameren-external",
+        "name": "Ameren",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://ameren.wd1.myworkdayjobs.com/wday/cxs/ameren/external/jobs",
+        "careers_url": "https://ameren.wd1.myworkdayjobs.com/external"
+      },
+      {
+        "id": "amgen-agency",
+        "name": "Amgen",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://amgen.wd1.myworkdayjobs.com/wday/cxs/amgen/agency/jobs",
+        "careers_url": "https://amgen.wd1.myworkdayjobs.com/agency"
+      },
+      {
+        "id": "amgen-careers",
+        "name": "Amgen",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://amgen.wd1.myworkdayjobs.com/wday/cxs/amgen/careers/jobs",
+        "careers_url": "https://amgen.wd1.myworkdayjobs.com/careers"
+      },
+      {
+        "id": "analogdevices-external",
+        "name": "Analog Devices",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://analogdevices.wd1.myworkdayjobs.com/wday/cxs/analogdevices/external/jobs",
+        "careers_url": "https://analogdevices.wd1.myworkdayjobs.com/external"
+      },
+      {
+        "id": "apa-apa-careers",
+        "name": "APA",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://apa.wd105.myworkdayjobs.com/wday/cxs/apa/apa-careers/jobs",
+        "careers_url": "https://apa.wd105.myworkdayjobs.com/apa-careers"
+      },
+      {
+        "id": "assurant-assurant_careers",
+        "name": "Assurant",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://assurant.wd1.myworkdayjobs.com/wday/cxs/assurant/assurant_careers/jobs",
+        "careers_url": "https://assurant.wd1.myworkdayjobs.com/assurant_careers"
+      },
+      {
+        "id": "assurant-ismash_external_career_site",
+        "name": "Assurant",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://assurant.wd1.myworkdayjobs.com/wday/cxs/assurant/ismash_external_career_site/jobs",
+        "careers_url": "https://assurant.wd1.myworkdayjobs.com/ismash_external_career_site"
+      },
+      {
+        "id": "att-attcollege",
+        "name": "AT&T",
+        "tags": [
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://att.wd1.myworkdayjobs.com/wday/cxs/att/attcollege/jobs",
+        "careers_url": "https://att.wd1.myworkdayjobs.com/attcollege"
+      },
+      {
+        "id": "att-attgeneral",
+        "name": "AT&T",
+        "tags": [
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://att.wd1.myworkdayjobs.com/wday/cxs/att/attgeneral/jobs",
+        "careers_url": "https://att.wd1.myworkdayjobs.com/attgeneral"
+      },
+      {
+        "id": "avisbudget-abg_careers",
+        "name": "Avis Budget Group",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://avisbudget.wd1.myworkdayjobs.com/wday/cxs/avisbudget/abg_careers/jobs",
+        "careers_url": "https://avisbudget.wd1.myworkdayjobs.com/abg_careers"
+      },
+      {
+        "id": "avisbudget-zipcar_careers",
+        "name": "Avis Budget Group",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://avisbudget.wd1.myworkdayjobs.com/wday/cxs/avisbudget/zipcar_careers/jobs",
+        "careers_url": "https://avisbudget.wd1.myworkdayjobs.com/zipcar_careers"
+      },
+      {
+        "id": "avnet-external",
+        "name": "Avnet, Inc.",
+        "tags": [
+          "computerworld-best-it-2026",
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://avnet.wd1.myworkdayjobs.com/wday/cxs/avnet/external/jobs",
+        "careers_url": "https://avnet.wd1.myworkdayjobs.com/external"
+      },
+      {
+        "id": "bakerhughes-bakerhughes",
+        "name": "Baker Hughes",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://bakerhughes.wd5.myworkdayjobs.com/wday/cxs/bakerhughes/bakerhughes/jobs",
+        "careers_url": "https://bakerhughes.wd5.myworkdayjobs.com/bakerhughes"
+      },
+      {
+        "id": "bannerhealth-careers",
+        "name": "Banner Health",
+        "tags": [
+          "computerworld-best-it-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://bannerhealth.wd108.myworkdayjobs.com/wday/cxs/bannerhealth/careers/jobs",
+        "careers_url": "https://bannerhealth.wd108.myworkdayjobs.com/careers"
+      },
+      {
+        "id": "bannerhealth-sonoraquestcareers",
+        "name": "Banner Health",
+        "tags": [
+          "computerworld-best-it-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://bannerhealth.wd108.myworkdayjobs.com/wday/cxs/bannerhealth/sonoraquestcareers/jobs",
+        "careers_url": "https://bannerhealth.wd108.myworkdayjobs.com/sonoraquestcareers"
+      },
+      {
+        "id": "bjswholesaleclub-bjscareers",
+        "name": "BJ's Wholesale Club",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://bjswholesaleclub.wd1.myworkdayjobs.com/wday/cxs/bjswholesaleclub/bjscareers/jobs",
+        "careers_url": "https://bjswholesaleclub.wd1.myworkdayjobs.com/bjscareers"
+      },
+      {
+        "id": "blackrock-blackrock_professional",
+        "name": "BlackRock",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://blackrock.wd1.myworkdayjobs.com/wday/cxs/blackrock/blackrock_professional/jobs",
+        "careers_url": "https://blackrock.wd1.myworkdayjobs.com/blackrock_professional"
+      },
+      {
+        "id": "blackstone-blackstone_campus_careers",
+        "name": "Blackstone",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://blackstone.wd1.myworkdayjobs.com/wday/cxs/blackstone/blackstone_campus_careers/jobs",
+        "careers_url": "https://blackstone.wd1.myworkdayjobs.com/blackstone_campus_careers"
+      },
+      {
+        "id": "blackstone-blackstone_careers",
+        "name": "Blackstone",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://blackstone.wd1.myworkdayjobs.com/wday/cxs/blackstone/blackstone_careers/jobs",
+        "careers_url": "https://blackstone.wd1.myworkdayjobs.com/blackstone_careers"
+      },
+      {
+        "id": "blackstone-blackstone_internalcareers",
+        "name": "Blackstone",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://blackstone.wd1.myworkdayjobs.com/wday/cxs/blackstone/blackstone_internalcareers/jobs",
+        "careers_url": "https://blackstone.wd1.myworkdayjobs.com/blackstone_internalcareers"
+      },
+      {
+        "id": "blackstone-blackstone_technology",
+        "name": "Blackstone",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://blackstone.wd1.myworkdayjobs.com/wday/cxs/blackstone/blackstone_technology/jobs",
+        "careers_url": "https://blackstone.wd1.myworkdayjobs.com/blackstone_technology"
+      },
+      {
+        "id": "blackstone-bx_external_site",
+        "name": "Blackstone",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://blackstone.wd1.myworkdayjobs.com/wday/cxs/blackstone/bx_external_site/jobs",
+        "careers_url": "https://blackstone.wd1.myworkdayjobs.com/bx_external_site"
+      },
+      {
+        "id": "boeing-external_careers",
+        "name": "Boeing",
+        "tags": [
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://boeing.wd1.myworkdayjobs.com/wday/cxs/boeing/external_careers/jobs",
+        "careers_url": "https://boeing.wd1.myworkdayjobs.com/external_careers"
+      },
+      {
+        "id": "boeing-external_recall",
+        "name": "Boeing",
+        "tags": [
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://boeing.wd1.myworkdayjobs.com/wday/cxs/boeing/external_recall/jobs",
+        "careers_url": "https://boeing.wd1.myworkdayjobs.com/external_recall"
+      },
+      {
+        "id": "boeing-external_subsidiary",
+        "name": "Boeing",
+        "tags": [
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://boeing.wd1.myworkdayjobs.com/wday/cxs/boeing/external_subsidiary/jobs",
+        "careers_url": "https://boeing.wd1.myworkdayjobs.com/external_subsidiary"
+      },
+      {
+        "id": "boeing-external_ukcontingentworker",
+        "name": "Boeing",
+        "tags": [
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://boeing.wd1.myworkdayjobs.com/wday/cxs/boeing/external_ukcontingentworker/jobs",
+        "careers_url": "https://boeing.wd1.myworkdayjobs.com/external_ukcontingentworker"
+      },
+      {
+        "id": "boeing-intern",
+        "name": "Boeing",
+        "tags": [
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://boeing.wd1.myworkdayjobs.com/wday/cxs/boeing/intern/jobs",
+        "careers_url": "https://boeing.wd1.myworkdayjobs.com/intern"
+      },
+      {
+        "id": "boeing-mfg",
+        "name": "Boeing",
+        "tags": [
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://boeing.wd1.myworkdayjobs.com/wday/cxs/boeing/mfg/jobs",
+        "careers_url": "https://boeing.wd1.myworkdayjobs.com/mfg"
+      },
+      {
+        "id": "boeing-pride",
+        "name": "Boeing",
+        "tags": [
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://boeing.wd1.myworkdayjobs.com/wday/cxs/boeing/pride/jobs",
+        "careers_url": "https://boeing.wd1.myworkdayjobs.com/pride"
+      },
+      {
+        "id": "boeing-tap2",
+        "name": "Boeing",
+        "tags": [
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://boeing.wd1.myworkdayjobs.com/wday/cxs/boeing/tap2/jobs",
+        "careers_url": "https://boeing.wd1.myworkdayjobs.com/tap2"
+      },
+      {
+        "id": "boeing-wmb",
+        "name": "Boeing",
+        "tags": [
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://boeing.wd1.myworkdayjobs.com/wday/cxs/boeing/wmb/jobs",
+        "careers_url": "https://boeing.wd1.myworkdayjobs.com/wmb"
+      },
+      {
+        "id": "borgwarner-borgwarner_careers",
+        "name": "BorgWarner",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://borgwarner.wd5.myworkdayjobs.com/wday/cxs/borgwarner/borgwarner_careers/jobs",
+        "careers_url": "https://borgwarner.wd5.myworkdayjobs.com/borgwarner_careers"
+      },
+      {
+        "id": "bristolmyerssquibb-bms",
+        "name": "Bristol-Myers Squibb",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://bristolmyerssquibb.wd5.myworkdayjobs.com/wday/cxs/bristolmyerssquibb/bms/jobs",
+        "careers_url": "https://bristolmyerssquibb.wd5.myworkdayjobs.com/bms"
+      },
+      {
+        "id": "broadcom-external_career",
+        "name": "Broadcom",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://broadcom.wd1.myworkdayjobs.com/wday/cxs/broadcom/external_career/jobs",
+        "careers_url": "https://broadcom.wd1.myworkdayjobs.com/external_career"
+      },
+      {
+        "id": "cadence-external_careers",
+        "name": "Cadence",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://cadence.wd1.myworkdayjobs.com/wday/cxs/cadence/external_careers/jobs",
+        "careers_url": "https://cadence.wd1.myworkdayjobs.com/external_careers"
+      },
+      {
+        "id": "cadence-openeye_careers",
+        "name": "Cadence",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://cadence.wd1.myworkdayjobs.com/wday/cxs/cadence/openeye_careers/jobs",
+        "careers_url": "https://cadence.wd1.myworkdayjobs.com/openeye_careers"
+      },
+      {
+        "id": "cadence-univ_careers",
+        "name": "Cadence",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://cadence.wd1.myworkdayjobs.com/wday/cxs/cadence/univ_careers/jobs",
+        "careers_url": "https://cadence.wd1.myworkdayjobs.com/univ_careers"
+      },
+      {
+        "id": "cadence-university_talent",
+        "name": "Cadence",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://cadence.wd1.myworkdayjobs.com/wday/cxs/cadence/university_talent/jobs",
+        "careers_url": "https://cadence.wd1.myworkdayjobs.com/university_talent"
+      },
+      {
+        "id": "calix-external",
+        "name": "Calix",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://calix.wd1.myworkdayjobs.com/wday/cxs/calix/external/jobs",
+        "careers_url": "https://calix.wd1.myworkdayjobs.com/external"
+      },
+      {
+        "id": "calix-externalinternational",
+        "name": "Calix",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://calix.wd1.myworkdayjobs.com/wday/cxs/calix/externalinternational/jobs",
+        "careers_url": "https://calix.wd1.myworkdayjobs.com/externalinternational"
+      },
+      {
+        "id": "capitalone-capital_one",
+        "name": "Capital One",
+        "tags": [
+          "great-place-to-work-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://capitalone.wd12.myworkdayjobs.com/wday/cxs/capitalone/capital_one/jobs",
+        "careers_url": "https://capitalone.wd12.myworkdayjobs.com/capital_one"
+      },
+      {
+        "id": "cardinalhealth-contractor",
+        "name": "Cardinal Health",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://cardinalhealth.wd1.myworkdayjobs.com/wday/cxs/cardinalhealth/contractor/jobs",
+        "careers_url": "https://cardinalhealth.wd1.myworkdayjobs.com/contractor"
+      },
+      {
+        "id": "cardinalhealth-ext",
+        "name": "Cardinal Health",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://cardinalhealth.wd1.myworkdayjobs.com/wday/cxs/cardinalhealth/ext/jobs",
+        "careers_url": "https://cardinalhealth.wd1.myworkdayjobs.com/ext"
+      },
+      {
+        "id": "cardinalhealth-navista",
+        "name": "Cardinal Health",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://cardinalhealth.wd1.myworkdayjobs.com/wday/cxs/cardinalhealth/navista/jobs",
+        "careers_url": "https://cardinalhealth.wd1.myworkdayjobs.com/navista"
+      },
+      {
+        "id": "caresource-caresource",
+        "name": "CareSource",
+        "tags": [
+          "computerworld-best-it-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://caresource.wd1.myworkdayjobs.com/wday/cxs/caresource/caresource/jobs",
+        "careers_url": "https://caresource.wd1.myworkdayjobs.com/caresource"
+      },
+      {
+        "id": "caresource-caresourcemilitaryveterans",
+        "name": "CareSource",
+        "tags": [
+          "computerworld-best-it-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://caresource.wd1.myworkdayjobs.com/wday/cxs/caresource/caresourcemilitaryveterans/jobs",
+        "careers_url": "https://caresource.wd1.myworkdayjobs.com/caresourcemilitaryveterans"
+      },
+      {
+        "id": "carmax-external",
+        "name": "CarMax",
+        "tags": [
+          "fortune-500-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://carmax.wd1.myworkdayjobs.com/wday/cxs/carmax/external/jobs",
+        "careers_url": "https://carmax.wd1.myworkdayjobs.com/external"
+      },
+      {
+        "id": "centene-centene_external",
+        "name": "Centene",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://centene.wd5.myworkdayjobs.com/wday/cxs/centene/centene_external/jobs",
+        "careers_url": "https://centene.wd5.myworkdayjobs.com/centene_external"
+      },
+      {
+        "id": "chenmed-chenmed",
+        "name": "ChenMed",
+        "tags": [
+          "computerworld-best-it-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://chenmed.wd1.myworkdayjobs.com/wday/cxs/chenmed/chenmed/jobs",
+        "careers_url": "https://chenmed.wd1.myworkdayjobs.com/chenmed"
+      },
+      {
+        "id": "chevron-jobs",
+        "name": "Chevron",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://chevron.wd5.myworkdayjobs.com/wday/cxs/chevron/jobs/jobs",
+        "careers_url": "https://chevron.wd5.myworkdayjobs.com/jobs"
+      },
+      {
+        "id": "chevron-university",
+        "name": "Chevron",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://chevron.wd5.myworkdayjobs.com/wday/cxs/chevron/university/jobs",
+        "careers_url": "https://chevron.wd5.myworkdayjobs.com/university"
+      },
+      {
+        "id": "cigna-cignacareers",
+        "name": "Cigna Group",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://cigna.wd5.myworkdayjobs.com/wday/cxs/cigna/cignacareers/jobs",
+        "careers_url": "https://cigna.wd5.myworkdayjobs.com/cignacareers"
+      },
+      {
+        "id": "cisco-cisco_careers",
+        "name": "Cisco",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://cisco.wd5.myworkdayjobs.com/wday/cxs/cisco/cisco_careers/jobs",
+        "careers_url": "https://cisco.wd5.myworkdayjobs.com/cisco_careers"
+      },
+      {
+        "id": "citi-citi_early_careers_events_site",
+        "name": "Citi",
+        "tags": [
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://citi.wd5.myworkdayjobs.com/wday/cxs/citi/citi_early_careers_events_site/jobs",
+        "careers_url": "https://citi.wd5.myworkdayjobs.com/citi_early_careers_events_site"
+      },
+      {
+        "id": "comfortsystemsusa-acimech",
+        "name": "Comfort Systems USA",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/wday/cxs/comfortsystemsusa/acimech/jobs",
+        "careers_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/acimech"
+      },
+      {
+        "id": "comfortsystemsusa-arkansas-careers",
+        "name": "Comfort Systems USA",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/wday/cxs/comfortsystemsusa/arkansas-careers/jobs",
+        "careers_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/arkansas-careers"
+      },
+      {
+        "id": "comfortsystemsusa-bcm",
+        "name": "Comfort Systems USA",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/wday/cxs/comfortsystemsusa/bcm/jobs",
+        "careers_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/bcm"
+      },
+      {
+        "id": "comfortsystemsusa-corpcareers",
+        "name": "Comfort Systems USA",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/wday/cxs/comfortsystemsusa/corpcareers/jobs",
+        "careers_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/corpcareers"
+      },
+      {
+        "id": "comfortsystemsusa-cusasw",
+        "name": "Comfort Systems USA",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/wday/cxs/comfortsystemsusa/cusasw/jobs",
+        "careers_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/cusasw"
+      },
+      {
+        "id": "comfortsystemsusa-design_mechanical",
+        "name": "Comfort Systems USA",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/wday/cxs/comfortsystemsusa/design_mechanical/jobs",
+        "careers_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/design_mechanical"
+      },
+      {
+        "id": "comfortsystemsusa-dynaten",
+        "name": "Comfort Systems USA",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/wday/cxs/comfortsystemsusa/dynaten/jobs",
+        "careers_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/dynaten"
+      },
+      {
+        "id": "comfortsystemsusa-eascareers",
+        "name": "Comfort Systems USA",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/wday/cxs/comfortsystemsusa/eascareers/jobs",
+        "careers_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/eascareers"
+      },
+      {
+        "id": "comfortsystemsusa-esolutions",
+        "name": "Comfort Systems USA",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/wday/cxs/comfortsystemsusa/esolutions/jobs",
+        "careers_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/esolutions"
+      },
+      {
+        "id": "comfortsystemsusa-intermountain",
+        "name": "Comfort Systems USA",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/wday/cxs/comfortsystemsusa/intermountain/jobs",
+        "careers_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/intermountain"
+      },
+      {
+        "id": "comfortsystemsusa-ivey",
+        "name": "Comfort Systems USA",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/wday/cxs/comfortsystemsusa/ivey/jobs",
+        "careers_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/ivey"
+      },
+      {
+        "id": "comfortsystemsusa-midsouth",
+        "name": "Comfort Systems USA",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/wday/cxs/comfortsystemsusa/midsouth/jobs",
+        "careers_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/midsouth"
+      },
+      {
+        "id": "comfortsystemsusa-quality-air-heating-cooling-inc",
+        "name": "Comfort Systems USA",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/wday/cxs/comfortsystemsusa/quality-air-heating-cooling-inc/jobs",
+        "careers_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/quality-air-heating-cooling-inc"
+      },
+      {
+        "id": "comfortsystemsusa-riddleberger",
+        "name": "Comfort Systems USA",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/wday/cxs/comfortsystemsusa/riddleberger/jobs",
+        "careers_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/riddleberger"
+      },
+      {
+        "id": "comfortsystemsusa-skmes-careers",
+        "name": "Comfort Systems USA",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/wday/cxs/comfortsystemsusa/skmes-careers/jobs",
+        "careers_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/skmes-careers"
+      },
+      {
+        "id": "comfortsystemsusa-sm_lawrence",
+        "name": "Comfort Systems USA",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/wday/cxs/comfortsystemsusa/sm_lawrence/jobs",
+        "careers_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/sm_lawrence"
+      },
+      {
+        "id": "comfortsystemsusa-starrelectric",
+        "name": "Comfort Systems USA",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/wday/cxs/comfortsystemsusa/starrelectric/jobs",
+        "careers_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/starrelectric"
+      },
+      {
+        "id": "comfortsystemsusa-tas-energy",
+        "name": "Comfort Systems USA",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/wday/cxs/comfortsystemsusa/tas-energy/jobs",
+        "careers_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/tas-energy"
+      },
+      {
+        "id": "comfortsystemsusa-tempright",
+        "name": "Comfort Systems USA",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/wday/cxs/comfortsystemsusa/tempright/jobs",
+        "careers_url": "https://comfortsystemsusa.wd1.myworkdayjobs.com/tempright"
+      },
+      {
+        "id": "conagrabrands-careers_can",
+        "name": "Conagra Brands",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://conagrabrands.wd1.myworkdayjobs.com/wday/cxs/conagrabrands/careers_can/jobs",
+        "careers_url": "https://conagrabrands.wd1.myworkdayjobs.com/careers_can"
+      },
+      {
+        "id": "conagrabrands-careers_us",
+        "name": "Conagra Brands",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://conagrabrands.wd1.myworkdayjobs.com/wday/cxs/conagrabrands/careers_us/jobs",
+        "careers_url": "https://conagrabrands.wd1.myworkdayjobs.com/careers_us"
+      },
+      {
+        "id": "corebridgefinancial-corebridgefinancial",
+        "name": "Corebridge Financial",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://corebridgefinancial.wd1.myworkdayjobs.com/wday/cxs/corebridgefinancial/corebridgefinancial/jobs",
+        "careers_url": "https://corebridgefinancial.wd1.myworkdayjobs.com/corebridgefinancial"
+      },
+      {
+        "id": "corebridgefinancial-early_careers",
+        "name": "Corebridge Financial",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://corebridgefinancial.wd1.myworkdayjobs.com/wday/cxs/corebridgefinancial/early_careers/jobs",
+        "careers_url": "https://corebridgefinancial.wd1.myworkdayjobs.com/early_careers"
+      },
+      {
+        "id": "corebridgefinancial-laya",
+        "name": "Corebridge Financial",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://corebridgefinancial.wd1.myworkdayjobs.com/wday/cxs/corebridgefinancial/laya/jobs",
+        "careers_url": "https://corebridgefinancial.wd1.myworkdayjobs.com/laya"
+      },
+      {
+        "id": "corteva-corteva",
+        "name": "Corteva",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://corteva.wd5.myworkdayjobs.com/wday/cxs/corteva/corteva/jobs",
+        "careers_url": "https://corteva.wd5.myworkdayjobs.com/corteva"
+      },
+      {
+        "id": "corteva-ctp",
+        "name": "Corteva",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://corteva.wd5.myworkdayjobs.com/wday/cxs/corteva/ctp/jobs",
+        "careers_url": "https://corteva.wd5.myworkdayjobs.com/ctp"
+      },
+      {
+        "id": "creditacceptance-credit_acceptance",
+        "name": "Credit Acceptance",
+        "tags": [
+          "computerworld-best-it-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://creditacceptance.wd5.myworkdayjobs.com/wday/cxs/creditacceptance/credit_acceptance/jobs",
+        "careers_url": "https://creditacceptance.wd5.myworkdayjobs.com/credit_acceptance"
+      },
+      {
+        "id": "cvshealth-cvs_health_careers",
+        "name": "CVS Health",
+        "tags": [
+          "computerworld-best-it-2026",
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://cvshealth.wd1.myworkdayjobs.com/wday/cxs/cvshealth/cvs_health_careers/jobs",
+        "careers_url": "https://cvshealth.wd1.myworkdayjobs.com/cvs_health_careers"
+      },
+      {
+        "id": "danaher-danaherjobs",
+        "name": "Danaher",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://danaher.wd1.myworkdayjobs.com/wday/cxs/danaher/danaherjobs/jobs",
+        "careers_url": "https://danaher.wd1.myworkdayjobs.com/danaherjobs"
+      },
+      {
+        "id": "davita-dkc_external",
+        "name": "DaVita",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://davita.wd1.myworkdayjobs.com/wday/cxs/davita/dkc_external/jobs",
+        "careers_url": "https://davita.wd1.myworkdayjobs.com/dkc_external"
+      },
+      {
+        "id": "davita-uk_international",
+        "name": "DaVita",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://davita.wd1.myworkdayjobs.com/wday/cxs/davita/uk_international/jobs",
+        "careers_url": "https://davita.wd1.myworkdayjobs.com/uk_international"
+      },
+      {
+        "id": "dickssportinggoods-dsg",
+        "name": "Dick's Sporting Goods",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://dickssportinggoods.wd1.myworkdayjobs.com/wday/cxs/dickssportinggoods/dsg/jobs",
+        "careers_url": "https://dickssportinggoods.wd1.myworkdayjobs.com/dsg"
+      },
+      {
+        "id": "dollartree-dollartreeca",
+        "name": "Dollar Tree",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://dollartree.wd5.myworkdayjobs.com/wday/cxs/dollartree/dollartreeca/jobs",
+        "careers_url": "https://dollartree.wd5.myworkdayjobs.com/dollartreeca"
+      },
+      {
+        "id": "dollartree-dollartreeus",
+        "name": "Dollar Tree",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://dollartree.wd5.myworkdayjobs.com/wday/cxs/dollartree/dollartreeus/jobs",
+        "careers_url": "https://dollartree.wd5.myworkdayjobs.com/dollartreeus"
+      },
+      {
+        "id": "dow-externalcareers",
+        "name": "Dow",
+        "tags": [
+          "fortune-500-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://dow.wd1.myworkdayjobs.com/wday/cxs/dow/externalcareers/jobs",
+        "careers_url": "https://dow.wd1.myworkdayjobs.com/externalcareers"
+      },
+      {
+        "id": "dupont-jobs",
+        "name": "DuPont",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://dupont.wd5.myworkdayjobs.com/wday/cxs/dupont/jobs/jobs",
+        "careers_url": "https://dupont.wd5.myworkdayjobs.com/jobs"
+      },
+      {
+        "id": "dxctechnology-asjobs",
+        "name": "DXC Technology",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://dxctechnology.wd1.myworkdayjobs.com/wday/cxs/dxctechnology/asjobs/jobs",
+        "careers_url": "https://dxctechnology.wd1.myworkdayjobs.com/asjobs"
+      },
+      {
+        "id": "dxctechnology-dxcjobs",
+        "name": "DXC Technology",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://dxctechnology.wd1.myworkdayjobs.com/wday/cxs/dxctechnology/dxcjobs/jobs",
+        "careers_url": "https://dxctechnology.wd1.myworkdayjobs.com/dxcjobs"
+      },
+      {
+        "id": "ebay-tcgplayer_external_career",
+        "name": "Ebay",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://ebay.wd5.myworkdayjobs.com/wday/cxs/ebay/tcgplayer_external_career/jobs",
+        "careers_url": "https://ebay.wd5.myworkdayjobs.com/tcgplayer_external_career"
+      },
+      {
+        "id": "ecolab-ecolab_external",
+        "name": "Ecolab",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://ecolab.wd1.myworkdayjobs.com/wday/cxs/ecolab/ecolab_external/jobs",
+        "careers_url": "https://ecolab.wd1.myworkdayjobs.com/ecolab_external"
+      },
+      {
+        "id": "elevancehealth-ant",
+        "name": "Elevance Health",
+        "tags": [
+          "fortune-500-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://elevancehealth.wd1.myworkdayjobs.com/wday/cxs/elevancehealth/ant/jobs",
+        "careers_url": "https://elevancehealth.wd1.myworkdayjobs.com/ant"
+      },
+      {
+        "id": "elevancehealth-carelonglobal_in",
+        "name": "Elevance Health",
+        "tags": [
+          "fortune-500-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://elevancehealth.wd1.myworkdayjobs.com/wday/cxs/elevancehealth/carelonglobal_in/jobs",
+        "careers_url": "https://elevancehealth.wd1.myworkdayjobs.com/carelonglobal_in"
+      },
+      {
+        "id": "elevancehealth-carelonglobal_ph",
+        "name": "Elevance Health",
+        "tags": [
+          "fortune-500-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://elevancehealth.wd1.myworkdayjobs.com/wday/cxs/elevancehealth/carelonglobal_ph/jobs",
+        "careers_url": "https://elevancehealth.wd1.myworkdayjobs.com/carelonglobal_ph"
+      },
+      {
+        "id": "equinix-applications_by_invitations",
+        "name": "Equinix",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://equinix.wd1.myworkdayjobs.com/wday/cxs/equinix/applications_by_invitations/jobs",
+        "careers_url": "https://equinix.wd1.myworkdayjobs.com/applications_by_invitations"
+      },
+      {
+        "id": "equinix-external",
+        "name": "Equinix",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://equinix.wd1.myworkdayjobs.com/wday/cxs/equinix/external/jobs",
+        "careers_url": "https://equinix.wd1.myworkdayjobs.com/external"
+      },
+      {
+        "id": "fanniemae-fanniemaecareers",
+        "name": "Fannie Mae",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://fanniemae.wd1.myworkdayjobs.com/wday/cxs/fanniemae/fanniemaecareers/jobs",
+        "careers_url": "https://fanniemae.wd1.myworkdayjobs.com/fanniemaecareers"
+      },
+      {
+        "id": "fedex-fcc_external",
+        "name": "FedEx",
+        "tags": [
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://fedex.wd1.myworkdayjobs.com/wday/cxs/fedex/fcc_external/jobs",
+        "careers_url": "https://fedex.wd1.myworkdayjobs.com/fcc_external"
+      },
+      {
+        "id": "fedex-fdw_eu_external_career_site",
+        "name": "FedEx",
+        "tags": [
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://fedex.wd1.myworkdayjobs.com/wday/cxs/fedex/fdw_eu_external_career_site/jobs",
+        "careers_url": "https://fedex.wd1.myworkdayjobs.com/fdw_eu_external_career_site"
+      },
+      {
+        "id": "fedex-ftn_apac_external",
+        "name": "FedEx",
+        "tags": [
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://fedex.wd1.myworkdayjobs.com/wday/cxs/fedex/ftn_apac_external/jobs",
+        "careers_url": "https://fedex.wd1.myworkdayjobs.com/ftn_apac_external"
+      },
+      {
+        "id": "fedex-ftn_can_external",
+        "name": "FedEx",
+        "tags": [
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://fedex.wd1.myworkdayjobs.com/wday/cxs/fedex/ftn_can_external/jobs",
+        "careers_url": "https://fedex.wd1.myworkdayjobs.com/ftn_can_external"
+      },
+      {
+        "id": "fedex-ftn_emeia_external",
+        "name": "FedEx",
+        "tags": [
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://fedex.wd1.myworkdayjobs.com/wday/cxs/fedex/ftn_emeia_external/jobs",
+        "careers_url": "https://fedex.wd1.myworkdayjobs.com/ftn_emeia_external"
+      },
+      {
+        "id": "fedex-fxe-eu_external",
+        "name": "FedEx",
+        "tags": [
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://fedex.wd1.myworkdayjobs.com/wday/cxs/fedex/fxe-eu_external/jobs",
+        "careers_url": "https://fedex.wd1.myworkdayjobs.com/fxe-eu_external"
+      },
+      {
+        "id": "fedex-fxe-lac_external_career_site",
+        "name": "FedEx",
+        "tags": [
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://fedex.wd1.myworkdayjobs.com/wday/cxs/fedex/fxe-lac_external_career_site/jobs",
+        "careers_url": "https://fedex.wd1.myworkdayjobs.com/fxe-lac_external_career_site"
+      },
+      {
+        "id": "fedex-fxe-meisa-external",
+        "name": "FedEx",
+        "tags": [
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://fedex.wd1.myworkdayjobs.com/wday/cxs/fedex/fxe-meisa-external/jobs",
+        "careers_url": "https://fedex.wd1.myworkdayjobs.com/fxe-meisa-external"
+      },
+      {
+        "id": "fedex-fxe_apac_external",
+        "name": "FedEx",
+        "tags": [
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://fedex.wd1.myworkdayjobs.com/wday/cxs/fedex/fxe_apac_external/jobs",
+        "careers_url": "https://fedex.wd1.myworkdayjobs.com/fxe_apac_external"
+      },
+      {
+        "id": "fedex-fxf-mex-external",
+        "name": "FedEx",
+        "tags": [
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://fedex.wd1.myworkdayjobs.com/wday/cxs/fedex/fxf-mex-external/jobs",
+        "careers_url": "https://fedex.wd1.myworkdayjobs.com/fxf-mex-external"
+      },
+      {
+        "id": "fiserv-ext",
+        "name": "Fiserv",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://fiserv.wd5.myworkdayjobs.com/wday/cxs/fiserv/ext/jobs",
+        "careers_url": "https://fiserv.wd5.myworkdayjobs.com/ext"
+      },
+      {
+        "id": "fox-domestic",
+        "name": "Fox",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://fox.wd1.myworkdayjobs.com/wday/cxs/fox/domestic/jobs",
+        "careers_url": "https://fox.wd1.myworkdayjobs.com/domestic"
+      },
+      {
+        "id": "fox-foxtvst_central",
+        "name": "Fox",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://fox.wd1.myworkdayjobs.com/wday/cxs/fox/foxtvst_central/jobs",
+        "careers_url": "https://fox.wd1.myworkdayjobs.com/foxtvst_central"
+      },
+      {
+        "id": "fox-foxtvst_east",
+        "name": "Fox",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://fox.wd1.myworkdayjobs.com/wday/cxs/fox/foxtvst_east/jobs",
+        "careers_url": "https://fox.wd1.myworkdayjobs.com/foxtvst_east"
+      },
+      {
+        "id": "fox-foxtvst_west",
+        "name": "Fox",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://fox.wd1.myworkdayjobs.com/wday/cxs/fox/foxtvst_west/jobs",
+        "careers_url": "https://fox.wd1.myworkdayjobs.com/foxtvst_west"
+      },
+      {
+        "id": "geaerospace-ge_externalsite",
+        "name": "GE Aerospace",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://geaerospace.wd5.myworkdayjobs.com/wday/cxs/geaerospace/ge_externalsite/jobs",
+        "careers_url": "https://geaerospace.wd5.myworkdayjobs.com/ge_externalsite"
+      },
+      {
+        "id": "generalmotors-careers_gm",
+        "name": "General Motors",
+        "tags": [
+          "fortune-500-2026",
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://generalmotors.wd5.myworkdayjobs.com/wday/cxs/generalmotors/careers_gm/jobs",
+        "careers_url": "https://generalmotors.wd5.myworkdayjobs.com/careers_gm"
+      },
+      {
+        "id": "gevernova-only_confidential_executive_recruiting",
+        "name": "GE Vernova",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://gevernova.wd5.myworkdayjobs.com/wday/cxs/gevernova/only_confidential_executive_recruiting/jobs",
+        "careers_url": "https://gevernova.wd5.myworkdayjobs.com/only_confidential_executive_recruiting"
+      },
+      {
+        "id": "gevernova-vernova_externalsite",
+        "name": "GE Vernova",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://gevernova.wd5.myworkdayjobs.com/wday/cxs/gevernova/vernova_externalsite/jobs",
+        "careers_url": "https://gevernova.wd5.myworkdayjobs.com/vernova_externalsite"
+      },
+      {
+        "id": "gsk-gskcareers",
+        "name": "GSK plc",
+        "tags": [
+          "computerworld-best-it-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://gsk.wd5.myworkdayjobs.com/wday/cxs/gsk/gskcareers/jobs",
+        "careers_url": "https://gsk.wd5.myworkdayjobs.com/gskcareers"
+      },
+      {
+        "id": "gsk-viiv_careers",
+        "name": "GSK plc",
+        "tags": [
+          "computerworld-best-it-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://gsk.wd5.myworkdayjobs.com/wday/cxs/gsk/viiv_careers/jobs",
+        "careers_url": "https://gsk.wd5.myworkdayjobs.com/viiv_careers"
+      },
+      {
+        "id": "henryschein-external_careers",
+        "name": "Henry Schein",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://henryschein.wd1.myworkdayjobs.com/wday/cxs/henryschein/external_careers/jobs",
+        "careers_url": "https://henryschein.wd1.myworkdayjobs.com/external_careers"
+      },
+      {
+        "id": "homedepot-careerdepot",
+        "name": "Home Depot",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://homedepot.wd5.myworkdayjobs.com/wday/cxs/homedepot/careerdepot/jobs",
+        "careers_url": "https://homedepot.wd5.myworkdayjobs.com/careerdepot"
+      },
+      {
+        "id": "hp-externalcareersite",
+        "name": "HP",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://hp.wd5.myworkdayjobs.com/wday/cxs/hp/externalcareersite/jobs",
+        "careers_url": "https://hp.wd5.myworkdayjobs.com/externalcareersite"
+      },
+      {
+        "id": "hp-exteu-ac-careersite",
+        "name": "HP",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://hp.wd5.myworkdayjobs.com/wday/cxs/hp/exteu-ac-careersite/jobs",
+        "careers_url": "https://hp.wd5.myworkdayjobs.com/exteu-ac-careersite"
+      },
+      {
+        "id": "hpe-acjobsite",
+        "name": "HPE",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://hpe.wd5.myworkdayjobs.com/wday/cxs/hpe/acjobsite/jobs",
+        "careers_url": "https://hpe.wd5.myworkdayjobs.com/acjobsite"
+      },
+      {
+        "id": "hpe-jobsathpe",
+        "name": "HPE",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://hpe.wd5.myworkdayjobs.com/wday/cxs/hpe/jobsathpe/jobs",
+        "careers_url": "https://hpe.wd5.myworkdayjobs.com/jobsathpe"
+      },
+      {
+        "id": "hpe-wfmathpe",
+        "name": "HPE",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://hpe.wd5.myworkdayjobs.com/wday/cxs/hpe/wfmathpe/jobs",
+        "careers_url": "https://hpe.wd5.myworkdayjobs.com/wfmathpe"
+      },
+      {
+        "id": "humana-centerwell_external_career_site",
+        "name": "Humana",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://humana.wd5.myworkdayjobs.com/wday/cxs/humana/centerwell_external_career_site/jobs",
+        "careers_url": "https://humana.wd5.myworkdayjobs.com/centerwell_external_career_site"
+      },
+      {
+        "id": "humana-humana_external_career_site",
+        "name": "Humana",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://humana.wd5.myworkdayjobs.com/wday/cxs/humana/humana_external_career_site/jobs",
+        "careers_url": "https://humana.wd5.myworkdayjobs.com/humana_external_career_site"
+      },
+      {
+        "id": "igsenergy-ecohousesolar",
+        "name": "IGS Energy",
+        "tags": [
+          "computerworld-best-it-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://igsenergy.wd1.myworkdayjobs.com/wday/cxs/igsenergy/ecohousesolar/jobs",
+        "careers_url": "https://igsenergy.wd1.myworkdayjobs.com/ecohousesolar"
+      },
+      {
+        "id": "igsenergy-igs",
+        "name": "IGS Energy",
+        "tags": [
+          "computerworld-best-it-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://igsenergy.wd1.myworkdayjobs.com/wday/cxs/igsenergy/igs/jobs",
+        "careers_url": "https://igsenergy.wd1.myworkdayjobs.com/igs"
+      },
+      {
+        "id": "igsenergy-scanaenergy",
+        "name": "IGS Energy",
+        "tags": [
+          "computerworld-best-it-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://igsenergy.wd1.myworkdayjobs.com/wday/cxs/igsenergy/scanaenergy/jobs",
+        "careers_url": "https://igsenergy.wd1.myworkdayjobs.com/scanaenergy"
+      },
+      {
+        "id": "intel-external",
+        "name": "Intel",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://intel.wd1.myworkdayjobs.com/wday/cxs/intel/external/jobs",
+        "careers_url": "https://intel.wd1.myworkdayjobs.com/external"
+      },
+      {
+        "id": "iqvia-iqvia",
+        "name": "IQVIA Holdings",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://iqvia.wd1.myworkdayjobs.com/wday/cxs/iqvia/iqvia/jobs",
+        "careers_url": "https://iqvia.wd1.myworkdayjobs.com/iqvia"
+      },
+      {
+        "id": "jabil-jabil_careers",
+        "name": "Jabil",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://jabil.wd5.myworkdayjobs.com/wday/cxs/jabil/jabil_careers/jobs",
+        "careers_url": "https://jabil.wd5.myworkdayjobs.com/jabil_careers"
+      },
+      {
+        "id": "jacksonhealthcare-careers-jacksonhealthcare",
+        "name": "Jackson Healthcare",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://jacksonhealthcare.wd1.myworkdayjobs.com/wday/cxs/jacksonhealthcare/careers-jacksonhealthcare/jobs",
+        "careers_url": "https://jacksonhealthcare.wd1.myworkdayjobs.com/careers-jacksonhealthcare"
+      },
+      {
+        "id": "jacksonhealthcare-careers-jacksonnurseprofessionals",
+        "name": "Jackson Healthcare",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://jacksonhealthcare.wd1.myworkdayjobs.com/wday/cxs/jacksonhealthcare/careers-jacksonnurseprofessionals/jobs",
+        "careers_url": "https://jacksonhealthcare.wd1.myworkdayjobs.com/careers-jacksonnurseprofessionals"
+      },
+      {
+        "id": "jacksonhealthcare-careers-jacksontherapypartners",
+        "name": "Jackson Healthcare",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://jacksonhealthcare.wd1.myworkdayjobs.com/wday/cxs/jacksonhealthcare/careers-jacksontherapypartners/jobs",
+        "careers_url": "https://jacksonhealthcare.wd1.myworkdayjobs.com/careers-jacksontherapypartners"
+      },
+      {
+        "id": "jacksonhealthcare-careers-jhgs",
+        "name": "Jackson Healthcare",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://jacksonhealthcare.wd1.myworkdayjobs.com/wday/cxs/jacksonhealthcare/careers-jhgs/jobs",
+        "careers_url": "https://jacksonhealthcare.wd1.myworkdayjobs.com/careers-jhgs"
+      },
+      {
+        "id": "jacksonhealthcare-careers-kimedics",
+        "name": "Jackson Healthcare",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://jacksonhealthcare.wd1.myworkdayjobs.com/wday/cxs/jacksonhealthcare/careers-kimedics/jobs",
+        "careers_url": "https://jacksonhealthcare.wd1.myworkdayjobs.com/careers-kimedics"
+      },
+      {
+        "id": "jacksonhealthcare-careers-locumtenens",
+        "name": "Jackson Healthcare",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://jacksonhealthcare.wd1.myworkdayjobs.com/wday/cxs/jacksonhealthcare/careers-locumtenens/jobs",
+        "careers_url": "https://jacksonhealthcare.wd1.myworkdayjobs.com/careers-locumtenens"
+      },
+      {
+        "id": "kbr-kbr_careers",
+        "name": "KBR",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://kbr.wd5.myworkdayjobs.com/wday/cxs/kbr/kbr_careers/jobs",
+        "careers_url": "https://kbr.wd5.myworkdayjobs.com/kbr_careers"
+      },
+      {
+        "id": "kimberlyclark-equest",
+        "name": "Kimberly-Clark",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://kimberlyclark.wd1.myworkdayjobs.com/wday/cxs/kimberlyclark/equest/jobs",
+        "careers_url": "https://kimberlyclark.wd1.myworkdayjobs.com/equest"
+      },
+      {
+        "id": "kimberlyclark-global",
+        "name": "Kimberly-Clark",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://kimberlyclark.wd1.myworkdayjobs.com/wday/cxs/kimberlyclark/global/jobs",
+        "careers_url": "https://kimberlyclark.wd1.myworkdayjobs.com/global"
+      },
+      {
+        "id": "kimberlyclark-linkedin",
+        "name": "Kimberly-Clark",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://kimberlyclark.wd1.myworkdayjobs.com/wday/cxs/kimberlyclark/linkedin/jobs",
+        "careers_url": "https://kimberlyclark.wd1.myworkdayjobs.com/linkedin"
+      },
+      {
+        "id": "kla-annarbor",
+        "name": "KLA",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://kla.wd1.myworkdayjobs.com/wday/cxs/kla/annarbor/jobs",
+        "careers_url": "https://kla.wd1.myworkdayjobs.com/annarbor"
+      },
+      {
+        "id": "kla-israel",
+        "name": "KLA",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://kla.wd1.myworkdayjobs.com/wday/cxs/kla/israel/jobs",
+        "careers_url": "https://kla.wd1.myworkdayjobs.com/israel"
+      },
+      {
+        "id": "kyndryl-ismcareers",
+        "name": "Kyndryl Holdings",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://kyndryl.wd5.myworkdayjobs.com/wday/cxs/kyndryl/ismcareers/jobs",
+        "careers_url": "https://kyndryl.wd5.myworkdayjobs.com/ismcareers"
+      },
+      {
+        "id": "kyndryl-kyndrylearlycareers",
+        "name": "Kyndryl Holdings",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://kyndryl.wd5.myworkdayjobs.com/wday/cxs/kyndryl/kyndrylearlycareers/jobs",
+        "careers_url": "https://kyndryl.wd5.myworkdayjobs.com/kyndrylearlycareers"
+      },
+      {
+        "id": "kyndryl-kyndrylprofessionalcareers",
+        "name": "Kyndryl Holdings",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://kyndryl.wd5.myworkdayjobs.com/wday/cxs/kyndryl/kyndrylprofessionalcareers/jobs",
+        "careers_url": "https://kyndryl.wd5.myworkdayjobs.com/kyndrylprofessionalcareers"
+      },
+      {
+        "id": "labcorp-external",
+        "name": "Labcorp Holdings",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://labcorp.wd1.myworkdayjobs.com/wday/cxs/labcorp/external/jobs",
+        "careers_url": "https://labcorp.wd1.myworkdayjobs.com/external"
+      },
+      {
+        "id": "landolakes-landolakes",
+        "name": "Land O'Lakes",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://landolakes.wd1.myworkdayjobs.com/wday/cxs/landolakes/landolakes/jobs",
+        "careers_url": "https://landolakes.wd1.myworkdayjobs.com/landolakes"
+      },
+      {
+        "id": "landolakes-stealth",
+        "name": "Land O'Lakes",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://landolakes.wd1.myworkdayjobs.com/wday/cxs/landolakes/stealth/jobs",
+        "careers_url": "https://landolakes.wd1.myworkdayjobs.com/stealth"
+      },
+      {
+        "id": "leidos-external",
+        "name": "Leidos Holdings",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://leidos.wd5.myworkdayjobs.com/wday/cxs/leidos/external/jobs",
+        "careers_url": "https://leidos.wd5.myworkdayjobs.com/external"
+      },
+      {
+        "id": "lennar-lennar_jobs",
+        "name": "Lennar Corporation",
+        "tags": [
+          "fortune-500-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://lennar.wd1.myworkdayjobs.com/wday/cxs/lennar/lennar_jobs/jobs",
+        "careers_url": "https://lennar.wd1.myworkdayjobs.com/lennar_jobs"
+      },
+      {
+        "id": "lowes-lws_external_cs",
+        "name": "Lowe's",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://lowes.wd5.myworkdayjobs.com/wday/cxs/lowes/lws_external_cs/jobs",
+        "careers_url": "https://lowes.wd5.myworkdayjobs.com/lws_external_cs"
+      },
+      {
+        "id": "lplfinancial-bd_partners",
+        "name": "LPL Financial Holdings",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://lplfinancial.wd1.myworkdayjobs.com/wday/cxs/lplfinancial/bd_partners/jobs",
+        "careers_url": "https://lplfinancial.wd1.myworkdayjobs.com/bd_partners"
+      },
+      {
+        "id": "lplfinancial-external",
+        "name": "LPL Financial Holdings",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://lplfinancial.wd1.myworkdayjobs.com/wday/cxs/lplfinancial/external/jobs",
+        "careers_url": "https://lplfinancial.wd1.myworkdayjobs.com/external"
+      },
+      {
+        "id": "lplfinancial-university",
+        "name": "LPL Financial Holdings",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://lplfinancial.wd1.myworkdayjobs.com/wday/cxs/lplfinancial/university/jobs",
+        "careers_url": "https://lplfinancial.wd1.myworkdayjobs.com/university"
+      },
+      {
+        "id": "mars-external",
+        "name": "Mars",
+        "tags": [
+          "glassdoor-best-places-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://mars.wd3.myworkdayjobs.com/wday/cxs/mars/external/jobs",
+        "careers_url": "https://mars.wd3.myworkdayjobs.com/external"
+      },
+      {
+        "id": "masco-behr",
+        "name": "Masco",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://masco.wd1.myworkdayjobs.com/wday/cxs/masco/behr/jobs",
+        "careers_url": "https://masco.wd1.myworkdayjobs.com/behr"
+      },
+      {
+        "id": "masco-brasstech",
+        "name": "Masco",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://masco.wd1.myworkdayjobs.com/wday/cxs/masco/brasstech/jobs",
+        "careers_url": "https://masco.wd1.myworkdayjobs.com/brasstech"
+      },
+      {
+        "id": "masco-deltafaucet",
+        "name": "Masco",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://masco.wd1.myworkdayjobs.com/wday/cxs/masco/deltafaucet/jobs",
+        "careers_url": "https://masco.wd1.myworkdayjobs.com/deltafaucet"
+      },
+      {
+        "id": "masco-liberty",
+        "name": "Masco",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://masco.wd1.myworkdayjobs.com/wday/cxs/masco/liberty/jobs",
+        "careers_url": "https://masco.wd1.myworkdayjobs.com/liberty"
+      },
+      {
+        "id": "masco-masco",
+        "name": "Masco",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://masco.wd1.myworkdayjobs.com/wday/cxs/masco/masco/jobs",
+        "careers_url": "https://masco.wd1.myworkdayjobs.com/masco"
+      },
+      {
+        "id": "masco-mascocanada",
+        "name": "Masco",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://masco.wd1.myworkdayjobs.com/wday/cxs/masco/mascocanada/jobs",
+        "careers_url": "https://masco.wd1.myworkdayjobs.com/mascocanada"
+      },
+      {
+        "id": "masco-mercuryplastics",
+        "name": "Masco",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://masco.wd1.myworkdayjobs.com/wday/cxs/masco/mercuryplastics/jobs",
+        "careers_url": "https://masco.wd1.myworkdayjobs.com/mercuryplastics"
+      },
+      {
+        "id": "mastercard-campus",
+        "name": "Mastercard",
+        "tags": [
+          "fortune-500-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://mastercard.wd1.myworkdayjobs.com/wday/cxs/mastercard/campus/jobs",
+        "careers_url": "https://mastercard.wd1.myworkdayjobs.com/campus"
+      },
+      {
+        "id": "mastercard-campusapplyonly",
+        "name": "Mastercard",
+        "tags": [
+          "fortune-500-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://mastercard.wd1.myworkdayjobs.com/wday/cxs/mastercard/campusapplyonly/jobs",
+        "careers_url": "https://mastercard.wd1.myworkdayjobs.com/campusapplyonly"
+      },
+      {
+        "id": "mastercard-contractorconversion",
+        "name": "Mastercard",
+        "tags": [
+          "fortune-500-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://mastercard.wd1.myworkdayjobs.com/wday/cxs/mastercard/contractorconversion/jobs",
+        "careers_url": "https://mastercard.wd1.myworkdayjobs.com/contractorconversion"
+      },
+      {
+        "id": "mastercard-corporatecareers",
+        "name": "Mastercard",
+        "tags": [
+          "fortune-500-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://mastercard.wd1.myworkdayjobs.com/wday/cxs/mastercard/corporatecareers/jobs",
+        "careers_url": "https://mastercard.wd1.myworkdayjobs.com/corporatecareers"
+      },
+      {
+        "id": "mckesson-covermymeds_external_careers",
+        "name": "McKesson",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://mckesson.wd3.myworkdayjobs.com/wday/cxs/mckesson/covermymeds_external_careers/jobs",
+        "careers_url": "https://mckesson.wd3.myworkdayjobs.com/covermymeds_external_careers"
+      },
+      {
+        "id": "mckesson-external_careers",
+        "name": "McKesson",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://mckesson.wd3.myworkdayjobs.com/wday/cxs/mckesson/external_careers/jobs",
+        "careers_url": "https://mckesson.wd3.myworkdayjobs.com/external_careers"
+      },
+      {
+        "id": "mckesson-ontada_careers",
+        "name": "McKesson",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://mckesson.wd3.myworkdayjobs.com/wday/cxs/mckesson/ontada_careers/jobs",
+        "careers_url": "https://mckesson.wd3.myworkdayjobs.com/ontada_careers"
+      },
+      {
+        "id": "mckesson-rxsscareers",
+        "name": "McKesson",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://mckesson.wd3.myworkdayjobs.com/wday/cxs/mckesson/rxsscareers/jobs",
+        "careers_url": "https://mckesson.wd3.myworkdayjobs.com/rxsscareers"
+      },
+      {
+        "id": "mckesson-scri_careers",
+        "name": "McKesson",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://mckesson.wd3.myworkdayjobs.com/wday/cxs/mckesson/scri_careers/jobs",
+        "careers_url": "https://mckesson.wd3.myworkdayjobs.com/scri_careers"
+      },
+      {
+        "id": "mckesson-sourcer_on_req",
+        "name": "McKesson",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://mckesson.wd3.myworkdayjobs.com/wday/cxs/mckesson/sourcer_on_req/jobs",
+        "careers_url": "https://mckesson.wd3.myworkdayjobs.com/sourcer_on_req"
+      },
+      {
+        "id": "medline-medline",
+        "name": "Medline",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://medline.wd5.myworkdayjobs.com/wday/cxs/medline/medline/jobs",
+        "careers_url": "https://medline.wd5.myworkdayjobs.com/medline"
+      },
+      {
+        "id": "mosaic-broadbean_external",
+        "name": "Mosaic",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://mosaic.wd5.myworkdayjobs.com/wday/cxs/mosaic/broadbean_external/jobs",
+        "careers_url": "https://mosaic.wd5.myworkdayjobs.com/broadbean_external"
+      },
+      {
+        "id": "mosaic-mosaic",
+        "name": "Mosaic",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://mosaic.wd5.myworkdayjobs.com/wday/cxs/mosaic/mosaic/jobs",
+        "careers_url": "https://mosaic.wd5.myworkdayjobs.com/mosaic"
+      },
+      {
+        "id": "motorolasolutions-careers",
+        "name": "Motorola Solutions, Inc.",
+        "tags": [
+          "computerworld-best-it-2026",
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://motorolasolutions.wd5.myworkdayjobs.com/wday/cxs/motorolasolutions/careers/jobs",
+        "careers_url": "https://motorolasolutions.wd5.myworkdayjobs.com/careers"
+      },
+      {
+        "id": "nasdaq-global_external_site",
+        "name": "Nasdaq",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://nasdaq.wd1.myworkdayjobs.com/wday/cxs/nasdaq/global_external_site/jobs",
+        "careers_url": "https://nasdaq.wd1.myworkdayjobs.com/global_external_site"
+      },
+      {
+        "id": "nasdaq-us_external_career_site",
+        "name": "Nasdaq",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://nasdaq.wd1.myworkdayjobs.com/wday/cxs/nasdaq/us_external_career_site/jobs",
+        "careers_url": "https://nasdaq.wd1.myworkdayjobs.com/us_external_career_site"
+      },
+      {
+        "id": "nationwide-nationwide_career",
+        "name": "Nationwide",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://nationwide.wd1.myworkdayjobs.com/wday/cxs/nationwide/nationwide_career/jobs",
+        "careers_url": "https://nationwide.wd1.myworkdayjobs.com/nationwide_career"
+      },
+      {
+        "id": "nike-nke",
+        "name": "Nike",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://nike.wd1.myworkdayjobs.com/wday/cxs/nike/nke/jobs",
+        "careers_url": "https://nike.wd1.myworkdayjobs.com/nke"
+      },
+      {
+        "id": "northwesternmutual-corporate-careers",
+        "name": "Northwestern Mutual",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://northwesternmutual.wd5.myworkdayjobs.com/wday/cxs/northwesternmutual/corporate-careers/jobs",
+        "careers_url": "https://northwesternmutual.wd5.myworkdayjobs.com/corporate-careers"
+      },
+      {
+        "id": "oclc-oclc_careers",
+        "name": "OCLC",
+        "tags": [
+          "computerworld-best-it-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://oclc.wd1.myworkdayjobs.com/wday/cxs/oclc/oclc_careers/jobs",
+        "careers_url": "https://oclc.wd1.myworkdayjobs.com/oclc_careers"
+      },
+      {
+        "id": "oclc-oclc_emea_careers",
+        "name": "OCLC",
+        "tags": [
+          "computerworld-best-it-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://oclc.wd1.myworkdayjobs.com/wday/cxs/oclc/oclc_emea_careers/jobs",
+        "careers_url": "https://oclc.wd1.myworkdayjobs.com/oclc_emea_careers"
+      },
+      {
+        "id": "oneok-oneok",
+        "name": "Oneok",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://oneok.wd1.myworkdayjobs.com/wday/cxs/oneok/oneok/jobs",
+        "careers_url": "https://oneok.wd1.myworkdayjobs.com/oneok"
+      },
+      {
+        "id": "oneok-oneok_early_careers",
+        "name": "Oneok",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://oneok.wd1.myworkdayjobs.com/wday/cxs/oneok/oneok_early_careers/jobs",
+        "careers_url": "https://oneok.wd1.myworkdayjobs.com/oneok_early_careers"
+      },
+      {
+        "id": "ovintiv-ovintivcareers",
+        "name": "Ovintiv",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://ovintiv.wd3.myworkdayjobs.com/wday/cxs/ovintiv/ovintivcareers/jobs",
+        "careers_url": "https://ovintiv.wd3.myworkdayjobs.com/ovintivcareers"
+      },
+      {
+        "id": "pacificlife-pacificlifecareers",
+        "name": "Pacific Life",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://pacificlife.wd1.myworkdayjobs.com/wday/cxs/pacificlife/pacificlifecareers/jobs",
+        "careers_url": "https://pacificlife.wd1.myworkdayjobs.com/pacificlifecareers"
+      },
+      {
+        "id": "pacificlife-pacificliferecareers",
+        "name": "Pacific Life",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://pacificlife.wd1.myworkdayjobs.com/wday/cxs/pacificlife/pacificliferecareers/jobs",
+        "careers_url": "https://pacificlife.wd1.myworkdayjobs.com/pacificliferecareers"
+      },
+      {
+        "id": "pacificlife-underwritemecareers",
+        "name": "Pacific Life",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://pacificlife.wd1.myworkdayjobs.com/wday/cxs/pacificlife/underwritemecareers/jobs",
+        "careers_url": "https://pacificlife.wd1.myworkdayjobs.com/underwritemecareers"
+      },
+      {
+        "id": "paypal-jobs",
+        "name": "PayPal Holdings",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://paypal.wd1.myworkdayjobs.com/wday/cxs/paypal/jobs/jobs",
+        "careers_url": "https://paypal.wd1.myworkdayjobs.com/jobs"
+      },
+      {
+        "id": "pbfenergy-pbf",
+        "name": "PBF Energy",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://pbfenergy.wd1.myworkdayjobs.com/wday/cxs/pbfenergy/pbf/jobs",
+        "careers_url": "https://pbfenergy.wd1.myworkdayjobs.com/pbf"
+      },
+      {
+        "id": "pfizer-internaljobs",
+        "name": "Pfizer",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://pfizer.wd1.myworkdayjobs.com/wday/cxs/pfizer/internaljobs/jobs",
+        "careers_url": "https://pfizer.wd1.myworkdayjobs.com/internaljobs"
+      },
+      {
+        "id": "pfizer-pfizercareers",
+        "name": "Pfizer",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://pfizer.wd1.myworkdayjobs.com/wday/cxs/pfizer/pfizercareers/jobs",
+        "careers_url": "https://pfizer.wd1.myworkdayjobs.com/pfizercareers"
+      },
+      {
+        "id": "plantemoran-pmexternalcareers",
+        "name": "Plante Moran",
+        "tags": [
+          "computerworld-best-it-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://plantemoran.wd1.myworkdayjobs.com/wday/cxs/plantemoran/pmexternalcareers/jobs",
+        "careers_url": "https://plantemoran.wd1.myworkdayjobs.com/pmexternalcareers"
+      },
+      {
+        "id": "pnc-external",
+        "name": "PNC",
+        "tags": [
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://pnc.wd5.myworkdayjobs.com/wday/cxs/pnc/external/jobs",
+        "careers_url": "https://pnc.wd5.myworkdayjobs.com/external"
+      },
+      {
+        "id": "pnc-harriswilliams",
+        "name": "PNC",
+        "tags": [
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://pnc.wd5.myworkdayjobs.com/wday/cxs/pnc/harriswilliams/jobs",
+        "careers_url": "https://pnc.wd5.myworkdayjobs.com/harriswilliams"
+      },
+      {
+        "id": "ppg-ppg_careers",
+        "name": "PPG",
+        "tags": [
+          "computerworld-best-it-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://ppg.wd5.myworkdayjobs.com/wday/cxs/ppg/ppg_careers/jobs",
+        "careers_url": "https://ppg.wd5.myworkdayjobs.com/ppg_careers"
+      },
+      {
+        "id": "pultegroup-pgi",
+        "name": "PulteGroup, Inc.",
+        "tags": [
+          "fortune-500-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://pultegroup.wd1.myworkdayjobs.com/wday/cxs/pultegroup/pgi/jobs",
+        "careers_url": "https://pultegroup.wd1.myworkdayjobs.com/pgi"
+      },
+      {
+        "id": "pvh-pvh_careers",
+        "name": "PVH",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://pvh.wd1.myworkdayjobs.com/wday/cxs/pvh/pvh_careers/jobs",
+        "careers_url": "https://pvh.wd1.myworkdayjobs.com/pvh_careers"
+      },
+      {
+        "id": "pwc-catalyst",
+        "name": "PwC",
+        "tags": [
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://pwc.wd3.myworkdayjobs.com/wday/cxs/pwc/catalyst/jobs",
+        "careers_url": "https://pwc.wd3.myworkdayjobs.com/catalyst"
+      },
+      {
+        "id": "pwc-crm_experienced_careers_site",
+        "name": "PwC",
+        "tags": [
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://pwc.wd3.myworkdayjobs.com/wday/cxs/pwc/crm_experienced_careers_site/jobs",
+        "careers_url": "https://pwc.wd3.myworkdayjobs.com/crm_experienced_careers_site"
+      },
+      {
+        "id": "pwc-global_campus_careers",
+        "name": "PwC",
+        "tags": [
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://pwc.wd3.myworkdayjobs.com/wday/cxs/pwc/global_campus_careers/jobs",
+        "careers_url": "https://pwc.wd3.myworkdayjobs.com/global_campus_careers"
+      },
+      {
+        "id": "pwc-global_experienced_careers",
+        "name": "PwC",
+        "tags": [
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://pwc.wd3.myworkdayjobs.com/wday/cxs/pwc/global_experienced_careers/jobs",
+        "careers_url": "https://pwc.wd3.myworkdayjobs.com/global_experienced_careers"
+      },
+      {
+        "id": "pwc-global_strategyand_careers",
+        "name": "PwC",
+        "tags": [
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://pwc.wd3.myworkdayjobs.com/wday/cxs/pwc/global_strategyand_careers/jobs",
+        "careers_url": "https://pwc.wd3.myworkdayjobs.com/global_strategyand_careers"
+      },
+      {
+        "id": "pwc-nonpublic_postings",
+        "name": "PwC",
+        "tags": [
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://pwc.wd3.myworkdayjobs.com/wday/cxs/pwc/nonpublic_postings/jobs",
+        "careers_url": "https://pwc.wd3.myworkdayjobs.com/nonpublic_postings"
+      },
+      {
+        "id": "pwc-us_entry_level_careers",
+        "name": "PwC",
+        "tags": [
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://pwc.wd3.myworkdayjobs.com/wday/cxs/pwc/us_entry_level_careers/jobs",
+        "careers_url": "https://pwc.wd3.myworkdayjobs.com/us_entry_level_careers"
+      },
+      {
+        "id": "pwc-us_experienced_careers",
+        "name": "PwC",
+        "tags": [
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://pwc.wd3.myworkdayjobs.com/wday/cxs/pwc/us_experienced_careers/jobs",
+        "careers_url": "https://pwc.wd3.myworkdayjobs.com/us_experienced_careers"
+      },
+      {
+        "id": "qvc-qrg",
+        "name": "QVC Group",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://qvc.wd5.myworkdayjobs.com/wday/cxs/qvc/qrg/jobs",
+        "careers_url": "https://qvc.wd5.myworkdayjobs.com/qrg"
+      },
+      {
+        "id": "qvc-qvceurope",
+        "name": "QVC Group",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://qvc.wd5.myworkdayjobs.com/wday/cxs/qvc/qvceurope/jobs",
+        "careers_url": "https://qvc.wd5.myworkdayjobs.com/qvceurope"
+      },
+      {
+        "id": "roberthalf-protivitiapac",
+        "name": "Robert Half Inc",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://roberthalf.wd1.myworkdayjobs.com/wday/cxs/roberthalf/protivitiapac/jobs",
+        "careers_url": "https://roberthalf.wd1.myworkdayjobs.com/protivitiapac"
+      },
+      {
+        "id": "roberthalf-protivitiemeacareers",
+        "name": "Robert Half Inc",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://roberthalf.wd1.myworkdayjobs.com/wday/cxs/roberthalf/protivitiemeacareers/jobs",
+        "careers_url": "https://roberthalf.wd1.myworkdayjobs.com/protivitiemeacareers"
+      },
+      {
+        "id": "roberthalf-protivitiexperiencedcareers",
+        "name": "Robert Half Inc",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://roberthalf.wd1.myworkdayjobs.com/wday/cxs/roberthalf/protivitiexperiencedcareers/jobs",
+        "careers_url": "https://roberthalf.wd1.myworkdayjobs.com/protivitiexperiencedcareers"
+      },
+      {
+        "id": "roberthalf-protivitigraduate",
+        "name": "Robert Half Inc",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://roberthalf.wd1.myworkdayjobs.com/wday/cxs/roberthalf/protivitigraduate/jobs",
+        "careers_url": "https://roberthalf.wd1.myworkdayjobs.com/protivitigraduate"
+      },
+      {
+        "id": "roberthalf-protivitiindia",
+        "name": "Robert Half Inc",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://roberthalf.wd1.myworkdayjobs.com/wday/cxs/roberthalf/protivitiindia/jobs",
+        "careers_url": "https://roberthalf.wd1.myworkdayjobs.com/protivitiindia"
+      },
+      {
+        "id": "roberthalf-protivitina",
+        "name": "Robert Half Inc",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://roberthalf.wd1.myworkdayjobs.com/wday/cxs/roberthalf/protivitina/jobs",
+        "careers_url": "https://roberthalf.wd1.myworkdayjobs.com/protivitina"
+      },
+      {
+        "id": "roberthalf-roberthalfcareers",
+        "name": "Robert Half Inc",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://roberthalf.wd1.myworkdayjobs.com/wday/cxs/roberthalf/roberthalfcareers/jobs",
+        "careers_url": "https://roberthalf.wd1.myworkdayjobs.com/roberthalfcareers"
+      },
+      {
+        "id": "roberthalf-roberthalfstaffingcareers",
+        "name": "Robert Half Inc",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://roberthalf.wd1.myworkdayjobs.com/wday/cxs/roberthalf/roberthalfstaffingcareers/jobs",
+        "careers_url": "https://roberthalf.wd1.myworkdayjobs.com/roberthalfstaffingcareers"
+      },
+      {
+        "id": "roche-mysugr-ext",
+        "name": "Roche",
+        "tags": [
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://roche.wd3.myworkdayjobs.com/wday/cxs/roche/mysugr-ext/jobs",
+        "careers_url": "https://roche.wd3.myworkdayjobs.com/mysugr-ext"
+      },
+      {
+        "id": "roche-roche-ext",
+        "name": "Roche",
+        "tags": [
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://roche.wd3.myworkdayjobs.com/wday/cxs/roche/roche-ext/jobs",
+        "careers_url": "https://roche.wd3.myworkdayjobs.com/roche-ext"
+      },
+      {
+        "id": "roche-rog-a2o-gene",
+        "name": "Roche",
+        "tags": [
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://roche.wd3.myworkdayjobs.com/wday/cxs/roche/rog-a2o-gene/jobs",
+        "careers_url": "https://roche.wd3.myworkdayjobs.com/rog-a2o-gene"
+      },
+      {
+        "id": "rockwellautomation-external-rockwell-automation-early-careers",
+        "name": "Rockwell Automation",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://rockwellautomation.wd1.myworkdayjobs.com/wday/cxs/rockwellautomation/external-rockwell-automation-early-careers/jobs",
+        "careers_url": "https://rockwellautomation.wd1.myworkdayjobs.com/external-rockwell-automation-early-careers"
+      },
+      {
+        "id": "rockwellautomation-external_rockwell_automation",
+        "name": "Rockwell Automation",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://rockwellautomation.wd1.myworkdayjobs.com/wday/cxs/rockwellautomation/external_rockwell_automation/jobs",
+        "careers_url": "https://rockwellautomation.wd1.myworkdayjobs.com/external_rockwell_automation"
+      },
+      {
+        "id": "ryan-experienced-professionals",
+        "name": "Ryan, LLC",
+        "tags": [
+          "glassdoor-best-places-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://ryan.wd1.myworkdayjobs.com/wday/cxs/ryan/experienced-professionals/jobs",
+        "careers_url": "https://ryan.wd1.myworkdayjobs.com/experienced-professionals"
+      },
+      {
+        "id": "ryan-ryancareers",
+        "name": "Ryan, LLC",
+        "tags": [
+          "glassdoor-best-places-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://ryan.wd1.myworkdayjobs.com/wday/cxs/ryan/ryancareers/jobs",
+        "careers_url": "https://ryan.wd1.myworkdayjobs.com/ryancareers"
+      },
+      {
+        "id": "ryan-students-graduates",
+        "name": "Ryan, LLC",
+        "tags": [
+          "glassdoor-best-places-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://ryan.wd1.myworkdayjobs.com/wday/cxs/ryan/students-graduates/jobs",
+        "careers_url": "https://ryan.wd1.myworkdayjobs.com/students-graduates"
+      },
+      {
+        "id": "salesforce-futureforce_internships",
+        "name": "Salesforce",
+        "tags": [
+          "fortune-500-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://salesforce.wd12.myworkdayjobs.com/wday/cxs/salesforce/futureforce_internships/jobs",
+        "careers_url": "https://salesforce.wd12.myworkdayjobs.com/futureforce_internships"
+      },
+      {
+        "id": "salesforce-futureforce_newgradroles",
+        "name": "Salesforce",
+        "tags": [
+          "fortune-500-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://salesforce.wd12.myworkdayjobs.com/wday/cxs/salesforce/futureforce_newgradroles/jobs",
+        "careers_url": "https://salesforce.wd12.myworkdayjobs.com/futureforce_newgradroles"
+      },
+      {
+        "id": "salesforce-mulesoft_careersite",
+        "name": "Salesforce",
+        "tags": [
+          "fortune-500-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://salesforce.wd12.myworkdayjobs.com/wday/cxs/salesforce/mulesoft_careersite/jobs",
+        "careers_url": "https://salesforce.wd12.myworkdayjobs.com/mulesoft_careersite"
+      },
+      {
+        "id": "salesforce-salesforce_research",
+        "name": "Salesforce",
+        "tags": [
+          "fortune-500-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://salesforce.wd12.myworkdayjobs.com/wday/cxs/salesforce/salesforce_research/jobs",
+        "careers_url": "https://salesforce.wd12.myworkdayjobs.com/salesforce_research"
+      },
+      {
+        "id": "salesforce-slack",
+        "name": "Salesforce",
+        "tags": [
+          "fortune-500-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://salesforce.wd12.myworkdayjobs.com/wday/cxs/salesforce/slack/jobs",
+        "careers_url": "https://salesforce.wd12.myworkdayjobs.com/slack"
+      },
+      {
+        "id": "salesforce-tableau",
+        "name": "Salesforce",
+        "tags": [
+          "fortune-500-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://salesforce.wd12.myworkdayjobs.com/wday/cxs/salesforce/tableau/jobs",
+        "careers_url": "https://salesforce.wd12.myworkdayjobs.com/tableau"
+      },
+      {
+        "id": "shell-avature",
+        "name": "Shell",
+        "tags": [
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://shell.wd3.myworkdayjobs.com/wday/cxs/shell/avature/jobs",
+        "careers_url": "https://shell.wd3.myworkdayjobs.com/avature"
+      },
+      {
+        "id": "shell-proactive",
+        "name": "Shell",
+        "tags": [
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://shell.wd3.myworkdayjobs.com/wday/cxs/shell/proactive/jobs",
+        "careers_url": "https://shell.wd3.myworkdayjobs.com/proactive"
+      },
+      {
+        "id": "shell-shellcareers",
+        "name": "Shell",
+        "tags": [
+          "linkedin-top-companies-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://shell.wd3.myworkdayjobs.com/wday/cxs/shell/shellcareers/jobs",
+        "careers_url": "https://shell.wd3.myworkdayjobs.com/shellcareers"
+      },
+      {
+        "id": "stryker-strykercareers",
+        "name": "Stryker",
+        "tags": [
+          "fortune-500-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://stryker.wd1.myworkdayjobs.com/wday/cxs/stryker/strykercareers/jobs",
+        "careers_url": "https://stryker.wd1.myworkdayjobs.com/strykercareers"
+      },
+      {
+        "id": "sysco-syscocareers",
+        "name": "Sysco",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://sysco.wd5.myworkdayjobs.com/wday/cxs/sysco/syscocareers/jobs",
+        "careers_url": "https://sysco.wd5.myworkdayjobs.com/syscocareers"
+      },
+      {
+        "id": "target-targetcareers",
+        "name": "Target Corporation",
+        "tags": [
+          "fortune-500-2026",
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://target.wd5.myworkdayjobs.com/wday/cxs/target/targetcareers/jobs",
+        "careers_url": "https://target.wd5.myworkdayjobs.com/targetcareers"
+      },
+      {
+        "id": "thehartford-careers_external",
+        "name": "The Hartford",
+        "tags": [
+          "computerworld-best-it-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://thehartford.wd5.myworkdayjobs.com/wday/cxs/thehartford/careers_external/jobs",
+        "careers_url": "https://thehartford.wd5.myworkdayjobs.com/careers_external"
+      },
+      {
+        "id": "thehartford-careers_restricted",
+        "name": "The Hartford",
+        "tags": [
+          "computerworld-best-it-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://thehartford.wd5.myworkdayjobs.com/wday/cxs/thehartford/careers_restricted/jobs",
+        "careers_url": "https://thehartford.wd5.myworkdayjobs.com/careers_restricted"
+      },
+      {
+        "id": "tjx-tjx_external",
+        "name": "TJX",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://tjx.wd1.myworkdayjobs.com/wday/cxs/tjx/tjx_external/jobs",
+        "careers_url": "https://tjx.wd1.myworkdayjobs.com/tjx_external"
+      },
+      {
+        "id": "tp-tp-icap",
+        "name": "TP",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://tp.wd107.myworkdayjobs.com/wday/cxs/tp/tp-icap/jobs",
+        "careers_url": "https://tp.wd107.myworkdayjobs.com/tp-icap"
+      },
+      {
+        "id": "travelers-external",
+        "name": "Travelers",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://travelers.wd5.myworkdayjobs.com/wday/cxs/travelers/external/jobs",
+        "careers_url": "https://travelers.wd5.myworkdayjobs.com/external"
+      },
+      {
+        "id": "travelers-simplybusinesssexternal",
+        "name": "Travelers",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://travelers.wd5.myworkdayjobs.com/wday/cxs/travelers/simplybusinesssexternal/jobs",
+        "careers_url": "https://travelers.wd5.myworkdayjobs.com/simplybusinesssexternal"
+      },
+      {
+        "id": "tysonfoods-cvt",
+        "name": "Tyson Foods",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://tysonfoods.wd5.myworkdayjobs.com/wday/cxs/tysonfoods/cvt/jobs",
+        "careers_url": "https://tysonfoods.wd5.myworkdayjobs.com/cvt"
+      },
+      {
+        "id": "tysonfoods-tepi",
+        "name": "Tyson Foods",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://tysonfoods.wd5.myworkdayjobs.com/wday/cxs/tysonfoods/tepi/jobs",
+        "careers_url": "https://tysonfoods.wd5.myworkdayjobs.com/tepi"
+      },
+      {
+        "id": "tysonfoods-tsn",
+        "name": "Tyson Foods",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://tysonfoods.wd5.myworkdayjobs.com/wday/cxs/tysonfoods/tsn/jobs",
+        "careers_url": "https://tysonfoods.wd5.myworkdayjobs.com/tsn"
+      },
+      {
+        "id": "tysonfoods-tsn1",
+        "name": "Tyson Foods",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://tysonfoods.wd5.myworkdayjobs.com/wday/cxs/tysonfoods/tsn1/jobs",
+        "careers_url": "https://tysonfoods.wd5.myworkdayjobs.com/tsn1"
+      },
+      {
+        "id": "tysonfoods-tsn5",
+        "name": "Tyson Foods",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://tysonfoods.wd5.myworkdayjobs.com/wday/cxs/tysonfoods/tsn5/jobs",
+        "careers_url": "https://tysonfoods.wd5.myworkdayjobs.com/tsn5"
+      },
+      {
+        "id": "tysonfoods-tyit",
+        "name": "Tyson Foods",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://tysonfoods.wd5.myworkdayjobs.com/wday/cxs/tysonfoods/tyit/jobs",
+        "careers_url": "https://tysonfoods.wd5.myworkdayjobs.com/tyit"
+      },
+      {
+        "id": "unum-external",
+        "name": "Unum Group",
+        "tags": [
+          "computerworld-best-it-2026",
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://unum.wd1.myworkdayjobs.com/wday/cxs/unum/external/jobs",
+        "careers_url": "https://unum.wd1.myworkdayjobs.com/external"
+      },
+      {
+        "id": "usaa-usaajobswd",
+        "name": "USAA",
+        "tags": [
+          "computerworld-best-it-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://usaa.wd1.myworkdayjobs.com/wday/cxs/usaa/usaajobswd/jobs",
+        "careers_url": "https://usaa.wd1.myworkdayjobs.com/usaajobswd"
+      },
+      {
+        "id": "viatris-external",
+        "name": "Viatris",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://viatris.wd5.myworkdayjobs.com/wday/cxs/viatris/external/jobs",
+        "careers_url": "https://viatris.wd5.myworkdayjobs.com/external"
+      },
+      {
+        "id": "visa-visa",
+        "name": "Visa",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://visa.wd5.myworkdayjobs.com/wday/cxs/visa/visa/jobs",
+        "careers_url": "https://visa.wd5.myworkdayjobs.com/visa"
+      },
+      {
+        "id": "visa-visa_early_careers",
+        "name": "Visa",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://visa.wd5.myworkdayjobs.com/wday/cxs/visa/visa_early_careers/jobs",
+        "careers_url": "https://visa.wd5.myworkdayjobs.com/visa_early_careers"
+      },
+      {
+        "id": "westlake-westlake",
+        "name": "Westlake",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://westlake.wd1.myworkdayjobs.com/wday/cxs/westlake/westlake/jobs",
+        "careers_url": "https://westlake.wd1.myworkdayjobs.com/westlake"
+      },
+      {
+        "id": "williams-external",
+        "name": "Williams",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://williams.wd5.myworkdayjobs.com/wday/cxs/williams/external/jobs",
+        "careers_url": "https://williams.wd5.myworkdayjobs.com/external"
+      },
+      {
+        "id": "williams-powerexternal",
+        "name": "Williams",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://williams.wd5.myworkdayjobs.com/wday/cxs/williams/powerexternal/jobs",
+        "careers_url": "https://williams.wd5.myworkdayjobs.com/powerexternal"
+      },
+      {
+        "id": "workday-workday",
+        "name": "Workday",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://workday.wd5.myworkdayjobs.com/wday/cxs/workday/workday/jobs",
+        "careers_url": "https://workday.wd5.myworkdayjobs.com/workday"
+      },
+      {
+        "id": "workday-workday_early_career",
+        "name": "Workday",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://workday.wd5.myworkdayjobs.com/wday/cxs/workday/workday_early_career/jobs",
+        "careers_url": "https://workday.wd5.myworkdayjobs.com/workday_early_career"
+      },
+      {
+        "id": "workday-workday_executive_site",
+        "name": "Workday",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://workday.wd5.myworkdayjobs.com/wday/cxs/workday/workday_executive_site/jobs",
+        "careers_url": "https://workday.wd5.myworkdayjobs.com/workday_executive_site"
+      },
+      {
+        "id": "workiva-careers",
+        "name": "Workiva",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://workiva.wd503.myworkdayjobs.com/wday/cxs/workiva/careers/jobs",
+        "careers_url": "https://workiva.wd503.myworkdayjobs.com/careers"
+      },
+      {
+        "id": "xcelenergy-external",
+        "name": "Xcel Energy",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://xcelenergy.wd1.myworkdayjobs.com/wday/cxs/xcelenergy/external/jobs",
+        "careers_url": "https://xcelenergy.wd1.myworkdayjobs.com/external"
+      },
+      {
+        "id": "xylem-xylem-careers",
+        "name": "Xylem",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://xylem.wd5.myworkdayjobs.com/wday/cxs/xylem/xylem-careers/jobs",
+        "careers_url": "https://xylem.wd5.myworkdayjobs.com/xylem-careers"
+      },
+      {
+        "id": "zillow-zillow_group_external",
+        "name": "Zillow Group",
+        "tags": [
+          "great-place-to-work-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://zillow.wd5.myworkdayjobs.com/wday/cxs/zillow/zillow_group_external/jobs",
+        "careers_url": "https://zillow.wd5.myworkdayjobs.com/zillow_group_external"
+      },
+      {
+        "id": "zoetis-broadbean_external",
+        "name": "Zoetis",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://zoetis.wd5.myworkdayjobs.com/wday/cxs/zoetis/broadbean_external/jobs",
+        "careers_url": "https://zoetis.wd5.myworkdayjobs.com/broadbean_external"
+      },
+      {
+        "id": "zoetis-zoetis",
+        "name": "Zoetis",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://zoetis.wd5.myworkdayjobs.com/wday/cxs/zoetis/zoetis/jobs",
+        "careers_url": "https://zoetis.wd5.myworkdayjobs.com/zoetis"
+      },
+      {
+        "id": "zoetis-zoetis_intl",
+        "name": "Zoetis",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://zoetis.wd5.myworkdayjobs.com/wday/cxs/zoetis/zoetis_intl/jobs",
+        "careers_url": "https://zoetis.wd5.myworkdayjobs.com/zoetis_intl"
+      },
+      {
+        "id": "acehardware-aih_external",
+        "name": "Ace Hardware",
+        "tags": [
+          "fortune-500-2026",
+          "recognized-employer"
+        ],
+        "api_url": "https://acehardware.wd1.myworkdayjobs.com/wday/cxs/acehardware/aih_external/jobs",
+        "careers_url": "https://acehardware.wd1.myworkdayjobs.com/aih_external"
       }
     ]
   }

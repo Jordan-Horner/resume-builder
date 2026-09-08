@@ -18,7 +18,11 @@ export function JobRow({ job, selected, onOpen }: Props) {
           <strong>{job.title}</strong>
           {isHot && <span className="job-hot-status">Hot</span>}
         </span>
-        <span className="company">{job.company}</span>
+        <span className="company-line">
+          <span className="company">{job.company}</span>
+          {job.company_recognition?.top_workplace && <span className="recognition-badge top-workplace">Top workplace</span>}
+          {job.company_recognition?.major_employer && <span className="recognition-badge major-employer">Major employer</span>}
+        </span>
         <span className="job-meta"><span>{job.location}</span><i /><span>{formatWorkModes(job.work_modes)}</span></span>
       </span>
       <span className="job-row-side">

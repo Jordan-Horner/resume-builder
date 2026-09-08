@@ -215,7 +215,11 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
 .queue-tabs button[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--ink); }
 .assistant-context-question { align-items: flex-start; background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
 .new-pill { flex: 0 0 auto; color: #7ee787; background: var(--success-soft); padding: 3px 7px; border-radius: 999px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; }
+.company-line { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .company { font-weight: 600; font-size: 12px; }
+.recognition-badge { flex: 0 0 auto; border: 1px solid transparent; border-radius: 999px; padding: 1px 6px; font-size: 9px; font-weight: 700; line-height: 1.4; }
+.recognition-badge.top-workplace { color: #d2a8ff; background: color-mix(in srgb, #8957e5 18%, transparent); border-color: color-mix(in srgb, #a371f7 35%, transparent); }
+.recognition-badge.major-employer { color: #79c0ff; background: color-mix(in srgb, #1f6feb 18%, transparent); border-color: color-mix(in srgb, #58a6ff 35%, transparent); }
 .job-meta { color: var(--muted); font-size: 12px; display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
 .job-meta i { width: 3px; height: 3px; border-radius: 50%; background: var(--muted); }
 .job-row-side { color: var(--muted); font-size: 11px; text-align: right; display: grid; grid-template-columns: auto 54px 18px; gap: 10px; align-items: center; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
@@ -232,6 +236,9 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
 .detail-company { font-size: 14px; font-weight: 600; margin: 0; }
 .detail-tags { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 7px; margin: 18px 0; }
 .detail-tags > span { min-height: 28px; display: inline-flex; align-items: center; padding: 5px 8px; background: #30363d; color: #c9d1d9; border-radius: 5px; font-size: 11px; }
+.detail-tags > .recognition-badge { border-radius: 999px; }
+.detail-tags > .recognition-badge.top-workplace { color: #d2a8ff; background: color-mix(in srgb, #8957e5 18%, #30363d); }
+.detail-tags > .recognition-badge.major-employer { color: #79c0ff; background: color-mix(in srgb, #1f6feb 18%, #30363d); }
 .salary-request, .salary-result { position: relative; min-width: 0; max-width: 100%; font-size: 11px; }
 .salary-tag-button, .salary-result > summary { min-height: 28px; border: 1px dashed #484f58; border-radius: 5px; background: transparent; color: var(--muted); font: inherit; line-height: 1; }
 .salary-tag-button { display: inline-flex; align-items: center; gap: 7px; padding: 5px 8px; cursor: pointer; }

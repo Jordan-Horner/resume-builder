@@ -15,22 +15,23 @@ def test_first_party_boards_are_bundled_and_local_entries_override_them(tmp_path
     scaffold_job_search(tmp_path)
     path = tmp_path / "job-search/config/search.yml"
     config = load_config(path)
-    assert {board.id for board in config.providers.greenhouse.boards} == {
+    assert {
         "axon",
         "blinkhealth",
         "cloudflare",
         "intercom",
         "obsidiansecurity",
         "rebuildmanufacturing",
-    }
-    assert {board.id for board in config.providers.ashby.boards} == {
+    }.issubset({board.id for board in config.providers.greenhouse.boards})
+    bundled_ashby_ids = {board.id for board in config.providers.ashby.boards}
+    assert {
         "baseten",
         "Cyberhaven",
         "langchain",
         "lumaai",
         "revenuecat",
-    }
-    assert {board.id for board in config.providers.lever.boards} == {"floqast"}
+    }.issubset(bundled_ashby_ids)
+    assert {"floqast"}.issubset({board.id for board in config.providers.lever.boards})
     assert {board.id for board in config.providers.rippling.boards} == {"riot-platforms-careers"}
     assert {
         "nvidia-nvidiaexternalcareersite",
@@ -43,13 +44,7 @@ def test_first_party_boards_are_bundled_and_local_entries_override_them(tmp_path
     }
     path.write_text(yaml.safe_dump(raw))
     boards = load_config(path).providers.ashby.boards
-    assert {board.id for board in boards} == {
-        "baseten",
-        "Cyberhaven",
-        "langchain",
-        "lumaai",
-        "revenuecat",
-    }
+    assert {board.id for board in boards} == bundled_ashby_ids
     overridden = next(board for board in boards if board.id == "baseten")
     assert overridden.name == "Local override"
     assert overridden.enabled is False

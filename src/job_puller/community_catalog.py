@@ -198,6 +198,14 @@ def audit_community_catalog(
                         "valid": accounting_valid,
                     },
                     "possible_false_negatives": possible_misses,
+                    "accepted_job_examples": [
+                        {
+                            "title": observation.title,
+                            "location": observation.location,
+                            "work_modes": sorted(mode.value for mode in observation.work_modes),
+                        }
+                        for observation in result.observations[:5]
+                    ],
                     "promotion_ready": promotion_ready,
                     "duration_seconds": round(
                         (result.completed_at - result.started_at).total_seconds(), 3

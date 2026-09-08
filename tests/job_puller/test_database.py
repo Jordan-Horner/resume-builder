@@ -54,7 +54,9 @@ def test_migrate_and_insert(tmp_path):
 def test_active_inventory_exposes_stable_consumer_projection(tmp_path):
     db = InventoryDatabase(tmp_path / "inventory.db")
     db.migrate()
-    db.record_result(result(observation(direct="https://example.com/apply/1")))
+    item = observation(direct="https://example.com/apply/1")
+    item.provider_board_id = "example"
+    db.record_result(result(item))
 
     inventory = db.active_inventory()
     assert len(inventory) == 1
@@ -63,6 +65,7 @@ def test_active_inventory_exposes_stable_consumer_projection(tmp_path):
     assert inventory[0]["description_quality"] == "complete"
     assert inventory[0]["work_modes"] == ["remote"]
     assert inventory[0]["providers"] == ["linkedin"]
+    assert inventory[0]["provider_boards"] == ["linkedin:example"]
     assert inventory[0]["url"] == "https://example.com/apply/1"
 
 

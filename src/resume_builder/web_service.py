@@ -118,6 +118,38 @@ APPLICATIONS_ROOT = Path("applications")
 STATE_PATH = Path("job-search/dashboard-state.json")
 WORK_MODES = frozenset({"remote", "hybrid", "onsite"})
 DATE_RANGES = frozenset({0, 1, 3, 7, 14, 30})
+MAJOR_EMPLOYER_TAG_PREFIXES = ("fortune-500-",)
+TOP_WORKPLACE_TAG_PREFIXES = (
+    "computerworld-best-it-",
+    "glassdoor-best-places-",
+    "great-place-to-work-",
+    "linkedin-top-companies-",
+)
+
+
+def _company_recognition(
+    provider_boards: list[object],
+    board_tags: dict[str, set[str]],
+    *,
+    company: str = "",
+    company_tags: dict[str, set[str]] | None = None,
+) -> dict[str, object] | None:
+    tags = {
+        tag
+        for identity in provider_boards
+        for tag in board_tags.get(str(identity), set())
+    }
+    if company_tags:
+        tags.update(company_tags.get(normalized_key(company), set()))
+    major_employer = any(tag.startswith(MAJOR_EMPLOYER_TAG_PREFIXES) for tag in tags)
+    top_workplace = any(tag.startswith(TOP_WORKPLACE_TAG_PREFIXES) for tag in tags)
+    if not (major_employer or top_workplace):
+        return None
+    return {
+        "major_employer": major_employer,
+        "top_workplace": top_workplace,
+        "sources": sorted(tag for tag in tags if tag != "recognized-employer"),
+    }
 EMPLOYMENT_TYPES = frozenset({"fulltime", "parttime", "contract", "temporary"})
 ONBOARDING_STATE_PATH = Path("job-search/web-onboarding.json")
 MAX_RESUME_BYTES = 10 * 1024 * 1024
@@ -1106,7 +1138,36 @@ class DashboardService:
         }
 
     def _load_inventory(self) -> list[dict[str, Any]]:
-        return self._inventory_database().active_inventory()
+        config_path = self.workspace / JOBS_CONFIG
+        config = load_config(config_path)
+        database = InventoryDatabase(
+            resolve_database_path(config_path, config.database_path),
+            config.raw_payload_retention_days,
+        )
+        database.migrate()
+        board_tags = {
+            f"{provider}:{board.id}": set(board.tags)
+            for provider in type(config.providers).model_fields
+            if provider not in {"linkedin", "indeed"}
+            for board in getattr(config.providers, provider).boards
+        }
+        company_tags: dict[str, set[str]] = {}
+        for provider in type(config.providers).model_fields:
+            if provider in {"linkedin", "indeed"}:
+                continue
+            for board in getattr(config.providers, provider).boards:
+                company_tags.setdefault(normalized_key(board.name), set()).update(board.tags)
+        inventory = database.active_inventory()
+        for job in inventory:
+            recognition = _company_recognition(
+                job.get("provider_boards", []),
+                board_tags,
+                company=str(job.get("company") or ""),
+                company_tags=company_tags,
+            )
+            if recognition:
+                job["company_recognition"] = recognition
+        return inventory
 
     def _inventory_database(self) -> InventoryDatabase:
         config_path = self.workspace / JOBS_CONFIG
@@ -1622,6 +1683,7 @@ class DashboardService:
             "work_modes": modes,
             "providers": providers,
             "url": job.get("url"),
+            "company_recognition": job.get("company_recognition"),
         }
 
     def _quick_screen_summaries(

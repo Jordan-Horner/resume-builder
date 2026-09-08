@@ -87,6 +87,32 @@ def test_clearance_preference_is_a_modest_positive_score_signal():
     assert scores["job-1"]["score"] > scores["job-2"]["score"]
 
 
+def test_company_recognition_is_a_capped_tiebreaker_not_a_fit_override():
+    recognized = _item("job-1", "stretch")
+    recognized["company_recognition"] = {
+        "major_employer": True,
+        "top_workplace": True,
+    }
+    ordinary = _item("job-2", "stretch")
+    weak_recognized = _item("job-3", "weak")
+    weak_recognized["company_recognition"] = {
+        "major_employer": True,
+        "top_workplace": True,
+    }
+
+    order, scores = build_shadow_order(
+        [ordinary, recognized, weak_recognized],
+        preferences={"personalization": {"exploration_fraction": 0}},
+        positive_titles=[],
+    )
+
+    assert order == ["job-1", "job-2", "job-3"]
+    assert scores["job-1"]["company_score"] == 0.65
+    assert scores["job-1"]["score"] > scores["job-2"]["score"]
+    assert scores["job-3"]["score"] < scores["job-2"]["score"]
+    assert scores["job-1"]["hot"] is False
+
+
 def test_exact_optional_preferences_refine_deterministic_interest_score():
     preferred = _item("job-1", "stretch")
     preferred["deterministic"]["interest"] = {
