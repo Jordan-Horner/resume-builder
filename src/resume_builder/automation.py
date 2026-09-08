@@ -1197,6 +1197,7 @@ class AutomationService:
                 if isinstance(raw_matches, list)
                 else []
             )
+            notifications: tuple[Notification | None, ...]
             if task == "jobs":
                 raw_reapplications = result.get("reapplications", [])
                 reapplications = (

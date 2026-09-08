@@ -1157,8 +1157,10 @@ class DashboardService:
                 company_tags.setdefault(normalized_key(board.name), set()).update(board.tags)
         inventory = database.active_inventory()
         for job in inventory:
+            raw_provider_boards = job.get("provider_boards", [])
+            provider_boards = raw_provider_boards if isinstance(raw_provider_boards, list) else []
             recognition = _company_recognition(
-                job.get("provider_boards", []),
+                provider_boards,
                 board_tags,
                 company=str(job.get("company") or ""),
                 company_tags=company_tags,
