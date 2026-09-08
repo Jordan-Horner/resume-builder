@@ -160,7 +160,8 @@ advanced installations, but it is no longer the primary onboarding path.
 
 Application confirmations require an explicit confirmation phrase plus a valid
 company and role. They create an application or link one submitted within three
-days. Known inventory jobs are linked only by exact normalized company and title
+days. Known inventory jobs are linked first by a unique requisition URL with
+compatible company and title evidence, then by exact normalized company and title
 identity.
 
 Rejections require strongly negative body context; the words “move forward” by

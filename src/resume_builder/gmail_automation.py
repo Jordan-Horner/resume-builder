@@ -40,7 +40,7 @@ from .gmail_semantic import SemanticEmailClassifier, SemanticLifecycleOutcome
 from .jobs import DEFAULT_CONFIG
 
 GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
-CLASSIFIER_VERSION = "application-lifecycle-rules-v7"
+CLASSIFIER_VERSION = "application-lifecycle-rules-v8"
 AUTOMATION_POLICY = "high-confidence-application-lifecycle-v2"
 AUTO_APPLY_THRESHOLD = 0.92
 SEMANTIC_CLASSIFIER_VERSION = f"{CLASSIFIER_VERSION}+semantic-v1"
@@ -54,7 +54,8 @@ GOOGLE_AUDIENCE_URL = "https://console.cloud.google.com/auth/audience"
 GOOGLE_DATA_ACCESS_URL = "https://console.cloud.google.com/auth/scopes"
 GOOGLE_CLIENTS_URL = "https://console.cloud.google.com/auth/clients"
 CONFIRMATION_QUERY = (
-    '{"thank you for applying" "thanks for applying" "we received your application" '
+    '{"thank you for applying" "thanks for applying" "thank you for your application" '
+    '"we received your application" "received and are reviewing your application" '
     '"application has been received" "application was submitted" '
     '"application has been submitted" "application submitted" '
     '"your application was sent"}'
@@ -82,14 +83,20 @@ DEFAULT_BACKFILL_QUERY = f"{APPLICATION_ACTIVITY_QUERY} newer_than:5y"
 MAX_BODY_CHARS = 100_000
 TOKEN = re.compile(r"[a-z0-9]+")
 REQUISITION = re.compile(
-    r"\b(?:job|requisition|req)(?:\s+(?:id|number|#))?\s*[:#-]?\s*"
+    r"(?:\b(?:job|requisition|req)(?:\s+(?:id|number|#))?\s*[:#-]?\s*|"
+    r"\bposition\s+(?:of|for)\s+[^.!]{3,100}?\s+"
+    r"[-\N{EN DASH}\N{EM DASH}]\s*)"
     r"([A-Z0-9-]*\d[A-Z0-9-]*)\b",
     re.IGNORECASE,
 )
 CONFIRMATION_PHRASES = (
     re.compile(r"\bthank you for applying\b", re.IGNORECASE),
     re.compile(r"\bthanks for applying\b", re.IGNORECASE),
-    re.compile(r"\bwe (?:have )?received your application\b", re.IGNORECASE),
+    re.compile(r"\bthank you for your application\b", re.IGNORECASE),
+    re.compile(
+        r"\bwe (?:have )?received(?: and (?:are )?reviewing)? your application\b",
+        re.IGNORECASE,
+    ),
     re.compile(r"\byour application (?:has been|was) (?:received|submitted)\b", re.IGNORECASE),
     re.compile(r"\byour application (?:has been|was) sent\b", re.IGNORECASE),
     re.compile(r"\bapplication submitted\b", re.IGNORECASE),
@@ -227,6 +234,13 @@ COMPANY_PATTERNS = (
 ROLE_PATTERNS = (
     re.compile(r"(?:job title|position|role)\s*[:|-]\s*(?P<role>[^\n|]{3,100})", re.IGNORECASE),
     re.compile(
+        r"position\s+(?:of|for)\s+(?P<role>[^.!]{3,100}?)"
+        r"\s+[-\N{EN DASH}\N{EM DASH}]\s*[A-Z0-9-]*\d[A-Z0-9-]*"
+        r"(?:[.!]|$)",
+        re.IGNORECASE,
+    ),
+    re.compile(r"position\s+(?:of|for)\s+(?P<role>[^\n.!]{3,100})", re.IGNORECASE),
+    re.compile(
         r"submitting an application for (?:the )?(?P<role>[^\n.!]{3,100})",
         re.IGNORECASE,
     ),
@@ -242,7 +256,6 @@ ROLE_PATTERNS = (
         r"apply for (?:the |our )?(?P<role>[^\n.!]{3,100}?) (?:position|role)\b",
         re.IGNORECASE,
     ),
-    re.compile(r"position (?:of|for) (?P<role>[^\n.!]{3,100})", re.IGNORECASE),
     re.compile(r"role (?:of|for) (?P<role>[^\n.!]{3,100})", re.IGNORECASE),
 )
 
@@ -1082,6 +1095,10 @@ def _identity(value: str) -> str:
     return " ".join(TOKEN.findall(value.casefold()))
 
 
+def _company_identity(value: str) -> str:
+    return _identity(value).removesuffix(" technologies")
+
+
 def _source_reference(account_id: str, message_id: str) -> str:
     return hashlib.sha256(f"{account_id}\x1f{message_id}".encode()).hexdigest()[:24]
 
@@ -1118,11 +1135,26 @@ def _inventory(workspace: Path) -> list[dict[str, object]]:
 def _match_job(
     confirmation: ApplicationConfirmation, inventory: Iterable[dict[str, object]]
 ) -> dict[str, object] | None:
-    matches = [
+    candidates = [
         job
         for job in inventory
-        if _identity(str(job.get("company", ""))) == _identity(confirmation.company)
+        if _company_identity(str(job.get("company", ""))) == _company_identity(confirmation.company)
         and _identity(str(job.get("title", ""))) == _identity(confirmation.role)
+    ]
+    if confirmation.requisition_id:
+        identifier = re.compile(
+            rf"(?<![A-Za-z0-9]){re.escape(confirmation.requisition_id)}(?![A-Za-z0-9])",
+            re.IGNORECASE,
+        )
+        requisition_matches = [
+            job for job in candidates if identifier.search(str(job.get("url", "")))
+        ]
+        if len(requisition_matches) == 1:
+            return requisition_matches[0]
+    matches = [
+        job
+        for job in candidates
+        if _identity(str(job.get("company", ""))) == _identity(confirmation.company)
     ]
     return matches[0] if len(matches) == 1 else None
 

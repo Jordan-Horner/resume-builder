@@ -172,6 +172,35 @@ def test_parse_and_classify_application_confirmation_without_retaining_html():
     assert confirmation.confidence == 0.95
 
 
+def test_classifier_accepts_akamai_application_template():
+    message = parse_message(
+        gmail_payload(
+            subject="Thank you for your application to Akamai Technologies",
+            body=(
+                "We have received and are reviewing your application for the position of "
+                "Site Reliability Engineer - 3772. If your profile corresponds to our "
+                "requirements, a member of our Talent Acquisition Team will contact you."
+            ),
+            sender="Talent Acquisition - Akamai <hr-akamaiijobs@akamai.com>",
+        )
+    )
+
+    confirmation = classify_confirmation(message)
+
+    assert '"thank you for your application"' in DEFAULT_SCAN_QUERY
+    assert confirmation is not None
+    assert confirmation.company == "Akamai Technologies"
+    assert confirmation.role == "Site Reliability Engineer"
+    assert confirmation.requisition_id == "3772"
+    unrelated = parse_message(
+        gmail_payload(
+            subject="Thank you for your application to Example Bank",
+            body="We have received and are reviewing your application.",
+        )
+    )
+    assert _classify_confirmation(unrelated) == (None, "missing-role")
+
+
 def test_classifier_rejects_job_alerts_and_incomplete_identity():
     alert = parse_message(
         gmail_payload(
@@ -871,6 +900,73 @@ def test_high_confidence_confirmation_creates_application_automatically(tmp_path
     serialized = json.dumps(record)
     assert "We received your application" not in serialized
     assert "gmail-1" not in serialized
+
+
+def test_akamai_confirmation_links_exact_requisition(tmp_path: Path, monkeypatch):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / ".resume-builder.json").write_text("{}\n", encoding="utf-8")
+    state = GmailRuntimeState(tmp_path / "runtime" / "gmail.sqlite")
+    gateway = FakeGateway(
+        {
+            "akamai-3772": gmail_payload(
+                message_id="akamai-3772",
+                subject="Thank you for your application to Akamai Technologies",
+                body=(
+                    "We have received and are reviewing your application for the position of\n"
+                    "Site Reliability Engineer\n-\n3772."
+                ),
+                sender="Talent Acquisition - Akamai <hr-akamaiijobs@akamai.com>",
+            )
+        }
+    )
+    monkeypatch.setattr(
+        "resume_builder.gmail_automation._inventory",
+        lambda _workspace: [
+            {
+                "id": "direct-3830",
+                "company": "Akamai",
+                "title": "Site Reliability Engineer",
+                "url": "https://example.com/requisitions/preview/3830",
+            },
+            {
+                "id": "linkedin-3772",
+                "company": "Akamai Technologies",
+                "title": "Site Reliability Engineer",
+                "url": "https://linkedin.com/jobs/view/4461277043",
+            },
+            {
+                "id": "direct-3772",
+                "company": "Akamai",
+                "title": "Site Reliability Engineer",
+                "url": "https://example.com/requisitions/preview/3772",
+            },
+        ],
+    )
+
+    result = process_messages(
+        gateway=gateway,
+        state=state,
+        workspace=workspace,
+        message_ids=["akamai-3772"],
+        apply=True,
+    )
+
+    record = load_record(
+        workspace / "applications" / f"{result['changes'][0]['application_id']}.json"
+    )
+    assert result["created"] == 1
+    assert record["application"]["job_id"] == "direct-3772"
+    assert record["application"]["requisition_id"] == "3772"
+    assert record["events"][0]["status"] == "applied"
+    repeated = process_messages(
+        gateway=gateway,
+        state=state,
+        workspace=workspace,
+        message_ids=["akamai-3772"],
+        apply=True,
+    )
+    assert repeated["examined"] == 0
 
 
 def test_confirmation_links_matching_manual_application_without_duplicate(tmp_path: Path):
