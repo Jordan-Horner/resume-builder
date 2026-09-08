@@ -1424,9 +1424,14 @@ class DashboardService:
                 input_path=shortlist,
             )
             status = "complete" if summary.failed == 0 else "partial"
+            attempted_jobs = int(getattr(summary, "attempted", summary.provider_calls))
+            screened_jobs = int(
+                getattr(summary, "succeeded", max(0, attempted_jobs - summary.failed))
+            )
+            duration_seconds = round(float(getattr(summary, "duration_seconds", 0.0)), 3)
             message = (
-                f"Screened {summary.provider_calls} recommended jobs."
-                if summary.provider_calls
+                f"Screened {screened_jobs} recommended jobs."
+                if attempted_jobs
                 else "Recommended jobs are already up to date."
             )
             with self._screening_state_lock:
@@ -1435,12 +1440,42 @@ class DashboardService:
                     "message": message,
                     "started_at": started_at.isoformat(),
                     "finished_at": datetime.now(UTC).isoformat(),
-                    "screened_jobs": summary.provider_calls,
+                    "attempted_jobs": attempted_jobs,
+                    "screened_jobs": screened_jobs,
                     "cached_jobs": summary.cached,
                     "failed_jobs": summary.failed,
+                    "provider_requests": summary.provider_calls,
+                    "input_tokens": int(getattr(summary, "input_tokens", 0)),
+                    "output_tokens": int(getattr(summary, "output_tokens", 0)),
+                    "cost_usd": str(getattr(summary, "cost_usd", "0")),
+                    "duration_seconds": duration_seconds,
+                    "average_seconds_per_attempt": (
+                        round(duration_seconds / attempted_jobs, 3) if attempted_jobs else 0.0
+                    ),
+                    "success_rate": (
+                        round(screened_jobs / attempted_jobs, 4) if attempted_jobs else 1.0
+                    ),
                     "recommended_jobs": summary.recommended,
                     "needs_review_jobs": summary.needs_review,
                 }
+            LOGGER.info(
+                "screening_backfill_completed status=%s duration_seconds=%.3f attempted_jobs=%d "
+                "screened_jobs=%d cached_jobs=%d failed_jobs=%d provider_requests=%d "
+                "input_tokens=%d output_tokens=%d cost_usd=%s recommended_jobs=%d "
+                "needs_review_jobs=%d",
+                status,
+                duration_seconds,
+                attempted_jobs,
+                screened_jobs,
+                summary.cached,
+                summary.failed,
+                summary.provider_calls,
+                int(getattr(summary, "input_tokens", 0)),
+                int(getattr(summary, "output_tokens", 0)),
+                str(getattr(summary, "cost_usd", "0")),
+                summary.recommended,
+                summary.needs_review,
+            )
         except (OSError, RuntimeError, ValueError):
             LOGGER.warning("recommendation screening backfill failed", exc_info=True)
             with self._screening_state_lock:

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import logging
+import time
 from collections import Counter
 from dataclasses import dataclass
 from decimal import Decimal
@@ -38,6 +41,8 @@ from .posting_interpretation import PostingInterpretationCache
 from .salary_estimation import SalaryEstimate, format_salary_estimate
 from .screening_service import ScreeningService, enrich_packet_from_cached_interpretation
 
+LOGGER = logging.getLogger(__name__)
+
 DEFAULT_SCREENING_OUTPUT = Path("job-search/new-job-screens.json")
 SCREENING_QUEUE_SCHEMA_VERSION = 1
 RECOMMENDED = {Recommendation.PURSUE, Recommendation.PURSUE_AS_STRETCH}
@@ -61,6 +66,8 @@ class ScreeningQueueSummary:
     active: int
     completed: int
     cached: int
+    attempted: int
+    succeeded: int
     provider_calls: int
     recommended: int
     needs_review: int
@@ -69,6 +76,12 @@ class ScreeningQueueSummary:
     input_tokens: int
     output_tokens: int
     cost_usd: Decimal
+    duration_seconds: float
+
+
+def _telemetry_job_id(job_id: object) -> str:
+    """Return a stable opaque identifier without putting source data in logs."""
+    return hashlib.sha256(str(job_id or "").encode("utf-8")).hexdigest()[:12]
 
 
 def _result_payload(result: ScreeningResult, *, cached: bool) -> dict[str, Any]:
@@ -154,6 +167,8 @@ def _priority(item: dict[str, Any]) -> tuple[int, int, int]:
 
 def _summary(
     items: list[dict[str, Any]],
+    attempted: int,
+    duration_seconds: float,
     provider_calls: int,
     input_tokens: int,
     output_tokens: int,
@@ -181,6 +196,8 @@ def _summary(
         active=len(active_items),
         completed=len(complete),
         cached=sum(bool(item["screening"].get("cached")) for item in complete),
+        attempted=attempted,
+        succeeded=max(0, attempted - statuses["failed"]),
         provider_calls=provider_calls,
         recommended=recommended,
         needs_review=needs_review,
@@ -189,6 +206,7 @@ def _summary(
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         cost_usd=cost,
+        duration_seconds=duration_seconds,
     )
 
 
@@ -207,6 +225,7 @@ def build_screening_queue(
     workspace: Path = Path("."),
 ) -> ScreeningQueueSummary:
     """Screen a complete new-job set without allowing any result to hide a job."""
+    batch_started = time.monotonic()
     if not 1 <= max_provider_jobs <= 25:
         raise ValueError("max_provider_jobs must be from 1 to 25")
     payload = json.loads(input_path.read_text(encoding="utf-8"))
@@ -267,6 +286,13 @@ def build_screening_queue(
             ),
             int(pair[1]["source_order"]),
         )
+    )
+    LOGGER.info(
+        "screening_batch_started model=%s total_jobs=%d active_jobs=%d max_provider_jobs=%d",
+        model,
+        len(prepared),
+        sum(bool(item[1]["active"]) for item in prepared),
+        max_provider_jobs,
     )
 
     items: list[dict[str, Any]] = []
@@ -331,21 +357,43 @@ def build_screening_queue(
             items.append(item)
             continue
         provider_jobs += 1
+        job_started = time.monotonic()
+        telemetry_id = _telemetry_job_id(job.get("id"))
         try:
             outcome = service.screen_detailed(packet, model=model)
         except (ModelProviderError, ValueError) as exc:
-            provider_calls += int(getattr(exc, "requests", 1))
+            requests = int(getattr(exc, "requests", 1))
+            provider_calls += requests
             item["screening"] = {
                 "status": "failed",
                 "reason": "provider_error",
                 "error_category": exc.__class__.__name__,
             }
+            LOGGER.warning(
+                "screening_job_failed job=%s duration_ms=%d requests=%d category=%s",
+                telemetry_id,
+                round((time.monotonic() - job_started) * 1000),
+                requests,
+                exc.__class__.__name__,
+            )
         else:
             provider_calls += outcome.requests
             input_tokens += outcome.input_tokens
             output_tokens += outcome.output_tokens
             total_cost += outcome.cost_usd
             item["screening"] = _result_payload(outcome.result, cached=outcome.cached)
+            LOGGER.info(
+                "screening_job_completed job=%s duration_ms=%d requests=%d "
+                "input_tokens=%d output_tokens=%d recommendation=%s fit=%s confidence=%s",
+                telemetry_id,
+                round((time.monotonic() - job_started) * 1000),
+                outcome.requests,
+                outcome.input_tokens,
+                outcome.output_tokens,
+                outcome.result.recommendation.value,
+                outcome.result.fit.value,
+                outcome.result.confidence.value,
+            )
         items.append(item)
 
     items.sort(key=lambda item: int(item["source_order"]))
@@ -360,7 +408,31 @@ def build_screening_queue(
         job_id = str(item.get("id") or "")
         if job_id in shadow_scores:
             item["shadow_personalization"] = shadow_scores[job_id]
-    summary = _summary(items, provider_calls, input_tokens, output_tokens, total_cost)
+    summary = _summary(
+        items,
+        provider_jobs,
+        time.monotonic() - batch_started,
+        provider_calls,
+        input_tokens,
+        output_tokens,
+        total_cost,
+    )
+    LOGGER.info(
+        "screening_batch_completed duration_seconds=%.3f attempted_jobs=%d succeeded_jobs=%d "
+        "cached_jobs=%d failed_jobs=%d provider_requests=%d input_tokens=%d output_tokens=%d "
+        "cost_usd=%s recommended_jobs=%d needs_review_jobs=%d",
+        summary.duration_seconds,
+        summary.attempted,
+        summary.succeeded,
+        summary.cached,
+        summary.failed,
+        summary.provider_calls,
+        summary.input_tokens,
+        summary.output_tokens,
+        summary.cost_usd,
+        summary.recommended,
+        summary.needs_review,
+    )
     output = {
         "schema_version": SCREENING_QUEUE_SCHEMA_VERSION,
         "source_generated_at": payload.get("generated_at"),

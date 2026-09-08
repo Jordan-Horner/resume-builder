@@ -80,6 +80,16 @@ tokens. Each provider attempt has a 25-second deadline and is not retried inside
 the same quick-screen job; a timeout is recorded as unresolved so later runs can
 retry it without blocking the recommendation queue.
 
+Each standalone backfill records privacy-safe operational telemetry: total batch
+duration, attempted/successful/cached/failed jobs, provider request count, token
+usage, estimated cost, recommendation totals, and average time per attempt. The
+service logs the same batch summary plus each provider attempt's duration and
+outcome under an opaque hashed job identifier. Job titles, descriptions, résumé
+text, candidate evidence, and provider response prose are never written to these
+logs. The latest aggregate metrics are also returned by
+`GET /api/jobs/screening-backfill` so administrators can tune the batch limit
+without needing container-log access.
+
 Provider output is validated against both its structural schema and the exact
 posting packet while the provider retry loop is still active. This includes
 source-unit grounding, complete criterion coverage, and evidence-citation

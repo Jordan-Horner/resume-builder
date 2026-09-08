@@ -110,10 +110,16 @@ def test_screening_backfill_rebuilds_current_inventory_without_source_refresh(
             calls.append(("screen", (root, max_jobs, input_path)))
             or SimpleNamespace(
                 failed=0,
-                provider_calls=4,
+                attempted=5,
+                succeeded=4,
+                provider_calls=5,
                 cached=6,
                 recommended=8,
                 needs_review=2,
+                input_tokens=1200,
+                output_tokens=300,
+                cost_usd="0.02",
+                duration_seconds=12.5,
             )
         ),
     )
@@ -131,7 +137,13 @@ def test_screening_backfill_rebuilds_current_inventory_without_source_refresh(
     assert not (tmp_path / "job-search/latest-refresh.json").exists()
     status = service.screening_backfill_status()
     assert status["status"] == "complete"
+    assert status["attempted_jobs"] == 5
     assert status["screened_jobs"] == 4
+    assert status["provider_requests"] == 5
+    assert status["duration_seconds"] == 12.5
+    assert status["average_seconds_per_attempt"] == 2.5
+    assert status["success_rate"] == 0.8
+    assert status["cost_usd"] == "0.02"
 
 
 def test_screening_backfill_deduplicates_overlapping_requests(

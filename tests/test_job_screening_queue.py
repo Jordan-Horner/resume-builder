@@ -155,8 +155,9 @@ def _input(path: Path, ids: list[str]) -> None:
 
 
 def test_queue_keeps_every_job_and_bounds_provider_work(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
+    caplog.set_level("INFO", logger="resume_builder.job_screening_queue")
     source = tmp_path / "new.json"
     output = tmp_path / "screens.json"
     _input(source, ["recommended", "blocked", "waiting"])
@@ -189,6 +190,8 @@ def test_queue_keeps_every_job_and_bounds_provider_work(
     assert payload["suggested_order"][0] == "recommended"
     assert summary.active == 3
     assert summary.completed == 1
+    assert summary.attempted == 1
+    assert summary.succeeded == 1
     assert summary.provider_calls == 1
     assert summary.recommended == 1
     assert summary.needs_review == 1
@@ -196,9 +199,15 @@ def test_queue_keeps_every_job_and_bounds_provider_work(
     assert summary.input_tokens == 100
     assert summary.output_tokens == 25
     assert str(summary.cost_usd) == "0.01"
+    assert summary.duration_seconds >= 0
     assert adapter.calls == 1
     assert adapter.models == ["fictional/model"]
     assert len(load_notification_jobs(output)) == 3
+    assert "screening_batch_started" in caplog.text
+    assert "screening_job_completed" in caplog.text
+    assert "screening_batch_completed" in caplog.text
+    assert "Support production operations" not in caplog.text
+    assert "Fictional Company" not in caplog.text
 
 
 def test_queue_without_authorization_uses_no_provider_and_marks_all_unknowns(
@@ -379,6 +388,8 @@ def test_provider_failure_remains_visible_and_consumes_the_attempt_budget(
     ]
     assert statuses == ["failed", "unscreened"]
     assert summary.provider_calls == 1
+    assert summary.attempted == 1
+    assert summary.succeeded == 0
     assert summary.failed == 1
     assert summary.needs_review == 2
     assert adapter.calls == 1

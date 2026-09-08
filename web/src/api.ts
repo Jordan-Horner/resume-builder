@@ -247,9 +247,17 @@ export interface ScreeningBackfillState {
   enabled: boolean;
   available: boolean;
   max_jobs: number;
+  attempted_jobs?: number;
   screened_jobs?: number;
   cached_jobs?: number;
   failed_jobs?: number;
+  provider_requests?: number;
+  input_tokens?: number;
+  output_tokens?: number;
+  cost_usd?: string;
+  duration_seconds?: number;
+  average_seconds_per_attempt?: number;
+  success_rate?: number;
   recommended_jobs?: number;
   needs_review_jobs?: number;
   started_at?: string;
