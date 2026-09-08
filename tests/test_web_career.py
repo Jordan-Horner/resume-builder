@@ -305,6 +305,46 @@ Evidence-backed resume.
     assert all("primary" not in item for item in directional["items"])
 
 
+def test_directional_resume_uses_a_compact_headline_when_plan_has_no_direction(
+    tmp_path: Path, monkeypatch
+) -> None:
+    root = _workspace(tmp_path)
+    resume = root / "resumes" / "baselines" / "forward-deployed-engineer.md"
+    resume.parent.mkdir(parents=True, exist_ok=True)
+    resume.write_text("# Resume\n", encoding="utf-8")
+    monkeypatch.setattr(
+        "resume_builder.web_career.project_report",
+        lambda *_args, **_kwargs: {
+            "resumes": [
+                {
+                    "path": "resumes/baselines/forward-deployed-engineer.md",
+                    "kind": "baseline",
+                    "direction": None,
+                }
+            ]
+        },
+    )
+    monkeypatch.setattr(
+        "resume_builder.web_career.compile_markdown",
+        lambda _text: {
+            "candidate": {
+                "headline": (
+                    "Forward Deployed Engineer | Customer Technical Delivery | Cloud & Automation"
+                )
+            }
+        },
+    )
+
+    directional = next(
+        section for section in list_resumes(root)["sections"] if section["id"] == "directional"
+    )
+
+    assert directional["items"][0]["name"] == "Forward Deployed Engineer"
+    assert directional["items"][0]["detail"] == (
+        "Customer Technical Delivery · Cloud & Automation"
+    )
+
+
 def test_portal_reader_renders_current_markdown_instead_of_old_preview(
     tmp_path: Path, monkeypatch
 ) -> None:

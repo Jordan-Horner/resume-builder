@@ -221,10 +221,23 @@ def resolve_application_resume_preview(root: Path, application_id: str) -> dict[
     raise ValueError("this preserved résumé format cannot be previewed")
 
 
-def _display_name(path: Path, payload: dict[str, Any] | None = None) -> str:
+def _headline_parts(path: Path, payload: dict[str, Any] | None = None) -> tuple[str, str | None]:
     candidate = payload.get("candidate") if isinstance(payload, dict) else None
     headline = candidate.get("headline") if isinstance(candidate, dict) else None
-    return str(headline).strip() if headline else path.stem.replace("-", " ").title()
+    parts = [part.strip() for part in str(headline).split("|") if part.strip()] if headline else []
+    if not parts:
+        return path.stem.replace("-", " ").title(), None
+    return parts[0], " · ".join(parts[1:]) or None
+
+
+def _display_name(path: Path, payload: dict[str, Any] | None = None) -> str:
+    return _headline_parts(path, payload)[0]
+
+
+def _direction_label(path: Path, direction: object) -> str:
+    """Return the role label even when a direction plan is unavailable or invalid."""
+    source = Path(direction) if isinstance(direction, str) and direction.strip() else path
+    return source.stem.replace("-", " ").title()
 
 
 def _all_evidence_ids(value: object) -> set[str]:
@@ -257,12 +270,14 @@ def list_resumes(root: Path) -> dict[str, Any]:
             error = str(exc)
         kind = "directional" if record["kind"] == "baseline" else "tailored"
         direction = record.get("direction")
+        _, headline_detail = _headline_parts(path, payload)
         detail = (
-            f"Direction · {Path(direction).stem.replace('-', ' ').title()}"
-            if kind == "directional" and direction
-            else "Reusable role direction"
-            if kind == "directional"
-            else "Minted application resume"
+            headline_detail
+            or (
+                f"Direction · {_direction_label(path, direction)}"
+                if kind == "directional"
+                else "Minted application resume"
+            )
         )
         generated[kind].append(
             {
