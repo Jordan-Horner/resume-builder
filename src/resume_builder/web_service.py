@@ -1231,9 +1231,7 @@ class DashboardService:
             raise ValueError(f"invalid hidden postings: {path}")
         if any(not isinstance(item, dict) for item in postings):
             raise ValueError(f"invalid hidden postings: {path}")
-        return [
-            {str(key): str(value) for key, value in item.items()} for item in postings
-        ]
+        return [{str(key): str(value) for key, value in item.items()} for item in postings]
 
     def hide_job(self, job_id: str, reason: object) -> dict[str, Any]:
         """Hide one posting, learning from the action only when it is not relevant."""
@@ -1246,9 +1244,7 @@ class DashboardService:
             self.record_job_feedback(job_id, "not_interested", [])
             return {"job_id": job_id, "reason": reason, "personalization_updated": True}
         with self._state_lock:
-            postings = [
-                item for item in self._hidden_postings() if item.get("job_id") != job_id
-            ]
+            postings = [item for item in self._hidden_postings() if item.get("job_id") != job_id]
             postings.append(
                 {
                     "job_id": job_id,

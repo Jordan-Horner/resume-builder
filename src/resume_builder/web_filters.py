@@ -18,17 +18,15 @@ class ViewFilters(BaseModel):
     model_config = ConfigDict(extra="forbid")
     roles: list[FilterTerm] = Field(default_factory=list, max_length=22)
     workModes: list[Literal["remote", "hybrid", "onsite"]] = Field(default_factory=list)
-    excludedWorkModes: list[Literal["remote", "hybrid", "onsite"]] = Field(
-        default_factory=list
-    )
+    excludedWorkModes: list[Literal["remote", "hybrid", "onsite"]] = Field(default_factory=list)
     country: str = Field(default="", max_length=100)
     locations: list[FilterTerm] = Field(default_factory=list, max_length=50)
     employmentTypes: list[Literal["fulltime", "parttime", "contract", "temporary"]] = Field(
         default_factory=list
     )
-    excludedEmploymentTypes: list[
-        Literal["fulltime", "parttime", "contract", "temporary"]
-    ] = Field(default_factory=list)
+    excludedEmploymentTypes: list[Literal["fulltime", "parttime", "contract", "temporary"]] = Field(
+        default_factory=list
+    )
     minimumPay: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     currency: str = Field(default="USD", pattern=r"^[A-Z]{3}$")
     period: Literal["year", "hour"] = "year"
