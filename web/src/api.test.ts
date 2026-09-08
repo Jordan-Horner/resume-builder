@@ -10,6 +10,7 @@ import {
   getScrapeSchedule,
   getScreeningBackfill,
   markJobApplied,
+  markApplicationReapplied,
   markJobNotInterested,
   screenJob,
   startScreeningBackfill,
@@ -73,6 +74,19 @@ describe("dashboard API client", () => {
     await action("job-1");
 
     expect(fetchMock).toHaveBeenCalledWith(endpoint, { method: "POST" });
+  });
+
+  it("records an explicit reapplication", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({}), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await markApplicationReapplied("APP-1");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/applications/APP-1/reapplied", { method: "POST" });
   });
 
   it("loads a saved salary estimate without requesting a new one", async () => {

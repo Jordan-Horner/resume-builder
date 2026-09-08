@@ -31,6 +31,7 @@ import yaml
 from job_puller.config import load_config as load_job_config
 
 from . import gmail_automation, jobs
+from .applications import reapplication_opportunities
 from .atomic import atomic_write_text
 from .background_screening import (
     background_screening_configured,
@@ -57,6 +58,7 @@ LOG_SUMMARY_FIELDS = {
         "screened_jobs",
         "recommended_jobs",
         "needs_review_jobs",
+        "reapplication_opportunities",
         "screening_status",
     ),
     "gmail": (
@@ -905,6 +907,38 @@ def gmail_notification(
     )
 
 
+def reapplication_notification(
+    opportunities: list[dict[str, Any]], config: NotificationConfig
+) -> Notification | None:
+    if not opportunities:
+        return None
+    identities = [
+        f"{item.get('application_id')}:{item.get('job_id')}:{item.get('kind')}"
+        for item in opportunities
+    ]
+    if config.privacy == "counts-only":
+        body = f"{len(opportunities)} previously applied job(s) may be open again."
+    else:
+        lines = []
+        for item in opportunities[: config.max_items]:
+            label = "Reopened" if item.get("kind") == "reopened" else "Possible repost"
+            url = str(item.get("url") or "")
+            link = f" — {url}" if url.startswith(("https://", "http://")) else ""
+            lines.append(f"• {label}: {item.get('role')} at {item.get('company')}{link}")
+        remaining = len(opportunities) - len(lines)
+        if remaining:
+            lines.append(f"• …and {remaining} more")
+        body = (
+            f"{len(opportunities)} previously applied job(s) may offer another chance:\n"
+            + "\n".join(lines)
+        )
+    return Notification(
+        key=_notification_key("reapplications", identities),
+        title="A job you applied to may be open again",
+        body=body,
+    )
+
+
 def failure_notification(task: str, occurred_at: datetime) -> Notification:
     """Build one generic daily health alert after repeated task failures."""
     return Notification(
@@ -966,8 +1000,10 @@ def _run_jobs(config: AutomationConfig) -> dict[str, object]:
                 "screened_jobs": 0,
                 "recommended_jobs": 0,
                 "needs_review_jobs": 0,
+                "reapplication_opportunities": 0,
                 "screening_status": "disabled",
                 "matches": [],
+                "reapplications": [],
             }
     try:
         with Path(os.devnull).open("w", encoding="utf-8") as null_stream:
@@ -991,6 +1027,7 @@ def _run_jobs(config: AutomationConfig) -> dict[str, object]:
     screened_jobs = 0
     recommended_jobs = 0
     needs_review_jobs = 0
+    workspace = jobs.DEFAULT_NEW_OUTPUT.expanduser().resolve().parent.parent
     try:
         matches = _reviewable_jobs(jobs.DEFAULT_NEW_OUTPUT)
         if config.jobs.semantic_screening_enabled:
@@ -1002,7 +1039,6 @@ def _run_jobs(config: AutomationConfig) -> dict[str, object]:
                         shortlist_code = jobs.main(["shortlist", "--limit", str(config.jobs.limit)])
                 if shortlist_code != 0:
                     raise RuntimeError("active job shortlist could not be prepared")
-                workspace = jobs.DEFAULT_NEW_OUTPUT.expanduser().resolve().parent.parent
                 queue_summary = run_background_quick_screening(
                     workspace,
                     max_jobs=config.jobs.semantic_screening_max_jobs,
@@ -1033,7 +1069,17 @@ def _run_jobs(config: AutomationConfig) -> dict[str, object]:
                 )
         else:
             needs_review_jobs = len(matches)
-    except (OSError, json.JSONDecodeError, TypeError) as exc:
+        applications_root = workspace / "applications"
+        if applications_root.is_dir():
+            database = jobs._database(jobs.DEFAULT_CONFIG)
+            reapplications = reapplication_opportunities(
+                applications_root,
+                database.active_inventory(),
+                database.possible_reposts(),
+            )
+        else:
+            reapplications = []
+    except (OSError, ValueError, json.JSONDecodeError, TypeError) as exc:
         raise TaskExecutionError("match", exc) from exc
     return {
         "exit_code": exit_code,
@@ -1043,8 +1089,10 @@ def _run_jobs(config: AutomationConfig) -> dict[str, object]:
         "screened_jobs": screened_jobs,
         "recommended_jobs": recommended_jobs,
         "needs_review_jobs": needs_review_jobs,
+        "reapplication_opportunities": len(reapplications),
         "screening_status": screening_status,
         "matches": matches,
+        "reapplications": reapplications,
     }
 
 
@@ -1136,7 +1184,11 @@ class AutomationService:
                 result = _run_jobs(self.config)
             else:
                 result = _run_gmail(self.workspace)
-            public_summary = {key: value for key, value in result.items() if key != "matches"}
+            public_summary = {
+                key: value
+                for key, value in result.items()
+                if key not in {"matches", "reapplications"}
+            }
             run_status = "partial" if result.get("refresh_status") == "partial" else "success"
             self.state.record_run(task, started, run_status, public_summary)
             raw_matches = result.get("matches", [])
@@ -1145,13 +1197,22 @@ class AutomationService:
                 if isinstance(raw_matches, list)
                 else []
             )
-            notification = (
-                job_notification(matches, self.config.notifications)
-                if task == "jobs"
-                else gmail_notification(result, self.config.notifications)
-            )
-            if notification is not None:
-                self.state.enqueue(notification)
+            if task == "jobs":
+                raw_reapplications = result.get("reapplications", [])
+                reapplications = (
+                    [item for item in raw_reapplications if isinstance(item, dict)]
+                    if isinstance(raw_reapplications, list)
+                    else []
+                )
+                notifications = (
+                    job_notification(matches, self.config.notifications),
+                    reapplication_notification(reapplications, self.config.notifications),
+                )
+            else:
+                notifications = (gmail_notification(result, self.config.notifications),)
+            for notification in notifications:
+                if notification is not None:
+                    self.state.enqueue(notification)
             summary_fields = {
                 key: public_summary[key]
                 for key in LOG_SUMMARY_FIELDS[task]

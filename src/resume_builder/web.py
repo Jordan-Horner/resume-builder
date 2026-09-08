@@ -409,6 +409,13 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         items = service.list_applications()
         return {"applications": items, "count": len(items)}
 
+    @app.post("/api/applications/{application_id}/reapplied", status_code=201)
+    def mark_reapplied(application_id: str) -> dict[str, Any]:
+        try:
+            return service.mark_reapplied(application_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
     @app.get("/api/job-sources")
     def job_sources() -> dict[str, Any]:
         try:

@@ -8,7 +8,7 @@ import json
 import re
 import sys
 from collections import Counter, defaultdict
-from collections.abc import Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
@@ -396,6 +396,90 @@ def application_job_dispositions(root: Path = DEFAULT_ROOT) -> dict[str, str]:
         if isinstance(job_id, str) and job_id.strip():
             dispositions[job_id] = str(_outcome(record)["current_status"])
     return dispositions
+
+
+def reapplication_opportunities(
+    root: Path,
+    inventory: Iterable[Mapping[str, object]],
+    possible_reposts: Iterable[Mapping[str, object]] = (),
+) -> list[dict[str, object]]:
+    """Find conservative reopen or repost signals linked to prior applications."""
+    linked: list[tuple[dict[str, Any], str]] = []
+    for _, record in iter_records(root):
+        job_id = record["application"].get("job_id")
+        if isinstance(job_id, str) and job_id.strip():
+            linked.append((record, job_id))
+    if not linked:
+        return []
+
+    attempts = Counter(job_id for _, job_id in linked)
+    latest: dict[str, dict[str, Any]] = {}
+    for record, job_id in linked:
+        current = latest.get(job_id)
+        key = (
+            str(record["application"].get("applied_on") or ""),
+            str(record["application"].get("created_at") or ""),
+        )
+        current_key = (
+            (
+                str(current["application"].get("applied_on") or ""),
+                str(current["application"].get("created_at") or ""),
+            )
+            if current
+            else ("", "")
+        )
+        if current is None or key > current_key:
+            latest[job_id] = record
+
+    active = {
+        str(item.get("id")): item
+        for item in inventory
+        if isinstance(item.get("id"), str) and item.get("id")
+    }
+    already_applied = set(latest)
+    candidates: list[dict[str, object]] = []
+
+    def add(prior_job_id: str, job: Mapping[str, object], kind: str, reason: str) -> None:
+        record = latest.get(prior_job_id)
+        if record is None or current_application_status(record) == "hired":
+            return
+        application = record["application"]
+        candidates.append(
+            {
+                "application_id": str(application["id"]),
+                "prior_job_id": prior_job_id,
+                "job_id": str(job["id"]),
+                "kind": kind,
+                "company": str(job.get("company") or application["company"]),
+                "role": str(job.get("title") or application["role"]),
+                "url": str(job.get("url") or application.get("application_url") or ""),
+                "detected_at": str(job.get("last_seen_at") or job.get("first_seen_at") or ""),
+                "reason": reason,
+            }
+        )
+
+    for job_id in latest:
+        job = active.get(job_id)
+        if job is not None and job.get("status") == "reopened" and attempts[job_id] == 1:
+            add(job_id, job, "reopened", "The previously applied posting reopened.")
+
+    for repost in possible_reposts:
+        prior_job_id = str(repost.get("earlier_job_id") or "")
+        job_id = str(repost.get("later_job_id") or "")
+        job = active.get(job_id)
+        if prior_job_id in latest and job is not None and job_id not in already_applied:
+            add(
+                prior_job_id,
+                job,
+                "possible_repost",
+                str(repost.get("reason") or "A distinct posting may be a new hiring cycle."),
+            )
+
+    return sorted(
+        candidates,
+        key=lambda item: (str(item["detected_at"]), str(item["job_id"])),
+        reverse=True,
+    )
 
 
 def validate_history(root: Path = DEFAULT_ROOT) -> dict[str, Any]:

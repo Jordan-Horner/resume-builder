@@ -344,6 +344,12 @@ Each row shows:
 - Most recent update.
 - Link back to the inventory job when available.
 
+When an applied posting reopens, or a distinct posting is conservatively linked
+as a possible repost, the row shows a persistent `Reopened` or `Possible repost`
+badge. Its detail view links to the current posting and lets the user record an
+explicit second application attempt. Deduplication continues to collapse source
+copies; it does not automatically submit or infer a reapplication.
+
 The user can filter by status and search by title or company. Selecting an
 application shows its status history in chronological order. This stays a list,
 not a drag-and-drop board.

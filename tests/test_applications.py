@@ -23,6 +23,7 @@ from resume_builder.applications import (
     main,
     migrate_dispositions,
     outcome_report,
+    reapplication_opportunities,
     record_application,
     validate_history,
 )
@@ -414,6 +415,58 @@ def test_application_history_validation_checks_current_fact_status(tmp_path: Pat
     result = validate_history(root)
     assert result["valid"] is False
     assert result["errors"] == ["cited career fact now needs review: EX-001"]
+
+
+def test_reapplication_opportunities_use_reopen_and_repost_signals(tmp_path: Path):
+    root = tmp_path / "applications"
+    original = write_application(root, tmp_path, on="2026-07-01", job_id="job-old")
+    inventory = [
+        {
+            "id": "job-old",
+            "company": "Example",
+            "title": "DevOps Engineer",
+            "status": "reopened",
+            "last_seen_at": "2026-09-01T12:00:00+00:00",
+            "url": "https://example.com/jobs/old",
+        },
+        {
+            "id": "job-new",
+            "company": "Example",
+            "title": "DevOps Engineer",
+            "status": "active",
+            "first_seen_at": "2026-09-02T12:00:00+00:00",
+            "url": "https://example.com/jobs/new",
+        },
+    ]
+
+    opportunities = reapplication_opportunities(
+        root,
+        inventory,
+        [
+            {
+                "earlier_job_id": "job-old",
+                "later_job_id": "job-new",
+                "reason": "A new posting identity appeared after the earlier role closed.",
+            }
+        ],
+    )
+
+    assert {item["kind"] for item in opportunities} == {"reopened", "possible_repost"}
+    assert {item["application_id"] for item in opportunities} == {original["application"]["id"]}
+
+
+def test_reapplication_opportunity_closes_after_second_attempt(tmp_path: Path):
+    root = tmp_path / "applications"
+    write_application(root, tmp_path, on="2026-07-01", job_id="job-old")
+    write_application(root, tmp_path, on="2026-09-01", job_id="job-old")
+
+    assert (
+        reapplication_opportunities(
+            root,
+            [{"id": "job-old", "status": "reopened"}],
+        )
+        == []
+    )
 
 
 def test_report_withholds_rates_below_sample_floor(tmp_path: Path):

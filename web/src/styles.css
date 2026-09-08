@@ -408,6 +408,8 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
 .application-summary > span:first-child { display: grid; gap: 5px; }
 .application-summary strong, .integration-copy strong { font-family: "Avenir Next", Avenir, sans-serif; font-size: 16px; }
 .application-summary small, .integration-copy small { color: var(--muted); font-size: 13px; }
+.application-statuses { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.reopened-pill { color: #e3b341; background: #3b2e16; padding: 6px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; }
 .status { font-size: 12px; padding: 6px 9px; border-radius: 999px; background: #30363d; font-weight: 700; }
 .status-interview, .status-screen_scheduled, .status-final_interview, .status-assessment { background: #3b2e16; color: #e3b341; }
 .status-offer, .status-hired { background: var(--success-soft); color: #7ee787; }
@@ -424,6 +426,11 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
 .application-resume > span { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
 .application-resume strong { font-size: 13px; }
 .application-resume small { display: block; margin-top: 4px; color: var(--muted); font-weight: 400; }
+.reapplication-actions { margin-top: 20px; padding: 16px; border: 1px solid #6e5a20; border-radius: 8px; background: #2b2516; }
+.reapplication-actions p { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+.reapplication-actions p strong { color: #e3b341; }
+.reapplication-actions a { display: inline-block; margin-right: 14px; }
+.reapplication-actions .primary-button { margin-top: 0; }
 
 .integration-summary { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto 24px; }
 .integration-icon { width: 40px; height: 40px; display: grid; place-items: center; background: var(--accent-soft); color: var(--ink); border-radius: 12px 5px 12px 5px; font-family: "Avenir Next", Avenir, sans-serif; font-weight: 700; }

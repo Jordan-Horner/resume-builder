@@ -29,6 +29,7 @@ from resume_builder.automation import (
     job_notification,
     load_config,
     next_job_run,
+    reapplication_notification,
     render_default_config,
     run_forever,
 )
@@ -264,6 +265,25 @@ def test_counts_only_notification_omits_company_and_role() -> None:
     assert "Support Engineer" not in result.body
 
 
+def test_reapplication_notification_is_specific_and_deduplicatable() -> None:
+    opportunity = {
+        "application_id": "APP-old",
+        "job_id": "job-reopened",
+        "kind": "reopened",
+        "company": "Example",
+        "role": "Support Engineer",
+        "url": "https://example.invalid/jobs/reopened",
+    }
+
+    first = reapplication_notification([opportunity], notification_config())
+    second = reapplication_notification([opportunity], notification_config())
+
+    assert first is not None
+    assert first == second
+    assert first.title == "A job you applied to may be open again"
+    assert "Reopened: Support Engineer at Example" in first.body
+
+
 def test_outbox_deduplicates_and_survives_delivery_failure(tmp_path: Path) -> None:
     state = AutomationState(tmp_path / "runtime" / "automation.sqlite")
     notification = Notification("same-event", "Update", "One change")
@@ -397,6 +417,42 @@ def test_task_history_excludes_job_match_details(tmp_path: Path) -> None:
     history = state.last_run("jobs")
     assert history is not None
     assert "matches" not in history["summary"]
+
+
+def test_job_task_enqueues_reapplication_notification_without_logging_details(
+    tmp_path: Path,
+) -> None:
+    config_path = tmp_path / "config.yml"
+    config_path.write_text(render_default_config("America/New_York"), encoding="utf-8")
+    state = AutomationState(tmp_path / "runtime" / "automation.sqlite")
+    opportunity = {
+        "application_id": "APP-old",
+        "job_id": "job-reopened",
+        "kind": "reopened",
+        "company": "Example",
+        "role": "Support Engineer",
+        "url": "https://example.invalid/jobs/reopened",
+    }
+    service = AutomationService(
+        workspace=tmp_path,
+        config=load_config(config_path),
+        state=state,
+        job_runner=lambda: {
+            "reapplication_opportunities": 1,
+            "matches": [],
+            "reapplications": [opportunity],
+        },
+    )
+
+    assert service.run_task("jobs") is True
+
+    assert [item.title for item in state.pending_notifications()] == [
+        "A job you applied to may be open again"
+    ]
+    history = state.last_run("jobs")
+    assert history is not None
+    assert history["summary"]["reapplication_opportunities"] == 1
+    assert "reapplications" not in history["summary"]
 
 
 def test_task_logs_privacy_safe_start_and_summary(

@@ -9,6 +9,7 @@ import yaml
 
 from resume_builder import web_service
 from resume_builder.agent_config import DEFAULT_AGENT_CONFIG, render_default_agent_config
+from resume_builder.applications import record_application
 from resume_builder.job_screening import (
     Confidence,
     build_screening_packet,
@@ -1368,6 +1369,32 @@ def test_application_projection_includes_current_status_and_history(tmp_path, mo
 
     assert projected["current_status"] == "interview"
     assert projected["events"][0]["stage"] == "Hiring manager"
+
+
+def test_reopened_application_is_flagged_and_can_be_recorded_again(tmp_path):
+    raw = {**job("remote-1", title="Support Engineer", mode="remote"), "status": "reopened"}
+    record_application(
+        tmp_path / "applications",
+        tmp_path,
+        company="Example",
+        role="Support Engineer",
+        job_id="remote-1",
+        application_url=raw["url"],
+        applied_on="2026-08-01",
+    )
+    service = DashboardService(tmp_path, inventory_loader=lambda: [raw])
+    application = service.list_applications()[0]
+
+    assert application["reapplication"]["kind"] == "reopened"
+
+    repeated = service.mark_reapplied(application["id"])
+
+    assert repeated["application"]["job_id"] == "remote-1"
+    assert repeated["events"][0]["note"] == (
+        "Reapplication to a posting flagged as reopened or reposted."
+    )
+    assert len(service.list_applications()) == 2
+    assert all(item["reapplication"] is None for item in service.list_applications())
 
 
 def _fresh_workspace(tmp_path):

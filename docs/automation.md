@@ -214,6 +214,15 @@ the generated configuration. Interview, assessment, offer, and repeated-failure
 alerts are high priority and are delivered immediately. Edit or remove
 `notifications.quiet_hours` to change that behavior.
 
+After a job refresh, the scheduler also checks prior applications against the
+inventory's existing high-confidence lifecycle signals. It sends one routine,
+deduplicated notification when the same canonical posting transitions to
+`reopened`, or when the conservative repost report links a distinct new posting
+to a closed job that was previously applied to. Ordinary cross-source merges,
+LinkedIn-to-ATS resolution, and posting refreshes do not create reapplication
+notifications. The Applications page keeps the opportunity visible until the
+user records another application attempt.
+
 The external automation database retains sanitized run summaries and a
 content-limited notification outbox. The outbox may contain the same structured
 company, role, and URL fields chosen for a summary notification, but never Gmail

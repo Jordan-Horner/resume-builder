@@ -182,6 +182,19 @@ export interface Application {
   events: ApplicationEvent[];
   resume: ApplicationResume | null;
   resume_attribution: "tailored" | "directional" | "not_recorded";
+  reapplication: ReapplicationOpportunity | null;
+}
+
+export interface ReapplicationOpportunity {
+  application_id: string;
+  prior_job_id: string;
+  job_id: string;
+  kind: "reopened" | "possible_repost";
+  company: string;
+  role: string;
+  url: string;
+  detected_at: string;
+  reason: string;
 }
 
 export interface ApplicationResume {

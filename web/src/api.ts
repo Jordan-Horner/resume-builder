@@ -90,6 +90,10 @@ export async function getApplications(): Promise<Application[]> {
   return payload.applications;
 }
 
+export function markApplicationReapplied(applicationId: string): Promise<unknown> {
+  return request(`/api/applications/${encodeURIComponent(applicationId)}/reapplied`, { method: "POST" });
+}
+
 export async function getIntegrations(): Promise<Integration[]> {
   const payload = await request<{ integrations: Integration[] }>("/api/integrations");
   return payload.integrations;

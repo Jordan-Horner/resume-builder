@@ -31,7 +31,12 @@ from job_puller.normalize import normalized_key
 from .agent_config import DEFAULT_AGENT_CONFIG, load_agent_config, render_default_agent_config
 from .agent_contracts import ModelProviderError
 from .agent_openrouter import OpenRouterAdapter
-from .applications import current_application_status, iter_records, record_application
+from .applications import (
+    current_application_status,
+    iter_records,
+    reapplication_opportunities,
+    record_application,
+)
 from .atomic import atomic_write_json, atomic_write_text
 from .discovery_activation import MANAGED_FAMILY_PREFIX, preview_activation
 from .discovery_evidence import (
@@ -1099,6 +1104,9 @@ class DashboardService:
         }
 
     def _load_inventory(self) -> list[dict[str, Any]]:
+        return self._inventory_database().active_inventory()
+
+    def _inventory_database(self) -> InventoryDatabase:
         config_path = self.workspace / JOBS_CONFIG
         config = load_config(config_path)
         database = InventoryDatabase(
@@ -1106,7 +1114,20 @@ class DashboardService:
             config.raw_payload_retention_days,
         )
         database.migrate()
-        return database.active_inventory()
+        return database
+
+    def _reapplication_opportunities(self) -> list[dict[str, object]]:
+        inventory = self._inventory_loader()
+        reposts = (
+            self._inventory_database().possible_reposts()
+            if (self.workspace / JOBS_CONFIG).is_file()
+            else []
+        )
+        return reapplication_opportunities(
+            self.workspace / APPLICATIONS_ROOT,
+            inventory,
+            reposts,
+        )
 
     def _dismissed_job_ids(self) -> set[str]:
         path = self.workspace / STATE_PATH
@@ -2226,39 +2247,68 @@ class DashboardService:
         job = self.get_job(job_id)
         if job is None:
             raise ValueError(f"job not found: {job_id}")
-        screening = self._feedback_screen_snapshot(job_id)
         with self._state_lock:
             for _, record in iter_records(self.workspace / APPLICATIONS_ROOT):
                 if str(record["application"].get("job_id")) == job_id:
                     return record
-            recommendation = self.job_resume_recommendation(job_id)
-            resume_record = recommendation.get("recommended_resume")
-            resume_path = (
-                self.workspace / resume_record["id"] if isinstance(resume_record, dict) else None
+            return self._record_job_application(job)
+
+    def mark_reapplied(self, application_id: str) -> dict[str, Any]:
+        opportunity = next(
+            (
+                item
+                for item in self._reapplication_opportunities()
+                if item["application_id"] == application_id
+            ),
+            None,
+        )
+        if opportunity is None:
+            raise ValueError(
+                f"application has no current reapplication opportunity: {application_id}"
             )
-            target_value = recommendation.get("target")
-            report_value = recommendation.get("match_report")
-            match_value = recommendation.get("match")
-            record = record_application(
-                self.workspace / APPLICATIONS_ROOT,
-                self.workspace,
-                company=job["company"],
-                role=job["title"],
-                job_id=job_id,
-                application_url=job["url"],
-                resume=resume_path,
-                target=self.workspace / target_value if isinstance(target_value, str) else None,
-                match_report=self.workspace / report_value
-                if isinstance(report_value, str)
-                else None,
-                match_classification=(
-                    match_value.get("label") if isinstance(match_value, dict) else None
-                ),
+        job = self.get_job(str(opportunity["job_id"]))
+        if job is None:
+            raise ValueError(f"reopened job not found: {opportunity['job_id']}")
+        with self._state_lock:
+            return self._record_job_application(
+                job,
+                note="Reapplication to a posting flagged as reopened or reposted.",
             )
-            self._append_feedback_event(job, "applied", [], screening)
-            return record
+
+    def _record_job_application(
+        self, job: dict[str, Any], *, note: str | None = None
+    ) -> dict[str, Any]:
+        job_id = str(job["id"])
+        recommendation = self.job_resume_recommendation(job_id)
+        resume_record = recommendation.get("recommended_resume")
+        resume_path = (
+            self.workspace / resume_record["id"] if isinstance(resume_record, dict) else None
+        )
+        target_value = recommendation.get("target")
+        report_value = recommendation.get("match_report")
+        match_value = recommendation.get("match")
+        record = record_application(
+            self.workspace / APPLICATIONS_ROOT,
+            self.workspace,
+            company=job["company"],
+            role=job["title"],
+            job_id=job_id,
+            application_url=job["url"],
+            resume=resume_path,
+            target=self.workspace / target_value if isinstance(target_value, str) else None,
+            match_report=self.workspace / report_value if isinstance(report_value, str) else None,
+            match_classification=(
+                match_value.get("label") if isinstance(match_value, dict) else None
+            ),
+            note=note,
+        )
+        self._append_feedback_event(job, "applied", [], self._feedback_screen_snapshot(job_id))
+        return record
 
     def list_applications(self) -> list[dict[str, Any]]:
+        opportunities: dict[str, dict[str, object]] = {}
+        for item in self._reapplication_opportunities():
+            opportunities.setdefault(str(item["application_id"]), item)
         applications: list[dict[str, Any]] = []
         for _, record in iter_records(self.workspace / APPLICATIONS_ROOT):
             application = record["application"]
@@ -2280,6 +2330,7 @@ class DashboardService:
                     "applied_on": application["applied_on"],
                     "created_at": application["created_at"],
                     "current_status": current_application_status(record),
+                    "reapplication": opportunities.get(str(application["id"])),
                     "resume": self._application_resume_view(
                         application.get("resume"), application["id"]
                     ),
