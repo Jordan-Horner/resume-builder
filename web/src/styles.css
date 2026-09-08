@@ -15,7 +15,8 @@
 @media (max-width: 600px) { .about-details > div { grid-template-columns: 1fr; gap: 6px; } }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; }
+html { min-height: 100%; background: var(--header-background); }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--page-background); }
 button, input, select { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 button { color: inherit; }
@@ -151,8 +152,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   align-items: center;
   justify-content: space-between;
   padding: 0 clamp(20px, 5vw, 72px);
-  background: #010409;
-  backdrop-filter: blur(14px);
+  background: var(--header-background);
   position: sticky;
   top: 0;
   z-index: 20;
@@ -160,7 +160,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .brand { border: 0; background: none; color: inherit; display: flex; align-items: center; gap: 9px; cursor: pointer; padding: 4px; font-family: "Avenir Next", Avenir, sans-serif; font-weight: 700; font-size: 15px; text-decoration: none; }
 .brand-mark { width: 30px; height: 30px; border-radius: 8px 3px 8px 3px; background: var(--accent-soft); color: var(--ink); display: grid; place-items: center; font-size: 10px; letter-spacing: .06em; }
 .topbar nav { display: flex; align-self: stretch; gap: 22px; }
-.nav-link { border: 0; border-bottom: 2px solid transparent; background: none; cursor: pointer; padding: 2px 1px 0; color: var(--muted); font-size: 13px; font-weight: 600; text-decoration: none; }
+.nav-link { border: 0; border-bottom: 2px solid transparent; background: none; cursor: pointer; padding: 2px 1px 0; color: var(--muted); display: inline-flex; align-items: center; font-size: 13px; font-weight: 600; text-decoration: none; }
 .nav-link:hover { color: var(--ink); }
 .nav-link.active { color: var(--ink); border-color: var(--accent); }
 
@@ -268,7 +268,7 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
 .notice-dismiss:hover { background: #ffffff12; opacity: 1; }
 
 @media (min-width: 901px) {
-  .app-shell:has(.jobs-page) { height: 100vh; display: flex; flex-direction: column; }
+  .app-shell:has(.jobs-page) { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; overscroll-behavior: none; }
   .app-shell:has(.jobs-page) > .topbar { flex-shrink: 0; }
   .app-shell:has(.jobs-page) > main { flex: 1; min-height: 0; }
   .jobs-page {
