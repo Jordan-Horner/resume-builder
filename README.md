@@ -20,10 +20,11 @@ phrase information, but it cannot silently invent career facts, strengthen
 authorship, discard opportunities, or take consequential actions on the user's
 behalf.
 
-> **Project status:** The resume lifecycle, multi-source job discovery, local
-> portal, AI-assisted screening, Gmail tracking, scheduled automation, and
-> private Telegram access are implemented. Automatic job submission is
-> intentionally out of scope today.
+[![Resume Builder portal showing enriched job discovery, evidence-based screening, resume matching, and the career assistant](docs/assets/portal-job-screen.png)](docs/assets/portal-job-screen.png)
+
+*The portal combines enriched job discovery, evidence-cited screening, resume
+matching, and context-aware career assistance. This demonstration uses public
+job-posting data with fictional career evidence.*
 
 ## Capabilities
 

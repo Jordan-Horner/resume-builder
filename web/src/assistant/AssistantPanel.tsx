@@ -58,6 +58,11 @@ function ConversationView({ initial, changed, open }: { initial: Conversation; c
   const submitting = useRef(false);
   const stopAllowedAt = useRef(0);
   const running = sending || thread.runs.some((run) => run.status === "running");
+  const composerPlaceholder = thread.job_id
+    ? "Ask about this job…"
+    : thread.resume_id
+      ? "Ask about this résumé…"
+      : "Ask about your career workspace…";
 
   useEffect(() => {
     if (!open || document.hidden) return;
@@ -132,7 +137,7 @@ function ConversationView({ initial, changed, open }: { initial: Conversation; c
     <form className="assistant-composer" onSubmit={(event) => { event.preventDefault(); void send(); }}>
       {error && <p className="error-text" role="alert">{error}</p>}
       <label className="sr-only" htmlFor="assistant-message">Message the assistant</label>
-      <textarea id="assistant-message" value={input} maxLength={12000} placeholder="Ask about your résumé…" rows={3} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => {
+      <textarea id="assistant-message" value={input} maxLength={12000} placeholder={composerPlaceholder} rows={3} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => {
         if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); }
       }} />
       <div className="assistant-compose-footer"><small>Changes stay in your control</small>{running ? <button className="secondary-button" type="button" onClick={() => void stop()}>Stop</button> : <button className="primary-button" disabled={!input.trim()}>Send</button>}</div>

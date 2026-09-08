@@ -106,6 +106,7 @@ it("automatically switches to the visible job context", async () => {
   });
   expect(host.textContent).toContain("Working on job");
   expect(host.textContent).toContain("Application Support Specialist at Sirona Medical");
+  expect(host.querySelector("textarea")?.placeholder).toBe("Ask about this job…");
   expect(host.textContent).not.toContain("Switching to");
   expect(host.textContent).not.toContain("Discuss this job");
 });
