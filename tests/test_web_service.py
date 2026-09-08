@@ -735,9 +735,7 @@ def test_lightweight_job_rows_are_reused_until_workspace_state_changes(
     assert loads == 2
 
 
-def test_lightweight_job_rows_normalize_equivalent_view_filters(
-    tmp_path, inventory, monkeypatch
-):
+def test_lightweight_job_rows_normalize_equivalent_view_filters(tmp_path, inventory, monkeypatch):
     monkeypatch.setattr(web_service, "iter_records", lambda _root: [])
     loads = 0
 
@@ -750,9 +748,7 @@ def test_lightweight_job_rows_normalize_equivalent_view_filters(
     monkeypatch.setattr(service, "_job_rows_revision", lambda: ())
 
     first = service.list_job_rows(view_filters='{"country":"United States"}')
-    second = service.list_job_rows(
-        view_filters='{"country": "United States", "roles": []}'
-    )
+    second = service.list_job_rows(view_filters='{"country": "United States", "roles": []}')
 
     assert first == second
     assert loads == 1

@@ -134,11 +134,7 @@ def _company_recognition(
     company: str = "",
     company_tags: dict[str, set[str]] | None = None,
 ) -> dict[str, object] | None:
-    tags = {
-        tag
-        for identity in provider_boards
-        for tag in board_tags.get(str(identity), set())
-    }
+    tags = {tag for identity in provider_boards for tag in board_tags.get(str(identity), set())}
     if company_tags:
         tags.update(company_tags.get(normalized_key(company), set()))
     major_employer = any(tag.startswith(MAJOR_EMPLOYER_TAG_PREFIXES) for tag in tags)
@@ -150,6 +146,8 @@ def _company_recognition(
         "top_workplace": top_workplace,
         "sources": sorted(tag for tag in tags if tag != "recognized-employer"),
     }
+
+
 EMPLOYMENT_TYPES = frozenset({"fulltime", "parttime", "contract", "temporary"})
 ONBOARDING_STATE_PATH = Path("job-search/web-onboarding.json")
 MAX_RESUME_BYTES = 10 * 1024 * 1024
