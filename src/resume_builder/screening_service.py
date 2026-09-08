@@ -18,6 +18,7 @@ from .agent_contracts import (
 from .job_screening import (
     SCREENING_INSTRUCTIONS,
     EligibilityStatus,
+    PostingWideSemanticScreen,
     ScreeningCache,
     ScreeningPacket,
     ScreeningResult,
@@ -281,7 +282,11 @@ class ScreeningService:
                     prompt=screening_prompt(packet),
                     instructions=SCREENING_INSTRUCTIONS,
                     model=model,
-                    output_type=SemanticScreen,
+                    output_type=(
+                        SemanticScreen
+                        if packet.criterion_evidence
+                        else PostingWideSemanticScreen
+                    ),
                     max_output_tokens=800,
                 )
             )

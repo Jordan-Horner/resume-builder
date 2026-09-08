@@ -9,6 +9,7 @@ import pytest
 
 from resume_builder.agent_contracts import StructuredModelReply, StructuredModelRequest
 from resume_builder.job_screening import (
+    SCREENING_INSTRUCTIONS,
     CandidateScreeningProfile,
     Confidence,
     ConstraintState,
@@ -16,6 +17,7 @@ from resume_builder.job_screening import (
     CriterionAssessmentOutcome,
     EligibilityStatus,
     FitOutcome,
+    PostingWideSemanticScreen,
     Recommendation,
     ScreeningCache,
     ScreeningPacket,
@@ -342,8 +344,13 @@ def test_screening_prompt_contains_only_fit_inputs() -> None:
     assert "url" not in payload["job"]
     assert "preferred_job_attributes" not in json.dumps(payload)
     assert "keyword_readiness" not in json.dumps(payload)
+    assert "criterion_assessments must be an empty list" in SCREENING_INSTRUCTIONS
     assert "salary_estimate" not in SemanticScreen.model_json_schema()["properties"]
     assert "preference_assessments" not in SemanticScreen.model_json_schema()["properties"]
+    assert (
+        "criterion_assessments"
+        not in PostingWideSemanticScreen.model_json_schema()["properties"]
+    )
 
 
 class FakeStructuredAdapter:
@@ -544,14 +551,21 @@ def test_insufficient_fit_cannot_claim_high_confidence() -> None:
 
 
 def test_semantic_screen_rejects_claiming_candidate_absence_from_missing_evidence() -> None:
-    with pytest.raises(ValueError, match="missing supplied evidence"):
-        SemanticScreen(
-            fit=FitOutcome.WEAK_FIT,
-            confidence=Confidence.LOW,
-            gaps=["The candidate lacks Kubernetes experience."],
-            unknowns=[],
-            reasoning_summary="The supplied evidence did not establish the required experience.",
-        )
+    for unsupported_gap in (
+        "The candidate lacks Kubernetes experience.",
+        "No demonstrated experience with Kubernetes.",
+        "No evidence of Kubernetes operations.",
+    ):
+        with pytest.raises(ValueError, match="missing supplied evidence"):
+            SemanticScreen(
+                fit=FitOutcome.WEAK_FIT,
+                confidence=Confidence.LOW,
+                gaps=[unsupported_gap],
+                unknowns=[],
+                reasoning_summary=(
+                    "The supplied evidence did not establish the required experience."
+                ),
+            )
 
 
 def test_screening_rejects_supporting_facts_outside_the_packet() -> None:

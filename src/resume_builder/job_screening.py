@@ -20,6 +20,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from pydantic.json_schema import SkipJsonSchema
 
 from job_puller.locations import location_key, matches_search_location, matching_location_terms
 
@@ -232,11 +233,21 @@ class SemanticScreen(StrictModel):
     @model_validator(mode="after")
     def validate_stretch_explanation(self) -> SemanticScreen:
         unsupported_absence = re.compile(
-            r"\b(?:candidate|applicant)\s+(?:lacks?|does not have|has no)\b", re.IGNORECASE
+            r"(?:\b(?:candidate|applicant)\s+(?:lacks?|does not have|has no)\b|"
+            r"^no\s+(?:demonstrated\s+|direct\s+)?(?:experience|evidence)\b)",
+            re.IGNORECASE,
         )
         if any(unsupported_absence.search(gap) for gap in self.gaps):
             raise ValueError("gaps must describe missing supplied evidence, not candidate absence")
         return self
+
+
+class PostingWideSemanticScreen(SemanticScreen):
+    """Provider schema for screens that have no extracted criteria to assess."""
+
+    criterion_assessments: SkipJsonSchema[list[CriterionAssessment]] = Field(
+        default_factory=list, max_length=0
+    )
 
 
 class ScreeningResult(StrictModel):
@@ -833,9 +844,13 @@ Judge career fit only; do not decide eligibility and do not override determinist
 Candidate evidence cards are the only proof of candidate capabilities. Job-description terms are
 navigation signals, never candidate evidence. For posting-wide screens, return up to five supplied
 fact_ids in supporting_fact_ids. Do not return an ID that is not supplied.
+Describe every gap as something the supplied evidence does not establish. Never say the candidate
+has no experience, lacks experience, or has no evidence; bounded retrieval cannot prove absence.
 When criterion_evidence is present, evaluate those criteria rather than rediscovering the role shape.
 Leave supporting_fact_ids empty for criterion-driven screens; criterion assessments already carry
 their supporting fact IDs.
+When criterion_evidence is empty, criterion_assessments must be an empty list. Do not invent or
+rediscover criteria; return only the overall fit and up to five supporting_fact_ids.
 Return exactly one criterion_assessment for every criterion whose status is not
 not-resume-evaluable. Use only these outcomes: supported, partially_supported, transferable,
 unknown, or apparent_gap. Cite no more than three fact_ids and only facts retrieved for that
