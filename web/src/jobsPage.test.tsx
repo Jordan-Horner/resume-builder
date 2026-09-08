@@ -10,7 +10,7 @@ import type { Job } from "./types";
 vi.mock("./api", () => ({
   getJobFilterDefaults: vi.fn(), getSearchPreferences: vi.fn(), getBlockedCompanies: vi.fn(), getJob: vi.fn(),
   getJobs: vi.fn(), getResumeRecommendation: vi.fn(), markJobApplied: vi.fn(),
-  markJobNotInterested: vi.fn(), setCompanyBlocked: vi.fn(), activateJobSearch: vi.fn(),
+  hideJobPosting: vi.fn(), markJobNotInterested: vi.fn(), setCompanyBlocked: vi.fn(), activateJobSearch: vi.fn(),
   getJobSources: vi.fn(), startJobScan: vi.fn(), estimateJobSalary: vi.fn(),
   getSavedJobSalary: vi.fn(),
   getSavedJobScreen: vi.fn(), getJobScreenStatus: vi.fn(), screenJob: vi.fn(),
@@ -33,6 +33,7 @@ beforeEach(() => {
   vi.mocked(api.getResumeRecommendation).mockResolvedValue({ status: "unavailable", recommended_resume: null, match: null, target: null, message: "None" });
   vi.mocked(api.getJobs).mockResolvedValue({ jobs: [job], count: 1, reviewable_count: 1 });
   vi.mocked(api.markJobApplied).mockResolvedValue({});
+  vi.mocked(api.hideJobPosting).mockResolvedValue({ job_id: "one", reason: "closed", personalization_updated: false });
   vi.mocked(api.getSavedJobSalary).mockResolvedValue(null);
   vi.mocked(api.getSavedJobScreen).mockResolvedValue(null);
   vi.mocked(api.getJobScreenStatus).mockResolvedValue({ status: "idle", job_id: "one" });
@@ -51,10 +52,15 @@ async function openJob() {
   await act(async () => root.render(<JobsPage />));
   await act(async () => (host.querySelector(".job-row") as HTMLButtonElement).click());
 }
-it.each(["Mark as applied", "Not interested"])("refreshes the final-job state after %s", async (action) => {
+async function hidePosting(reason = "Posting is closed") {
+  await click("Hide posting");
+  await click(reason);
+}
+it.each(["applied", "hidden"])("refreshes the final-job state after a job is %s", async (action) => {
   await openJob();
   vi.mocked(api.getJobs).mockResolvedValue({ jobs: [], count: 0, reviewable_count: 0 });
-  await click(action);
+  if (action === "applied") await click("Mark as applied");
+  else await hidePosting();
   expect(host.textContent).toContain("Build your job queue");
   expect(host.textContent).not.toContain("hidden by your current filters");
   expect(api.getJobFilterDefaults).toHaveBeenCalledTimes(1);
@@ -62,7 +68,7 @@ it.each(["Mark as applied", "Not interested"])("refreshes the final-job state af
 it("refills the page from the backend after removing a result", async () => {
   await openJob();
   vi.mocked(api.getJobs).mockResolvedValue({ jobs: [{ ...job, id: "two", title: "Platform Engineer" }], count: 101, reviewable_count: 101 });
-  await click("Not interested");
+  await hidePosting();
   expect(host.textContent).toContain("Platform Engineer");
   expect(host.textContent).toContain("101 jobs to review");
   expect(document.activeElement).toBe(host.querySelector(".job-row"));
@@ -75,12 +81,34 @@ it("keeps remaining jobs visible while refreshing after a dismissal", async () =
   let finishRefresh!: (payload: { jobs: Job[]; count: number; reviewable_count: number }) => void;
   vi.mocked(api.getJobs).mockImplementationOnce(() => new Promise((resolve) => { finishRefresh = resolve; }));
 
-  await click("Not interested");
+  await hidePosting();
 
   expect(host.textContent).toContain("Platform Engineer");
   expect([...host.querySelectorAll(".job-row")].some((row) => row.textContent?.includes("Support Engineer"))).toBe(false);
   expect(host.querySelector(".loading-rows")).toBeNull();
   await act(async () => finishRefresh({ jobs: [remainingJob], count: 1, reviewable_count: 1 }));
+});
+
+it("keeps unavailable-posting cleanup out of recommendation feedback", async () => {
+  await openJob();
+
+  await click("Hide posting");
+
+  expect(host.textContent).toContain("Only “Not interested” changes future recommendations.");
+  await click("Posting is closed");
+  expect(api.hideJobPosting).toHaveBeenCalledWith("one", "closed");
+  expect(api.saveJobFeedback).not.toHaveBeenCalledWith("one", "not_interested", []);
+  expect(host.textContent).toContain("Similar roles will still be recommended");
+});
+
+it("labels an explicit fit rejection as recommendation feedback", async () => {
+  vi.mocked(api.hideJobPosting).mockResolvedValue({ job_id: "one", reason: "not_relevant", personalization_updated: true });
+  await openJob();
+
+  await hidePosting("Not interested");
+
+  expect(api.hideJobPosting).toHaveBeenCalledWith("one", "not_relevant");
+  expect(host.textContent).toContain("Recommendations will use this feedback");
 });
 
 it("records interested feedback without asking the user to classify it", async () => {

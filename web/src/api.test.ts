@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getJobs,
+  hideJobPosting,
   getJobScreenStatus,
   estimateJobSalary,
   getSavedJobSalary,
@@ -87,6 +88,23 @@ describe("dashboard API client", () => {
     await markApplicationReapplied("APP-1");
 
     expect(fetchMock).toHaveBeenCalledWith("/api/applications/APP-1/reapplied", { method: "POST" });
+  });
+
+  it("sends a posting-hide reason separately from preference feedback", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ job_id: "job-1", reason: "closed", personalization_updated: false }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await hideJobPosting("job-1", "closed");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/jobs/job-1/hide", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: "closed" }),
+    });
   });
 
   it("loads a saved salary estimate without requesting a new one", async () => {

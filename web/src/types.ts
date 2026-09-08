@@ -126,6 +126,12 @@ export type JobScreenState = JobScreenResult | JobScreenProgress;
 
 export type JobFeedbackAction = "interested" | "not_interested";
 export type JobFeedbackReason = "company" | "compensation" | "customer_facing" | "day_to_day" | "location" | "on_call" | "phone_support" | "role" | "seniority" | "travel" | "work_mode";
+export type JobHideReason = "closed" | "duplicate" | "not_relevant";
+export interface HiddenJobResult {
+  job_id: string;
+  reason: JobHideReason;
+  personalization_updated: boolean;
+}
 export interface JobFeedback {
   job_id: string;
   latest: { action: "interested" | "not_interested" | "applied"; reasons: JobFeedbackReason[]; created_at: string } | null;

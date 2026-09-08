@@ -202,8 +202,10 @@ Good or Strong fit with at least medium confidence; other completed screens retu
 **All jobs**. Provider failures do not empty the deterministic backlog. **Interested jobs** contains explicit
 positive decisions that have not become applications, and **All jobs** remains the
 complete reviewable inventory. Marking a recommendation Interested moves it from
-Recommended Jobs to Interested jobs; applying or dismissing it removes it from
-both active queues. Current feedback and the current screening cache are combined
+Recommended Jobs to Interested jobs; applying or hiding it removes it from
+both active queues. Closed and duplicate hides remain neutral;
+only an explicit `Not interested` hide records negative preference feedback.
+Current feedback and the current screening cache are combined
 at request time, so these transitions never wait for the next scheduled artifact
 refresh. A decision also schedules the same bounded worker to continue screening;
 the Settings portal can start that worker directly against the current inventory.

@@ -408,6 +408,17 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
+    @app.post("/api/jobs/{job_id}/hide")
+    def hide_job_posting(
+        job_id: str, payload: dict[str, Any], background_tasks: BackgroundTasks
+    ) -> dict[str, Any]:
+        try:
+            result = service.hide_job(job_id, payload.get("reason"))
+            background_tasks.add_task(service.replenish_recommendations)
+            return result
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     @app.post("/api/jobs/{job_id}/applied", status_code=201)
     def mark_applied(job_id: str, background_tasks: BackgroundTasks) -> dict[str, Any]:
         try:

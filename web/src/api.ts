@@ -1,4 +1,4 @@
-import type { Application, GmailSetup, Integration, Job, JobFeedback, JobFeedbackAction, JobFeedbackReason, JobFilters, JobScreenResult, JobScreenState, OnboardingStatus, ResumeLibrary, ResumeRecommendation, SalaryEstimateResult, SearchPreferences, TelegramPairing } from "./types";
+import type { Application, GmailSetup, HiddenJobResult, Integration, Job, JobFeedback, JobFeedbackAction, JobFeedbackReason, JobFilters, JobHideReason, JobScreenResult, JobScreenState, OnboardingStatus, ResumeLibrary, ResumeRecommendation, SalaryEstimateResult, SearchPreferences, TelegramPairing } from "./types";
 
 export interface UpdateStatus {
   version: string;
@@ -55,6 +55,14 @@ export function getJob(jobId: string, signal?: AbortSignal): Promise<Job> {
 
 export function markJobNotInterested(jobId: string): Promise<JobFeedback> {
   return request(`/api/jobs/${encodeURIComponent(jobId)}/not-interested`, { method: "POST" });
+}
+
+export function hideJobPosting(jobId: string, reason: JobHideReason): Promise<HiddenJobResult> {
+  return request(`/api/jobs/${encodeURIComponent(jobId)}/hide`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason }),
+  });
 }
 
 export function getJobFeedback(jobId: string): Promise<JobFeedback> {

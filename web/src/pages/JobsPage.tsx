@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   activateJobSearch, getBlockedCompanies, getJobFilterDefaults, getJobs, getJobSources,
-  getScrapeSchedule, getSearchPreferences, markJobApplied, saveJobFeedback, setCompanyBlocked,
+  getScrapeSchedule, getSearchPreferences, hideJobPosting, markJobApplied, saveJobFeedback, setCompanyBlocked,
   startJobScan,
 } from "../api";
 import { EmptyState, ErrorMessage, LoadingRows, SearchField } from "../components";
@@ -10,7 +10,7 @@ import { JobDetailPanel } from "../jobs/JobDetailPanel";
 import { formatCompactCurrency, formatWorkModes } from "../jobs/jobFormatters";
 import { JobRow } from "../jobs/JobRow";
 import { useAssistant } from "../assistant/AssistantProvider";
-import type { Job, JobFeedback, JobFeedbackAction, JobFilters, JobScreenResult, SearchPreferences, ViewFilters } from "../types";
+import type { Job, JobFeedback, JobFeedbackAction, JobFilters, JobHideReason, JobScreenResult, SearchPreferences, ViewFilters } from "../types";
 import { EMPTY_FILTERS, persistView, restoreView } from "../viewPreferences";
 
 const DATE_FILTERS = [
@@ -66,7 +66,7 @@ export function JobsPage() {
   const [queueError, setQueueError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [queueRevision, setQueueRevision] = useState(0);
-  const [pendingAction, setPendingAction] = useState<JobFeedbackAction | "applied" | null>(null);
+  const [pendingAction, setPendingAction] = useState<JobFeedbackAction | "applied" | "hide" | null>(null);
   const [notice, setNotice] = useState("");
   const [queueView, setQueueView] = useState<JobQueue>("recommended");
   const [recommendationStage, setRecommendationStage] = useState<"idle" | "searching" | "screening">("idle");
@@ -366,6 +366,26 @@ export function JobsPage() {
     } finally { setPendingAction(null); }
   }
 
+  async function hideSelected(reason: JobHideReason): Promise<void> {
+    if (!selected || pendingAction || companyBusy) return;
+    const job = selected;
+    setPendingAction("hide"); setError("");
+    try {
+      const result = await hideJobPosting(job.id, reason);
+      focusQueueAfterRefresh.current = true;
+      removeVisibleJob(job.id, true);
+      silentQueueRefresh.current = true;
+      setQueueRefreshing(true);
+      setQueueRevision((value) => value + 1);
+      setSelected(null);
+      setNotice(result.personalization_updated
+        ? `${job.title} hidden. Recommendations will use this feedback.`
+        : `${job.title} hidden. Similar roles will still be recommended.`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not hide this posting");
+    } finally { setPendingAction(null); }
+  }
+
   const emptyState = searchPreferences?.status === "ready_to_activate"
     ? { title: "Finish setting up your search", message: "Activate your saved roles before searching.", actions: <button className="primary-button" onClick={() => void finishSetup()}>Finish setup</button> }
     : reviewableTotal === 0
@@ -438,7 +458,7 @@ export function JobsPage() {
           </>}
         </section>
 
-        {selected && <JobDetailPanel job={selected} companyBlocked={selectedCompanyBlocked} companyBusy={companyBusy} pendingAction={pendingAction} queueLoading={loading} onClose={closeJob} onChangeCompany={changeCompany} onDisposition={dispositionSelected} onScreened={updateQuickScreen} />}
+        {selected && <JobDetailPanel job={selected} companyBlocked={selectedCompanyBlocked} companyBusy={companyBusy} pendingAction={pendingAction} queueLoading={loading} onClose={closeJob} onChangeCompany={changeCompany} onDisposition={dispositionSelected} onHide={hideSelected} onScreened={updateQuickScreen} />}
       </div>
     </div>
   );

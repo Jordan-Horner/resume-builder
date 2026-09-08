@@ -268,7 +268,14 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
 .apply-button { min-height: 40px; }
 .job-actions .secondary-button { min-height: var(--control-height); }
 .job-actions button:disabled { opacity: .55; cursor: wait; }
-.reject-button { color: #ff7b72; width: 100%; }
+.hide-posting-button { color: var(--muted); width: 100%; }
+.hide-posting-button[aria-expanded="true"] { border-color: #6e7681; color: var(--ink); }
+.hide-posting-reasons { display: grid; gap: 12px; margin-top: 10px; padding: 13px; scroll-margin-bottom: 68px; border: 1px solid var(--line); border-radius: 8px; background: #161b22; }
+.hide-posting-reasons strong { color: var(--ink); font-size: 12px; }
+.hide-posting-reasons p { margin: 3px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.hide-posting-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.hide-posting-options .secondary-button { min-width: 0; min-height: 34px; padding: 7px 9px; font-size: 11px; }
+.hide-posting-options .preference-feedback-button { grid-column: 1 / -1; color: #ffb3ad; }
 .action-notice { margin: 0 0 12px; padding: 10px 13px; border: 1px solid #2ea043; border-radius: 10px; background: var(--success-soft); color: #aff5b4; font-size: 13px; }
 .transient-notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .notice-dismiss { flex: 0 0 32px; width: 32px; height: 32px; margin: -7px -8px -7px 0; padding: 0; border: 0; border-radius: 6px; background: transparent; color: currentColor; cursor: pointer; font-size: 21px; line-height: 1; opacity: .8; }
@@ -305,6 +312,7 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
   .job-screen-heading { align-items: flex-start; flex-direction: column; gap: 5px; }
   .job-resume-heading { grid-template-columns: 1fr; gap: 4px; }
   .job-resume-signals { grid-template-columns: 1fr; }
+  .hide-posting-options { grid-template-columns: 1fr; }
 }
 
 .empty-state { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 32px; width: 100%; margin-top: 14px; padding: 30px 6px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; }

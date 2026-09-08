@@ -270,9 +270,11 @@ location, and description. Show `X jobs to review` so the user knows when the wo
 filter or search is narrowing the inbox.
 
 Opening a job is read-only. It stays in the review queue until the user chooses
-`Not interested` or `Applied`. The first action dismisses it; the second creates
-an application record and moves it to Applications. Store disposition state in
-the backend so it is consistent across browser sessions.
+`Hide posting` or `Applied`. Hiding asks whether the posting is closed, duplicated,
+or not relevant. Only `Not interested` records negative
+preference feedback; the neutral reasons simply clear the posting from the queue.
+Applied creates an application record and moves it to Applications. Store
+disposition state in the backend so it is consistent across browser sessions.
 
 The detail pane also offers `Interested` without asking the user to classify the
 decision. Interested feedback keeps the job in the queue. The backend combines a

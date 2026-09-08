@@ -46,8 +46,10 @@ interface:
 - **Jobs** combines every enabled source into one review queue. Filters persist
   locally and can be reset to saved search preferences or cleared for broader
   exploration. Job detail includes source links, compensation, a matching
-  resume recommendation, an on-demand quick screen, and simple Interested or
-  Not interested feedback for an explainable shadow recommendation. Compact
+  resume recommendation, an on-demand quick screen, an Interested action, and
+  reasoned posting cleanup. Closed and duplicate postings are hidden without
+  affecting personalization; only an explicit relevance rejection
+  becomes feedback for the explainable shadow recommendation. Compact
   queue labels expose completed, skipped, and failed background screens, while
   opening an original posting contributes one weak positive preference signal.
 - **Applications** shows current stages, event history, and the exact resume

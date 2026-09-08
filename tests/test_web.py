@@ -185,6 +185,18 @@ def test_job_feedback_routes_are_backend_owned(tmp_path: Path, monkeypatch) -> N
     assert response.json() == result
 
 
+def test_job_hide_route_keeps_reason_explicit(tmp_path: Path, monkeypatch) -> None:
+    from resume_builder.web_service import DashboardService
+
+    result = {"job_id": "job-1", "reason": "closed", "personalization_updated": False}
+    monkeypatch.setattr(DashboardService, "hide_job", lambda self, job_id, reason: result)
+
+    response = _client(tmp_path).post("/api/jobs/job-1/hide", json={"reason": "closed"})
+
+    assert response.status_code == 200
+    assert response.json() == result
+
+
 def test_screening_backfill_route_starts_standalone_worker(tmp_path: Path, monkeypatch) -> None:
     from resume_builder.web_service import DashboardService
 

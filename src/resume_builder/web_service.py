@@ -154,8 +154,10 @@ MAX_RESUME_BYTES = 10 * 1024 * 1024
 OPENROUTER_SECRET_PATH = Path("build/secrets/openrouter-key")
 TITLE_GENERATION_CACHE_PATH = Path("build/job-search/title-generation.json")
 JOB_FEEDBACK_PATH = Path("job-search/job-feedback.json")
+HIDDEN_POSTINGS_PATH = Path("job-search/hidden-postings.json")
 JOB_SCREENING_OUTPUT = Path("job-search/new-job-screens.json")
 JOB_FEEDBACK_ACTIONS = frozenset({"interested", "not_interested", "applied"})
+JOB_HIDE_REASONS = frozenset({"closed", "duplicate", "not_relevant"})
 JOB_FEEDBACK_REASONS = frozenset(
     {
         "company",
@@ -1211,6 +1213,57 @@ class DashboardService:
 
     def _feedback_events(self) -> list[dict[str, Any]]:
         return load_feedback_events(self.workspace / JOB_FEEDBACK_PATH)
+
+    def _hidden_postings(self) -> list[dict[str, str]]:
+        path = self.workspace / HIDDEN_POSTINGS_PATH
+        if not path.is_file():
+            return []
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise ValueError(f"invalid hidden postings: {path}") from exc
+        postings = payload.get("postings") if isinstance(payload, dict) else None
+        if (
+            not isinstance(payload, dict)
+            or payload.get("schema_version") != 1
+            or not isinstance(postings, list)
+        ):
+            raise ValueError(f"invalid hidden postings: {path}")
+        if any(not isinstance(item, dict) for item in postings):
+            raise ValueError(f"invalid hidden postings: {path}")
+        return [
+            {str(key): str(value) for key, value in item.items()} for item in postings
+        ]
+
+    def hide_job(self, job_id: str, reason: object) -> dict[str, Any]:
+        """Hide one posting, learning from the action only when it is not relevant."""
+        if not isinstance(reason, str) or reason not in JOB_HIDE_REASONS:
+            raise ValueError("unsupported hide reason")
+        job = self.get_job(job_id)
+        if job is None:
+            raise ValueError(f"job not found: {job_id}")
+        if reason == "not_relevant":
+            self.record_job_feedback(job_id, "not_interested", [])
+            return {"job_id": job_id, "reason": reason, "personalization_updated": True}
+        with self._state_lock:
+            postings = [
+                item for item in self._hidden_postings() if item.get("job_id") != job_id
+            ]
+            postings.append(
+                {
+                    "job_id": job_id,
+                    "reason": reason,
+                    "hidden_at": datetime.now(UTC).isoformat(),
+                }
+            )
+            atomic_write_json(
+                self.workspace / HIDDEN_POSTINGS_PATH,
+                {"schema_version": 1, "postings": postings},
+            )
+            dismissed = self._dismissed_job_ids()
+            dismissed.add(job_id)
+            self._write_dismissed_job_ids(dismissed)
+        return {"job_id": job_id, "reason": reason, "personalization_updated": False}
 
     def _append_feedback_event(
         self,

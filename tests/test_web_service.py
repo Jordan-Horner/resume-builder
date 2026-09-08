@@ -1155,6 +1155,41 @@ def test_not_interested_feedback_keeps_reason_and_dismisses_job(tmp_path, invent
     assert latest["reasons"] == ["phone_support"]
 
 
+@pytest.mark.parametrize("reason", ["closed", "duplicate"])
+def test_neutral_hide_removes_posting_without_preference_feedback(
+    tmp_path, inventory, monkeypatch, reason
+):
+    monkeypatch.setattr(web_service, "iter_records", lambda _root: [])
+    service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
+
+    result = service.hide_job("hybrid-1", reason)
+
+    assert result["personalization_updated"] is False
+    assert [item["id"] for item in service.list_jobs()] == ["remote-1", "onsite-1"]
+    assert not (tmp_path / "job-search/job-feedback.json").exists()
+    hidden = json.loads((tmp_path / "job-search/hidden-postings.json").read_text())
+    assert hidden["postings"][0]["job_id"] == "hybrid-1"
+    assert hidden["postings"][0]["reason"] == reason
+
+
+def test_not_relevant_hide_records_negative_preference_feedback(tmp_path, inventory):
+    service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
+
+    result = service.hide_job("hybrid-1", "not_relevant")
+
+    assert result["personalization_updated"] is True
+    latest = service.job_feedback("hybrid-1")["latest"]
+    assert latest["action"] == "not_interested"
+    assert not (tmp_path / "job-search/hidden-postings.json").exists()
+
+
+def test_hide_job_rejects_an_unknown_reason(tmp_path, inventory):
+    service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
+
+    with pytest.raises(ValueError, match="unsupported hide reason"):
+        service.hide_job("hybrid-1", "bad_link")
+
+
 def test_not_interested_feedback_records_deterministic_seniority(tmp_path, inventory):
     new_grad = {
         **inventory[0],

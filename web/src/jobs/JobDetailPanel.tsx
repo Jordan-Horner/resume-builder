@@ -3,18 +3,19 @@ import { getJob, getJobFeedback, getJobScreenStatus, getResumeRecommendation, re
 import { ArrowIcon, IconButton } from "../components";
 import { JobSalary } from "../components/JobSalary";
 import { useAssistant } from "../assistant/AssistantProvider";
-import type { Job, JobFeedback, JobFeedbackAction, JobScreenResult, ResumeRecommendation } from "../types";
+import type { Job, JobFeedback, JobFeedbackAction, JobHideReason, JobScreenResult, ResumeRecommendation } from "../types";
 import { formatPayRange, formatWorkModes } from "./jobFormatters";
 
 interface Props {
   job: Job;
   companyBlocked: boolean;
   companyBusy: boolean;
-  pendingAction: JobFeedbackAction | "applied" | null;
+  pendingAction: JobFeedbackAction | "applied" | "hide" | null;
   queueLoading: boolean;
   onClose: () => void;
   onChangeCompany: (company: string, blocked: boolean) => Promise<void>;
   onDisposition: (disposition: JobFeedbackAction | "applied") => Promise<JobFeedback | null>;
+  onHide: (reason: JobHideReason) => Promise<void>;
   onScreened: (screen: JobScreenResult) => void;
 }
 
@@ -52,10 +53,12 @@ export function JobDetailPanel({
   onClose,
   onChangeCompany,
   onDisposition,
+  onHide,
   onScreened,
 }: Props) {
   const assistant = useAssistant();
   const heading = useRef<HTMLHeadingElement>(null);
+  const hideReasons = useRef<HTMLElement>(null);
   const [recommendation, setRecommendation] = useState<ResumeRecommendation | null>(null);
   const [recommendationError, setRecommendationError] = useState("");
   const [jobScreen, setJobScreen] = useState<JobScreenResult | null>(null);
@@ -64,6 +67,7 @@ export function JobDetailPanel({
   const [screenError, setScreenError] = useState("");
   const [feedback, setFeedback] = useState<JobFeedback | null>(null);
   const [feedbackError, setFeedbackError] = useState("");
+  const [showHideReasons, setShowHideReasons] = useState(false);
   const [description, setDescription] = useState<string | null>(job.description ?? descriptionCache.get(job.id) ?? null);
   const [descriptionError, setDescriptionError] = useState("");
   const currentJobId = useRef(job.id);
@@ -86,6 +90,7 @@ export function JobDetailPanel({
     setScreenError("");
     setFeedback(null);
     setFeedbackError("");
+    setShowHideReasons(false);
     setDescription(job.description ?? descriptionCache.get(job.id) ?? null);
     setDescriptionError("");
     const controller = new AbortController();
@@ -192,6 +197,14 @@ export function JobDetailPanel({
     setFeedbackError("");
     const result = await onDisposition("interested");
     if (result) setFeedback(result);
+  }
+
+  function toggleHideReasons() {
+    const willShow = !showHideReasons;
+    setShowHideReasons(willShow);
+    if (willShow) {
+      window.requestAnimationFrame(() => hideReasons.current?.scrollIntoView?.({ block: "nearest" }));
+    }
   }
 
   const postedSalary = formatPayRange(job);
@@ -324,10 +337,21 @@ export function JobDetailPanel({
           <button className="primary-button apply-button" onClick={() => void onDisposition("applied")} disabled={pendingAction !== null}>
             {pendingAction === "applied" ? "Moving to Applications…" : "Mark as applied"}
           </button>
-          <button className="secondary-button reject-button" onClick={() => void onDisposition("not_interested")} disabled={pendingAction !== null}>
-            {pendingAction === "not_interested" ? "Removing…" : "Not interested"}
+          <button className="secondary-button hide-posting-button" aria-expanded={showHideReasons} aria-controls="hide-posting-reasons" onClick={toggleHideReasons} disabled={pendingAction !== null}>
+            {pendingAction === "hide" ? "Hiding…" : "Hide posting"}
           </button>
         </div>
+        {showHideReasons && <section ref={hideReasons} id="hide-posting-reasons" className="hide-posting-reasons" aria-labelledby="hide-posting-heading">
+          <div>
+            <strong id="hide-posting-heading">Why hide this posting?</strong>
+            <p>Only “Not interested” changes future recommendations.</p>
+          </div>
+          <div className="hide-posting-options">
+            <button className="secondary-button" onClick={() => void onHide("closed")} disabled={pendingAction !== null}>Posting is closed</button>
+            <button className="secondary-button" onClick={() => void onHide("duplicate")} disabled={pendingAction !== null}>Duplicate posting</button>
+            <button className="secondary-button preference-feedback-button" onClick={() => void onHide("not_relevant")} disabled={pendingAction !== null}>Not interested</button>
+          </div>
+        </section>}
       </div>
       <div className="job-description">
         {descriptionError
