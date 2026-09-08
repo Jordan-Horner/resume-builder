@@ -2022,26 +2022,6 @@ class DashboardService:
         else:
             payload["eligibility_label"] = "Eligible"
         payload["recommendation_label"] = recommendation_labels[payload["recommendation"]]
-        assessments = payload.get("preference_assessments", [])
-        matches = [item for item in assessments if item.get("outcome") == "match"]
-        conflicts = [item for item in assessments if item.get("outcome") == "conflict"]
-        unknowns = [item for item in assessments if item.get("outcome") == "unknown"]
-        if not assessments:
-            preference_label = "No job preferences saved"
-        elif matches and conflicts:
-            preference_label = "Mixed"
-        elif conflicts:
-            preference_label = "Probably not for you"
-        elif matches:
-            preference_label = "Looks aligned"
-        else:
-            preference_label = "Not enough information"
-        payload["preference_fit"] = {
-            "label": preference_label,
-            "matches": matches[:2],
-            "conflicts": conflicts[:2],
-            "unknown_count": len(unknowns),
-        }
         return {"status": "complete", "cached": cached, "result": payload}
 
     def _screening_packet(self, job_id: str) -> Any:

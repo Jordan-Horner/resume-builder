@@ -633,7 +633,6 @@ def get_job_screening_packet(
         job,
         preferences,
         prescreen,
-        inventory=list(inventory.values()),
         evidence=evidence,
     )
 

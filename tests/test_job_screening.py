@@ -10,14 +10,12 @@ import pytest
 from resume_builder.agent_contracts import StructuredModelReply, StructuredModelRequest
 from resume_builder.job_screening import (
     CandidateScreeningProfile,
-    CitedFinding,
     Confidence,
     ConstraintState,
     CriterionAssessment,
     CriterionAssessmentOutcome,
     EligibilityStatus,
     FitOutcome,
-    PreferenceAssessmentOutcome,
     Recommendation,
     ScreeningCache,
     ScreeningPacket,
@@ -28,7 +26,6 @@ from resume_builder.job_screening import (
     finalize_screen,
     has_clearance_requirement,
     screening_prompt,
-    semantic_screen_output_type,
     with_directional_resumes,
     with_screening_evidence,
 )
@@ -136,15 +133,9 @@ def test_missing_qualifications_can_remain_a_positive_stretch() -> None:
     semantic = SemanticScreen(
         fit=FitOutcome.WORTHWHILE_STRETCH,
         confidence=Confidence.MEDIUM,
-        strengths=[
-            CitedFinding(
-                statement="Production operations experience supports the central responsibility.",
-                fact_ids=[packet.candidate_evidence[0].fact_id],
-            )
-        ],
+        supporting_fact_ids=[packet.candidate_evidence[0].fact_id],
         gaps=["Exact Kubernetes depth is not established."],
         unknowns=[],
-        stretch_case="The core operational work aligns and the named tooling gap is learnable.",
         reasoning_summary="This is credible enough to pursue despite incomplete preferred experience.",
     )
 
@@ -279,12 +270,7 @@ def test_hard_ineligibility_overrides_even_a_strong_model_fit() -> None:
     semantic = SemanticScreen(
         fit=FitOutcome.STRONG_MATCH,
         confidence=Confidence.HIGH,
-        strengths=[
-            CitedFinding(
-                statement="Capabilities align.",
-                fact_ids=[packet.candidate_evidence[0].fact_id],
-            )
-        ],
+        supporting_fact_ids=[packet.candidate_evidence[0].fact_id],
         gaps=[],
         unknowns=[],
         reasoning_summary="The supplied capabilities align with the role.",
@@ -323,101 +309,41 @@ def test_posting_instructions_remain_delimited_untrusted_data() -> None:
     assert "Ignore prior instructions" in prompt
 
 
-def test_semantic_preferences_are_screened_without_changing_eligibility() -> None:
+def test_screening_prompt_contains_only_fit_inputs() -> None:
     packet = build_screening_packet(
         {
-            "id": "fictional-semantic-preferences",
-            "title": "Production Support Engineer",
-            "company": "Fictional Systems",
-            "location": "Remote",
-            "work_modes": ["remote"],
-            "description_text": "Own production incidents and rotate through an inbound phone queue.",
-            "description_quality": "complete",
-            "url": "https://example.invalid/jobs/semantic-preferences",
-        },
-        {
-            "accepted_work_modes": ["remote"],
-            "include_unknown_locations": True,
-            "preferred_job_attributes": ["Production ownership"],
-            "avoided_job_attributes": ["Phone-first support"],
-            "screening_profile": {"supported_capabilities": ["production operations"]},
-        },
-        {},
-    )
-    semantic = SemanticScreen(
-        fit=FitOutcome.GOOD_MATCH,
-        confidence=Confidence.MEDIUM,
-        strengths=[
-            CitedFinding(
-                statement="Production operations experience aligns.",
-                fact_ids=[packet.candidate_evidence[0].fact_id],
-            )
-        ],
-        gaps=[],
-        unknowns=[],
-        reasoning_summary="The candidate evidence supports the central work.",
-        preference_assessments=[
-            {
-                "preference": "Production ownership",
-                "direction": "prefer",
-                "outcome": "match",
-                "explanation": "The role owns production incidents.",
-                "posting_evidence": "Own production incidents",
-            },
-            {
-                "preference": "Phone-first support",
-                "direction": "avoid",
-                "outcome": "conflict",
-                "explanation": "The role includes an inbound phone queue.",
-                "posting_evidence": "inbound phone queue",
-            },
-        ],
-    )
-
-    result = finalize_screen(packet, semantic, model="fictional/model")
-
-    assert result.eligibility == EligibilityStatus.ELIGIBLE
-    assert [item.outcome for item in result.preference_assessments] == ["match", "conflict"]
-
-
-def test_semantic_preference_evidence_must_come_from_posting() -> None:
-    packet = build_screening_packet(
-        {
-            "id": "fictional-invalid-preference-evidence",
+            "id": "fictional-lean-prompt",
             "title": "Support Engineer",
-            "company": "Fictional Systems",
+            "company": "Fictional Software",
             "location": "Remote",
             "work_modes": ["remote"],
             "description_text": "Support production systems.",
             "description_quality": "complete",
-            "url": "https://example.invalid/jobs/invalid-preference-evidence",
+            "url": "https://example.invalid/jobs/lean-prompt",
         },
         {
             "preferred_job_attributes": ["Production ownership"],
-            "screening_profile": {"supported_capabilities": ["production operations"]},
+            "avoided_job_attributes": ["Phone queue"],
+            "screening_profile": {"supported_capabilities": ["production support"]},
         },
-        {},
-    )
-    semantic = SemanticScreen(
-        fit=FitOutcome.INSUFFICIENT_INFORMATION,
-        confidence=Confidence.LOW,
-        strengths=[],
-        gaps=[],
-        unknowns=[],
-        reasoning_summary="More evidence is needed.",
-        preference_assessments=[
-            {
-                "preference": "Production ownership",
-                "direction": "prefer",
-                "outcome": "match",
-                "explanation": "The role owns incidents.",
-                "posting_evidence": "Own every incident globally",
-            }
-        ],
+        {"keyword_readiness": {"percent": 42}},
     )
 
-    with pytest.raises(ValueError, match="posting evidence"):
-        finalize_screen(packet, semantic, model="fictional/model")
+    payload = json.loads(screening_prompt(packet).split("\n", 1)[1])
+
+    assert set(payload) == {
+        "candidate_evidence",
+        "criterion_evidence",
+        "evidence_coverage",
+        "evidence_strategy",
+        "job",
+        "posting_coverage",
+    }
+    assert "url" not in payload["job"]
+    assert "preferred_job_attributes" not in json.dumps(payload)
+    assert "keyword_readiness" not in json.dumps(payload)
+    assert "salary_estimate" not in SemanticScreen.model_json_schema()["properties"]
+    assert "preference_assessments" not in SemanticScreen.model_json_schema()["properties"]
 
 
 class FakeStructuredAdapter:
@@ -434,12 +360,7 @@ class FakeStructuredAdapter:
             output=SemanticScreen(
                 fit=FitOutcome.GOOD_MATCH,
                 confidence=Confidence.MEDIUM,
-                strengths=[
-                    CitedFinding(
-                        statement="Supported operations capability aligns.",
-                        fact_ids=[packet["candidate_evidence"][0]["fact_id"]],
-                    )
-                ],
+                supporting_fact_ids=[packet["candidate_evidence"][0]["fact_id"]],
                 gaps=[],
                 unknowns=[],
                 reasoning_summary="The explicit profile supports the central work.",
@@ -516,9 +437,6 @@ def test_screening_service_never_sends_confirmed_hard_conflicts(tmp_path: Path) 
 
     assert result.recommendation == Recommendation.DO_NOT_APPLY
     assert result.model == "local/deterministic"
-    assert [(item.preference, item.outcome) for item in result.preference_assessments] == [
-        ("Production ownership", "unknown")
-    ]
     assert cached is False
     assert adapter.requests == []
 
@@ -552,9 +470,6 @@ def test_screening_service_does_not_pay_for_an_empty_evidence_packet(tmp_path: P
     assert result.fit == FitOutcome.INSUFFICIENT_INFORMATION
     assert result.recommendation == Recommendation.NEEDS_MORE_EVIDENCE
     assert result.model == "local/evidence"
-    assert [(item.preference, item.outcome) for item in result.preference_assessments] == [
-        ("Continuous phone queue", "unknown")
-    ]
     assert "evidence-coverage limitation" in result.reasoning_summary
     assert cached is False
     assert adapter.requests == []
@@ -583,12 +498,7 @@ def test_partial_posting_and_supporting_only_evidence_cap_confidence() -> None:
     semantic = SemanticScreen(
         fit=FitOutcome.GOOD_MATCH,
         confidence=Confidence.HIGH,
-        strengths=[
-            CitedFinding(
-                statement="The supporting profile names platform operations.",
-                fact_ids=[packet.candidate_evidence[0].fact_id],
-            )
-        ],
+        supporting_fact_ids=[packet.candidate_evidence[0].fact_id],
         gaps=[],
         unknowns=["The remainder of the posting was not included."],
         reasoning_summary="The bounded evidence offers supporting, but not demonstrated, alignment.",
@@ -623,7 +533,6 @@ def test_insufficient_fit_cannot_claim_high_confidence() -> None:
     semantic = SemanticScreen(
         fit=FitOutcome.INSUFFICIENT_INFORMATION,
         confidence=Confidence.HIGH,
-        strengths=[],
         gaps=[],
         unknowns=["The supplied evidence does not settle the role fit."],
         reasoning_summary="The supplied evidence does not support a reliable fit judgment.",
@@ -639,14 +548,13 @@ def test_semantic_screen_rejects_claiming_candidate_absence_from_missing_evidenc
         SemanticScreen(
             fit=FitOutcome.WEAK_FIT,
             confidence=Confidence.LOW,
-            strengths=[],
             gaps=["The candidate lacks Kubernetes experience."],
             unknowns=[],
             reasoning_summary="The supplied evidence did not establish the required experience.",
         )
 
 
-def test_screening_rejects_strengths_citing_evidence_outside_the_packet() -> None:
+def test_screening_rejects_supporting_facts_outside_the_packet() -> None:
     packet = build_screening_packet(
         {
             "id": "fictional-invalid-citation",
@@ -669,7 +577,7 @@ def test_screening_rejects_strengths_citing_evidence_outside_the_packet() -> Non
     semantic = SemanticScreen(
         fit=FitOutcome.GOOD_MATCH,
         confidence=Confidence.HIGH,
-        strengths=[CitedFinding(statement="Unsupported assertion.", fact_ids=["FACT-999"])],
+        supporting_fact_ids=["FACT-999"],
         gaps=[],
         unknowns=[],
         reasoning_summary="This result cites evidence the packet did not supply.",
@@ -679,7 +587,7 @@ def test_screening_rejects_strengths_citing_evidence_outside_the_packet() -> Non
         finalize_screen(packet, semantic, model="fictional/model")
 
 
-def test_criterion_screen_rejects_unmapped_positive_findings() -> None:
+def test_criterion_screen_rejects_positive_judgment_without_candidate_evidence() -> None:
     packet = build_screening_packet(
         {
             "id": "fictional-criterion-citation",
@@ -723,37 +631,23 @@ def test_criterion_screen_rejects_unmapped_positive_findings() -> None:
     enriched = with_screening_evidence(packet, evidence)
     fact_id = enriched.candidate_evidence[0].fact_id
 
-    missing_criterion = SemanticScreen(
+    wrong_mapping = SemanticScreen(
         fit=FitOutcome.GOOD_MATCH,
         confidence=Confidence.MEDIUM,
         criterion_assessments=[
             CriterionAssessment(
                 criterion_id="incident-response",
-                outcome=CriterionAssessmentOutcome.UNKNOWN,
-                confidence=Confidence.LOW,
-                explanation="No relevant evidence was retrieved.",
+                outcome=CriterionAssessmentOutcome.TRANSFERABLE,
+                confidence=Confidence.MEDIUM,
+                fact_ids=[fact_id],
+                explanation="Relevant evidence was retrieved.",
             )
         ],
-        strengths=[CitedFinding(statement="Relevant evidence.", fact_ids=[fact_id])],
         gaps=[],
         unknowns=[],
-        reasoning_summary="A criterion citation is required.",
+        reasoning_summary="The cited fact was not retrieved for this criterion.",
     )
-    with pytest.raises(ValueError, match="must cite a criterion_id"):
-        finalize_screen(enriched, missing_criterion, model="fictional/model")
-
-    wrong_mapping = missing_criterion.model_copy(
-        update={
-            "strengths": [
-                CitedFinding(
-                    statement="Relevant evidence.",
-                    fact_ids=[fact_id],
-                    criterion_id="incident-response",
-                )
-            ]
-        }
-    )
-    with pytest.raises(ValueError, match="outside its criterion retrieval"):
+    with pytest.raises(ValueError, match="must remain unknown"):
         finalize_screen(enriched, wrong_mapping, model="fictional/model")
 
 
@@ -837,7 +731,6 @@ def test_semantic_screen_accepts_json_encoded_criterion_assessments() -> None:
                     }
                 ]
             ),
-            "strengths": [],
             "gaps": [],
             "unknowns": [],
             "reasoning_summary": "The supplied evidence does not resolve the criterion.",
@@ -955,13 +848,6 @@ def test_finalize_screen_includes_shared_resume_match() -> None:
                 explanation="Verified incident-response evidence is present.",
             )
         ],
-        strengths=[
-            CitedFinding(
-                statement="Incident response is demonstrated.",
-                fact_ids=[fact_id],
-                criterion_id="incident-response",
-            )
-        ],
         gaps=[],
         unknowns=[],
         reasoning_summary="The supplied evidence demonstrates the core work.",
@@ -972,140 +858,6 @@ def test_finalize_screen_includes_shared_resume_match() -> None:
     assert result.resume_match is not None
     assert result.resume_match.label == "Strong match"
     assert result.resume_match.resume_id == "resumes/baselines/sre.md"
-
-
-def test_packet_bound_semantic_screen_completes_missing_criterion_assessments_as_unknown() -> None:
-    packet = _criterion_screen_packet()
-    output_type = semantic_screen_output_type(packet)
-
-    result = output_type(
-        fit=FitOutcome.GOOD_MATCH,
-        confidence=Confidence.MEDIUM,
-        criterion_assessments=[],
-        strengths=[],
-        gaps=[],
-        unknowns=[],
-        reasoning_summary="The supplied evidence appears relevant.",
-    )
-
-    assert {item.criterion_id for item in result.criterion_assessments} == {
-        "kubernetes",
-        "incident-response",
-    }
-    assert all(
-        item.outcome == CriterionAssessmentOutcome.UNKNOWN for item in result.criterion_assessments
-    )
-
-
-def test_packet_bound_semantic_screen_drops_cross_criterion_fact_citations() -> None:
-    packet = _criterion_screen_packet()
-    output_type = semantic_screen_output_type(packet)
-
-    result = output_type(
-        fit=FitOutcome.GOOD_MATCH,
-        confidence=Confidence.MEDIUM,
-        criterion_assessments=[
-            {
-                "criterion_id": "kubernetes",
-                "outcome": "supported",
-                "confidence": "high",
-                "fact_ids": ["WRONG-FACT"],
-                "explanation": "The model cited evidence from another criterion.",
-            }
-        ],
-        reasoning_summary="The technical qualifications appear relevant.",
-    )
-
-    assessment = next(
-        item for item in result.criterion_assessments if item.criterion_id == "kubernetes"
-    )
-    assert assessment.outcome == CriterionAssessmentOutcome.UNKNOWN
-    assert assessment.fact_ids == []
-
-
-def test_packet_bound_semantic_screen_completes_omitted_preferences_as_unknown() -> None:
-    packet = build_screening_packet(
-        {
-            "id": "fictional-omitted-preference",
-            "title": "Support Engineer",
-            "company": "Fictional Systems",
-            "location": "Remote",
-            "work_modes": ["remote"],
-            "description_text": "Support production systems.",
-            "description_quality": "complete",
-            "url": "https://example.invalid/jobs/omitted-preference",
-        },
-        {
-            "preferred_job_attributes": ["Production ownership"],
-            "avoided_job_attributes": ["Phone-first support"],
-        },
-        {},
-    )
-    output_type = semantic_screen_output_type(packet)
-
-    result = output_type(
-        fit=FitOutcome.INSUFFICIENT_INFORMATION,
-        confidence=Confidence.LOW,
-        preference_assessments=[
-            {
-                "preference": "Production ownership",
-                "direction": "prefer",
-                "outcome": "match",
-                "explanation": "The role supports production systems.",
-                "posting_evidence": "Support production systems",
-            }
-        ],
-        reasoning_summary="The supplied evidence is incomplete.",
-    )
-
-    assert [(item.preference, item.outcome) for item in result.preference_assessments] == [
-        ("Production ownership", PreferenceAssessmentOutcome.MATCH),
-        ("Phone-first support", PreferenceAssessmentOutcome.UNKNOWN),
-    ]
-
-
-def test_packet_bound_semantic_screen_derives_strengths_from_criterion_assessments() -> None:
-    packet = _criterion_screen_packet()
-    criterion = packet.criterion_evidence[0]
-    fact_id = criterion.fact_ids[0]
-    output_type = semantic_screen_output_type(packet)
-
-    result = output_type(
-        fit=FitOutcome.GOOD_MATCH,
-        confidence=Confidence.MEDIUM,
-        criterion_assessments=[
-            {
-                "criterion_id": criterion.criterion_id,
-                "outcome": "transferable",
-                "confidence": "medium",
-                "fact_ids": [fact_id],
-                "explanation": "Related evidence supports a transferable fit.",
-            },
-            {
-                "criterion_id": "incident-response",
-                "outcome": "unknown",
-                "confidence": "low",
-                "fact_ids": [],
-                "explanation": "No candidate evidence was retrieved.",
-            },
-        ],
-        strengths=[
-            {
-                "statement": "The model attached an unrelated fact.",
-                "fact_ids": ["UNRELATED-FACT"],
-                "criterion_id": criterion.criterion_id,
-            }
-        ],
-        reasoning_summary="The supplied evidence is partially relevant.",
-    )
-
-    assert [item.model_dump(mode="json") for item in result.strengths] == [
-        {
-            "statement": "Related evidence supports a transferable fit.",
-            "fact_ids": [fact_id],
-            "criterion_id": criterion.criterion_id,
-        }
-    ]
 
 
 def test_campus_hire_is_deprioritized_for_established_work_history() -> None:

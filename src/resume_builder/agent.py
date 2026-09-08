@@ -73,7 +73,6 @@ from .job_screening_queue import (
 from .jobs import DEFAULT_CONFIG as DEFAULT_JOBS_CONFIG
 from .jobs import DEFAULT_PREFERENCES, get_job_screening_packet
 from .posting_interpretation import PostingInterpretationCache
-from .salary_estimation import format_salary_estimate
 from .screening_service import (
     INTERACTIVE_SCREEN_TIMEOUT_SECONDS,
     QUICK_SCREEN_PROVIDER_RETRIES,
@@ -359,8 +358,6 @@ def _render_screen(result: ScreeningResult, *, cached: bool) -> str:
         "",
         result.reasoning_summary,
     ]
-    if result.salary_estimate:
-        lines.extend(("", format_salary_estimate(result.salary_estimate)))
     if result.resume_match:
         lines.extend(
             (
@@ -373,8 +370,6 @@ def _render_screen(result: ScreeningResult, *, cached: bool) -> str:
             lines.append("Strongest overlap: " + ", ".join(result.resume_match.strongest_overlap))
         if result.resume_match.primary_gap:
             lines.append(f"Primary gap: {result.resume_match.primary_gap}")
-    if result.stretch_case:
-        lines.extend(("", f"Why it may be worth the stretch: {result.stretch_case}"))
     violated = [item for item in result.constraints if item.state.value == "violated"]
     unknown = [item for item in result.constraints if item.state.value == "unknown"]
     if violated:

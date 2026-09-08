@@ -70,14 +70,7 @@ export interface JobScreenResult {
     strengths: string[];
     gaps: string[];
     unknowns: string[];
-    stretch_case: string | null;
     reasoning_summary: string;
-    preference_fit: {
-      label: "No job preferences saved" | "Looks aligned" | "Mixed" | "Probably not for you" | "Not enough information";
-      matches: JobPreferenceAssessment[];
-      conflicts: JobPreferenceAssessment[];
-      unknown_count: number;
-    };
     evidence_coverage: "good" | "partial" | "low";
     evidence_strategy?: "posting-wide" | "criterion-driven";
     criterion_evidence?: Array<{
@@ -125,14 +118,6 @@ export interface JobScreenProgress {
 }
 
 export type JobScreenState = JobScreenResult | JobScreenProgress;
-
-export interface JobPreferenceAssessment {
-  preference: string;
-  direction: "prefer" | "avoid";
-  outcome: "match" | "conflict" | "unknown";
-  explanation: string;
-  posting_evidence: string | null;
-}
 
 export type JobFeedbackAction = "interested" | "not_interested";
 export type JobFeedbackReason = "company" | "compensation" | "customer_facing" | "day_to_day" | "location" | "on_call" | "phone_support" | "role" | "seniority" | "travel" | "work_mode";

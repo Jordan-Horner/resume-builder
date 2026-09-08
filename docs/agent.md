@@ -298,12 +298,11 @@ of saved result objects. The report measures criterion coverage, outcome agreeme
 precision, abstention accuracy, and overall-fit agreement. Generated results and
 evaluation files stay outside the authoritative vault.
 
-When a posting has neither salary bound, semantic screening also requests an
-advisory base-pay estimate in the **same structured model call**. This applies
-to authorized individual and batch screening, including scheduled screening
-that already has provider authorization. Collection, shortlist preparation and
-dashboard browsing never request estimates. Deterministic ineligible screens
-still skip the model entirely.
+Salary estimation is not part of semantic screening. When a posting has neither
+salary bound, the dashboard offers a separate explicit estimate action using
+public posting data only. Collection, shortlist preparation, dashboard browsing,
+and quick screening never request estimates. Deterministic ineligible screens
+still skip the fit model entirely.
 
 The shared salary workflow uses title, company, location, employment type and
 up to 8,000 description characters. It adds up to twelve salary-bearing active
@@ -319,13 +318,11 @@ and pay policy must not be invented from a company name. This version does not
 perform live company or market research: model knowledge alone is labeled low
 confidence. Supplied posting references are validated, not fabricated citations.
 
-Estimates are stored separately as `salary_estimate` in screening results and
-appear in the readable screen/queue report. They never populate posted salary
+Estimates are stored in the dedicated salary-estimate cache. They never populate posted salary
 fields, satisfy minimum-pay constraints, change deterministic eligibility or
 filter jobs out. Missing posted pay remains unknown even if an estimate is
-below the user's minimum. Screening instructions also exclude estimates from
-career-fit judgments. Screening caches containing salary context expire after
-30 days; changed input packets invalidate them immediately.
+below the user's minimum. Salary-estimate cache entries expire after 30 days;
+changed inputs invalidate them immediately.
 
 ### Request an estimate from the dashboard API
 
@@ -373,10 +370,10 @@ field preserves the legacy shared-location behavior.
 `preferred_job_attributes` and `avoided_job_attributes` store up to twenty
 plain-language statements each about work the user explicitly wants or avoids.
 They are personal interest signals, not candidate evidence or eligibility
-requirements. The quick screen evaluates every saved statement in its existing
-provider call and returns `match`, `conflict`, or `unknown` with posting evidence
-for every non-unknown judgment. Changing these fields changes the screening
-packet hash, so an older cached screen is not reused.
+requirements. Deterministic recommendation scoring and feedback learning use
+them directly; the quick-screen model does not repeat that work. Changing these
+fields still changes the screening packet hash, so an older cached screen is not
+reused after the user's preferences change.
 
 ## Screen a complete new-job queue
 

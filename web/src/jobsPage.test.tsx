@@ -264,9 +264,8 @@ it("screens a job only after the user requests it", async () => {
   const result = { status: "complete" as const, cached: false, result: {
     job_id: "one", fit: "good_match", fit_label: "Good fit", screening_label: "Quick screen" as const, eligibility: "eligible",
     eligibility_label: "Eligible", recommendation: "pursue", recommendation_label: "Pursue",
-    confidence: "medium" as const, strengths: [], gaps: [], unknowns: [], stretch_case: null,
+    confidence: "medium" as const, strengths: [], gaps: [], unknowns: [],
     reasoning_summary: "Strong production support evidence.",
-    preference_fit: { label: "Looks aligned" as const, matches: [{ preference: "Production ownership", direction: "prefer" as const, outcome: "match" as const, explanation: "The role owns production incidents.", posting_evidence: "production support" }], conflicts: [], unknown_count: 1 },
     evidence_coverage: "good" as const, evidence_strategy: "criterion-driven" as const,
     criterion_evidence: [{ criterion_id: "incident-response", label: "Incident response", importance: "required" as const, status: "demonstrated-candidate" as const, fact_ids: ["OPS-001"] }],
     criterion_assessments: [{ criterion_id: "incident-response", outcome: "supported" as const, confidence: "high" as const, fact_ids: ["OPS-001"], explanation: "Verified incident leadership directly supports this requirement.", materially_affects_recommendation: true }],
@@ -293,9 +292,6 @@ it("screens a job only after the user requests it", async () => {
   expect(host.querySelector(".job-resume-signals dd")?.textContent).toBe("Incident response");
   expect(host.querySelector<HTMLAnchorElement>('.job-resume-match a')?.getAttribute("href")).toContain("resumes%2Fbaselines%2Fsupport.md");
   expect(host.textContent).toContain("Verified incident leadership directly supports this requirement.");
-  expect(host.textContent).toContain("What you wantLooks aligned");
-  expect(host.textContent).toContain("Matches: The role owns production incidents.");
-  expect(host.textContent).toContain("1 saved preference was not clear from this posting.");
   expect(host.textContent).toContain("Evidence used");
 });
 
@@ -303,8 +299,7 @@ it("queues a slow screen and renders its background result without blocking the 
   const result = { status: "complete" as const, cached: false, result: {
     job_id: "one", fit: "good_match", fit_label: "Good fit", screening_label: "Quick screen" as const, eligibility: "eligible",
     eligibility_label: "Eligible", recommendation: "pursue", recommendation_label: "Pursue", confidence: "medium" as const,
-    strengths: [], gaps: [], unknowns: [], stretch_case: null, reasoning_summary: "Relevant support experience.",
-    preference_fit: { label: "No job preferences saved" as const, matches: [], conflicts: [], unknown_count: 0 },
+    strengths: [], gaps: [], unknowns: [], reasoning_summary: "Relevant support experience.",
     evidence_coverage: "good" as const, evidence_strategy: "posting-wide" as const, posting_coverage: "complete" as const, evidence_used: [],
   } };
   vi.useFakeTimers();
@@ -344,9 +339,7 @@ it("keeps screening state and late results attached to the job that started them
       strengths: [],
       gaps: [],
       unknowns: [],
-      stretch_case: null,
       reasoning_summary: `${fitLabel} evidence.`,
-      preference_fit: { label: "No job preferences saved" as const, matches: [], conflicts: [], unknown_count: 0 },
       evidence_coverage: "good" as const,
       evidence_strategy: "posting-wide",
       criterion_evidence: undefined,

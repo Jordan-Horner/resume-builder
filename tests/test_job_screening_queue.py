@@ -11,7 +11,6 @@ import resume_builder.job_screening_queue as queue_module
 from resume_builder.agent_contracts import StructuredModelReply, StructuredModelRequest
 from resume_builder.agent_openrouter import AgentProviderError
 from resume_builder.job_screening import (
-    CitedFinding,
     Confidence,
     FitOutcome,
     SemanticScreen,
@@ -84,12 +83,7 @@ class QueueAdapter:
             output=SemanticScreen(
                 fit=FitOutcome.STRONG_MATCH,
                 confidence=Confidence.LOW,
-                strengths=[
-                    CitedFinding(
-                        statement="The fictional evidence supports the central work.",
-                        fact_ids=[packet["candidate_evidence"][0]["fact_id"]],
-                    )
-                ],
+                supporting_fact_ids=[packet["candidate_evidence"][0]["fact_id"]],
                 gaps=[],
                 unknowns=[],
                 reasoning_summary="Relevant work is supported, but confidence remains limited.",

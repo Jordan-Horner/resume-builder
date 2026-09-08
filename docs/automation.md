@@ -75,7 +75,7 @@ provider-call telemetry counts the single structured request. Jobs with
 hard local conflicts, incomplete listings, or no saved title search signal
 are skipped before any provider call and remain available for a manual screen.
 Provider-backed jobs run serially, so `max_jobs_per_run` is a total allowance,
-not a concurrency setting. Each quick-screen response is capped at 1,000
+not a concurrency setting. Each quick-screen response is capped at 800
 tokens. Each provider attempt has a 25-second deadline and is not retried inside
 the same quick-screen job; a timeout is recorded as unresolved so later runs can
 retry it without blocking the recommendation queue.

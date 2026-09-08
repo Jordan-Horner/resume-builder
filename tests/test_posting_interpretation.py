@@ -13,7 +13,6 @@ from resume_builder.agent_contracts import (
     StructuredModelRequest,
 )
 from resume_builder.job_screening import (
-    CitedFinding,
     Confidence,
     CriterionAssessment,
     CriterionAssessmentOutcome,
@@ -591,12 +590,7 @@ class InvalidShadowAdapter(InterpretationAdapter):
             output=SemanticScreen(
                 fit=FitOutcome.GOOD_MATCH,
                 confidence=Confidence.MEDIUM,
-                strengths=[
-                    CitedFinding(
-                        statement="Production operations evidence aligns.",
-                        fact_ids=[packet["candidate_evidence"][0]["fact_id"]],
-                    )
-                ],
+                supporting_fact_ids=[packet["candidate_evidence"][0]["fact_id"]],
                 gaps=[],
                 unknowns=[],
                 reasoning_summary="The current quick screen remains independently validated.",
@@ -756,13 +750,6 @@ class CriterionScreenAdapter:
                         fact_ids=["OPS-001"],
                         explanation="Confirmed production Kubernetes evidence directly supports the criterion.",
                         materially_affects_recommendation=True,
-                    )
-                ],
-                strengths=[
-                    CitedFinding(
-                        statement="Production Kubernetes evidence aligns.",
-                        fact_ids=["OPS-001"],
-                        criterion_id="kubernetes-operations",
                     )
                 ],
                 gaps=[],

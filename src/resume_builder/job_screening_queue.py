@@ -37,7 +37,6 @@ from .jobs import (
     get_job_screening_packet,
 )
 from .posting_interpretation import PostingInterpretationCache
-from .salary_estimation import SalaryEstimate, format_salary_estimate
 from .screening_service import ScreeningService, enrich_packet_from_cached_interpretation
 
 LOGGER = logging.getLogger(__name__)
@@ -454,9 +453,6 @@ def build_screening_queue(
         else:
             label = f"{screen['status']} / {screen.get('reason', 'unknown')}"
         lines.append(f"- **{label.upper()}** — {item.get('title')} at {item.get('company')}")
-        if screen["status"] == "complete" and screen["result"].get("salary_estimate"):
-            estimate = SalaryEstimate.model_validate(screen["result"]["salary_estimate"])
-            lines.append(f"  {format_salary_estimate(estimate)}")
     atomic_write_text(output_path.with_suffix(".md"), "\n".join(lines) + "\n")
     return summary
 

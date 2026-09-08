@@ -282,7 +282,7 @@ class ScreeningService:
                     instructions=SCREENING_INSTRUCTIONS,
                     model=model,
                     output_type=SemanticScreen,
-                    max_output_tokens=1_000,
+                    max_output_tokens=800,
                 )
             )
         except ModelProviderError as exc:

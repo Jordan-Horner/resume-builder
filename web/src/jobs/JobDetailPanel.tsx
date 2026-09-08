@@ -253,11 +253,6 @@ export function JobDetailPanel({
                 {jobScreen.result.resume_match.primary_gap && <div><dt>Primary gap</dt><dd>{jobScreen.result.resume_match.primary_gap}</dd></div>}
               </dl>}
             </div>}
-            {jobScreen.result.preference_fit.label !== "No job preferences saved" && <div className="job-preference-fit">
-              <span>What you want</span><strong>{jobScreen.result.preference_fit.label}</strong>
-              {[...jobScreen.result.preference_fit.matches, ...jobScreen.result.preference_fit.conflicts].map((item) => <p key={`${item.direction}-${item.preference}`}><b>{item.outcome === "match" ? "Matches" : "Concern"}:</b> {item.explanation}</p>)}
-              {jobScreen.result.preference_fit.unknown_count > 0 && <small>{jobScreen.result.preference_fit.unknown_count} saved {jobScreen.result.preference_fit.unknown_count === 1 ? "preference was" : "preferences were"} not clear from this posting.</small>}
-            </div>}
             {(jobScreen.result.evidence_used.length > 0 || checkedCriteria > 0) && <dl className="job-screen-coverage">
               {jobScreen.result.evidence_used.length > 0 && <div><dt>{jobScreen.result.evidence_used.length}</dt><dd>Verified {jobScreen.result.evidence_used.length === 1 ? "fact" : "facts"}</dd></div>}
               {checkedCriteria > 0 && <div><dt>{checkedCriteria}</dt><dd>{checkedCriteria === 1 ? "Criterion" : "Criteria"} checked</dd></div>}

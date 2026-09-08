@@ -13,22 +13,13 @@ from pydantic import ValidationError
 
 from resume_builder.agent_config import render_default_agent_config
 from resume_builder.agent_contracts import ModelAdapter, ModelProviderError, StructuredModelReply
-from resume_builder.job_screening import (
-    ConstraintState,
-    ScreeningCache,
-    SemanticScreen,
-    build_screening_packet,
-    finalize_screen,
-)
 from resume_builder.salary_estimation import (
     SALARY_CACHE_PATH,
     SalaryEstimate,
     SalaryEstimationService,
     build_salary_packet,
-    format_salary_estimate,
     validate_salary_estimate,
 )
-from resume_builder.screening_service import ScreeningService
 from resume_builder.web import create_app
 from resume_builder.web_service import DashboardService
 
@@ -206,59 +197,6 @@ def test_provider_failures_are_not_saved_as_estimates(tmp_path: Path) -> None:
             model="fictional/model",
         )
     assert not list(tmp_path.iterdir())
-
-
-def test_screening_estimates_in_one_call_without_changing_salary_eligibility(
-    tmp_path: Path,
-) -> None:
-    packet = build_screening_packet(
-        posting(),
-        {
-            "minimum_salary": 200_000,
-            "screening_profile": {"supported_capabilities": ["production operations"]},
-        },
-        {},
-    )
-    output = SemanticScreen(
-        fit="good_match",
-        confidence="medium",
-        reasoning_summary="Supported role fit.",
-        salary_estimate=estimate(),
-    )
-    adapter = adapter_for(output)
-    service = ScreeningService(adapter, ScreeningCache(tmp_path / "screen.sqlite"))
-    first, cached = service.screen(packet, model="fictional/model")
-    assert not cached and first.salary_estimate.minimum == 80_000
-    salary_constraint = next(item for item in first.constraints if item.code == "minimum_salary")
-    assert salary_constraint.state == ConstraintState.UNKNOWN
-    assert first.recommendation.value != "do_not_apply"
-    assert service.screen(packet, model="fictional/model")[1]
-    assert adapter.run_structured.call_count == 1
-    assert "not employer-confirmed" in format_salary_estimate(first.salary_estimate)
-    assert "salary_context" in adapter.run_structured.call_args.args[0].prompt
-    expired = first.model_copy(
-        update={
-            "generated_at": (datetime.now(UTC) - timedelta(days=31)).isoformat(),
-        }
-    )
-    service.cache.put(packet, expired)
-    assert service.cache.get(packet, "fictional/model") is None
-
-
-def test_screening_discards_estimates_for_posted_pay_and_reports_abstention() -> None:
-    semantic = SemanticScreen(
-        fit="good_match",
-        confidence="medium",
-        reasoning_summary="Supported role fit.",
-        salary_estimate=estimate(),
-    )
-    packet = build_screening_packet(posting(salary_max=120_000), {}, {})
-    assert packet.salary_context is None
-    assert finalize_screen(packet, semantic, model="fictional/model").salary_estimate is None
-    missing = semantic.model_copy(update={"salary_estimate": None})
-    result = finalize_screen(build_screening_packet(posting(), {}, {}), missing, model="model")
-    assert result.salary_estimate.status == "unavailable"
-    assert "unavailable" in format_salary_estimate(result.salary_estimate)
 
 
 def test_endpoint_is_explicit_cached_and_leaves_browsing_unchanged(

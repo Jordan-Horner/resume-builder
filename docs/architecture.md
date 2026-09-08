@@ -210,12 +210,12 @@ Indeed, ATS resolution, or another discovery provider. Source refresh and screen
 therefore have independent failure and retry boundaries. The browser only requests
 and renders these backend-owned views.
 
-The version 5 screening packet also carries the user's bounded explicit
-`preferred_job_attributes` and `avoided_job_attributes`. They are sent in the
-same semantic-screen request; no second model stage or preference retriever is
-introduced. The result keeps preference assessments separate from résumé fit
-and deterministic eligibility, requires complete assessment coverage, and
-validates every cited posting excerpt locally.
+Quick-screen provider requests contain only the bounded posting, selected
+candidate-evidence cards, criterion-evidence map, and coverage flags. Explicit
+preferred and avoided job attributes remain deterministic recommendation and
+feedback signals; they are not reclassified by the model. Salary estimation is
+also a separate, explicit public-posting-only request. This keeps the private
+fit request focused on the judgment the model uniquely provides.
 
 The same criterion-driven screen recommends the closest active directional
 resume without another provider request. The service intersects each validated
