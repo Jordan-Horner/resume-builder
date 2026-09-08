@@ -344,9 +344,27 @@ uv run job-puller boards check --provider ashby
 uv run job-puller boards check --provider workday
 ```
 
+Audit a small, attributed batch from the Feashliaa community ATS catalog without
+adding jobs or enabling boards:
+
+```bash
+uv run job-puller boards audit-catalog
+uv run job-puller boards audit-catalog --provider greenhouse --limit-per-provider 25
+```
+
+The audit supports only the existing Greenhouse, Lever, Ashby, and Workday
+adapters. It resolves and records the exact upstream commit, validates identifiers
+onto fixed ATS hosts, continues from a private cursor, and writes a JSON filter
+waterfall under `job-search/build/`. The report identifies healthy boards that
+currently produce matching jobs as promotion-ready, but promotion remains a
+separate reviewed action. The external company lists are CC BY-NC 4.0; the audit
+downloads them only for explicit private use and they are not bundled with this
+package.
+
 After review, set `enabled: true` on the boards worth monitoring. A whole ATS board is filtered locally through the
-same enabled title families, accepted work modes, and incremental cutoff used by commercial discovery, preventing
-unrelated company openings from flooding inventory. Boards may carry reusable tags such as `faang-plus`; tags are
+same enabled title families and incremental cutoff used by commercial discovery, preventing unrelated company
+openings from flooding inventory. Accepted work modes are reported as recommendation-profile matches rather than
+destructive ingestion gates. Boards may carry reusable tags such as `faang-plus`; tags are
 metadata for future search profiles and do not change collection behavior yet.
 
 SmartRecruiters reads the platform's structured remote/hybrid location flags and compensation fields when present.

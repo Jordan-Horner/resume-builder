@@ -109,6 +109,64 @@ it("sends on plain HTTP where crypto.randomUUID is unavailable", async () => {
   });
 });
 
+it("submits a message only once when the form fires twice before React rerenders", async () => {
+  let finishRun: ((value: Conversation) => void) | undefined;
+  const pendingRun = new Promise<Conversation>((resolve) => { finishRun = resolve; });
+  vi.mocked(assistantRequest).mockImplementation(async (path) => {
+    if (path === "/status") return { configured: true, online: true };
+    if (path === "/threads") return { threads: [thread] };
+    if (path === "/threads/saved/runs") return pendingRun;
+    return thread;
+  });
+  await act(async () => root.render(<AssistantPanel open target={null} onClose={() => undefined} />));
+  const input = host.querySelector("textarea")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(input, "review this job");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  const form = host.querySelector("form")!;
+  await act(async () => {
+    form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+  });
+
+  expect(assistantRequest).toHaveBeenCalledTimes(4);
+  expect(vi.mocked(assistantRequest).mock.calls.filter(([path]) => path === "/threads/saved/runs")).toHaveLength(1);
+  expect(host.querySelectorAll(".assistant-message.user")).toHaveLength(1);
+
+  await act(async () => finishRun?.({
+    ...thread,
+    runs: [{ id: "run", status: "running" }],
+    messages: [...thread.messages, { id: "run", role: "user", content: "review this job" }],
+  }));
+});
+
+it("does not treat the second click of a double-click as Stop", async () => {
+  vi.spyOn(Date, "now").mockReturnValue(1000);
+  const runningThread: Conversation = {
+    ...thread,
+    runs: [{ id: "run", status: "running" }],
+    messages: [...thread.messages, { id: "run", role: "user", content: "review this job" }],
+  };
+  vi.mocked(assistantRequest).mockImplementation(async (path) => {
+    if (path === "/status") return { configured: true, online: true };
+    if (path === "/threads") return { threads: [thread] };
+    if (path === "/threads/saved/runs") return runningThread;
+    return thread;
+  });
+  await act(async () => root.render(<AssistantPanel open target={null} onClose={() => undefined} />));
+  const input = host.querySelector("textarea")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(input, "review this job");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "Send")?.click());
+  await act(async () => Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "Stop")?.click());
+
+  expect(vi.mocked(assistantRequest).mock.calls.filter(([path]) => path === "/threads/saved/runs")).toHaveLength(1);
+  expect(vi.mocked(assistantRequest).mock.calls.some(([path]) => path === "/threads/saved/stop")).toBe(false);
+});
+
 it("shows preparation failures and preserves the typed message", async () => {
   vi.stubGlobal("crypto", { getRandomValues: () => { throw new Error("Random generation unavailable"); } });
   await submitMessage();

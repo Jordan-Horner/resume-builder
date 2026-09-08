@@ -174,6 +174,63 @@ def _screening_criteria(item: dict[str, Any]) -> str:
     )
 
 
+def _snapshot_criteria(snapshot: dict[str, Any]) -> str:
+    screen = snapshot.get("screening")
+    criteria = screen.get("criteria") if isinstance(screen, dict) else None
+    if not isinstance(criteria, list):
+        return ""
+    return " ".join(
+        str(criterion.get("label") or "") for criterion in criteria if isinstance(criterion, dict)
+    )
+
+
+def _same_role_pattern(item: dict[str, Any], snapshot: dict[str, Any]) -> bool:
+    role_similarity = _role_similarity(
+        str(item.get("title") or ""), str(snapshot.get("title") or "")
+    )
+    if role_similarity < 0.5:
+        return False
+    current_seniority = extract_seniority(item)
+    saved_seniority = str(snapshot.get("seniority") or extract_seniority(snapshot))
+    if (
+        current_seniority != "unknown"
+        and saved_seniority != "unknown"
+        and current_seniority != saved_seniority
+    ):
+        return False
+    current_criteria = _screening_criteria(item)
+    prior_criteria = _snapshot_criteria(snapshot)
+    if current_criteria and prior_criteria:
+        return _terms_similarity(current_criteria, prior_criteria) >= 0.25
+    return role_similarity >= (0.8 if current_criteria or prior_criteria else 0.67)
+
+
+def _role_pattern_feedback(
+    item: dict[str, Any], events: list[dict[str, Any]]
+) -> dict[str, int | bool]:
+    applied = 0
+    interested = 0
+    rejected = 0
+    for event in events:
+        snapshot = event.get("job")
+        if not isinstance(snapshot, dict) or snapshot.get("id") == item.get("id"):
+            continue
+        if not _same_role_pattern(item, snapshot):
+            continue
+        action = event.get("action")
+        applied += action == "applied"
+        interested += action == "interested"
+        rejected += action == "not_interested"
+    positive_anchor = applied >= 1 or interested >= 2
+    return {
+        "applied": applied,
+        "interested": interested,
+        "rejected": rejected,
+        "positive_anchor": positive_anchor,
+        "suppressed": rejected >= 3 and not positive_anchor,
+    }
+
+
 def _positive_event_affinity(item: dict[str, Any], event: dict[str, Any]) -> float:
     weights = {"opened_posting": 0.04, "interested": 0.09, "applied": 0.14}
     weight = weights.get(str(event.get("action")))
@@ -206,9 +263,6 @@ def _positive_event_affinity(item: dict[str, Any], event: dict[str, Any]) -> flo
 
 def _positive_pattern_matches(item: dict[str, Any], events: list[dict[str, Any]]) -> int:
     """Count distinct positive jobs that match role, level, and available duties."""
-    title = str(item.get("title") or "")
-    seniority = extract_seniority(item)
-    criteria = _screening_criteria(item)
     matches = 0
     for event in events:
         if event.get("action") not in {"interested", "applied"}:
@@ -216,29 +270,7 @@ def _positive_pattern_matches(item: dict[str, Any], events: list[dict[str, Any]]
         snapshot = event.get("job")
         if not isinstance(snapshot, dict) or snapshot.get("id") == item.get("id"):
             continue
-        role_similarity = _role_similarity(title, str(snapshot.get("title") or ""))
-        if role_similarity < 0.5:
-            continue
-        saved_seniority = str(snapshot.get("seniority") or "unknown")
-        if seniority != "unknown" and saved_seniority != "unknown" and seniority != saved_seniority:
-            continue
-        prior_screen = snapshot.get("screening")
-        prior_criteria = prior_screen.get("criteria") if isinstance(prior_screen, dict) else None
-        prior_labels = (
-            " ".join(
-                str(criterion.get("label") or "")
-                for criterion in prior_criteria
-                if isinstance(criterion, dict)
-            )
-            if isinstance(prior_criteria, list)
-            else ""
-        )
-        if criteria or prior_labels:
-            if not criteria or not prior_labels:
-                continue
-            if _terms_similarity(criteria, prior_labels) < 0.25:
-                continue
-        elif role_similarity < 0.67:
+        if not _same_role_pattern(item, snapshot):
             continue
         matches += 1
     return matches
@@ -392,6 +424,13 @@ def score_shadow_job(
         interest_score += min(0.2, positive_affinity)
         reasons.append("Similar to jobs you opened or pursued.")
     positive_pattern_matches = _positive_pattern_matches(item, list(events_by_job.values()))
+    role_pattern = _role_pattern_feedback(item, list(events_by_job.values()))
+    if role_pattern["positive_anchor"]:
+        interest_score += 0.12
+        reasons.append("You have pursued this role pattern before.")
+    if role_pattern["suppressed"]:
+        interest_score -= 0.30
+        reasons.append("You repeatedly passed on this role pattern.")
     same_company = [
         event
         for event in events_by_job.values()
@@ -436,6 +475,8 @@ def score_shadow_job(
     explicit_interest_match = bool(isinstance(interest, dict) and interest.get("interest_terms"))
     deterministic_match = explicit_target_match or explicit_interest_match
     hard_conflict = bool(isinstance(deterministic, dict) and deterministic.get("hard_conflicts"))
+    adjacent = deterministic.get("adjacent_candidate") if isinstance(deterministic, dict) else None
+    adjacent_candidate = bool(isinstance(adjacent, dict) and adjacent.get("eligible"))
     exact_positive = bool(latest and latest.get("action") in {"interested", "applied"})
     screen_is_supported = bool(
         isinstance(screen, dict)
@@ -451,9 +492,25 @@ def score_shadow_job(
         and result.get("fit") == "strong_match"
         and result.get("recommendation") != "do_not_apply"
     )
-    learned_match = positive_pattern_matches >= 2
+    fit_is_recommended = bool(
+        isinstance(screen, dict)
+        and screen.get("status") == "complete"
+        and isinstance(result, dict)
+        and result.get("fit") in {"strong_match", "good_match"}
+        and result.get("recommendation") == "pursue"
+        and result.get("confidence") in {"medium", "high"}
+    )
+    learned_match = bool(role_pattern["positive_anchor"])
+    adjacent_confirmed = adjacent_candidate and fit_is_recommended
     hot = bool(
-        screen_is_supported and not hard_conflict and deterministic_match and fit_is_strong
+        screen_is_supported
+        and not hard_conflict
+        and not role_pattern["suppressed"]
+        and (
+            (deterministic_match and fit_is_strong)
+            or adjacent_confirmed
+            or (learned_match and fit_is_recommended)
+        )
     )
     hot_reasons: list[str] = []
     if hot:
@@ -466,6 +523,8 @@ def score_shadow_job(
             hot_reasons.append("exact_interest")
         if learned_match:
             hot_reasons.append("positive_pattern")
+        if adjacent_confirmed:
+            hot_reasons.append("adjacent_capability_match")
     return {
         "score": round(hot_score, 3),
         "hot_score": round(hot_score, 3),
@@ -499,6 +558,7 @@ def score_shadow_job(
             "not_interested_without_reason_used_as_rule": bool(seniority_pattern["applied"]),
             "seniority_pattern": seniority_pattern,
             "positive_pattern_matches": positive_pattern_matches,
+            "role_pattern": role_pattern,
         },
     }
 

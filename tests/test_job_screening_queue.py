@@ -25,9 +25,10 @@ from resume_builder.posting_interpretation import (
 
 
 class QueueAdapter:
-    def __init__(self, *, fail: bool = False) -> None:
+    def __init__(self, *, fail: bool = False, confidence: Confidence = Confidence.LOW) -> None:
         self.calls = 0
         self.fail = fail
+        self.confidence = confidence
         self.models: list[str] = []
 
     def run(self, request: object) -> object:
@@ -82,7 +83,7 @@ class QueueAdapter:
         return StructuredModelReply(
             output=SemanticScreen(
                 fit=FitOutcome.STRONG_MATCH,
-                confidence=Confidence.LOW,
+                confidence=self.confidence,
                 supporting_fact_ids=[packet["candidate_evidence"][0]["fact_id"]],
                 gaps=[],
                 unknowns=[],
@@ -202,6 +203,149 @@ def test_queue_keeps_every_job_and_bounds_provider_work(
     assert "screening_batch_completed" in caplog.text
     assert "Support production operations" not in caplog.text
     assert "Fictional Company" not in caplog.text
+
+
+def test_queue_spends_only_on_local_adjacent_candidates(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "new.json"
+    output = tmp_path / "screens.json"
+    _input(source, ["adjacent", "unrelated"])
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    for job in payload["jobs"]:
+        job["prescreen"] = {
+            "queue_state": "ready",
+            "interest": {"desired_title_terms": [], "interest_terms": []},
+            "constraints": {"hard_conflicts": []},
+        }
+    source.write_text(json.dumps(payload), encoding="utf-8")
+    monkeypatch.setattr(
+        queue_module, "get_job_screening_packet", lambda job_id, **_: _packet(job_id)
+    )
+    monkeypatch.setattr(
+        queue_module,
+        "adjacent_evidence_signal",
+        lambda job, _cards: {
+            "eligible": job["id"] == "adjacent",
+            "matched_fact_count": 2 if job["id"] == "adjacent" else 0,
+            "matched_terms": ["incident", "production"] if job["id"] == "adjacent" else [],
+        },
+    )
+    monkeypatch.setattr(queue_module, "_screen_confirms_adjacent", lambda _screen: True)
+    adapter = QueueAdapter(confidence=Confidence.MEDIUM)
+
+    build_screening_queue(
+        adapter=adapter,
+        model="fictional/model",
+        interpretation_model="fictional/public-job-model",
+        cache_path=tmp_path / "cache.sqlite",
+        input_path=source,
+        output_path=output,
+        max_provider_jobs=2,
+        allow_provider=True,
+    )
+
+    jobs = {item["id"]: item for item in json.loads(output.read_text())["jobs"]}
+    assert adapter.calls == 1
+    assert jobs["adjacent"]["screening"]["status"] == "complete"
+    assert jobs["unrelated"]["screening"] == {
+        "status": "skipped",
+        "reason": "no_saved_search_signal",
+    }
+    assert json.loads((tmp_path / "learned-adjacent-roles.json").read_text())["patterns"] == [
+        {"title": "role adjacent", "seniority": "unknown"}
+    ]
+
+
+def test_confirmed_adjacent_title_is_reused_only_at_a_compatible_level() -> None:
+    patterns: list[dict[str, str]] = []
+    assert queue_module._screen_confirms_adjacent(
+        {
+            "status": "complete",
+            "result": {
+                "fit": "good_match",
+                "recommendation": "pursue",
+                "confidence": "medium",
+            },
+        }
+    )
+    queue_module._remember_adjacent({"title": "Senior Forward Deployed Engineer"}, patterns)
+
+    assert queue_module._learned_adjacent_match(
+        {"title": "Senior Forward Deployed Engineer"}, patterns
+    )
+    assert not queue_module._learned_adjacent_match(
+        {"title": "Staff Forward Deployed Engineer"}, patterns
+    )
+
+
+@pytest.mark.parametrize("learned_title", [False, True])
+def test_three_rejections_stop_spending_on_a_role_pattern(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, learned_title: bool
+) -> None:
+    source = tmp_path / "new.json"
+    output = tmp_path / "screens.json"
+    _input(source, ["current"])
+    payload = json.loads(source.read_text())
+    payload["jobs"][0]["title"] = "Forward Deployed Engineer"
+    payload["jobs"][0]["prescreen"] = {
+        "queue_state": "ready",
+        "interest": {
+            "desired_title_terms": [] if learned_title else ["forward deployed engineer"],
+            "interest_terms": [],
+        },
+        "constraints": {"hard_conflicts": []},
+    }
+    source.write_text(json.dumps(payload), encoding="utf-8")
+    if learned_title:
+        (tmp_path / "learned-adjacent-roles.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "patterns": [{"title": "forward deployed engineer", "seniority": "unknown"}],
+                }
+            ),
+            encoding="utf-8",
+        )
+    feedback_path = tmp_path / "job-search/job-feedback.json"
+    feedback_path.parent.mkdir(parents=True)
+    feedback_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "events": [
+                    {
+                        "action": "not_interested",
+                        "job": {
+                            "id": f"rejected-{index}",
+                            "title": "Forward Deployed Engineer",
+                        },
+                    }
+                    for index in range(3)
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        queue_module, "get_job_screening_packet", lambda job_id, **_: _packet(job_id)
+    )
+    adapter = QueueAdapter()
+
+    build_screening_queue(
+        adapter=adapter,
+        model="fictional/model",
+        cache_path=tmp_path / "cache.sqlite",
+        input_path=source,
+        output_path=output,
+        max_provider_jobs=2,
+        allow_provider=True,
+        workspace=tmp_path,
+    )
+
+    screened = json.loads(output.read_text())["jobs"][0]["screening"]
+    assert adapter.calls == 0
+    assert screened == {"status": "skipped", "reason": "role_pattern_suppressed"}
 
 
 def test_queue_without_authorization_uses_no_provider_and_marks_all_unknowns(

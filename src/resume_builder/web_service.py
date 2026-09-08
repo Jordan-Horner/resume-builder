@@ -1326,8 +1326,7 @@ class DashboardService:
             prescreen = _prescreen(raw_job, preferences, set()) if raw_job else None
             current_personalization = self.job_feedback(job_id).get("personalization")
             was_recommended = bool(
-                _is_recommended_prescreen(prescreen)
-                and isinstance(current_personalization, dict)
+                isinstance(current_personalization, dict)
                 and current_personalization.get("hot") is True
             )
             interest = prescreen.get("interest") if isinstance(prescreen, dict) else None
@@ -1627,6 +1626,7 @@ class DashboardService:
             "hard_constraint_conflict": "Outside required preferences",
             "incomplete_listing": "Incomplete listing",
             "no_saved_search_signal": "Outside saved searches",
+            "role_pattern_suppressed": "Deprioritized by your feedback",
         }
         if feedback_events is None:
             feedback_events = self._feedback_events()
@@ -1887,19 +1887,29 @@ class DashboardService:
                     clearance_preference=str(preferences.get("clearance_preference", "neutral")),
                     feedback_events=feedback_events,
                 )
-            if queue == "recommended" and (
-                not _is_recommended_prescreen(deterministic)
-                or job["id"] in explicitly_interested
-                or (
-                    isinstance(summary, dict)
-                    and summary.get("status") == "complete"
-                    and (
-                        not isinstance(summary.get("personalization"), dict)
-                        or summary["personalization"].get("hot") is not True
-                    )
+            if queue == "recommended":
+                completed = isinstance(summary, dict) and summary.get("status") == "complete"
+                personalized_hot = bool(
+                    isinstance(job.get("personalization"), dict)
+                    and job["personalization"].get("hot") is True
                 )
-            ):
-                continue
+                learning_sources = (
+                    job["personalization"].get("learning_sources")
+                    if isinstance(job.get("personalization"), dict)
+                    else None
+                )
+                role_pattern = (
+                    learning_sources.get("role_pattern")
+                    if isinstance(learning_sources, dict)
+                    else None
+                )
+                if (
+                    job["id"] in explicitly_interested
+                    or (isinstance(role_pattern, dict) and role_pattern.get("suppressed") is True)
+                    or (completed and not personalized_hot)
+                    or (not completed and not _is_recommended_prescreen(deterministic))
+                ):
+                    continue
             if not matches_view(job, view):
                 continue
             if view.employmentTypes and not set(view.employmentTypes).intersection(

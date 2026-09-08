@@ -196,9 +196,10 @@ signal. Those candidates appear in **Recommended Jobs** immediately and remain a
 backlog rather than a fixed-size shelf. Candidates are screened in deterministic
 preference order until the existing per-run provider cap is reached. A strong
 career-fit result with medium-or-high confidence and cited candidate evidence promotes
-an otherwise eligible recommendation to **Hot** and sorts it first; any completed
-non-strong screen demotes it to **All jobs**. Provider failures do not empty
-the deterministic backlog. **Interested jobs** contains explicit
+an otherwise eligible direct recommendation to **Hot** and
+sorts it first. A locally nominated unfamiliar title may also remain recommended after a
+Good or Strong fit with at least medium confidence; other completed screens return to
+**All jobs**. Provider failures do not empty the deterministic backlog. **Interested jobs** contains explicit
 positive decisions that have not become applications, and **All jobs** remains the
 complete reviewable inventory. Marking a recommendation Interested moves it from
 Recommended Jobs to Interested jobs; applying or dismissing it removes it from
@@ -210,6 +211,15 @@ The standalone backfill rebuilds the local shortlist and never invokes LinkedIn,
 Indeed, ATS resolution, or another discovery provider. Source refresh and screening
 therefore have independent failure and retry boundaries. The browser only requests
 and renders these backend-owned views.
+
+An unfamiliar title may also enter screening through a conservative local adjacent-role
+signal derived from confirmed vault facts. This signal only authorizes the existing
+quick screen; it is not a qualification judgment. Successful screens retain the
+normalized title and seniority as a private learned admission pattern, while every later
+posting still receives its own fit screen. Feedback is evaluated against title,
+seniority, and available screened duties: one application or two Interested decisions
+preserve a pattern, while three matching rejections with no positive anchor suppress it
+from recommendations and automatic screening without hiding it from All jobs.
 
 Quick-screen provider requests contain only the bounded posting, selected
 candidate-evidence cards, criterion-evidence map, and coverage flags. Explicit

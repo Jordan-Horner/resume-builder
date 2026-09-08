@@ -862,6 +862,45 @@ def test_recommended_queue_reuses_the_existing_deterministic_prescreen(
     assert [item["id"] for item in service.list_jobs(queue="recommended")] == ["remote-1"]
 
 
+def test_recommended_queue_accepts_an_ai_confirmed_adjacent_candidate(
+    tmp_path, inventory, monkeypatch
+):
+    preferences_path = tmp_path / "job-search/preferences.yml"
+    preferences_path.parent.mkdir(parents=True)
+    preferences_path.write_text("schema_version: 1\n", encoding="utf-8")
+    monkeypatch.setattr(web_service, "_load_preferences", lambda _path: {"configured": True})
+    monkeypatch.setattr(
+        web_service,
+        "_prescreen",
+        lambda _raw, _preferences, _resume_terms: {
+            "queue_state": "ready",
+            "interest": {"desired_title_terms": [], "interest_terms": []},
+        },
+    )
+    write_screening_output(tmp_path, ["remote-1"], fit="good_match")
+    output = tmp_path / web_service.JOB_SCREENING_OUTPUT
+    payload = json.loads(output.read_text())
+    payload["jobs"][0]["deterministic"]["interest"] = {
+        "desired_title_terms": [],
+        "interest_terms": [],
+    }
+    payload["jobs"][0]["deterministic"]["adjacent_candidate"] = {
+        "eligible": True,
+        "matched_fact_count": 3,
+        "matched_terms": ["automation", "incident", "terraform"],
+    }
+    output.write_text(json.dumps(payload), encoding="utf-8")
+    service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
+
+    recommended = service.list_jobs(queue="recommended")
+
+    assert [item["id"] for item in recommended] == ["remote-1"]
+    assert recommended[0]["personalization"]["hot_reasons"] == [
+        "career_fit",
+        "adjacent_capability_match",
+    ]
+
+
 @pytest.mark.parametrize(
     ("fit", "recommendation"),
     [
@@ -913,6 +952,42 @@ def test_recommended_queue_keeps_the_deterministic_backlog(tmp_path, monkeypatch
     service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
 
     assert len(service.list_jobs(queue="recommended")) == 15
+
+
+def test_recommended_queue_suppresses_a_three_rejection_role_pattern(
+    tmp_path, inventory, monkeypatch
+):
+    preferences_path = tmp_path / "job-search/preferences.yml"
+    preferences_path.parent.mkdir(parents=True)
+    preferences_path.write_text("schema_version: 1\n", encoding="utf-8")
+    monkeypatch.setattr(web_service, "_load_preferences", lambda _path: {"configured": True})
+    monkeypatch.setattr(
+        web_service,
+        "_prescreen",
+        lambda _raw, _preferences, _resume_terms: {
+            "queue_state": "ready",
+            "interest": {"desired_title_terms": ["support engineer"], "interest_terms": []},
+        },
+    )
+    (tmp_path / "job-search/job-feedback.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "events": [
+                    {
+                        "action": "not_interested",
+                        "job": {"id": f"old-{index}", "title": "Support Engineer"},
+                    }
+                    for index in range(3)
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    service = DashboardService(tmp_path, inventory_loader=lambda: [inventory[0]])
+
+    assert service.list_jobs(queue="recommended") == []
+    assert [item["id"] for item in service.list_jobs(queue="all")] == ["remote-1"]
 
 
 def test_recommended_queue_sorts_screened_hot_jobs_before_the_backlog(

@@ -55,6 +55,8 @@ function ConversationView({ initial, changed, open }: { initial: Conversation; c
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const end = useRef<HTMLDivElement>(null);
+  const submitting = useRef(false);
+  const stopAllowedAt = useRef(0);
   const running = sending || thread.runs.some((run) => run.status === "running");
 
   useEffect(() => {
@@ -78,7 +80,9 @@ function ConversationView({ initial, changed, open }: { initial: Conversation; c
   useEffect(() => { end.current?.scrollIntoView?.({ block: "nearest" }); }, [thread.messages.length, sending]);
 
   async function send() {
-    if (!input.trim() || running) return;
+    if (!input.trim() || running || submitting.current) return;
+    submitting.current = true;
+    stopAllowedAt.current = Date.now() + 750;
     const content = input.trim();
     setError(""); setSending(true); setInput("");
     try {
@@ -93,12 +97,15 @@ function ConversationView({ initial, changed, open }: { initial: Conversation; c
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not send message.");
       setInput(content);
-    } finally { setSending(false); }
+    } finally { submitting.current = false; setSending(false); }
   }
 
   async function stop() {
+    // Ignore the second click of a double-click after Send changes into Stop.
+    if (Date.now() < stopAllowedAt.current) return;
     try {
       await assistantRequest(`/threads/${initial.id}/stop`, { method: "POST" });
+      submitting.current = false;
       setSending(false);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not stop response."); }
   }

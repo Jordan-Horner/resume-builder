@@ -406,7 +406,7 @@ def test_hard_conflict_never_becomes_hot_even_when_explicitly_interested():
     assert score["hot_reasons"] == []
 
 
-def test_positive_patterns_improve_learning_but_do_not_bypass_deterministic_match():
+def test_positive_pattern_becomes_a_reusable_recommendation_signal():
     item = _item("job-1", "strong", title="DevOps Engineer")
     item["screening"]["result"]["criterion_evidence"] = [
         {"criterion_id": "current", "label": "Operate Kubernetes infrastructure"}
@@ -441,8 +441,9 @@ def test_positive_patterns_improve_learning_but_do_not_bypass_deterministic_matc
     )[1]["job-1"]
 
     assert one["hot"] is False
-    assert repeated["hot"] is False
+    assert repeated["hot"] is True
     assert repeated["learning_sources"]["positive_pattern_matches"] == 2
+    assert repeated["learning_sources"]["role_pattern"]["positive_anchor"] is True
 
     item["deterministic"]["interest"] = {
         "desired_title_terms": ["devops engineer"],
@@ -456,3 +457,108 @@ def test_positive_patterns_improve_learning_but_do_not_bypass_deterministic_matc
     )[1]["job-1"]
     assert deterministic_match["hot"] is True
     assert "positive_pattern" in deterministic_match["hot_reasons"]
+
+
+def test_three_matching_rejections_suppress_a_pattern_without_positive_anchor():
+    item = _item("job-1", "strong", title="Forward Deployed Engineer")
+    feedback = [
+        {
+            "action": "not_interested",
+            "job": {
+                "id": f"rejected-{index}",
+                "title": "Forward Deployed Engineer",
+                "seniority": "unknown",
+            },
+        }
+        for index in range(3)
+    ]
+
+    score = build_shadow_order(
+        [item], preferences={}, positive_titles=[], feedback_events=feedback
+    )[1]["job-1"]
+
+    assert score["hot"] is False
+    assert score["learning_sources"]["role_pattern"] == {
+        "applied": 0,
+        "interested": 0,
+        "rejected": 3,
+        "positive_anchor": False,
+        "suppressed": True,
+    }
+
+
+def test_application_preserves_pattern_after_three_matching_rejections():
+    item = _item("job-1", "good", title="Forward Deployed Engineer")
+    feedback = [
+        {
+            "action": "applied",
+            "job": {"id": "applied", "title": "Forward Deployed Engineer"},
+        },
+        *[
+            {
+                "action": "not_interested",
+                "job": {"id": f"rejected-{index}", "title": "Forward Deployed Engineer"},
+            }
+            for index in range(3)
+        ],
+    ]
+
+    score = build_shadow_order(
+        [item], preferences={}, positive_titles=[], feedback_events=feedback
+    )[1]["job-1"]
+
+    assert score["hot"] is True
+    assert score["learning_sources"]["role_pattern"]["positive_anchor"] is True
+    assert score["learning_sources"]["role_pattern"]["suppressed"] is False
+
+
+def test_rejected_duty_subtype_does_not_suppress_an_applied_subtype():
+    item = _item("job-1", "good", title="Forward Deployed Engineer")
+    item["screening"]["result"]["criterion_evidence"] = [
+        {"criterion_id": "delivery", "label": "Customer implementation and cloud automation"}
+    ]
+    feedback = [
+        {
+            "action": "applied",
+            "job": {
+                "id": "applied",
+                "title": "Forward Deployed Engineer",
+                "screening": {
+                    "criteria": [{"label": "Cloud automation and customer implementation"}]
+                },
+            },
+        },
+        *[
+            {
+                "action": "not_interested",
+                "job": {
+                    "id": f"rejected-{index}",
+                    "title": "Forward Deployed Engineer",
+                    "screening": {"criteria": [{"label": "Continuous phone support queue"}]},
+                },
+            }
+            for index in range(3)
+        ],
+    ]
+
+    score = build_shadow_order(
+        [item], preferences={}, positive_titles=[], feedback_events=feedback
+    )[1]["job-1"]
+
+    assert score["learning_sources"]["role_pattern"]["applied"] == 1
+    assert score["learning_sources"]["role_pattern"]["rejected"] == 0
+    assert score["hot"] is True
+
+
+def test_ai_confirmed_adjacent_candidate_can_be_recommended_without_title_match():
+    item = _item("job-1", "good", title="Forward Deployed Engineer")
+    item["deterministic"]["adjacent_candidate"] = {
+        "eligible": True,
+        "matched_fact_count": 3,
+        "matched_terms": ["automation", "customer", "terraform"],
+    }
+
+    score = score_shadow_job(item, positive_titles=[])
+
+    assert score["hot"] is True
+    assert "adjacent_capability_match" in score["hot_reasons"]

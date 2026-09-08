@@ -164,13 +164,26 @@ that pass the title, location, work-mode, seniority, completeness, and compensat
 gates and have a saved role or interest signal. Provider work stops when the
 12-job recommendation shelf is full or the configured per-run cost cap is reached.
 Cached results do not consume the cap. Deterministic candidates populate Recommended Jobs
-immediately; only completed Strong fits with medium-or-high confidence and cited candidate
-evidence earn Hot, and completed non-strong screens return to All jobs. Failures and
-unfinished screens remain in the recommendation backlog.
+immediately. Direct matches require a completed Strong fit with medium-or-high confidence
+and cited candidate evidence; unfamiliar adjacent titles
+may remain recommended after a Good or Strong fit with at least medium confidence.
+Other completed screens return to All jobs. Failures and unfinished screens remain in
+the recommendation backlog.
 Interested, applied, and dismissed decisions immediately re-rank existing results
 and schedule a bounded background refill. Discovery failures do not require or
 trigger a repeated source refresh before that backlog can continue. The manual
 per-job Screen button is a retry or override, not the normal workflow.
+
+Jobs with unfamiliar titles get one bounded local second chance before the worker skips
+them. Confirmed vault facts must overlap the posting across at least two demonstrated
+facts and two non-generic terms; hard constraints still win. Direct saved-role matches
+always consume the screening allowance first. A Good or Strong `pursue` result with at
+least medium confidence records the title and seniority in
+`job-search/learned-adjacent-roles.json`, so later jobs with that title can be screened
+without rediscovering the title. The later job is still screened on its own duties.
+Three matching `Not interested` decisions suppress further automatic screening only
+when there is no application or pair of Interested decisions for that role pattern.
+Suppression never removes jobs from All jobs.
 
 Test exactly one task without starting the service:
 

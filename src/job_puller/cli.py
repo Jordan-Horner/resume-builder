@@ -7,6 +7,8 @@ import os
 import sys
 from pathlib import Path
 
+import httpx
+
 from . import __version__
 from .boards import (
     SUPPORTED_PROVIDERS,
@@ -120,6 +122,33 @@ def _parser() -> argparse.ArgumentParser:
         "check", help="Test one ATS vendor's configured boards without updating inventory"
     )
     check.add_argument("--provider", required=True, choices=SUPPORTED_PROVIDERS)
+    audit_catalog = board_commands.add_parser(
+        "audit-catalog",
+        help="Test a capped batch from the attributed community catalog without updating inventory",
+    )
+    audit_catalog.add_argument(
+        "--provider",
+        action="append",
+        choices=("greenhouse", "lever", "ashby", "workday"),
+        dest="catalog_providers",
+        help="Audit one supported catalog; repeat to select more than one",
+    )
+    audit_catalog.add_argument(
+        "--limit-per-provider",
+        type=int,
+        default=25,
+        help="Boards to test per provider (default 25, maximum 100)",
+    )
+    audit_catalog.add_argument(
+        "--cursor",
+        default="cache/community-board-audit-cursor.json",
+        help="Private cursor path relative to the job-search directory",
+    )
+    audit_catalog.add_argument(
+        "--output",
+        default="build/community-board-audit.json",
+        help="JSON report path relative to the job-search directory",
+    )
     return parser
 
 
@@ -237,6 +266,40 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.command == "boards":
+        if args.boards_action == "audit-catalog":
+            from .community_catalog import CATALOG_FILES, audit_community_catalog
+
+            try:
+                output_path = resolve_project_path(config_path, args.output)
+                report = audit_community_catalog(
+                    config,
+                    providers=list(args.catalog_providers or CATALOG_FILES),
+                    limit_per_provider=args.limit_per_provider,
+                    cursor_path=resolve_project_path(config_path, args.cursor),
+                    output_path=output_path,
+                )
+            except (OSError, ValueError, httpx.HTTPError) as exc:
+                print(f"Catalog audit failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+                return 2
+            totals = report["totals"]
+            assert isinstance(totals, dict)
+            print(f"Community catalog audit: {output_path}")
+            print(
+                f"Tested {totals.get('boards_tested', 0)} boards; "
+                f"raw jobs={totals.get('raw_results', 0)}; "
+                f"accepted={totals.get('accepted', 0)}; "
+                f"title rejected={totals.get('title_rejected', 0)}; "
+                f"stale={totals.get('freshness_rejected', 0)}."
+            )
+            print(
+                f"Promotion-ready boards: {totals.get('promotion_ready', 0)}. "
+                "No boards were enabled and inventory was not changed."
+            )
+            failures = sum(
+                int(totals.get(f"outcome.{outcome}", 0))
+                for outcome in ("failed", "blocked", "partial")
+            )
+            return 1 if failures else 0
         if args.boards_action == "check":
             service = InventoryService(config, database)
             providers = service.ats_providers(args.provider, include_disabled=True)

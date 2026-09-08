@@ -3,7 +3,10 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from resume_builder.agent_config import DEFAULT_AGENT_CONFIG, render_default_agent_config
 from resume_builder.web import create_app
+from resume_builder.web_agent import asyncio as web_agent_asyncio
+from resume_builder.web_service import DashboardService
 
 
 @pytest.fixture
@@ -61,3 +64,32 @@ def test_direct_assistant_runs_validate_messages_and_configuration(client: TestC
     assert invalid.status_code == 400
     assert unconfigured.status_code == 409
     assert client.get(f"/api/assistant/threads/{identity}").json()["messages"] == []
+
+
+def test_configured_assistant_run_launches_from_the_request_event_loop(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RESUME_BUILDER_AGENT_STATE", str(tmp_path / "agent.sqlite"))
+    config_path = tmp_path / DEFAULT_AGENT_CONFIG
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text(render_default_agent_config(), encoding="utf-8")
+    monkeypatch.setattr(DashboardService, "_openrouter_configured", lambda _self: True)
+
+    async def unavailable_worker(*_args: object, **_kwargs: object) -> None:
+        raise OSError("worker unavailable in test")
+
+    monkeypatch.setattr(web_agent_asyncio, "create_subprocess_exec", unavailable_worker)
+    with TestClient(create_app(tmp_path)) as configured_client:
+        identity = configured_client.post("/api/assistant/threads", json={}).json()["id"]
+        response = configured_client.post(
+            f"/api/assistant/threads/{identity}/runs",
+            json={"run_id": "run-one", "prompt": "Review my search"},
+        )
+
+    assert response.status_code == 202
+    assert response.headers["content-type"].startswith("application/json")
+    assert response.json()["messages"][0] == {
+        "id": "run-one",
+        "role": "user",
+        "content": "Review my search",
+    }

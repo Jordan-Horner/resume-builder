@@ -183,7 +183,7 @@ def install_assistant(app: FastAPI, workspace: Path) -> None:
         return thread(identity)
 
     @router.post("/threads/{identity}/runs", status_code=202)
-    def start_turn(identity: str, payload: dict[str, Any]) -> dict[str, Any]:
+    async def start_turn(identity: str, payload: dict[str, Any]) -> dict[str, Any]:
         run_id = payload.get("run_id")
         prompt = payload.get("prompt")
         if (

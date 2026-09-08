@@ -19,6 +19,7 @@ from resume_builder.screening_evidence import (
     EvidenceCoverage,
     EvidenceStrategy,
     EvidenceStrength,
+    adjacent_evidence_signal,
     select_criterion_screening_evidence,
     select_screening_evidence,
 )
@@ -80,6 +81,39 @@ def _interpretation(*criteria: PostingCriterion) -> PostingInterpretation:
         ],
         criteria_complete=True,
     )
+
+
+def test_adjacent_signal_requires_distinct_demonstrated_facts_and_terms(tmp_path: Path) -> None:
+    initialize_workspace(tmp_path)
+    _fact(
+        tmp_path,
+        "FACT-000000000001",
+        title="Cloud automation",
+        body="Automated Terraform delivery across AWS environments.",
+    )
+    _fact(
+        tmp_path,
+        "FACT-000000000002",
+        title="Customer troubleshooting",
+        body="Resolved complex customer incidents across APIs and Kubernetes services.",
+    )
+    adjacent_job = _job(
+        description_text=(
+            "Deliver Terraform automation across AWS environments and troubleshoot "
+            "customer APIs and Kubernetes services."
+        )
+    )
+    selection = select_screening_evidence(tmp_path / "vault", adjacent_job)
+
+    adjacent = adjacent_evidence_signal(adjacent_job, selection.cards)
+    unrelated = adjacent_evidence_signal(
+        _job(title="Accountant", description_text="Prepare tax filings and financial reports."),
+        selection.cards,
+    )
+
+    assert adjacent["eligible"] is True
+    assert adjacent["matched_fact_count"] >= 2
+    assert unrelated == {"eligible": False, "matched_fact_count": 0, "matched_terms": []}
 
 
 def _criterion(

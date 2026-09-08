@@ -7,6 +7,7 @@ import json
 import math
 import re
 from collections import Counter
+from collections.abc import Sequence
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
@@ -94,6 +95,18 @@ _WEAK_SINGLE_TERM_ANCHORS = {
     "support",
     "systems",
     "technical",
+}
+
+_ADJACENT_GENERIC_TERMS = _WEAK_SINGLE_TERM_ANCHORS | {
+    "developer",
+    "engineer",
+    "experience",
+    "lead",
+    "principal",
+    "senior",
+    "staff",
+    "team",
+    "years",
 }
 
 _CATEGORY_LIMITS = {
@@ -197,6 +210,34 @@ class _IndexedFact(BaseModel):
     searchable: str
     themes: list[str]
     latest_year: int
+
+
+def adjacent_evidence_signal(
+    job: object, cards: Sequence[ScreeningEvidenceCard]
+) -> dict[str, object]:
+    """Return a conservative local signal for screening an unfamiliar title."""
+    if not isinstance(job, dict):
+        return {"eligible": False, "matched_fact_count": 0, "matched_terms": []}
+    posting_tokens = _tokens(
+        "\n".join(str(job.get(key) or "") for key in ("title", "description", "description_text"))
+    )
+    matched_fact_ids: list[str] = []
+    matched_terms: set[str] = set()
+    for card in cards:
+        if card.strength != EvidenceStrength.DEMONSTRATED:
+            continue
+        overlap = (
+            posting_tokens & _tokens(f"{card.title}\n{card.excerpt}")
+        ) - _ADJACENT_GENERIC_TERMS
+        if not overlap:
+            continue
+        matched_fact_ids.append(str(card.fact_id))
+        matched_terms.update(overlap)
+    return {
+        "eligible": len(matched_fact_ids) >= 2 and len(matched_terms) >= 2,
+        "matched_fact_count": len(matched_fact_ids),
+        "matched_terms": sorted(matched_terms)[:12],
+    }
 
 
 def _tokens(value: str) -> set[str]:

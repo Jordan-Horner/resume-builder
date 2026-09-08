@@ -11,6 +11,8 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+from job_puller.normalize import normalized_key
+
 from .agent_contracts import ModelAdapter, ModelProviderError
 from .applications import DEFAULT_ROOT as DEFAULT_APPLICATIONS_ROOT
 from .applications import applied_job_ids
@@ -18,6 +20,7 @@ from .atomic import atomic_write_json, atomic_write_text
 from .job_personalization import (
     build_shadow_order,
     extract_preference_traits,
+    extract_seniority,
     load_feedback_events,
     score_shadow_job,
 )
@@ -39,12 +42,14 @@ from .jobs import (
 )
 from .posting_interpretation import PostingInterpretationCache
 from .resume_screening import load_directional_resume_candidates
+from .screening_evidence import adjacent_evidence_signal
 from .screening_service import ScreeningService, enrich_packet_from_cached_interpretation
 
 LOGGER = logging.getLogger(__name__)
 
 DEFAULT_SCREENING_OUTPUT = Path("job-search/new-job-screens.json")
 SCREENING_QUEUE_SCHEMA_VERSION = 1
+LEARNED_ADJACENT_SCHEMA_VERSION = 1
 RECOMMENDED = {Recommendation.PURSUE, Recommendation.PURSUE_AS_STRETCH}
 QUEUE_JOB_FIELDS = (
     "id",
@@ -121,12 +126,77 @@ def _automatic_skip_reason(job: dict[str, Any]) -> str | None:
         return "hard_constraint_conflict"
     if queue_state == "needs_description":
         return "incomplete_listing"
-    interest = prescreen.get("interest")
-    if isinstance(interest, dict) and not any(
-        bool(interest.get(key)) for key in ("desired_title_terms", "interest_terms")
-    ):
+    if isinstance(prescreen.get("interest"), dict) and not _has_saved_search_signal(job):
         return "no_saved_search_signal"
     return None
+
+
+def _has_saved_search_signal(job: dict[str, Any]) -> bool:
+    prescreen = job.get("prescreen")
+    interest = prescreen.get("interest") if isinstance(prescreen, dict) else None
+    return bool(
+        isinstance(interest, dict)
+        and any(bool(interest.get(key)) for key in ("desired_title_terms", "interest_terms"))
+    )
+
+
+def _load_learned_adjacent(path: Path) -> list[dict[str, str]]:
+    if not path.is_file():
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"invalid learned adjacent roles: {path}") from exc
+    patterns = payload.get("patterns") if isinstance(payload, dict) else None
+    if (
+        not isinstance(payload, dict)
+        or payload.get("schema_version") != LEARNED_ADJACENT_SCHEMA_VERSION
+        or not isinstance(patterns, list)
+    ):
+        raise ValueError(f"invalid learned adjacent roles: {path}")
+    if any(
+        not isinstance(item, dict)
+        or not isinstance(item.get("title"), str)
+        or not isinstance(item.get("seniority"), str)
+        for item in patterns
+    ):
+        raise ValueError(f"invalid learned adjacent roles: {path}")
+    return patterns
+
+
+def _learned_adjacent_match(job: dict[str, Any], patterns: list[dict[str, str]]) -> bool:
+    title = normalized_key(str(job.get("title") or ""))
+    seniority = extract_seniority(job)
+    return any(
+        item.get("title") == title
+        and (
+            seniority == "unknown"
+            or item.get("seniority") == "unknown"
+            or item.get("seniority") == seniority
+        )
+        for item in patterns
+    )
+
+
+def _screen_confirms_adjacent(screening: dict[str, Any]) -> bool:
+    result = screening.get("result") if screening.get("status") == "complete" else None
+    return bool(
+        isinstance(result, dict)
+        and result.get("fit") in {"strong_match", "good_match"}
+        and result.get("recommendation") == "pursue"
+        and result.get("confidence") in {"medium", "high"}
+    )
+
+
+def _remember_adjacent(job: dict[str, Any], patterns: list[dict[str, str]]) -> bool:
+    pattern = {
+        "title": normalized_key(str(job.get("title") or "")),
+        "seniority": extract_seniority(job),
+    }
+    if pattern["title"] and pattern not in patterns:
+        patterns.append(pattern)
+        return True
+    return False
 
 
 def _priority(item: dict[str, Any]) -> tuple[int, int, int]:
@@ -261,6 +331,8 @@ def build_screening_queue(
         else []
     )
     feedback_events = load_feedback_events(workspace / "job-search/job-feedback.json")
+    learned_path = output_path.with_name("learned-adjacent-roles.json")
+    learned_adjacent = _load_learned_adjacent(learned_path)
     latest_actions = {
         str(snapshot["id"]): str(event.get("action"))
         for event in feedback_events
@@ -280,6 +352,7 @@ def build_screening_queue(
         prepared.append((job, _job_view(job, source_order=source_order, active=active)))
     prepared.sort(
         key=lambda pair: (
+            0 if _has_saved_search_signal(pair[0]) else 1,
             -float(
                 score_shadow_job(
                     {**pair[1], "screening": {"status": "unscreened"}},
@@ -306,14 +379,48 @@ def build_screening_queue(
     output_tokens = 0
     total_cost = Decimal("0")
     failure_categories: Counter[str] = Counter()
+    adjacent_candidates = 0
+    learned_title_candidates = 0
+    confirmed_adjacent = 0
+    suppressed_patterns = 0
     for job, item in prepared:
         active = bool(item["active"])
         if not active:
             item["screening"] = {"status": "not_active", "reason": "durable_disposition"}
             items.append(item)
             continue
+        packet = None
+        adjacent: dict[str, object] | None = None
         skip_reason = _automatic_skip_reason(job)
-        if skip_reason:
+        if skip_reason == "no_saved_search_signal":
+            packet = get_job_screening_packet(
+                str(job.get("id") or ""),
+                config_path=config_path,
+                preferences_path=preferences_path,
+                workspace=workspace,
+                prepared_job=job,
+                prepared_preferences=preferences,
+                prepared_prescreen=(
+                    prescreen if isinstance((prescreen := job.get("prescreen")), dict) else None
+                ),
+                prepared_directional_resumes=directional_resumes,
+            )
+            learned = _learned_adjacent_match(job, learned_adjacent)
+            adjacent = (
+                {"eligible": True, "learned_title": True}
+                if learned
+                else adjacent_evidence_signal(
+                    packet.job.model_dump(mode="python"), packet.candidate_evidence
+                )
+            )
+            item.setdefault("deterministic", {})["adjacent_candidate"] = adjacent
+            if not adjacent["eligible"]:
+                item["screening"] = {"status": "skipped", "reason": skip_reason}
+                items.append(item)
+                continue
+            adjacent_candidates += 1
+            learned_title_candidates += learned
+        elif skip_reason:
             item["screening"] = {"status": "skipped", "reason": skip_reason}
             items.append(item)
             continue
@@ -325,19 +432,32 @@ def build_screening_queue(
             item["screening"] = {"status": "skipped", "reason": "feedback_disposition"}
             items.append(item)
             continue
-
-        packet = get_job_screening_packet(
-            str(job.get("id") or ""),
-            config_path=config_path,
-            preferences_path=preferences_path,
-            workspace=workspace,
-            prepared_job=job,
-            prepared_preferences=preferences,
-            prepared_prescreen=(
-                prescreen if isinstance((prescreen := job.get("prescreen")), dict) else None
-            ),
-            prepared_directional_resumes=directional_resumes,
+        pattern_score = score_shadow_job(
+            {**item, "screening": {"status": "unscreened"}},
+            positive_titles=positive_titles,
+            clearance_preference=str(preferences.get("clearance_preference", "neutral")),
+            feedback_events=feedback_events,
         )
+        role_pattern = pattern_score.get("learning_sources", {}).get("role_pattern", {})
+        if isinstance(role_pattern, dict) and role_pattern.get("suppressed") is True:
+            suppressed_patterns += 1
+            item["screening"] = {"status": "skipped", "reason": "role_pattern_suppressed"}
+            items.append(item)
+            continue
+
+        if packet is None:
+            packet = get_job_screening_packet(
+                str(job.get("id") or ""),
+                config_path=config_path,
+                preferences_path=preferences_path,
+                workspace=workspace,
+                prepared_job=job,
+                prepared_preferences=preferences,
+                prepared_prescreen=(
+                    prescreen if isinstance((prescreen := job.get("prescreen")), dict) else None
+                ),
+                prepared_directional_resumes=directional_resumes,
+            )
         packet = enrich_packet_from_cached_interpretation(
             packet,
             model=interpretation_model or model,
@@ -348,6 +468,8 @@ def build_screening_queue(
         cached = cache.get(packet, model)
         if cached is not None:
             item["screening"] = _result_payload(cached, cached=True)
+            if adjacent and _screen_confirms_adjacent(item["screening"]):
+                confirmed_adjacent += _remember_adjacent(job, learned_adjacent)
             items.append(item)
             continue
         if packet.eligibility.value == "ineligible":
@@ -387,6 +509,8 @@ def build_screening_queue(
             output_tokens += outcome.output_tokens
             total_cost += outcome.cost_usd
             item["screening"] = _result_payload(outcome.result, cached=outcome.cached)
+            if adjacent and _screen_confirms_adjacent(item["screening"]):
+                confirmed_adjacent += _remember_adjacent(job, learned_adjacent)
         items.append(item)
 
     items.sort(key=lambda item: int(item["source_order"]))
@@ -449,8 +573,26 @@ def build_screening_queue(
             "changes_notifications": False,
             "ignored_jobs_are_negative_feedback": False,
         },
+        "adjacent_learning": {
+            "candidates": adjacent_candidates,
+            "learned_title_candidates": learned_title_candidates,
+            "newly_confirmed_patterns": confirmed_adjacent,
+            "suppressed_patterns": suppressed_patterns,
+            "stored_patterns": len(learned_adjacent),
+        },
     }
     atomic_write_json(output_path, output)
+    if learned_adjacent or learned_path.exists():
+        atomic_write_json(
+            learned_path,
+            {
+                "schema_version": LEARNED_ADJACENT_SCHEMA_VERSION,
+                "patterns": sorted(
+                    learned_adjacent,
+                    key=lambda item: (item.get("title", ""), item.get("seniority", "")),
+                ),
+            },
+        )
     lines = [
         "# New Job Screening",
         "",
