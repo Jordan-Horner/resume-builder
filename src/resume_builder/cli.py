@@ -141,7 +141,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     if command == "report" and "--summary" not in forwarded:
         forwarded = [*forwarded, "--summary"]
     try:
-        if command in {"init", "serve"} or active_workspace is None:
+        # Long-running services must not hold the workspace write lock for
+        # their whole lifetime: the portal takes the same lock for every
+        # write request, and a held lock turns each click into a timeout.
+        # Automation tasks take short locks around their own work instead.
+        if command in {"automation", "init", "serve"} or active_workspace is None:
             return handler(forwarded)
         with workspace_lock(active_workspace, exclusive=True):
             return handler(forwarded)

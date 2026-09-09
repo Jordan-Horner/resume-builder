@@ -34,6 +34,7 @@ from resume_builder.scheduled_tasks.scheduler import (
     run_forever,
 )
 from resume_builder.scheduled_tasks.scheduler import main as automation_main
+from resume_builder.workspace_management.locking import workspace_lock, workspace_sync_lock
 
 
 def write_config(path: Path, **updates: object) -> None:
@@ -453,6 +454,53 @@ def test_job_task_enqueues_reapplication_notification_without_logging_details(
     assert history is not None
     assert history["summary"]["reapplication_opportunities"] == 1
     assert "reapplications" not in history["summary"]
+
+
+def test_task_run_keeps_workspace_writes_open_to_portal_decisions(
+    tmp_path: Path,
+) -> None:
+    """A running task holds the sync gate but never the exclusive write lock."""
+    config_path = tmp_path / "config.yml"
+    config_path.write_text(render_default_config("America/New_York"), encoding="utf-8")
+    started = threading.Event()
+    release = threading.Event()
+
+    def slow_jobs() -> dict[str, object]:
+        started.set()
+        release.wait(10)
+        return {"new_jobs": 0, "reviewable_jobs": 0, "matches": []}
+
+    service = AutomationService(
+        workspace=tmp_path,
+        config=load_config(config_path),
+        state=AutomationState(tmp_path / "runtime" / "automation.sqlite"),
+        job_runner=slow_jobs,
+    )
+    worker = threading.Thread(target=lambda: service.run_task("jobs"))
+    worker.start()
+    sync_finished = threading.Event()
+    try:
+        assert started.wait(5)
+        with workspace_lock(tmp_path, exclusive=True):
+            pass  # portal-style writes must not wait for a running task
+
+        def run_sync_gate() -> None:
+            with workspace_sync_lock(tmp_path):
+                sync_finished.set()
+
+        sync_worker = threading.Thread(target=run_sync_gate)
+        sync_worker.start()
+        try:
+            assert not sync_finished.wait(0.2)  # sync still waits for active work
+        finally:
+            release.set()
+            worker.join(timeout=5)
+        sync_worker.join(timeout=5)
+    finally:
+        release.set()
+        worker.join(timeout=5)
+
+    assert sync_finished.is_set()
 
 
 def test_task_logs_privacy_safe_start_and_summary(

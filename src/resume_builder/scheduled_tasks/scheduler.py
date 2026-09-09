@@ -37,6 +37,7 @@ from ..opportunities.screening_queue import (
     DEFAULT_SCREENING_OUTPUT,
     load_notification_jobs,
 )
+from ..workspace_management.locking import workspace_lock
 from .config import (
     DEFAULT_CONFIG,
     AutomationConfig,
@@ -879,13 +880,18 @@ class AutomationService:
             attempt=attempt,
         )
         try:
-            runner = self.runners[task]
-            if runner is not None:
-                result = runner()
-            elif task == "jobs":
-                result = _run_jobs(self.config)
-            else:
-                result = _run_gmail(self.workspace)
+            # Hold only the shared sync gate during task work: a workspace
+            # sync still waits for the task, but the portal's exclusive write
+            # lock stays free so decisions like "mark applied" never block
+            # behind a scan or screening burst.
+            with workspace_lock(self.workspace, exclusive=False):
+                runner = self.runners[task]
+                if runner is not None:
+                    result = runner()
+                elif task == "jobs":
+                    result = _run_jobs(self.config)
+                else:
+                    result = _run_gmail(self.workspace)
             public_summary = {
                 key: value
                 for key, value in result.items()
@@ -1099,11 +1105,12 @@ def run_forever(
             and _screening_backlog_pending(service.workspace)
         ):
             try:
-                run_background_replenishment(
-                    service.workspace,
-                    max_jobs=service.config.jobs.semantic_screening_max_jobs,
-                    display_limit=service.config.jobs.limit,
-                )
+                with workspace_lock(service.workspace, exclusive=False):
+                    run_background_replenishment(
+                        service.workspace,
+                        max_jobs=service.config.jobs.semantic_screening_max_jobs,
+                        display_limit=service.config.jobs.limit,
+                    )
             except (OSError, RuntimeError, ValueError):
                 _log(
                     logging.WARNING,

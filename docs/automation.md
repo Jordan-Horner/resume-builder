@@ -125,7 +125,11 @@ result requires a human eligibility or evidence decision.
 Discovery publishes its new-job result before semantic screening drains, so a
 manual search does not wait for the screening backlog. Background workers hold
 a shared workspace-sync gate so Git synchronization cannot replace files while
-they are active. Screening's own replenishment lock serializes screening
+they are active. The scheduler service follows the same rule: it takes no
+workspace lock while idle between runs, and each scan or screening burst holds
+only the shared gate, never the exclusive write lock, so portal decisions such
+as saving feedback or marking an application never wait for automation.
+Screening's own replenishment lock serializes screening
 writers without blocking unrelated portal decisions while a provider call or
 backfill is running; the operating system releases both locks automatically if
 a worker exits.
