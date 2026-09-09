@@ -7,11 +7,6 @@ from collections.abc import Mapping
 from pathlib import Path
 
 FACADE_LINE_BUDGETS = {
-    "artifact_paths": 10,
-    "artifact_status": 25,
-    "ats": 10,
-    "ats_readability": 20,
-    "compilation": 55,
     "directions": 450,
     "direction_diagnostics": 20,
     "direction_schema": 60,
@@ -21,18 +16,11 @@ FACADE_LINE_BUDGETS = {
     "job_report": 10,
     "jobs": 40,
     "match_grading": 50,
-    "minting": 20,
-    "pdf_rendering": 25,
-    "previewing": 35,
     "project_report": 60,
     "report_policy": 15,
-    "rendering": 80,
-    "resume_parser": 60,
-    "resume_templates": 30,
     "review_records": 300,
     "synthesis": 180,
     "updates": 10,
-    "verification": 30,
 }
 
 FORBIDDEN_IMPORTS = {

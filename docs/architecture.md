@@ -134,34 +134,29 @@ remain compatibility facades, and the `direction` CLI is unchanged.
 
 Employer-ready document output lives under `resume_builder.document_export`.
 It normalizes troublesome characters before rendering, audits the minted PDF's
-ATS readability, and verifies text extraction and browser layout. The root
-`ats.py`, `ats_readability.py`, and `pdf_rendering.py` modules remain compatibility
-facades for established imports.
+ATS readability, and verifies text extraction and browser layout.
 
 Canonical resume document formats live under `resume_builder.resume_documents`.
 `markdown.py` parses the editable, evidence-annotated Markdown contract without
 depending on compilation or review orchestration. `html.py` validates renderer
-payloads and produces safe HTML. Root `resume_parser.py` and `rendering.py`
-modules preserve established imports and the `render` CLI. Template selection,
+payloads and produces safe HTML. The `render` CLI dispatches directly to
+`html.py`. Template selection,
 compilation, preview, verification, and minting remain separate orchestration
 boundaries because they coordinate planning, reviews, or release state.
 Grounded resume construction lives under `resume_builder.construction`.
 `construction/templates.py` validates and selects content templates and visual
 themes, while `construction/compiler.py` turns canonical Markdown into audited
-build artifacts. The established `resume_templates.py` and `compilation.py`
-modules and the `compile` command remain compatible.
+build artifacts. The `compile` command dispatches directly to the compiler.
 Reviewed publication workflows live under `resume_builder.publishing`.
 `publishing/preview.py` owns the continuously refreshed HTML approval surface,
 `publishing/verification.py` prepares hash-pinned review inputs and reports
 workflow readiness, and `publishing/mint.py` releases the explicitly approved
-PDF. The established `previewing.py`, `verification.py`, and `minting.py`
-modules and their CLI commands remain compatible.
+PDF. Their CLI commands dispatch directly to these publication modules.
 
 Generated-build metadata lives under `resume_builder.build_artifacts`.
 `paths.py` owns the canonical internal output locations for each resume, while
 `status.py` owns typed readiness records and validates whether compiled inputs,
-outputs, evidence, templates, and feedback guidance are still current. Root
-`artifact_paths.py` and `artifact_status.py` remain compatibility facades.
+outputs, evidence, templates, and feedback guidance are still current.
 
 Project-wide readiness reporting lives under `resume_builder.project_status`.
 `report.py` assembles vault, direction, resume, review, preview, mint, target,

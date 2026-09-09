@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from reportlab.pdfgen.canvas import Canvas
 
-from resume_builder.pdf_rendering import (
+from resume_builder.document_export.pdf import (
     audit_pdf,
     normalized_tokens,
     tokens_recovered,

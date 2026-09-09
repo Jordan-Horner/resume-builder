@@ -8,26 +8,26 @@ import sys
 from collections.abc import Callable, Sequence
 
 from . import (
-    compilation,
     directions,
     feedback_memory,
     job_matching,
-    minting,
-    previewing,
     project_report,
-    rendering,
     review_records,
     synthesis,
-    verification,
 )
 from .application_tracking import records as applications
 from .assistant import runtime as agent
+from .construction import compiler as compilation
 from .gmail_integration import orchestration as gmail_automation
 from .opportunities import cli as jobs
 from .opportunities import evaluation as screening_evaluation
 from .opportunities import onboarding as job_onboarding
 from .opportunities import preferences
+from .publishing import mint as minting
+from .publishing import preview as previewing
+from .publishing import verification
 from .quality_assurance import regression as evaluations
+from .resume_documents import html as rendering
 from .scheduled_tasks import scheduler as automation
 from .scheduled_tasks import supervisor as service
 from .vault import change_plans as plans

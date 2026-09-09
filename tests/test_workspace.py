@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from resume_builder import project_report
-from resume_builder.resume_templates import (
+from resume_builder.construction.templates import (
     load_content_template,
     load_rendering_theme,
     rendering_theme_text,

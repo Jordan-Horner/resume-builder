@@ -1,4 +1,4 @@
-from resume_builder.artifact_status import ArtifactStatus
+from resume_builder.build_artifacts.status import ArtifactStatus
 
 
 def test_artifact_status_preserves_the_json_report_shape() -> None:

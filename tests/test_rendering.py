@@ -6,7 +6,8 @@ from pathlib import Path
 import pytest
 from pypdf import PdfReader
 
-from resume_builder import pdf_rendering, rendering
+from resume_builder.document_export import pdf as pdf_rendering
+from resume_builder.resume_documents import html as rendering
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = (ROOT / "templates" / "resume-template.html").read_text(encoding="utf-8")
