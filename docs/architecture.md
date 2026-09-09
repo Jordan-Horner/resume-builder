@@ -98,8 +98,11 @@ containment-safe canonical paths, `validation.py` enforces vault structure and
 provenance, `source_import.py` registers immutable source evidence, and
 `evidence.py` audits resume claims against canonical facts. The established
 root modules remain compatibility facades, and the `hydrate` and `validate`
-commands are unchanged. Migration, approved change-plan application, and
-evidence-question workflows remain higher-level vault operations.
+commands are unchanged. Higher-level vault operations live alongside those
+foundations: `change_plans.py` applies reviewed canonical writes,
+`questions.py` tracks prioritized evidence gaps, `legacy_migration.py`
+converts aggregate vaults, and `schema_upgrade.py` performs versioned upgrades.
+Their established root modules and CLI commands remain compatibility surfaces.
 
 Pre-application job work lives under `resume_builder.opportunities`. That domain
 turns external postings into a personalized, reviewable opportunity queue: it

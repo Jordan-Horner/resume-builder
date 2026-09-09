@@ -7,7 +7,6 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from .evidence_questions import question_plan, resolve_question
 from .reviews.approval import require_editorial_approval, review_freshness
 from .reviews.blocks import (
     BLOCK_ID,
@@ -57,6 +56,7 @@ from .reviews.selection_review import (
     selection_review_freshness,
 )
 from .vault.layout import contained_path
+from .vault.questions import question_plan, resolve_question
 
 __all__ = [
     "BLOCK_ID",

@@ -17,7 +17,6 @@ from .artifact_paths import default_resume_output_base
 from .artifact_status import build_manifest_freshness
 from .atomic import atomic_write_json, atomic_write_text
 from .compilation import build_resume, relative_output, sha256_file
-from .evidence_questions import open_questions
 from .opportunities.targets import parse_target, project_target_path
 from .resume_documents.html import (
     contained_project_path,
@@ -38,6 +37,7 @@ from .reviews.selection_review import (
 )
 from .role_profiles.profiles import audit_direction, parse_direction
 from .synthesis import SynthesisPlan, load_synthesis_plan
+from .vault.questions import open_questions
 
 APPROVED_NOTICE = "Language reviewed · Edit or mint when ready"
 ATTENTION_NOTICE = "Language reviewed · Wording needs attention before minting"
