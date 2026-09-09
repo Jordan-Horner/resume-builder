@@ -1275,6 +1275,7 @@ class DashboardService:
         *,
         was_recommended: bool = False,
         recommendation_reasons: list[str] | None = None,
+        events: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         event = {
             "id": f"JF-{uuid4()}",
@@ -1298,7 +1299,8 @@ class DashboardService:
                 "screening": screening,
             },
         }
-        events = self._feedback_events()
+        if events is None:
+            events = self._feedback_events()
         events.append(event)
         atomic_write_json(
             self.workspace / JOB_FEEDBACK_PATH,
@@ -1377,15 +1379,25 @@ class DashboardService:
             raise ValueError("choose no more than four feedback reasons")
         return action, cleaned
 
-    def job_feedback(self, job_id: str) -> dict[str, Any]:
-        raw_job = next(
-            (item for item in self._inventory_loader() if str(item.get("id") or "") == job_id),
-            None,
-        )
-        if raw_job is None:
-            raise ValueError(f"job not found: {job_id}")
+    def _positive_application_titles(self) -> list[str]:
+        return [
+            str(application.get("role"))
+            for _, record in iter_records(self.workspace / APPLICATIONS_ROOT)
+            if isinstance((application := record.get("application")), dict)
+            and application.get("role")
+        ]
+
+    def _job_feedback_payload(
+        self,
+        raw_job: dict[str, Any],
+        events: list[dict[str, Any]],
+        *,
+        preferences: dict[str, Any],
+        quick_screen_items: dict[str, dict[str, Any]],
+        positive_titles: list[str],
+    ) -> dict[str, Any]:
+        job_id = str(raw_job.get("id") or "")
         job = self._serialize_job(raw_job)
-        events = self._feedback_events()
         latest = next(
             (
                 event
@@ -1397,13 +1409,7 @@ class DashboardService:
             None,
         )
         deterministic: dict[str, Any] = {"interest": {}, "hard_conflicts": []}
-        clearance_preference = "neutral"
-        preferences: dict[str, Any] = {}
-        if (self.workspace / PREFERENCES_PATH).is_file():
-            from ..opportunities.cli import _load_preferences
-
-            preferences = _load_preferences(self.workspace / PREFERENCES_PATH)
-            clearance_preference = str(preferences.get("clearance_preference", "neutral"))
+        clearance_preference = str(preferences.get("clearance_preference", "neutral"))
         if (self.workspace / JOBS_CONFIG).is_file():
             prescreen = _prescreen(raw_job, preferences, set())
             constraints = prescreen.get("constraints") if isinstance(prescreen, dict) else None
@@ -1418,13 +1424,10 @@ class DashboardService:
                     else False
                 ),
             }
-            screened_item = self._quick_screen_items().get(job_id)
+            screened_item = quick_screen_items.get(job_id)
             screen = screened_item.get("screening") if screened_item else None
         else:
             screen = None
-        positive_titles = [
-            str(item.get("role") or "") for item in self.list_applications() if item.get("role")
-        ]
         score = score_shadow_job(
             {
                 **job,
@@ -1449,25 +1452,58 @@ class DashboardService:
         )
         return {"job_id": job_id, "latest": public_latest, "personalization": score}
 
+    def job_feedback(self, job_id: str) -> dict[str, Any]:
+        raw_job = next(
+            (item for item in self._inventory_loader() if str(item.get("id") or "") == job_id),
+            None,
+        )
+        if raw_job is None:
+            raise ValueError(f"job not found: {job_id}")
+        preferences = (
+            _load_preferences(self.workspace / PREFERENCES_PATH)
+            if (self.workspace / PREFERENCES_PATH).is_file()
+            else {}
+        )
+        return self._job_feedback_payload(
+            raw_job,
+            self._feedback_events(),
+            preferences=preferences,
+            quick_screen_items=self._quick_screen_items(),
+            positive_titles=self._positive_application_titles(),
+        )
+
     def record_job_feedback(self, job_id: str, action: object, reasons: object) -> dict[str, Any]:
         normalized_action, normalized_reasons = self._validated_feedback(action, reasons)
         if normalized_action == "applied":
             raise ValueError("applied feedback is recorded by marking the job applied")
-        job = self.get_job(job_id)
-        if job is None:
+        raw_job = next(
+            (item for item in self._inventory_loader() if str(item.get("id") or "") == job_id),
+            None,
+        )
+        if raw_job is None:
             raise ValueError(f"job not found: {job_id}")
+        job = self._serialize_job(raw_job)
+        events = self._feedback_events()
+        preferences = (
+            _load_preferences(self.workspace / PREFERENCES_PATH)
+            if (self.workspace / PREFERENCES_PATH).is_file()
+            else {}
+        )
+        quick_screen_items = self._quick_screen_items()
+        positive_titles = self._positive_application_titles()
         screening = self._feedback_screen_snapshot(job_id)
         was_recommended = False
         recommendation_reasons: list[str] = []
         preferences_path = self.workspace / PREFERENCES_PATH
         if preferences_path.is_file():
-            raw_job = next(
-                (item for item in self._inventory_loader() if str(item.get("id") or "") == job_id),
-                None,
-            )
-            preferences = _load_preferences(preferences_path)
             prescreen = _prescreen(raw_job, preferences, set()) if raw_job else None
-            current_personalization = self.job_feedback(job_id).get("personalization")
+            current_personalization = self._job_feedback_payload(
+                raw_job,
+                events,
+                preferences=preferences,
+                quick_screen_items=quick_screen_items,
+                positive_titles=positive_titles,
+            ).get("personalization")
             was_recommended = bool(
                 isinstance(current_personalization, dict)
                 and current_personalization.get("hot") is True
@@ -1479,19 +1515,49 @@ class DashboardService:
                 if interest.get("interest_terms"):
                     recommendation_reasons.append("saved_interest")
         with self._state_lock:
-            self._append_feedback_event(
-                job,
-                normalized_action,
-                normalized_reasons,
-                screening,
-                was_recommended=was_recommended,
-                recommendation_reasons=recommendation_reasons,
+            events = self._feedback_events()
+            previous = next(
+                (
+                    event
+                    for event in reversed(events)
+                    if event.get("action") in JOB_FEEDBACK_ACTIONS
+                    and isinstance(event.get("job"), dict)
+                    and event["job"].get("id") == job_id
+                ),
+                None,
             )
+            if (
+                previous is not None
+                and previous.get("action") == normalized_action
+                and previous.get("reasons") == normalized_reasons
+            ):
+                was_recommended = bool(previous.get("was_recommended"))
+                recommendation_reasons = [
+                    str(reason)
+                    for reason in previous.get("recommendation_reasons", [])
+                    if isinstance(reason, str)
+                ]
+            else:
+                self._append_feedback_event(
+                    job,
+                    normalized_action,
+                    normalized_reasons,
+                    screening,
+                    was_recommended=was_recommended,
+                    recommendation_reasons=recommendation_reasons,
+                    events=events,
+                )
             if normalized_action == "not_interested":
                 dismissed = self._dismissed_job_ids()
                 dismissed.add(job_id)
                 self._write_dismissed_job_ids(dismissed)
-        response = self.job_feedback(job_id)
+        response = self._job_feedback_payload(
+            raw_job,
+            events,
+            preferences=preferences,
+            quick_screen_items=quick_screen_items,
+            positive_titles=positive_titles,
+        )
         response["dismissal_follow_up"] = {
             "ask_why": normalized_action == "not_interested" and was_recommended,
             "prompt": (
@@ -2250,7 +2316,16 @@ class DashboardService:
             config_path = self.workspace / DEFAULT_AGENT_CONFIG
             config = load_agent_config(config_path) if config_path.is_file() else None
             api_key = self._openrouter_key() if config else ""
-            adapter = OpenRouterAdapter(config, api_key=api_key) if config and api_key else None
+            adapter = (
+                OpenRouterAdapter(
+                    config,
+                    api_key=api_key,
+                    timeout_seconds=BACKGROUND_SCREEN_TIMEOUT_SECONDS,
+                    retries=QUICK_SCREEN_PROVIDER_RETRIES,
+                )
+                if config and api_key
+                else None
+            )
             result, cached = estimator.estimate(
                 packet,
                 adapter=adapter,

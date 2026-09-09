@@ -97,7 +97,7 @@ export function JobDetailPanel({
     const descriptionRequest = job.description !== undefined || descriptionCache.has(job.id)
       ? Promise.resolve(null)
       : getJob(job.id, controller.signal);
-    void getJobScreenStatus(job.id).then((state) => {
+    void getJobScreenStatus(job.id, controller.signal).then((state) => {
       if (!active) return;
       if (state.status === "complete") setJobScreen(state);
       else if (state.status === "queued" || state.status === "running") {
@@ -108,21 +108,32 @@ export function JobDetailPanel({
         setScreenError(state.message ?? "The background analysis could not finish.");
       }
     }).catch((reason: unknown) => {
-      if (!active) return;
+      if (!active || isAbortError(reason)) return;
       setScreenError(reason instanceof Error ? reason.message : "Could not load this job screen.");
     });
-    void Promise.allSettled([getResumeRecommendation(job.id), getJobFeedback(job.id), descriptionRequest]).then(([resumeResult, feedbackResult, descriptionResult]) => {
-      if (!active) return;
-      if (resumeResult.status === "fulfilled") setRecommendation(resumeResult.value);
-      else setRecommendationError(resumeResult.reason instanceof Error ? resumeResult.reason.message : "Could not load the resume recommendation.");
-      if (feedbackResult.status === "fulfilled") setFeedback(feedbackResult.value);
-      else setFeedbackError(feedbackResult.reason instanceof Error ? feedbackResult.reason.message : "Could not load your preference for this job.");
-      if (descriptionResult.status === "fulfilled" && descriptionResult.value) {
-        const loadedDescription = descriptionResult.value.description ?? "";
+    void getResumeRecommendation(job.id, controller.signal).then((value) => {
+      if (active) setRecommendation(value);
+    }).catch((reason: unknown) => {
+      if (active && !isAbortError(reason)) {
+        setRecommendationError(reason instanceof Error ? reason.message : "Could not load the resume recommendation.");
+      }
+    });
+    void getJobFeedback(job.id, controller.signal).then((value) => {
+      if (active) setFeedback(value);
+    }).catch((reason: unknown) => {
+      if (active && !isAbortError(reason)) {
+        setFeedbackError(reason instanceof Error ? reason.message : "Could not load your preference for this job.");
+      }
+    });
+    void descriptionRequest.then((value) => {
+      if (active && value) {
+        const loadedDescription = value.description ?? "";
         cacheDescription(job.id, loadedDescription);
         setDescription(loadedDescription);
-      } else if (descriptionResult.status === "rejected" && !isAbortError(descriptionResult.reason)) {
-        setDescriptionError(descriptionResult.reason instanceof Error ? descriptionResult.reason.message : "Could not load the job description.");
+      }
+    }).catch((reason: unknown) => {
+      if (active && !isAbortError(reason)) {
+        setDescriptionError(reason instanceof Error ? reason.message : "Could not load the job description.");
       }
     });
     return () => { active = false; screenPollToken.current += 1; controller.abort(); };
@@ -141,9 +152,9 @@ export function JobDetailPanel({
       if (started.status === "complete") {
         setJobScreen(started);
         onScreened(started);
-        setFeedback(await getJobFeedback(requestedJobId));
         setScreeningJobId(null);
         setScreeningMessage("");
+        void refreshFeedback(requestedJobId);
         return;
       }
       if (started.status === "failed") {
@@ -171,9 +182,9 @@ export function JobDetailPanel({
         if (state.status === "complete") {
           setJobScreen(state);
           onScreened(state);
-          setFeedback(await getJobFeedback(requestedJobId));
           setScreeningJobId(null);
           setScreeningMessage("");
+          void refreshFeedback(requestedJobId);
           return;
         }
         if (state.status === "failed") {
@@ -193,6 +204,17 @@ export function JobDetailPanel({
       } catch (reason) {
         setScreenError(reason instanceof Error ? `${reason.message} Retrying…` : "Could not check the background analysis. Retrying…");
         setScreeningMessage("Analysis is still running");
+      }
+    }
+  }
+
+  async function refreshFeedback(requestedJobId: string) {
+    try {
+      const value = await getJobFeedback(requestedJobId);
+      if (currentJobId.current === requestedJobId) setFeedback(value);
+    } catch (reason) {
+      if (currentJobId.current === requestedJobId) {
+        setFeedbackError(reason instanceof Error ? reason.message : "Could not refresh your preference for this job.");
       }
     }
   }

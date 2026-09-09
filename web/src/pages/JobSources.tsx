@@ -215,13 +215,25 @@ export function JobSources() {
   const [error, setError] = useState("");
   useEffect(() => {
     let active = true;
+    let timer: number | undefined;
     async function refresh() {
-      try { const next = await getJobSources(); if (active) setData(next); }
-      catch (reason) { if (active) setError(reason instanceof Error ? reason.message : "Could not load job sources"); }
+      try {
+        const next = await getJobSources();
+        if (active) {
+          setData(next);
+          setError("");
+        }
+      } catch (reason) {
+        if (active) setError(reason instanceof Error ? reason.message : "Could not load job sources");
+      } finally {
+        if (active) timer = window.setTimeout(refresh, 4000);
+      }
     }
     void refresh();
-    const timer = window.setInterval(refresh, 4000);
-    return () => { active = false; window.clearInterval(timer); };
+    return () => {
+      active = false;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
   }, []);
   async function change(action: () => Promise<JobSourcesState>) {
     setBusy(true); setError("");

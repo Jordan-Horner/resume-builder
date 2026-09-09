@@ -114,15 +114,21 @@ sequential batches of `max_jobs_per_run`. It stops when no automatic screens are
 pending, when a retry makes no progress, or at a shortlist-derived safety bound.
 Scheduled and portal-started collection use the same rolling replenishment loop,
 so newly published inventory continues through bounded batches without another
-user action. Feedback decisions also resume the loop. Backfill status reports
+user action. Feedback decisions also resume the loop, but that replenishment runs
+after the decision response has been returned; saving interest, hiding a posting,
+or marking an application never waits for the screening backlog to drain.
+Backfill status reports
 `pending_screening_jobs` separately from
 `needs_review_jobs`, because the latter also includes completed screens whose
 result requires a human eligibility or evidence decision.
 
 Discovery publishes its new-job result before semantic screening drains, so a
-manual search does not wait for the screening backlog. A workspace file lock
-serializes scheduler, portal, and feedback-triggered screening workers; the
-operating system releases it automatically if a worker exits.
+manual search does not wait for the screening backlog. Background workers hold
+a shared workspace-sync gate so Git synchronization cannot replace files while
+they are active. Screening's own replenishment lock serializes screening
+writers without blocking unrelated portal decisions while a provider call or
+backfill is running; the operating system releases both locks automatically if
+a worker exits.
 On scheduler startup, due discovery runs before screening. When discovery is not
 due, the scheduler resumes screening only when the saved replenishment state
 reports pending jobs; a completed backlog is left alone.

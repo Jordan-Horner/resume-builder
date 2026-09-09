@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from threading import Event, Thread
 
 import pytest
 
@@ -205,6 +206,8 @@ def test_screening_backfill_route_starts_standalone_worker(tmp_path: Path, monke
     from resume_builder.portal.service import DashboardService
 
     calls: list[str] = []
+    started = Event()
+    release = Event()
     state = {
         "status": "running",
         "message": "Screening the next recommended jobs…",
@@ -221,16 +224,67 @@ def test_screening_backfill_route_starts_standalone_worker(tmp_path: Path, monke
     monkeypatch.setattr(
         DashboardService,
         "run_queued_screening_backfill",
-        lambda self: calls.append("screen"),
+        lambda self: (calls.append("screen"), started.set(), release.wait(timeout=1)),
     )
-    client = _client(tmp_path)
+    with _client(tmp_path) as client:
+        assert client.get("/api/jobs/screening-backfill").json() == state
+        response = client.post("/api/jobs/screening-backfill")
 
-    assert client.get("/api/jobs/screening-backfill").json() == state
-    response = client.post("/api/jobs/screening-backfill")
+        assert response.status_code == 202
+        assert response.json() == state
+        assert started.wait(timeout=1)
+        assert calls == ["screen"]
+        completed = Event()
+        status_codes: list[int] = []
 
-    assert response.status_code == 202
-    assert response.json() == state
-    assert calls == ["screen"]
+        def load_status() -> None:
+            status_codes.append(client.get("/api/jobs/screening-backfill").status_code)
+            completed.set()
+
+        request = Thread(target=load_status)
+        request.start()
+        try:
+            assert completed.wait(timeout=0.5), "background screening blocked another portal request"
+            assert status_codes == [200]
+        finally:
+            release.set()
+            request.join(timeout=1)
+
+
+def test_feedback_response_does_not_wait_for_recommendation_screening(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from resume_builder.portal.service import DashboardService
+
+    result = {"job_id": "job-1", "latest": {"action": "interested"}}
+    started = Event()
+    release = Event()
+    monkeypatch.setattr(
+        DashboardService,
+        "record_job_feedback",
+        lambda self, job_id, action, reasons: result,
+    )
+    monkeypatch.setattr(
+        DashboardService,
+        "queue_screening_backfill",
+        lambda self, *, drain=False: (True, {"status": "running"}),
+    )
+    monkeypatch.setattr(
+        DashboardService,
+        "run_queued_screening_backfill",
+        lambda self, *, drain=False: (started.set(), release.wait(timeout=1)),
+    )
+
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/api/jobs/job-1/feedback",
+            json={"action": "interested", "reasons": []},
+        )
+
+        assert response.status_code == 200
+        assert response.json() == result
+        assert started.wait(timeout=1)
+        release.set()
 
 
 def test_open_posting_route_records_passive_positive_once(tmp_path: Path, monkeypatch) -> None:

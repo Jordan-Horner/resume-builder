@@ -12,13 +12,17 @@ import {
   markJobApplied,
   markApplicationReapplied,
   markJobNotInterested,
+  saveJobFeedback,
   screenJob,
   startScreeningBackfill,
   skipOnboarding,
   uploadResume,
 } from "./api";
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+});
 
 describe("dashboard API client", () => {
   it("starts a screening backfill without starting job discovery", async () => {
@@ -33,8 +37,8 @@ describe("dashboard API client", () => {
     await startScreeningBackfill();
     await getScreeningBackfill();
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/jobs/screening-backfill", { method: "POST" });
-    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/jobs/screening-backfill", undefined);
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/jobs/screening-backfill", expect.objectContaining({ method: "POST", signal: expect.any(AbortSignal) }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/jobs/screening-backfill", expect.objectContaining({ signal: expect.any(AbortSignal) }));
     expect(fetchMock).not.toHaveBeenCalledWith("/api/job-sources/scan", expect.anything());
   });
 
@@ -73,7 +77,7 @@ describe("dashboard API client", () => {
 
     await action("job-1");
 
-    expect(fetchMock).toHaveBeenCalledWith(endpoint, { method: "POST" });
+    expect(fetchMock).toHaveBeenCalledWith(endpoint, expect.objectContaining({ method: "POST" }));
   });
 
   it("records an explicit reapplication", async () => {
@@ -99,11 +103,30 @@ describe("dashboard API client", () => {
 
     await hideJobPosting("job-1", "closed");
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/jobs/job-1/hide", {
+    expect(fetchMock).toHaveBeenCalledWith("/api/jobs/job-1/hide", expect.objectContaining({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reason: "closed" }),
-    });
+      signal: expect.any(AbortSignal),
+    }));
+  });
+
+  it("stops waiting when saving job feedback takes too long", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(globalThis, "fetch").mockImplementation((_url, init) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("Aborted", "AbortError"));
+        });
+      }),
+    );
+
+    const expectation = expect(
+      saveJobFeedback("job-1", "interested", []),
+    ).rejects.toThrow("Saving took too long. Please try again.");
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await expectation;
   });
 
   it("loads a saved salary estimate without requesting a new one", async () => {
@@ -113,7 +136,10 @@ describe("dashboard API client", () => {
 
     expect(await getSavedJobSalary("job-1")).toBeNull();
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/jobs/job-1/salary-estimate", undefined);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/jobs/job-1/salary-estimate",
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
   });
 
   it("loads the authoritative screening status separately from an explicit screen", async () => {
@@ -128,8 +154,16 @@ describe("dashboard API client", () => {
     await getJobScreenStatus("job-1");
     await screenJob("job-1");
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/jobs/job-1/screen-status", undefined);
-    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/jobs/job-1/screen", { method: "POST" });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/jobs/job-1/screen-status",
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/jobs/job-1/screen",
+      expect.objectContaining({ method: "POST", signal: expect.any(AbortSignal) }),
+    );
   });
 
   it("loads and defers onboarding through explicit endpoints", async () => {

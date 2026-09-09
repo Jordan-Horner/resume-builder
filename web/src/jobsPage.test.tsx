@@ -476,6 +476,24 @@ it("shows persisted screening and recommendation metadata without waiting for de
   expect(host.textContent).not.toContain("Loading recommendation details");
 });
 
+it("shows saved job feedback without waiting for the resume recommendation", async () => {
+  vi.mocked(api.getResumeRecommendation).mockImplementation(() => new Promise(() => {}));
+  vi.mocked(api.getJobFeedback).mockResolvedValue({
+    job_id: "one",
+    latest: { action: "interested", reasons: [], created_at: "2026-09-09T12:00:00Z" },
+    personalization: {
+      hot_label: "Recommended", fit_score: 0.7, interest_score: 0.85,
+      company_score: 0.5, fit_label: "Strong", interest_label: "High",
+      company_label: "Neutral", confidence: "medium", reasons: [], hot: true,
+      hot_reasons: ["interest"],
+    },
+  });
+
+  await openJob();
+
+  expect(host.textContent).toContain("Interested ✓");
+});
+
 it("restores an in-progress screen when the job is reopened before other details finish loading", async () => {
   vi.useFakeTimers();
   vi.mocked(api.screenJob).mockResolvedValue({ status: "queued", job_id: "one", message: "Analysis queued." });

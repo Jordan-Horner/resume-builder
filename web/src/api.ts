@@ -38,6 +38,33 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function requestWithTimeout<T>(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+  timeoutMessage: string,
+): Promise<T> {
+  const controller = new AbortController();
+  const upstreamSignal = init.signal;
+  let timedOut = false;
+  const abortFromUpstream = () => controller.abort();
+  if (upstreamSignal?.aborted) controller.abort();
+  else upstreamSignal?.addEventListener("abort", abortFromUpstream, { once: true });
+  const timeout = globalThis.setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+  try {
+    return await request<T>(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (timedOut) throw new Error(timeoutMessage);
+    throw error;
+  } finally {
+    globalThis.clearTimeout(timeout);
+    upstreamSignal?.removeEventListener("abort", abortFromUpstream);
+  }
+}
+
 export async function getJobs(filters: JobFilters, queue: "all" | "recommended" | "interested" = "all", signal?: AbortSignal): Promise<{ jobs: Job[]; count: number; reviewable_count: number }> {
   const params = new URLSearchParams();
   if (filters.view) params.set("view_filters", JSON.stringify({ ...filters.view, roles: [], locations: filters.view.locations.map((item) => item.trim()).filter(Boolean) }));
@@ -50,31 +77,46 @@ export async function getJobs(filters: JobFilters, queue: "all" | "recommended" 
 }
 
 export function getJob(jobId: string, signal?: AbortSignal): Promise<Job> {
-  return request(`/api/jobs/${encodeURIComponent(jobId)}`, signal ? { signal } : undefined);
+  return requestWithTimeout(
+    `/api/jobs/${encodeURIComponent(jobId)}`,
+    signal ? { signal } : {},
+    8_000,
+    "Loading this job took too long. Try opening it again.",
+  );
 }
 
 export function markJobNotInterested(jobId: string): Promise<JobFeedback> {
-  return request(`/api/jobs/${encodeURIComponent(jobId)}/not-interested`, { method: "POST" });
+  return requestWithTimeout(
+    `/api/jobs/${encodeURIComponent(jobId)}/not-interested`,
+    { method: "POST" },
+    10_000,
+    "Saving took too long. Please try again.",
+  );
 }
 
 export function hideJobPosting(jobId: string, reason: JobHideReason): Promise<HiddenJobResult> {
-  return request(`/api/jobs/${encodeURIComponent(jobId)}/hide`, {
+  return requestWithTimeout(`/api/jobs/${encodeURIComponent(jobId)}/hide`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ reason }),
-  });
+  }, 10_000, "Hiding this posting took too long. Please try again.");
 }
 
-export function getJobFeedback(jobId: string): Promise<JobFeedback> {
-  return request(`/api/jobs/${encodeURIComponent(jobId)}/feedback`);
+export function getJobFeedback(jobId: string, signal?: AbortSignal): Promise<JobFeedback> {
+  return requestWithTimeout(
+    `/api/jobs/${encodeURIComponent(jobId)}/feedback`,
+    signal ? { signal } : {},
+    8_000,
+    "Loading your job preference took too long.",
+  );
 }
 
 export function saveJobFeedback(jobId: string, action: JobFeedbackAction, reasons: JobFeedbackReason[]): Promise<JobFeedback> {
-  return request(`/api/jobs/${encodeURIComponent(jobId)}/feedback`, {
+  return requestWithTimeout(`/api/jobs/${encodeURIComponent(jobId)}/feedback`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action, reasons }),
-  });
+  }, 10_000, "Saving took too long. Please try again.");
 }
 
 export function recordJobPostingOpened(jobId: string): Promise<void> {
@@ -82,15 +124,30 @@ export function recordJobPostingOpened(jobId: string): Promise<void> {
 }
 
 export function estimateJobSalary(jobId: string): Promise<SalaryEstimateResult> {
-  return request(`/api/jobs/${encodeURIComponent(jobId)}/estimate-salary`, { method: "POST" });
+  return requestWithTimeout(
+    `/api/jobs/${encodeURIComponent(jobId)}/estimate-salary`,
+    { method: "POST" },
+    30_000,
+    "Salary estimation took too long. Please try again.",
+  );
 }
 
 export async function getSavedJobSalary(jobId: string): Promise<SalaryEstimateResult | null> {
-  return (await request<SalaryEstimateResult | null>(`/api/jobs/${encodeURIComponent(jobId)}/salary-estimate`)) ?? null;
+  return (await requestWithTimeout<SalaryEstimateResult | null>(
+    `/api/jobs/${encodeURIComponent(jobId)}/salary-estimate`,
+    {},
+    8_000,
+    "Loading the saved salary estimate took too long.",
+  )) ?? null;
 }
 
 export function markJobApplied(jobId: string): Promise<unknown> {
-  return request(`/api/jobs/${encodeURIComponent(jobId)}/applied`, { method: "POST" });
+  return requestWithTimeout(
+    `/api/jobs/${encodeURIComponent(jobId)}/applied`,
+    { method: "POST" },
+    10_000,
+    "Saving the application took too long. Please try again.",
+  );
 }
 
 export async function getApplications(): Promise<Application[]> {
@@ -224,31 +281,46 @@ export function restoreResume(resumeId: string): Promise<{ restored: boolean; me
   });
 }
 
-export function getResumeRecommendation(jobId: string): Promise<ResumeRecommendation> {
-  return request(`/api/jobs/${encodeURIComponent(jobId)}/resume-recommendation`);
+export function getResumeRecommendation(jobId: string, signal?: AbortSignal): Promise<ResumeRecommendation> {
+  return requestWithTimeout(
+    `/api/jobs/${encodeURIComponent(jobId)}/resume-recommendation`,
+    signal ? { signal } : {},
+    8_000,
+    "Loading the resume recommendation took too long.",
+  );
 }
-export function getJobScreenStatus(jobId: string): Promise<JobScreenState> {
-  return request(`/api/jobs/${encodeURIComponent(jobId)}/screen-status`);
+export function getJobScreenStatus(jobId: string, signal?: AbortSignal): Promise<JobScreenState> {
+  return requestWithTimeout(
+    `/api/jobs/${encodeURIComponent(jobId)}/screen-status`,
+    signal ? { signal } : {},
+    8_000,
+    "Checking the screen status took too long.",
+  );
 }
 export function screenJob(jobId: string): Promise<JobScreenState> {
-  return request(`/api/jobs/${encodeURIComponent(jobId)}/screen`, { method: "POST" });
+  return requestWithTimeout(
+    `/api/jobs/${encodeURIComponent(jobId)}/screen`,
+    { method: "POST" },
+    10_000,
+    "Starting the screen took too long. Check its status before trying again.",
+  );
 }
 
 export function getBlockedCompanies(): Promise<{ companies: string[] }> { return request("/api/blocked-companies"); }
 export function getJobFilterDefaults(): Promise<import("./types").ViewFilters> { return request("/api/job-filter-defaults"); }
 export function setCompanyBlocked(company: string, blocked: boolean): Promise<{ companies: string[] }> {
-  return request("/api/blocked-companies", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ company, blocked }) });
+  return requestWithTimeout("/api/blocked-companies", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ company, blocked }) }, 10_000, "Saving the company preference took too long. Please try again.");
 }
 
 export interface JobSourcesState {
   providers: { id: string; name: string; enabled: boolean; detail: string }[];
   scan: { status: string; message?: string; new_jobs?: number; errors?: { provider: string; message: string }[] };
 }
-export function getJobSources(): Promise<JobSourcesState> { return request("/api/job-sources"); }
+export function getJobSources(): Promise<JobSourcesState> { return requestWithTimeout("/api/job-sources", {}, 8_000, "Loading job sources took too long."); }
 export function setJobSource(id: string, enabled: boolean): Promise<JobSourcesState> {
-  return request(`/api/job-sources/${encodeURIComponent(id)}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }) });
+  return requestWithTimeout(`/api/job-sources/${encodeURIComponent(id)}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }) }, 10_000, "Saving the job source took too long. Please try again.");
 }
-export function startJobScan(): Promise<JobSourcesState> { return request("/api/job-sources/scan", { method: "POST" }); }
+export function startJobScan(): Promise<JobSourcesState> { return requestWithTimeout("/api/job-sources/scan", { method: "POST" }, 10_000, "Starting the job search took too long. Check its status before trying again."); }
 
 export interface ScreeningBackfillState {
   status: "idle" | "running" | "complete" | "partial" | "failed";
@@ -275,8 +347,8 @@ export interface ScreeningBackfillState {
   started_at?: string;
   finished_at?: string;
 }
-export function getScreeningBackfill(): Promise<ScreeningBackfillState> { return request("/api/jobs/screening-backfill"); }
-export function startScreeningBackfill(): Promise<ScreeningBackfillState> { return request("/api/jobs/screening-backfill", { method: "POST" }); }
+export function getScreeningBackfill(): Promise<ScreeningBackfillState> { return requestWithTimeout("/api/jobs/screening-backfill", {}, 8_000, "Loading screening progress took too long."); }
+export function startScreeningBackfill(): Promise<ScreeningBackfillState> { return requestWithTimeout("/api/jobs/screening-backfill", { method: "POST" }, 10_000, "Starting the screening backfill took too long. Check its status before trying again."); }
 
 export interface ScrapeSchedule {
   configured: boolean;
@@ -292,9 +364,9 @@ export interface ScrapeSchedule {
   current_stage: "idle" | "searching" | "screening";
   recommendation_revision?: string;
 }
-export function getScrapeSchedule(): Promise<ScrapeSchedule> { return request("/api/scrape-schedule"); }
+export function getScrapeSchedule(): Promise<ScrapeSchedule> { return requestWithTimeout("/api/scrape-schedule", {}, 8_000, "Loading the schedule took too long."); }
 export function saveScrapeSchedule(enabled: boolean, times: string[], screeningEnabled = false, screeningMaxJobs = 6): Promise<ScrapeSchedule> {
-  return request("/api/scrape-schedule", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled, times, screening_enabled: screeningEnabled, screening_max_jobs: screeningMaxJobs }) });
+  return requestWithTimeout("/api/scrape-schedule", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled, times, screening_enabled: screeningEnabled, screening_max_jobs: screeningMaxJobs }) }, 10_000, "Saving the schedule took too long. Please try again.");
 }
 
 export function previewRoleTitles(scope: "onboarding" | "settings", titles: string[]): Promise<{ titles: string[]; remaining: number; minimum_length: number; maximum_length: number }> {

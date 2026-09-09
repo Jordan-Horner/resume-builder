@@ -2,6 +2,8 @@
 
 import argparse
 import asyncio
+import logging
+from concurrent.futures import CancelledError, Future, ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -11,11 +13,12 @@ from ..workspace_management.locking import async_workspace_lock, workspace_lock
 from ..workspace_management.state import discover_workspace
 from .service import JOBS_CONFIG, DashboardService, ScreeningInputError
 
+LOGGER = logging.getLogger(__name__)
+
 
 def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
     try:
         from fastapi import (
-            BackgroundTasks,
             FastAPI,
             File,
             HTTPException,
@@ -39,6 +42,10 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
     from .updates import UpdateChecker
 
     updates = UpdateChecker()
+    background_executor = ThreadPoolExecutor(
+        max_workers=1,
+        thread_name_prefix="resume-builder-background",
+    )
     from .job_sources import source_status, start_scan, toggle_source
     from .schedule import save_schedule, schedule_status
     from .system import system_status
@@ -55,7 +62,10 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
                 queue="recommended",
                 view_filters=ViewFilters.model_validate(defaults).model_dump_json(),
             )
-        yield
+        try:
+            yield
+        finally:
+            background_executor.shutdown(wait=False, cancel_futures=True)
 
     app = FastAPI(
         title="Resume Builder",
@@ -73,8 +83,36 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
             return await call_next(request)
 
     def locked_background_task(callback: Any, *arguments: Any, **keywords: Any) -> None:
-        with workspace_lock(workspace, exclusive=True):
+        # Keep background work outside workspace sync without blocking unrelated
+        # portal writes for the duration of a provider call or backfill.
+        with workspace_lock(workspace, exclusive=False):
             callback(*arguments, **keywords)
+
+    def submit_locked_background_task(callback: Any, *arguments: Any, **keywords: Any) -> None:
+        future = background_executor.submit(
+            locked_background_task,
+            callback,
+            *arguments,
+            **keywords,
+        )
+
+        def report_failure(completed: Future[Any]) -> None:
+            try:
+                completed.result()
+            except CancelledError:
+                return
+            except Exception:
+                LOGGER.exception("portal background task failed")
+
+        future.add_done_callback(report_failure)
+
+    def continue_recommendation_screening() -> None:
+        try:
+            started, _ = service.queue_screening_backfill(drain=True)
+        except ValueError:
+            return
+        if started:
+            submit_locked_background_task(service.run_queued_screening_backfill, drain=True)
 
     from .assistant_routes import install_assistant
 
@@ -290,13 +328,11 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         return service.screening_backfill_status()
 
     @app.post("/api/jobs/screening-backfill", status_code=202)
-    def start_screening_backfill(background_tasks: BackgroundTasks) -> dict[str, Any]:
+    def start_screening_backfill() -> dict[str, Any]:
         try:
             started, status = service.queue_screening_backfill()
             if started:
-                background_tasks.add_task(
-                    locked_background_task, service.run_queued_screening_backfill
-                )
+                submit_locked_background_task(service.run_queued_screening_backfill)
             return status
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -357,17 +393,12 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @app.post("/api/jobs/{job_id}/screen", status_code=202)
-    def screen_job(
-        job_id: str, background_tasks: BackgroundTasks, refresh: bool = False
-    ) -> dict[str, Any]:
+    def screen_job(job_id: str, refresh: bool = False) -> dict[str, Any]:
         try:
             result = service.queue_job_screen(job_id, refresh=refresh)
             if result["status"] == "queued":
-                background_tasks.add_task(
-                    locked_background_task,
-                    service.run_queued_job_screen,
-                    job_id,
-                    refresh=refresh,
+                submit_locked_background_task(
+                    service.run_queued_job_screen, job_id, refresh=refresh
                 )
             return result
         except ScreeningInputError as exc:
@@ -402,45 +433,41 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @app.post("/api/jobs/{job_id}/feedback")
-    def record_job_feedback(
-        job_id: str, payload: dict[str, Any], background_tasks: BackgroundTasks
-    ) -> dict[str, Any]:
+    def record_job_feedback(job_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         try:
             result = service.record_job_feedback(
                 job_id,
                 payload.get("action"),
                 payload.get("reasons", []),
             )
-            background_tasks.add_task(locked_background_task, service.replenish_recommendations)
+            continue_recommendation_screening()
             return result
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.post("/api/jobs/{job_id}/not-interested")
-    def mark_not_interested(job_id: str, background_tasks: BackgroundTasks) -> dict[str, Any]:
+    def mark_not_interested(job_id: str) -> dict[str, Any]:
         try:
             result = service.mark_not_interested(job_id)
-            background_tasks.add_task(locked_background_task, service.replenish_recommendations)
+            continue_recommendation_screening()
             return result
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @app.post("/api/jobs/{job_id}/hide")
-    def hide_job_posting(
-        job_id: str, payload: dict[str, Any], background_tasks: BackgroundTasks
-    ) -> dict[str, Any]:
+    def hide_job_posting(job_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         try:
             result = service.hide_job(job_id, payload.get("reason"))
-            background_tasks.add_task(locked_background_task, service.replenish_recommendations)
+            continue_recommendation_screening()
             return result
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.post("/api/jobs/{job_id}/applied", status_code=201)
-    def mark_applied(job_id: str, background_tasks: BackgroundTasks) -> dict[str, Any]:
+    def mark_applied(job_id: str) -> dict[str, Any]:
         try:
             result = service.mark_applied(job_id)
-            background_tasks.add_task(locked_background_task, service.replenish_recommendations)
+            continue_recommendation_screening()
             return result
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc

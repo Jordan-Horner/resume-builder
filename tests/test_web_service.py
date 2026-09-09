@@ -975,10 +975,18 @@ def test_explicit_job_feedback_is_durable_and_interest_does_not_hide_job(
     tmp_path, inventory, monkeypatch
 ):
     monkeypatch.setattr(web_service, "iter_records", lambda _root: [])
-    service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
+    loads = 0
+
+    def load_inventory():
+        nonlocal loads
+        loads += 1
+        return inventory
+
+    service = DashboardService(tmp_path, inventory_loader=load_inventory)
 
     saved = service.record_job_feedback("remote-1", "interested", ["day_to_day"])
 
+    assert loads == 1
     assert saved["latest"]["action"] == "interested"
     assert saved["latest"]["reasons"] == ["day_to_day"]
     assert [item["id"] for item in service.list_jobs()] == [
@@ -989,6 +997,20 @@ def test_explicit_job_feedback_is_durable_and_interest_does_not_hide_job(
     payload = json.loads((tmp_path / "job-search/job-feedback.json").read_text())
     assert payload["schema_version"] == 1
     assert payload["events"][0]["job"]["description_hash"]
+
+
+def test_retrying_identical_job_feedback_does_not_duplicate_the_event(
+    tmp_path, inventory, monkeypatch
+):
+    monkeypatch.setattr(web_service, "iter_records", lambda _root: [])
+    service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
+
+    first = service.record_job_feedback("remote-1", "interested", ["day_to_day"])
+    second = service.record_job_feedback("remote-1", "interested", ["day_to_day"])
+
+    payload = json.loads((tmp_path / "job-search/job-feedback.json").read_text())
+    assert len(payload["events"]) == 1
+    assert second["latest"] == first["latest"]
 
 
 def test_opening_posting_records_one_weak_positive_with_screen_snapshot(
@@ -1482,8 +1504,8 @@ def test_only_recommended_rejections_request_contextual_follow_up(
     )
     monkeypatch.setattr(
         service,
-        "job_feedback",
-        lambda _job_id: {
+        "_job_feedback_payload",
+        lambda *_args, **_kwargs: {
             "job_id": "remote-1",
             "latest": None,
             "personalization": {"hot": was_recommended},
