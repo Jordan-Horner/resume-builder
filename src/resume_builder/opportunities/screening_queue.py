@@ -14,8 +14,8 @@ from typing import Any
 from job_puller.normalize import normalized_key
 
 from ..agent_contracts import ModelAdapter, ModelProviderError
-from ..applications import DEFAULT_ROOT as DEFAULT_APPLICATIONS_ROOT
-from ..applications import applied_job_ids
+from ..application_tracking.records import DEFAULT_ROOT as DEFAULT_APPLICATIONS_ROOT
+from ..application_tracking.records import applied_job_ids
 from ..atomic import atomic_write_json, atomic_write_text
 from .cli import (
     DEFAULT_CONFIG,

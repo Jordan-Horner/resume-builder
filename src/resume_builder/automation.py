@@ -31,7 +31,7 @@ import yaml
 from job_puller.config import load_config as load_job_config
 
 from . import gmail_automation
-from .applications import reapplication_opportunities
+from .application_tracking.records import reapplication_opportunities
 from .atomic import atomic_write_text
 from .background_screening import (
     DEFAULT_REPLENISHMENT_STATE,

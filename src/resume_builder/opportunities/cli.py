@@ -25,8 +25,8 @@ from job_puller.database import InventoryDatabase
 from job_puller.liveness import verify_job_liveness
 from job_puller.locations import location_key, matches_search_location, matching_location_terms
 
-from ..applications import DEFAULT_ROOT as DEFAULT_APPLICATIONS_ROOT
-from ..applications import application_job_dispositions
+from ..application_tracking.records import DEFAULT_ROOT as DEFAULT_APPLICATIONS_ROOT
+from ..application_tracking.records import application_job_dispositions
 from ..atomic import atomic_write_json, atomic_write_text
 from ..source_import import is_metadata_name
 from .resume_recommendations import DirectionalResumeCandidate, load_directional_resume_candidates

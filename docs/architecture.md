@@ -102,6 +102,13 @@ lifecycle reconciliation remain sibling workflows, while the portal, assistant,
 and automation layers compose both domains. The root `jobs.py` module is a
 compatibility facade for the established CLI and import surface.
 
+Post-application history lives under `resume_builder.application_tracking`.
+Its records module owns append-only application events, submitted-answer history,
+resume snapshots, outcomes, and reapplication signals. Its email-classification
+module contains the provider-neutral semantic decision boundary. The root
+`applications.py` and `gmail_semantic.py` modules remain compatibility facades;
+Gmail OAuth, mailbox scanning, and runtime state remain an integration workflow.
+
 Resume construction is split into two internal domains. `resume_builder.planning`
 owns synthesis-plan models, schema helpers, loading, summary strategy, role
 balance, and plan audits. `resume_builder.reviews` owns narrative-block review,
@@ -151,6 +158,12 @@ the only permitted evidence source for answer claims. Job prescreening reads
 only application-linked job IDs to suppress already-applied opportunities. The
 application CLI has no arbitrary storage-root override, and advisory repost
 detection derives results without replacing persisted inventory state.
+The implementation lives under `resume_builder.application_tracking`: `records.py`
+owns the append-only application ledger and outcome reporting, while
+`email_classification.py` contains the provider-neutral semantic classifier.
+The root `applications.py` and `gmail_semantic.py` modules preserve their
+established import surfaces; Gmail orchestration remains a separate integration
+boundary.
 The optional Gmail boundary stores OAuth credentials and content-free sync state
 outside both repositories. It converts an explicit, uniquely identified
 application confirmation into an append-only application event; raw message

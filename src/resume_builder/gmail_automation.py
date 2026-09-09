@@ -26,17 +26,20 @@ from job_puller.config import load_config, resolve_database_path
 from job_puller.database import InventoryDatabase
 
 from .agent_contracts import ModelProviderError
-from .applications import (
+from .application_tracking.email_classification import (
+    SemanticEmailClassifier,
+    SemanticLifecycleOutcome,
+)
+from .application_tracking.records import (
     DEFAULT_ROOT as DEFAULT_APPLICATIONS_ROOT,
 )
-from .applications import (
+from .application_tracking.records import (
     _write_or_preview,
     append_event,
     build_automated_record,
     current_application_status,
     iter_records,
 )
-from .gmail_semantic import SemanticEmailClassifier, SemanticLifecycleOutcome
 from .opportunities.cli import DEFAULT_CONFIG
 
 GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"

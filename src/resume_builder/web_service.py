@@ -32,7 +32,7 @@ from job_puller.normalize import normalized_key
 from .agent_config import DEFAULT_AGENT_CONFIG, load_agent_config, render_default_agent_config
 from .agent_contracts import ModelProviderError
 from .agent_openrouter import OpenRouterAdapter
-from .applications import (
+from .application_tracking.records import (
     current_application_status,
     iter_records,
     reapplication_opportunities,

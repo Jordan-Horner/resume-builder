@@ -10,7 +10,7 @@ from urllib.parse import quote
 
 import yaml
 
-from .applications import (
+from .application_tracking.records import (
     RESUME_SNAPSHOT_ROOT,
     iter_records,
     load_record,
