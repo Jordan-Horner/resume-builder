@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from resume_builder.automation import load_config, render_default_config
 from resume_builder.scheduled_tasks import supervisor as service
+from resume_builder.scheduled_tasks.config import load_config, render_default_config
 from resume_builder.scheduled_tasks.supervisor import (
     render_supervisor_config,
     telegram_configuration_status,
@@ -40,7 +40,7 @@ def test_supervisor_runs_portal_scheduler_and_managed_telegram(tmp_path: Path) -
     assert "resume-builder-web" in rendered
     assert "resume-builder automation run --task jobs" in rendered
     assert "resume-builder automation run --task gmail" in rendered
-    assert "resume_builder.service telegram-worker" in rendered
+    assert "resume_builder.scheduled_tasks.supervisor telegram-worker" in rendered
     assert "[unix_http_server]" in rendered
     assert "[supervisorctl]" in rendered
     assert "stopasgroup=true" in rendered

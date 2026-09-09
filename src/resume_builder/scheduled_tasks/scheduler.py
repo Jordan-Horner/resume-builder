@@ -62,7 +62,7 @@ DEFAULT_NOTIFICATION_RETRY_MINUTES = 5
 DEFAULT_HEARTBEAT_HOURS = 6
 TASKS = ("jobs", "gmail")
 LOG_FORMAT_VERSION = 1
-LOGGER = logging.getLogger("resume_builder.automation")
+LOGGER = logging.getLogger("resume_builder.scheduled_tasks.scheduler")
 LOG_SUMMARY_FIELDS = {
     "jobs": (
         "refresh_status",

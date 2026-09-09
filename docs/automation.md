@@ -7,17 +7,14 @@ required.
 
 Automation configuration is an independent boundary in
 `resume_builder.scheduled_tasks.config`: it owns schedule models, YAML validation,
-serialization, and atomic configuration updates. The established
-`resume_builder.automation_config` facade and configuration exports from
-`resume_builder.automation` remain compatible, while runtime services can depend
-on configuration without importing the full scheduler orchestrator.
-Background quick-screen replenishment lives beside it in
-`resume_builder.scheduled_tasks.screening`; the established
-`resume_builder.background_screening` import remains compatible.
-The scheduler itself lives in `resume_builder.scheduled_tasks.scheduler`; the
-`resume_builder.automation` module remains the stable CLI and import facade.
+serialization, and atomic configuration updates. Runtime services import that
+configuration without importing the full scheduler orchestrator. Background
+quick-screen replenishment lives beside it in
+`resume_builder.scheduled_tasks.screening`. The scheduler itself lives in
+`resume_builder.scheduled_tasks.scheduler`, which directly serves the
+`automation` CLI.
 The local process supervisor lives in `resume_builder.scheduled_tasks.supervisor`;
-the `resume_builder.service` module remains its executable compatibility facade.
+the `serve` CLI and subprocess workers call it directly.
 
 ## What runs automatically
 

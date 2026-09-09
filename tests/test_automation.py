@@ -12,12 +12,11 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from resume_builder.automation import (
+from resume_builder.opportunities import cli as jobs_module
+from resume_builder.scheduled_tasks.scheduler import (
     LOGGER,
-    AutomationConfig,
     AutomationService,
     AutomationState,
-    GmailSchedule,
     JobSchedule,
     Notification,
     NotificationConfig,
@@ -25,7 +24,6 @@ from resume_builder.automation import (
     _configure_logging,
     _in_quiet_hours,
     _run_jobs,
-    config_payload,
     configure,
     gmail_notification,
     job_notification,
@@ -35,21 +33,7 @@ from resume_builder.automation import (
     render_default_config,
     run_forever,
 )
-from resume_builder.automation import main as automation_main
-from resume_builder.opportunities import cli as jobs_module
-
-
-def test_automation_keeps_configuration_imports_compatible() -> None:
-    from resume_builder import automation_config
-
-    assert AutomationConfig is automation_config.AutomationConfig
-    assert GmailSchedule is automation_config.GmailSchedule
-    assert JobSchedule is automation_config.JobSchedule
-    assert NotificationConfig is automation_config.NotificationConfig
-    assert config_payload is automation_config.config_payload
-    assert configure is automation_config.configure
-    assert load_config is automation_config.load_config
-    assert render_default_config is automation_config.render_default_config
+from resume_builder.scheduled_tasks.scheduler import main as automation_main
 
 
 def write_config(path: Path, **updates: object) -> None:

@@ -57,7 +57,7 @@ def render_supervisor_config(
         (
             sys.executable,
             "-m",
-            "resume_builder.service",
+            "resume_builder.scheduled_tasks.supervisor",
             "telegram-worker",
             "--workspace",
             workspace,
