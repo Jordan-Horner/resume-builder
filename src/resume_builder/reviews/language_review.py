@@ -7,9 +7,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ..artifact_paths import resume_output_base
-from ..artifact_status import build_manifest_freshness
 from ..atomic import atomic_write_json
+from ..build_artifacts.paths import resume_output_base
+from ..build_artifacts.status import build_manifest_freshness
 from ..compilation import relative_output, sha256_file
 from ..vault.layout import contained_path
 from .blocks import NarrativeReviewBlock, narrative_block_inventory

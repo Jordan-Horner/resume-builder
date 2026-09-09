@@ -63,6 +63,15 @@ FACADE_EXPORTS = {
         "validate_history",
         "validate_record",
     },
+    "artifact_paths": {"default_resume_output_base", "resume_output_base"},
+    "artifact_status": {
+        "ArtifactStatus",
+        "build_manifest_freshness",
+        "load_json_object",
+        "record_freshness",
+        "relative_path",
+        "sha256",
+    },
     "ats": {"REPLACEMENTS", "normalize_payload", "normalize_text"},
     "ats_readability": {
         "MAX_RECOMMENDED_BYTES",

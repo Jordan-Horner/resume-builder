@@ -14,8 +14,8 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
-from .artifact_paths import default_resume_output_base
 from .atomic import atomic_write_json, atomic_write_text
+from .build_artifacts.paths import default_resume_output_base
 from .document_export.normalization import normalize_payload
 from .resume_documents.html import contained_project_path, known_fact_ids, render_payload
 from .resume_documents.markdown import (

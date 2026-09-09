@@ -13,9 +13,9 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
-from .artifact_paths import default_resume_output_base
-from .artifact_status import build_manifest_freshness
 from .atomic import atomic_write_json, atomic_write_text
+from .build_artifacts.paths import default_resume_output_base
+from .build_artifacts.status import build_manifest_freshness
 from .compilation import build_resume, relative_output, sha256_file
 from .opportunities.targets import parse_target, project_target_path
 from .resume_documents.html import (

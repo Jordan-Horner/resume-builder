@@ -14,8 +14,8 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
-from .artifact_paths import default_resume_output_base
 from .atomic import atomic_write_bytes, atomic_write_json
+from .build_artifacts.paths import default_resume_output_base
 from .compilation import relative_output, sha256_file
 from .document_export.pdf import render_pdf
 from .previewing import _current_build

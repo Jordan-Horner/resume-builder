@@ -14,6 +14,8 @@ FACADE_LINE_BUDGETS = {
     "agent_telegram": 35,
     "agent_tools": 10,
     "applications": 90,
+    "artifact_paths": 10,
+    "artifact_status": 25,
     "ats": 10,
     "ats_readability": 20,
     "compilation": 250,

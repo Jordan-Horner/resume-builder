@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import Any
 
 from .. import __version__
-from ..artifact_paths import resume_output_base
-from ..artifact_status import build_manifest_freshness
 from ..atomic import atomic_write_json
+from ..build_artifacts.paths import resume_output_base
+from ..build_artifacts.status import build_manifest_freshness
 from ..synthesis import load_synthesis_plan, role_arc_payloads
 from ..vault.layout import contained_path
 from .blocks import (

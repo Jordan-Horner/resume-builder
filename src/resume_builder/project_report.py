@@ -11,21 +11,21 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
-from .artifact_paths import resume_output_base
-from .artifact_status import (
+from .build_artifacts.paths import resume_output_base
+from .build_artifacts.status import (
     ArtifactStatus,
     build_manifest_freshness,
 )
-from .artifact_status import (
+from .build_artifacts.status import (
     load_json_object as _load_json,
 )
-from .artifact_status import (
+from .build_artifacts.status import (
     record_freshness as _record_freshness,
 )
-from .artifact_status import (
+from .build_artifacts.status import (
     relative_path as _relative,
 )
-from .artifact_status import (
+from .build_artifacts.status import (
     sha256 as _sha256,
 )
 from .evaluations import load_case

@@ -16,8 +16,8 @@ from .application_tracking.records import (
     load_record,
     preserve_application_resume_snapshots,
 )
-from .artifact_paths import resume_output_base
 from .atomic import atomic_write_text
+from .build_artifacts.paths import resume_output_base
 from .document_export.normalization import normalize_payload
 from .project_report import project_report
 from .resume_documents.html import known_fact_ids, render_payload

@@ -148,6 +148,12 @@ modules preserve established imports and the `render` CLI. Template selection,
 compilation, preview, verification, and minting remain separate orchestration
 boundaries because they coordinate planning, reviews, or release state.
 
+Generated-build metadata lives under `resume_builder.build_artifacts`.
+`paths.py` owns the canonical internal output locations for each resume, while
+`status.py` owns typed readiness records and validates whether compiled inputs,
+outputs, evidence, templates, and feedback guidance are still current. Root
+`artifact_paths.py` and `artifact_status.py` remain compatibility facades.
+
 Resume construction is split into two internal domains. `resume_builder.planning`
 owns synthesis-plan models, schema helpers, loading, summary strategy, role
 balance, and plan audits. `resume_builder.reviews` owns narrative-block review,
