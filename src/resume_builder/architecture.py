@@ -53,6 +53,7 @@ FACADE_LINE_BUDGETS = {
     "service": 35,
     "source_import": 80,
     "synthesis": 180,
+    "updates": 10,
     "workspace": 40,
     "workspace_state": 50,
     "workspace_templates": 15,

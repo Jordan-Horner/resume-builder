@@ -35,7 +35,7 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
 
     integration_service = PortalIntegrationService(workspace)
     resolved_static = static_dir.expanduser().resolve() if static_dir else None
-    from ..updates import UpdateChecker
+    from .updates import UpdateChecker
 
     updates = UpdateChecker()
     from .job_sources import source_status, start_scan, toggle_source

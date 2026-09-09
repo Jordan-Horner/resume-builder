@@ -46,6 +46,9 @@ contacts GitHub at most hourly and retries failures after five minutes. It sends
 no workspace data. Local builds do not check for updates, and the application
 does not install images or restart containers.
 
+The bounded server-side checker lives in `resume_builder.portal.updates`;
+`resume_builder.updates` remains its compatibility import.
+
 Private repositories require a separate read-only GitHub credential with
 repository Contents access. Save it outside the repository in a file readable
 by container UID 1000, restrict its permissions, and set

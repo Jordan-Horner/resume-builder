@@ -672,6 +672,7 @@ FACADE_EXPORTS = {
         "sha256_file",
         "string_list",
     },
+    "updates": {"API_URL", "RELEASE_URL", "REPOSITORY", "UpdateChecker"},
     "validation": {
         "ALLOWED_CATEGORIES",
         "ALLOWED_FORMATS",
