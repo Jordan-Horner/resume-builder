@@ -434,6 +434,8 @@ export function JobsPage() {
     ? { title: "Finish setting up your search", message: "Activate your saved roles before searching.", actions: <button className="primary-button" onClick={() => void finishSetup()}>Finish setup</button> }
     : reviewableTotal === 0
       ? { title: "Find your first jobs", message: "Search your enabled sources using your saved roles and preferences.", actions: <><button className="primary-button" disabled={scanning} onClick={() => void runManualScan()}>{scanning ? "Finding jobs…" : "Find jobs now"}</button><a className="empty-state-link" href="/settings/search-preferences">Edit preferences</a></> }
+      : deferredSearch
+        ? { title: `No jobs match “${deferredSearch}”`, message: "Your saved search is still active. Clear it to see the full queue.", actions: <><button className="primary-button" onClick={() => setFilters({ ...filters, search: "" })}>Clear search</button><button className="empty-state-link" onClick={() => defaults && setFilters({ ...EMPTY_FILTERS, view: defaults })}>Reset all filters</button></> }
       : queueView === "interested"
           ? { title: "No Interested jobs yet", message: "Jobs you mark Interested stay here until you apply or pass on them.", actions: <button className="primary-button" onClick={() => selectQueue("recommended")}>Review recommendations</button> }
           : queueView === "recommended"

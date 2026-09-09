@@ -243,6 +243,24 @@ it("shows when the scheduled search is still preparing recommendations", async (
   expect(host.textContent).toContain("New matches will be screened automatically");
 });
 
+it("explains that a restored text search is hiding jobs even while discovery runs", async () => {
+  localStorage.setItem("resume-builder.job-view.v8", JSON.stringify({
+    filters: { search: "wordbricks", dateDays: 0, workMode: "", employmentType: "", view: EMPTY_VIEW },
+    previous: EMPTY_VIEW,
+  }));
+  vi.mocked(api.getJobs).mockResolvedValue({ jobs: [], count: 0, reviewable_count: 12 });
+  vi.mocked(api.getScrapeSchedule).mockResolvedValue({ configured: true, enabled: true, times: ["08:00"], timezone: "America/New_York", next_run: null, last_run: null, service_status: "online", screening_enabled: true, screening_max_jobs: 15, screening_available: true, current_stage: "searching" });
+
+  await act(async () => root.render(<JobsPage />));
+  await act(async () => { await new Promise((resolve) => window.setTimeout(resolve, 300)); });
+
+  expect(host.textContent).toContain("No jobs match “wordbricks”");
+  expect(host.textContent).toContain("Your saved search is still active");
+  expect(host.textContent).not.toContain("Finding new jobs…");
+  await click("Clear search");
+  expect((host.querySelector('input[type="search"]') as HTMLInputElement).value).toBe("");
+});
+
 it("keeps failed automatic-screen metadata out of the queue", async () => {
   vi.mocked(api.getJobs).mockResolvedValue({
     jobs: [{ ...job, quick_screen: { status: "failed", label: "Screen unavailable", resume_name: null, generated_at: null } }],
