@@ -119,8 +119,8 @@ def write_screening_output(
 def test_screening_backfill_rebuilds_current_inventory_without_source_refresh(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from resume_builder import background_screening
     from resume_builder.automation import DEFAULT_CONFIG, render_default_config
+    from resume_builder.scheduled_tasks import screening as background_screening
 
     automation_path = tmp_path / DEFAULT_CONFIG
     automation_path.parent.mkdir(parents=True)
@@ -213,8 +213,8 @@ def test_screening_backfill_deduplicates_overlapping_requests(
 def test_screening_backfill_drains_bounded_batches_and_stops_without_progress(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from resume_builder import background_screening
     from resume_builder.automation import DEFAULT_CONFIG, render_default_config
+    from resume_builder.scheduled_tasks import screening as background_screening
 
     automation_path = tmp_path / DEFAULT_CONFIG
     automation_path.parent.mkdir(parents=True)
@@ -349,8 +349,8 @@ def test_recommendation_replenishment_drains_the_current_backlog(
 def test_screening_backfill_input_is_built_only_from_local_inventory(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from resume_builder import background_screening
     from resume_builder.opportunities.cli import DEFAULT_CONFIG, DEFAULT_OUTPUT, DEFAULT_PREFERENCES
+    from resume_builder.scheduled_tasks import screening as background_screening
 
     calls: list[tuple[Path, Path, int, Path, Path]] = []
 
@@ -657,7 +657,7 @@ def test_failed_queued_job_screen_surfaces_retryable_state(tmp_path, monkeypatch
 def test_background_quick_screen_has_one_short_provider_attempt(tmp_path, monkeypatch) -> None:
     from types import SimpleNamespace
 
-    from resume_builder import background_screening
+    from resume_builder.scheduled_tasks import screening as background_screening
 
     captured: dict[str, object] = {}
     config = SimpleNamespace(
@@ -695,7 +695,7 @@ def test_background_quick_screen_has_one_short_provider_attempt(tmp_path, monkey
 def test_background_replenishment_runs_bounded_batches_until_pending_is_empty(
     tmp_path, monkeypatch
 ) -> None:
-    from resume_builder import background_screening
+    from resume_builder.scheduled_tasks import screening as background_screening
 
     summaries = iter(
         [
@@ -741,7 +741,7 @@ def test_background_replenishment_runs_bounded_batches_until_pending_is_empty(
 def test_background_replenishment_stops_when_a_batch_makes_no_progress(
     tmp_path, monkeypatch
 ) -> None:
-    from resume_builder import background_screening
+    from resume_builder.scheduled_tasks import screening as background_screening
 
     summary = SimpleNamespace(
         active=4,
@@ -769,7 +769,7 @@ def test_background_replenishment_stops_when_a_batch_makes_no_progress(
 
 
 def test_background_replenishment_serializes_workspace_writers(tmp_path, monkeypatch) -> None:
-    from resume_builder import background_screening
+    from resume_builder.scheduled_tasks import screening as background_screening
 
     first_entered = Event()
     second_started = Event()

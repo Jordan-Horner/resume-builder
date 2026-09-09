@@ -1518,7 +1518,7 @@ class DashboardService:
                 max_jobs = schedule.jobs.semantic_screening_max_jobs
             except (OSError, ValueError):
                 pass
-        from ..background_screening import background_screening_configured
+        from ..scheduled_tasks.screening import background_screening_configured
 
         with self._screening_state_lock:
             state = dict(self._screening_backfill_state)
@@ -1531,7 +1531,7 @@ class DashboardService:
 
     def queue_screening_backfill(self, *, drain: bool = True) -> tuple[bool, dict[str, Any]]:
         """Reserve one standalone backfill without starting provider discovery."""
-        from ..background_screening import publish_replenishment_state
+        from ..scheduled_tasks.screening import publish_replenishment_state
 
         status = self.screening_backfill_status()
         if not status["enabled"]:
@@ -1564,7 +1564,7 @@ class DashboardService:
         started_at = datetime.now(UTC)
         try:
             from ..automation import load_config as load_automation
-            from ..background_screening import (
+            from ..scheduled_tasks.screening import (
                 publish_replenishment_state,
                 run_background_replenishment,
             )
@@ -1687,7 +1687,7 @@ class DashboardService:
             )
         except (OSError, RuntimeError, ValueError):
             LOGGER.warning("recommendation screening backfill failed", exc_info=True)
-            from ..background_screening import publish_replenishment_state
+            from ..scheduled_tasks.screening import publish_replenishment_state
 
             publish_replenishment_state(
                 self.workspace,

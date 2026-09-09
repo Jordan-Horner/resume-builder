@@ -31,11 +31,6 @@ from job_puller.config import load_config as load_job_config
 
 from .application_tracking.records import reapplication_opportunities
 from .atomic import atomic_write_text
-from .background_screening import (
-    DEFAULT_REPLENISHMENT_STATE,
-    background_screening_configured,
-    run_background_replenishment,
-)
 from .gmail_integration import orchestration as gmail_automation
 from .opportunities import cli as jobs
 from .opportunities.screening_queue import (
@@ -57,6 +52,11 @@ from .scheduled_tasks.config import (
 )
 from .scheduled_tasks.config import DEFAULT_JOB_TIMES as DEFAULT_JOB_TIMES
 from .scheduled_tasks.config import GmailSchedule as GmailSchedule
+from .scheduled_tasks.screening import (
+    DEFAULT_REPLENISHMENT_STATE,
+    background_screening_configured,
+    run_background_replenishment,
+)
 
 DEFAULT_NOTIFICATION_RETRY_MINUTES = 5
 DEFAULT_HEARTBEAT_HOURS = 6

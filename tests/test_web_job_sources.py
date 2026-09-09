@@ -113,8 +113,8 @@ def test_manual_scan_runs_enabled_background_quick_screening(
 ) -> None:
     from types import SimpleNamespace
 
-    from resume_builder import background_screening
     from resume_builder.opportunities import cli as jobs
+    from resume_builder.scheduled_tasks import screening as background_screening
 
     scaffold_job_search(tmp_path)
     automation_config = tmp_path / DEFAULT_CONFIG
@@ -161,8 +161,8 @@ def test_manual_scan_publishes_discovery_before_screening_finishes(
 ) -> None:
     from types import SimpleNamespace
 
-    from resume_builder import background_screening
     from resume_builder.opportunities import cli as jobs
+    from resume_builder.scheduled_tasks import screening as background_screening
 
     scaffold_job_search(tmp_path)
     automation_config = tmp_path / DEFAULT_CONFIG

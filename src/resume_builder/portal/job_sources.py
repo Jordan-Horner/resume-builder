@@ -193,7 +193,7 @@ def run_worker(root: Path, snapshot: Path) -> None:
         try:
             from ..automation import DEFAULT_CONFIG as AUTOMATION_CONFIG
             from ..automation import load_config as load_automation
-            from ..background_screening import run_background_replenishment
+            from ..scheduled_tasks.screening import run_background_replenishment
 
             schedule_path = root / AUTOMATION_CONFIG
             if schedule_path.is_file():
