@@ -16,7 +16,7 @@ import yaml
 from .assistant.config import TelegramChannel, render_default_agent_config
 from .assistant.state import AgentState, default_agent_state_path
 from .atomic import atomic_write_text
-from .workspace_state import discover_workspace
+from .workspace_management.state import discover_workspace
 
 TELEGRAM_WEB_URL = "https://web.telegram.org/"
 BOTFATHER_URL = "https://t.me/BotFather"

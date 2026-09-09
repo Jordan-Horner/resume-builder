@@ -294,7 +294,7 @@ def _catalog_files(project_root: Path, directory: str) -> list[Path]:
 
 def template_catalog(project_root: Path) -> dict[str, object]:
     """Return every workspace template with validation and display metadata."""
-    from .workspace_templates import template_resources
+    from .workspace_management.templates import template_resources
 
     built_ins = {
         (Path("templates") / relative).as_posix(): content

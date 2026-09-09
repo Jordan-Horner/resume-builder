@@ -39,7 +39,9 @@ FACADE_LINE_BUDGETS = {
     "schema_upgrade": 40,
     "source_import": 80,
     "synthesis": 180,
-    "workspace": 510,
+    "workspace": 40,
+    "workspace_state": 50,
+    "workspace_templates": 15,
     "validation": 70,
 }
 

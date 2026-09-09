@@ -104,6 +104,14 @@ foundations: `change_plans.py` applies reviewed canonical writes,
 converts aggregate vaults, and `schema_upgrade.py` performs versioned upgrades.
 Their established root modules and CLI commands remain compatibility surfaces.
 
+Private-workspace lifecycle code lives under `resume_builder.workspace_management`.
+`state.py` discovers workspaces and inspects Git remote privacy without mutation,
+`templates.py` installs the packaged workspace skeleton and built-in templates,
+and `setup.py` coordinates initialization, connection, template synchronization,
+and the related CLI flows. The established `workspace.py`, `workspace_state.py`,
+and `workspace_templates.py` modules remain compatibility facades, and the
+`init` and `workspace` commands are unchanged.
+
 Pre-application job work lives under `resume_builder.opportunities`. That domain
 turns external postings into a personalized, reviewable opportunity queue: it
 owns discovery coordination, source enrichment, deterministic eligibility,

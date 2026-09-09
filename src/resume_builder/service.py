@@ -18,7 +18,7 @@ from .agent_telegram_setup import resolve_telegram_token
 from .assistant.config import DEFAULT_AGENT_CONFIG, load_agent_config
 from .atomic import atomic_write_text
 from .automation import DEFAULT_CONFIG, load_config
-from .workspace_state import discover_workspace
+from .workspace_management.state import discover_workspace
 
 SUPERVISOR_CONFIG_ENV = "RESUME_BUILDER_SUPERVISOR_CONFIG"
 

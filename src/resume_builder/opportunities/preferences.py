@@ -18,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from job_puller.config import load_config, resolve_database_path
 
 from ..atomic import atomic_write_json, atomic_write_text
-from ..workspace import discover_workspace
+from ..workspace_management.state import discover_workspace
 from .cli import (
     DEFAULT_OUTPUT,
     DEFAULT_REVIEW_OUTPUT,
