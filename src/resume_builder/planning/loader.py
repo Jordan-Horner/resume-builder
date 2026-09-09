@@ -26,6 +26,7 @@ from .schema import (
     string_list,
 )
 from .schema import optional_string as optional_string
+from .selections import parse_exclusions, parse_progression, parse_summary_evidence
 from .stories import parse_stories
 from .summary import parse_summary_strategy
 from .targeting import parse_targeting
@@ -114,29 +115,12 @@ def load_synthesis_plan(path: Path, project_root: Path, vault_root: Path) -> Syn
         )
 
     facts = fact_metadata(vault_root)
-    progression = string_list(data["progression"], "synthesis progression")
-    unknown_progression = sorted(set(progression) - facts.keys())
-    if unknown_progression:
-        raise ValueError(f"synthesis progression cites unknown facts: {unknown_progression}")
-    non_roles = sorted(fact_id for fact_id in progression if facts[fact_id].get("type") != "role")
-    if non_roles:
-        raise ValueError(f"synthesis progression must contain role facts: {non_roles}")
-
-    summary_job: str | None = None
-    summary_fact_ids: list[str] = []
-    summary_body_fact_ids: list[str] = []
-    if version >= 2:
-        summary_job = nonempty_string(data["summary_job"], "synthesis summary_job")
-        summary_fact_ids = string_list(data["summary_fact_ids"], "synthesis summary_fact_ids")
-        unknown_summary = sorted(set(summary_fact_ids) - facts.keys())
-        if unknown_summary:
-            raise ValueError(f"synthesis summary cites unknown facts: {unknown_summary}")
-        summary_body_fact_ids = [
-            fact_id
-            for fact_id in summary_fact_ids
-            if facts[fact_id].get("category") == "employment"
-            and facts[fact_id].get("scope") == "role"
-        ]
+    progression = parse_progression(data["progression"], facts)
+    summary_job, summary_fact_ids, summary_body_fact_ids = parse_summary_evidence(
+        data,
+        version=version,
+        facts=facts,
+    )
 
     stories, selected_facts, planned_visible_facts = parse_stories(
         data["stories"],
@@ -147,24 +131,7 @@ def load_synthesis_plan(path: Path, project_root: Path, vault_root: Path) -> Syn
     selected_facts.update(summary_fact_ids)
     summary_strategy = parse_summary_strategy(version, data, facts, stories, summary_fact_ids)
 
-    raw_exclusions = data["exclusions"]
-    if not isinstance(raw_exclusions, list):
-        raise ValueError("synthesis exclusions must be a list")
-    exclusions: list[tuple[str, str]] = []
-    excluded_facts: set[str] = set()
-    for index, raw_exclusion in enumerate(raw_exclusions):
-        owner = f"synthesis exclusions[{index}]"
-        exclusion = object_value(raw_exclusion, owner)
-        exact_fields(exclusion, {"fact_id", "reason"}, owner)
-        fact_id = nonempty_string(exclusion["fact_id"], f"{owner}.fact_id")
-        if fact_id not in facts:
-            raise ValueError(f"{owner} cites unknown fact: {fact_id}")
-        if fact_id in selected_facts:
-            raise ValueError(f"synthesis fact cannot be selected and excluded: {fact_id}")
-        if fact_id in excluded_facts:
-            raise ValueError(f"duplicate synthesis exclusion: {fact_id}")
-        excluded_facts.add(fact_id)
-        exclusions.append((fact_id, nonempty_string(exclusion["reason"], f"{owner}.reason")))
+    exclusions = parse_exclusions(data["exclusions"], facts=facts, selected_facts=selected_facts)
 
     gaps = tuple(string_list(data["gaps"], "synthesis gaps", required=False))
 
