@@ -17,9 +17,7 @@ from .opportunities.defaults import PREFERENCES_PATH
 from .opportunities.preferences import PreferenceChangeRequest
 from .opportunities.preferences import apply as apply_preferences
 from .opportunities.preferences import propose as propose_preferences
-from .web_agent_resume import apply_wording, read_resume, replacement_source, resume_path
-from .web_agent_state import WebAgentState
-from .web_career import (
+from .portal.career import (
     archive_directional_resume,
     directional_resume_removal_impact,
     list_resumes,
@@ -27,6 +25,8 @@ from .web_career import (
     resolve_retired_resume_reference,
     restore_directional_resume,
 )
+from .web_agent_resume import apply_wording, read_resume, replacement_source, resume_path
+from .web_agent_state import WebAgentState
 from .web_service import STATE_PATH, DashboardService
 
 WEB_INSTRUCTIONS = """You are the private Resume Builder assistant. Be concise and candid.

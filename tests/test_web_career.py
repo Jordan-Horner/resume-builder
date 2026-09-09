@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from resume_builder.web_career import (
+from resume_builder.portal.career import (
     archive_directional_resume,
     directional_resume_removal_impact,
     list_resumes,
@@ -155,7 +155,7 @@ def test_application_preview_uses_preserved_copy_after_source_changes(
         rendered_from.append(source)
         return source
 
-    monkeypatch.setattr("resume_builder.web_career._render_portal_preview", render)
+    monkeypatch.setattr("resume_builder.portal.career._render_portal_preview", render)
 
     resolve_application_resume_preview(root, record["application"]["id"])
 
@@ -313,7 +313,7 @@ def test_directional_resume_uses_a_compact_headline_when_plan_has_no_direction(
     resume.parent.mkdir(parents=True, exist_ok=True)
     resume.write_text("# Resume\n", encoding="utf-8")
     monkeypatch.setattr(
-        "resume_builder.web_career.project_report",
+        "resume_builder.portal.career.project_report",
         lambda *_args, **_kwargs: {
             "resumes": [
                 {
@@ -325,7 +325,7 @@ def test_directional_resume_uses_a_compact_headline_when_plan_has_no_direction(
         },
     )
     monkeypatch.setattr(
-        "resume_builder.web_career.compile_markdown",
+        "resume_builder.portal.career.compile_markdown",
         lambda _text: {
             "candidate": {
                 "headline": (
@@ -356,7 +356,7 @@ def test_portal_reader_renders_current_markdown_instead_of_old_preview(
     current_draft = old_preview.with_name("resume.portal.html")
     current_draft.write_text("Current draft preview", encoding="utf-8")
     monkeypatch.setattr(
-        "resume_builder.web_career._render_portal_preview", lambda *_args: current_draft
+        "resume_builder.portal.career._render_portal_preview", lambda *_args: current_draft
     )
 
     resolved = resolve_resume_preview(root, "resumes/tailored/example.md")
@@ -386,7 +386,7 @@ Evidence-backed resume.
     (tailored / "minted.md").write_text(source.format(headline="Minted"), encoding="utf-8")
     (tailored / "draft.md").write_text(source.format(headline="Draft"), encoding="utf-8")
     monkeypatch.setattr(
-        "resume_builder.web_career.project_report",
+        "resume_builder.portal.career.project_report",
         lambda *_args, **_kwargs: {
             "resumes": [
                 {

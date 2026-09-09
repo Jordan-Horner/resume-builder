@@ -994,23 +994,23 @@ class DashboardService:
         return self.onboarding_status()
 
     def career_resumes(self) -> dict[str, Any]:
-        from .web_career import list_resumes
+        from .portal.career import list_resumes
 
         return list_resumes(self.workspace)
 
     def career_resume_preview(self, resume_id: str) -> dict[str, Any]:
-        from .web_career import resolve_resume_preview
+        from .portal.career import resolve_resume_preview
 
         return resolve_resume_preview(self.workspace, resume_id)
 
     def restore_career_resume(self, resume_id: str) -> dict[str, Any]:
-        from .web_career import restore_directional_resume
+        from .portal.career import restore_directional_resume
 
         with self._state_lock:
             return restore_directional_resume(self.workspace, resume_id)
 
     def application_resume_preview(self, application_id: str) -> dict[str, Any]:
-        from .web_career import resolve_application_resume_preview
+        from .portal.career import resolve_application_resume_preview
 
         return resolve_application_resume_preview(self.workspace, application_id)
 

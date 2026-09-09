@@ -46,6 +46,7 @@ FACADE_LINE_BUDGETS = {
     "workspace_state": 50,
     "workspace_templates": 15,
     "validation": 70,
+    "web_career": 45,
     "web_filters": 10,
     "web_integrations": 20,
     "web_job_sources": 40,

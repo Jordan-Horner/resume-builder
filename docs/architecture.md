@@ -166,9 +166,12 @@ inventory-view filters without changing discovery configuration, `schedule.py`
 and `system.py` expose scheduler controls and content-free health, and
 `integrations.py` coordinates short-lived Gmail and Telegram setup sessions.
 `job_sources.py` controls manual provider scans while preserving the existing
-collector workflow. The established `web_filters.py`, `web_schedule.py`,
-`web_system.py`, `web_integrations.py`, and `web_job_sources.py` modules remain
-compatibility facades; the manual-scan worker entry point is unchanged.
+collector workflow. `career.py` presents generated and retired résumés, renders
+read-only portal previews, and preserves application-linked copies during
+lifecycle changes. The established `web_career.py`, `web_filters.py`,
+`web_schedule.py`, `web_system.py`, `web_integrations.py`, and
+`web_job_sources.py` modules remain compatibility facades; the manual-scan
+worker entry point is unchanged.
 
 Resume construction is split into two internal domains. `resume_builder.planning`
 owns synthesis-plan models, schema helpers, loading, summary strategy, role
