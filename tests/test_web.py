@@ -244,7 +244,9 @@ def test_screening_backfill_route_starts_standalone_worker(tmp_path: Path, monke
         request = Thread(target=load_status)
         request.start()
         try:
-            assert completed.wait(timeout=0.5), "background screening blocked another portal request"
+            assert completed.wait(timeout=0.5), (
+                "background screening blocked another portal request"
+            )
             assert status_codes == [200]
         finally:
             release.set()
