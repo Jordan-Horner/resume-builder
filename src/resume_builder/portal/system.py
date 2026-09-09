@@ -20,9 +20,12 @@ def system_status(workspace: Path) -> dict[str, Any]:
     schedule = schedule_status(workspace)
     scheduler = schedule["service_status"] if schedule["enabled"] else "disabled"
     telegram_config = telegram_configuration_status(workspace)
-    sync_enabled = os.environ.get(
-        "RESUME_BUILDER_WORKSPACE_SYNC_ENABLED", ""
-    ).strip().lower() in {"1", "true", "yes", "on"}
+    sync_enabled = os.environ.get("RESUME_BUILDER_WORKSPACE_SYNC_ENABLED", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
     state_root = Path(os.environ.get("RESUME_BUILDER_STATE_DIR", "/state")).expanduser()
     try:
         interval = max(
@@ -99,10 +102,6 @@ def system_status(workspace: Path) -> dict[str, Any]:
         "updated",
     }
     return {
-        "status": (
-            "healthy"
-            if scheduler in {"online", "disabled"} and sync_ready
-            else "degraded"
-        ),
+        "status": ("healthy" if scheduler in {"online", "disabled"} and sync_ready else "degraded"),
         "components": components,
     }

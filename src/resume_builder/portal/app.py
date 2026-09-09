@@ -73,6 +73,7 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
     def locked_background_task(callback: Any, *arguments: Any, **keywords: Any) -> None:
         with workspace_lock(workspace, exclusive=True):
             callback(*arguments, **keywords)
+
     from .assistant_routes import install_assistant
 
     install_assistant(app, workspace)
@@ -404,9 +405,7 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
                 payload.get("action"),
                 payload.get("reasons", []),
             )
-            background_tasks.add_task(
-                locked_background_task, service.replenish_recommendations
-            )
+            background_tasks.add_task(locked_background_task, service.replenish_recommendations)
             return result
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -415,9 +414,7 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
     def mark_not_interested(job_id: str, background_tasks: BackgroundTasks) -> dict[str, Any]:
         try:
             result = service.mark_not_interested(job_id)
-            background_tasks.add_task(
-                locked_background_task, service.replenish_recommendations
-            )
+            background_tasks.add_task(locked_background_task, service.replenish_recommendations)
             return result
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -428,9 +425,7 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
     ) -> dict[str, Any]:
         try:
             result = service.hide_job(job_id, payload.get("reason"))
-            background_tasks.add_task(
-                locked_background_task, service.replenish_recommendations
-            )
+            background_tasks.add_task(locked_background_task, service.replenish_recommendations)
             return result
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -439,9 +434,7 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
     def mark_applied(job_id: str, background_tasks: BackgroundTasks) -> dict[str, Any]:
         try:
             result = service.mark_applied(job_id)
-            background_tasks.add_task(
-                locked_background_task, service.replenish_recommendations
-            )
+            background_tasks.add_task(locked_background_task, service.replenish_recommendations)
             return result
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc

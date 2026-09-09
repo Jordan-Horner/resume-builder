@@ -538,9 +538,7 @@ def test_system_status_keeps_optional_services_out_of_core_health(tmp_path: Path
         "status": "online",
         "detail": "Available",
     }
-    workspace_sync = next(
-        item for item in payload["components"] if item["id"] == "workspace-sync"
-    )
+    workspace_sync = next(item for item in payload["components"] if item["id"] == "workspace-sync")
     assert workspace_sync["status"] == "disabled"
     telegram = next(item for item in payload["components"] if item["id"] == "telegram")
     assert telegram["status"] == "not_configured"
@@ -569,9 +567,7 @@ def test_system_status_surfaces_blocked_workspace_sync(tmp_path: Path, monkeypat
 
     payload = client.get("/api/system/status").json()
 
-    workspace_sync = next(
-        item for item in payload["components"] if item["id"] == "workspace-sync"
-    )
+    workspace_sync = next(item for item in payload["components"] if item["id"] == "workspace-sync")
     assert workspace_sync == {
         "id": "workspace-sync",
         "name": "Workspace sync",
@@ -581,9 +577,7 @@ def test_system_status_surfaces_blocked_workspace_sync(tmp_path: Path, monkeypat
     assert payload["status"] == "degraded"
 
 
-def test_system_status_rejects_a_stopped_workspace_sync_worker(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_system_status_rejects_a_stopped_workspace_sync_worker(tmp_path: Path, monkeypatch) -> None:
     from resume_builder.portal import system
 
     state = tmp_path / "state"
@@ -607,9 +601,7 @@ def test_system_status_rejects_a_stopped_workspace_sync_worker(
 
     payload = client.get("/api/system/status").json()
 
-    workspace_sync = next(
-        item for item in payload["components"] if item["id"] == "workspace-sync"
-    )
+    workspace_sync = next(item for item in payload["components"] if item["id"] == "workspace-sync")
     assert workspace_sync["status"] == "error"
     assert workspace_sync["detail"] == "Workspace update worker is not running"
     assert payload["status"] == "degraded"

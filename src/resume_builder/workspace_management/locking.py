@@ -38,9 +38,7 @@ def workspace_lock(workspace: Path, *, exclusive: bool) -> Iterator[None]:
 
 
 @asynccontextmanager
-async def async_workspace_lock(
-    workspace: Path, *, exclusive: bool
-) -> AsyncIterator[None]:
+async def async_workspace_lock(workspace: Path, *, exclusive: bool) -> AsyncIterator[None]:
     """Asynchronously acquire the same lock without blocking the event loop."""
     stream = _lock_path(workspace).open("a+b")
     try:

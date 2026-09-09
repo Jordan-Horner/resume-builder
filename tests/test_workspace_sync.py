@@ -152,9 +152,7 @@ def test_sync_rejects_incomplete_ssh_credentials(tmp_path: Path, monkeypatch) ->
     assert result.detail == "SSH credentials are incomplete"
 
 
-def test_git_environment_reuses_the_private_update_token(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_git_environment_reuses_the_private_update_token(tmp_path: Path, monkeypatch) -> None:
     token = tmp_path / "github-token"
     token.write_text("synthetic-token", encoding="utf-8")
     monkeypatch.setenv(UPDATE_TOKEN_FILE_ENV, str(token))

@@ -116,11 +116,7 @@ def _text(result: subprocess.CompletedProcess[bytes]) -> str:
 
 
 def _paths(result: subprocess.CompletedProcess[bytes]) -> set[str]:
-    return {
-        item.decode("utf-8", "surrogateescape")
-        for item in result.stdout.split(b"\0")
-        if item
-    }
+    return {item.decode("utf-8", "surrogateescape") for item in result.stdout.split(b"\0") if item}
 
 
 def _result(
@@ -158,9 +154,7 @@ def _sync_once_locked(workspace: Path, identity: str) -> SyncResult:
     """Perform one update while all workspace writers are excluded."""
     inside = _run(workspace, "rev-parse", "--is-inside-work-tree")
     if inside.returncode != 0 or _text(inside) != "true":
-        return _result(
-            "not_configured", "Workspace is not Git-backed", workspace_id=identity
-        )
+        return _result("not_configured", "Workspace is not Git-backed", workspace_id=identity)
 
     branch_result = _run(workspace, "branch", "--show-current")
     branch = _text(branch_result)
@@ -199,16 +193,12 @@ def _sync_once_locked(workspace: Path, identity: str) -> SyncResult:
         )
     fetch = _run(workspace, "fetch", "--quiet", remote, merge_ref, timeout=120)
     if fetch.returncode != 0:
-        return _result(
-            "error", "Remote update check failed", branch=branch, workspace_id=identity
-        )
+        return _result("error", "Remote update check failed", branch=branch, workspace_id=identity)
 
     head_result = _run(workspace, "rev-parse", "HEAD")
     upstream_head_result = _run(workspace, "rev-parse", "FETCH_HEAD")
     if head_result.returncode != 0 or upstream_head_result.returncode != 0:
-        return _result(
-            "error", "Git revision check failed", branch=branch, workspace_id=identity
-        )
+        return _result("error", "Git revision check failed", branch=branch, workspace_id=identity)
     head = _text(head_result)
     upstream_head = _text(upstream_head_result)
     if head == upstream_head:
@@ -223,9 +213,7 @@ def _sync_once_locked(workspace: Path, identity: str) -> SyncResult:
 
     ancestor = _run(workspace, "merge-base", "--is-ancestor", "HEAD", "FETCH_HEAD")
     if ancestor.returncode != 0:
-        upstream_ancestor = _run(
-            workspace, "merge-base", "--is-ancestor", "FETCH_HEAD", "HEAD"
-        )
+        upstream_ancestor = _run(workspace, "merge-base", "--is-ancestor", "FETCH_HEAD", "HEAD")
         detail = (
             "Local commits have not been pushed"
             if upstream_ancestor.returncode == 0
@@ -265,9 +253,7 @@ def _sync_once_locked(workspace: Path, identity: str) -> SyncResult:
             workspace_id=identity,
         )
 
-    merge = _run(
-        workspace, "merge", "--ff-only", "--quiet", "--", "FETCH_HEAD", timeout=120
-    )
+    merge = _run(workspace, "merge", "--ff-only", "--quiet", "--", "FETCH_HEAD", timeout=120)
     if merge.returncode != 0:
         return _result(
             "blocked",
