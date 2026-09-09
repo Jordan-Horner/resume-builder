@@ -197,8 +197,10 @@ facade.
 
 Resume construction is split into two internal domains. `resume_builder.planning`
 owns synthesis-plan models, schema helpers, loading, summary strategy, role
-balance, and plan audits. `resume_builder.reviews` owns narrative-block review,
-feedback memory, selection checks, decisions, repairs, and review packaging.
+balance, and plan audits. Its loader coordinates version-aware assembly while
+the `stories` and `role_arcs` modules validate their respective plan sections.
+`resume_builder.reviews` owns narrative-block review, feedback memory, selection
+checks, decisions, repairs, and review packaging.
 The root `synthesis.py`, `feedback_memory.py`, and `review_records.py` modules
 remain compatibility facades for established commands and public imports.
 
@@ -361,11 +363,14 @@ visibly cited by each resume and passes that matrix to the same gate-first
 classifier used by formal CLI matching. A posting-wide screen instead compares
 only the fact IDs the fit model cited: it names a resume only when one direction
 has strictly greater cited-evidence overlap than every other active direction.
-It abstains on ties or zero overlap rather than inventing precision. Resume paths
-and content hashes are part of the screen cache identity, so editing or retiring
-a direction invalidates its old recommendation. Applying pins the selected path,
-hash, and match label at that moment. A minted same-job tailored resume still
-takes precedence.
+It does not invent a winner on ties or zero overlap. Instead, it preserves the
+vault-backed decision as actionable guidance: multiple matches when top resumes
+tie, needs tailoring when cited vault facts do not appear in a current resume,
+build a resume when no active direction exists, or not enough evidence when the
+screen cited no facts. Resume paths and content hashes are part of the screen
+cache identity, so editing or retiring a direction invalidates its old
+recommendation. Applying pins the selected path, hash, and match label at that
+moment. A minted same-job tailored resume still takes precedence.
 
 Posting interpretation and private fit use separate model routes when deeper
 analysis requests an interpretation. The candidate-independent interpretation

@@ -9,40 +9,31 @@ import yaml
 from ..resume_documents.html import contained_project_path
 from ..resume_templates import load_content_template, load_rendering_theme
 from .models import (
-    CLAIM_COMPOSITIONS,
     COMPETENCY_DECISIONS,
     FIT_STATUSES,
     PAGE_BUDGET_SOURCES,
     RISK_STATUSES,
-    ROLE_ARC_EMPHASES,
-    SECTIONS,
     STORY_ID,
     TARGET_MODES,
-    ClaimEvidence,
-    ClaimSpec,
     ConceptFit,
-    OmittedRoleSignal,
     PageBudget,
     PresentationStrategy,
     ResumeTemplateSelection,
     ReviewerRisk,
-    RoleArc,
     SynthesisPlan,
-    SynthesisStory,
 )
+from .role_arcs import parse_role_arcs
 from .schema import (
-    core_job_assessment,
     direction_concept_ids,
     direction_page_budget,
     exact_fields,
     fact_metadata,
     nonempty_string,
     object_value,
-    optional_string,
-    role_arc_fields,
-    role_story_classes,
     string_list,
 )
+from .schema import optional_string as optional_string
+from .stories import parse_stories
 from .summary import parse_summary_strategy
 
 
@@ -153,196 +144,12 @@ def load_synthesis_plan(path: Path, project_root: Path, vault_root: Path) -> Syn
             and facts[fact_id].get("scope") == "role"
         ]
 
-    raw_stories = data["stories"]
-    if not isinstance(raw_stories, list) or not raw_stories:
-        raise ValueError("synthesis stories must be a non-empty list")
-    stories: list[SynthesisStory] = []
-    seen_story_ids: set[str] = set()
-    seen_jobs: set[tuple[str, tuple[str, ...], str]] = set()
-    selected_facts: set[str] = set()
-    story_fields = {
-        "id",
-        "section",
-        "role_ids",
-        "fact_ids",
-        "primary_job",
-        "priority",
-        "rationale",
-    }
-    if version >= 2:
-        story_fields.add("importance")
-    if version >= 4:
-        story_fields.update({"claim_focus", "core_fact_ids"})
-    if version >= 6:
-        story_fields.add("claim")
-    planned_visible_facts: set[str] = set()
-    for index, raw_story in enumerate(raw_stories):
-        owner = f"synthesis stories[{index}]"
-        story = object_value(raw_story, owner)
-        exact_fields(story, story_fields, owner)
-        story_id = nonempty_string(story["id"], f"{owner}.id")
-        if not STORY_ID.fullmatch(story_id):
-            raise ValueError(f"{owner}.id must be a lowercase hyphenated identifier")
-        if story_id in seen_story_ids:
-            raise ValueError(f"duplicate synthesis story ID: {story_id}")
-        seen_story_ids.add(story_id)
-        section = nonempty_string(story["section"], f"{owner}.section")
-        if section not in SECTIONS:
-            raise ValueError(f"{owner}.section must be experience or projects")
-        role_ids = string_list(
-            story["role_ids"], f"{owner}.role_ids", required=section == "experience"
-        )
-        if set(role_ids) - set(progression):
-            raise ValueError(f"{owner}.role_ids must be declared in progression")
-        fact_ids = string_list(story["fact_ids"], f"{owner}.fact_ids")
-        unknown = sorted(set(fact_ids) - facts.keys())
-        if unknown:
-            raise ValueError(f"{owner} cites unknown facts: {unknown}")
-        for fact_id in fact_ids:
-            fact = facts[fact_id]
-            if fact.get("category") != "employment" or fact.get("type") == "role":
-                continue
-            if fact.get("scope") != "role":
-                continue
-            raw_allowed_roles = fact.get("role_ids")
-            if not isinstance(raw_allowed_roles, list):
-                raise ValueError(f"role-scoped fact {fact_id} has invalid role_ids")
-            allowed_roles = {item for item in raw_allowed_roles if isinstance(item, str)}
-            placed_roles = set(role_ids)
-            if section != "experience" or not placed_roles.issubset(allowed_roles):
-                raise ValueError(
-                    f"{owner} places role-scoped fact {fact_id} outside its roles: "
-                    f"{sorted(allowed_roles)}"
-                )
-        primary_job = nonempty_string(story["primary_job"], f"{owner}.primary_job")
-        if not STORY_ID.fullmatch(primary_job):
-            raise ValueError(f"{owner}.primary_job must be a lowercase hyphenated identifier")
-        job_key = (section, tuple(sorted(role_ids)), primary_job)
-        if job_key in seen_jobs:
-            raise ValueError(f"duplicate primary job for the same placement: {primary_job}")
-        seen_jobs.add(job_key)
-        priority = story["priority"]
-        if not isinstance(priority, int) or isinstance(priority, bool) or not 1 <= priority <= 5:
-            raise ValueError(f"{owner}.priority must be an integer from 1 to 5")
-        importance = (
-            nonempty_string(story["importance"], f"{owner}.importance") if version >= 2 else "core"
-        )
-        if importance not in {"core", "supporting"}:
-            raise ValueError(f"{owner}.importance must be core or supporting")
-        rationale = nonempty_string(story["rationale"], f"{owner}.rationale")
-        claim_focus = (
-            nonempty_string(story["claim_focus"], f"{owner}.claim_focus") if version >= 4 else None
-        )
-        core_fact_ids = (
-            string_list(story["core_fact_ids"], f"{owner}.core_fact_ids")
-            if version >= 4
-            else fact_ids
-        )
-        facts_outside_story = sorted(set(core_fact_ids) - set(fact_ids))
-        if facts_outside_story:
-            raise ValueError(
-                f"{owner}.core_fact_ids must be a subset of fact_ids: {facts_outside_story}"
-            )
-        claim: ClaimSpec | None = None
-        if version >= 6:
-            raw_claim = object_value(story["claim"], f"{owner}.claim")
-            exact_fields(
-                raw_claim,
-                {
-                    "subject",
-                    "action",
-                    "object",
-                    "scope",
-                    "outcome",
-                    "composition",
-                    "relationship",
-                    "evidence",
-                },
-                f"{owner}.claim",
-            )
-            subject = nonempty_string(raw_claim["subject"], f"{owner}.claim.subject")
-            if subject != "candidate":
-                raise ValueError(f"{owner}.claim.subject must be candidate")
-            composition = nonempty_string(raw_claim["composition"], f"{owner}.claim.composition")
-            if composition not in CLAIM_COMPOSITIONS:
-                raise ValueError(
-                    f"{owner}.claim.composition must be one of {sorted(CLAIM_COMPOSITIONS)}"
-                )
-            raw_claim_evidence = object_value(raw_claim["evidence"], f"{owner}.claim.evidence")
-            exact_fields(
-                raw_claim_evidence,
-                {"action", "object", "scope", "outcome"},
-                f"{owner}.claim.evidence",
-            )
-            scope = optional_string(raw_claim["scope"], f"{owner}.claim.scope")
-            outcome = optional_string(raw_claim["outcome"], f"{owner}.claim.outcome")
-            claim_evidence = ClaimEvidence(
-                action=tuple(
-                    string_list(raw_claim_evidence["action"], f"{owner}.claim.evidence.action")
-                ),
-                object=tuple(
-                    string_list(raw_claim_evidence["object"], f"{owner}.claim.evidence.object")
-                ),
-                scope=tuple(
-                    string_list(
-                        raw_claim_evidence["scope"],
-                        f"{owner}.claim.evidence.scope",
-                        required=scope is not None,
-                    )
-                ),
-                outcome=tuple(
-                    string_list(
-                        raw_claim_evidence["outcome"],
-                        f"{owner}.claim.evidence.outcome",
-                        required=outcome is not None,
-                    )
-                ),
-            )
-            if scope is None and claim_evidence.scope:
-                raise ValueError(f"{owner}.claim scope evidence requires visible scope")
-            if outcome is None and claim_evidence.outcome:
-                raise ValueError(f"{owner}.claim outcome evidence requires visible outcome")
-            claim_fact_ids = set(claim_evidence.fact_ids)
-            unknown_claim_facts = sorted(claim_fact_ids - set(fact_ids))
-            missing_claim_core = sorted(set(core_fact_ids) - claim_fact_ids)
-            if unknown_claim_facts or missing_claim_core:
-                raise ValueError(
-                    f"{owner}.claim evidence disagrees with story facts: "
-                    f"missing_core={missing_claim_core}, unexpected={unknown_claim_facts}"
-                )
-            if composition == "single-fact" and len(claim_fact_ids) != 1:
-                raise ValueError(f"{owner}.claim single-fact composition requires exactly one fact")
-            relationship = nonempty_string(raw_claim["relationship"], f"{owner}.claim.relationship")
-            claim = ClaimSpec(
-                subject=subject,
-                action=nonempty_string(raw_claim["action"], f"{owner}.claim.action"),
-                object=nonempty_string(raw_claim["object"], f"{owner}.claim.object"),
-                scope=scope,
-                outcome=outcome,
-                composition=composition,
-                relationship=relationship,
-                evidence=claim_evidence,
-            )
-            planned_visible_facts.update(claim_evidence.fact_ids)
-        else:
-            planned_visible_facts.update(fact_ids)
-        selected_facts.update(fact_ids)
-        stories.append(
-            SynthesisStory(
-                story_id=story_id,
-                section=section,
-                role_ids=tuple(role_ids),
-                fact_ids=tuple(fact_ids),
-                primary_job=primary_job,
-                priority=priority,
-                importance=importance,
-                rationale=rationale,
-                claim_focus=claim_focus,
-                core_fact_ids=tuple(core_fact_ids),
-                claim=claim,
-            )
-        )
-
+    stories, selected_facts, planned_visible_facts = parse_stories(
+        data["stories"],
+        version=version,
+        facts=facts,
+        progression=progression,
+    )
     selected_facts.update(summary_fact_ids)
     summary_strategy = parse_summary_strategy(version, data, facts, stories, summary_fact_ids)
 
@@ -371,7 +178,6 @@ def load_synthesis_plan(path: Path, project_root: Path, vault_root: Path) -> Syn
     concept_fit: tuple[ConceptFit, ...] = ()
     reviewer_risks: tuple[ReviewerRisk, ...] = ()
     presentation: PresentationStrategy | None = None
-    role_arcs: tuple[RoleArc, ...] = ()
     if version >= 3:
         target_mode = nonempty_string(data["target_mode"], "synthesis target_mode")
         if target_mode not in TARGET_MODES:
@@ -527,201 +333,14 @@ def load_synthesis_plan(path: Path, project_root: Path, vault_root: Path) -> Syn
                     "the selected template forbids competencies"
                 )
 
-    if version >= 5:
-        assert presentation is not None
-        raw_role_arcs = data["role_arcs"]
-        if not isinstance(raw_role_arcs, list) or not raw_role_arcs:
-            raise ValueError("synthesis role_arcs must be a non-empty list")
-        story_by_id = {story.story_id: story for story in stories}
-        experience_story_ids = {
-            story.story_id for story in stories if story.section == "experience"
-        }
-        arc_entries: list[RoleArc] = []
-        seen_placements: set[tuple[str, ...]] = set()
-        allocated_story_ids: set[str] = set()
-        roles_in_arcs: set[str] = set()
-        compressed_arc_roles: set[str] = set()
-        lead_arc_found = False
-        for index, raw_arc in enumerate(raw_role_arcs):
-            owner = f"synthesis role_arcs[{index}]"
-            arc = object_value(raw_arc, owner)
-            exact_fields(arc, role_arc_fields(version), owner)
-            arc_role_ids = string_list(arc["role_ids"], f"{owner}.role_ids")
-            unknown_arc_roles = sorted(set(arc_role_ids) - set(progression))
-            if unknown_arc_roles:
-                raise ValueError(
-                    f"{owner}.role_ids must be declared in progression: {unknown_arc_roles}"
-                )
-            placement = tuple(sorted(arc_role_ids))
-            if placement in seen_placements:
-                raise ValueError(f"duplicate synthesis role arc placement: {list(placement)}")
-            seen_placements.add(placement)
-            roles_in_arcs.update(arc_role_ids)
-
-            emphasis = nonempty_string(arc["emphasis"], f"{owner}.emphasis")
-            if emphasis not in ROLE_ARC_EMPHASES:
-                raise ValueError(f"{owner}.emphasis must be one of {sorted(ROLE_ARC_EMPHASES)}")
-            lead_arc_found = lead_arc_found or emphasis == "lead"
-            if emphasis == "compressed":
-                compressed_arc_roles.update(arc_role_ids)
-
-            required_dimensions: list[str] = []
-            required_story_ids: list[str] = []
-            optional_story_ids: list[str] = []
-            if version >= 6:
-                required_dimensions = string_list(
-                    arc["required_dimensions"], f"{owner}.required_dimensions"
-                )
-                if any(not STORY_ID.fullmatch(item) for item in required_dimensions):
-                    raise ValueError(
-                        f"{owner}.required_dimensions must use lowercase hyphenated identifiers"
-                    )
-                required_story_ids = string_list(
-                    arc["required_story_ids"], f"{owner}.required_story_ids"
-                )
-                optional_story_ids = string_list(
-                    arc["optional_story_ids"],
-                    f"{owner}.optional_story_ids",
-                    required=False,
-                )
-                overlap = sorted(set(required_story_ids) & set(optional_story_ids))
-                if overlap:
-                    raise ValueError(
-                        f"{owner} assigns stories as both required and optional: {overlap}"
-                    )
-                arc_story_ids = [*required_story_ids, *optional_story_ids]
-            else:
-                arc_story_ids = string_list(arc["story_ids"], f"{owner}.story_ids")
-            role_anchor_story_ids, role_selling_story_ids = role_story_classes(
-                arc, owner, required_story_ids, version
-            )
-            core_job_candidates, selected_core_job_id, core_job_decision = core_job_assessment(
-                arc, owner, version
-            )
-            unknown_arc_stories = sorted(set(arc_story_ids) - experience_story_ids)
-            if unknown_arc_stories:
-                raise ValueError(
-                    f"{owner}.story_ids must reference experience stories: {unknown_arc_stories}"
-                )
-            if version < 6:
-                required_story_ids = [
-                    story_id
-                    for story_id in arc_story_ids
-                    if story_by_id[story_id].importance == "core"
-                ]
-                optional_story_ids = [
-                    story_id
-                    for story_id in arc_story_ids
-                    if story_by_id[story_id].importance == "supporting"
-                ]
-            duplicate_allocations = sorted(set(arc_story_ids) & allocated_story_ids)
-            if duplicate_allocations:
-                raise ValueError(
-                    "synthesis experience stories allocated to more than one role arc: "
-                    f"{duplicate_allocations}"
-                )
-            mismatched_placements = sorted(
-                story_id
-                for story_id in arc_story_ids
-                if tuple(sorted(story_by_id[story_id].role_ids)) != placement
-            )
-            if mismatched_placements:
-                raise ValueError(
-                    f"{owner}.story_ids disagree with role placement: {mismatched_placements}"
-                )
-            if version >= 6:
-                non_core_required = sorted(
-                    story_id
-                    for story_id in required_story_ids
-                    if story_by_id[story_id].importance != "core"
-                )
-                non_supporting_optional = sorted(
-                    story_id
-                    for story_id in optional_story_ids
-                    if story_by_id[story_id].importance != "supporting"
-                )
-                if non_core_required or non_supporting_optional:
-                    raise ValueError(
-                        f"{owner} story importance disagrees with allocation: "
-                        f"required_not_core={non_core_required}, "
-                        f"optional_not_supporting={non_supporting_optional}"
-                    )
-                required_jobs = {
-                    story_by_id[story_id].primary_job for story_id in required_story_ids
-                }
-                missing_dimensions = sorted(set(required_dimensions) - required_jobs)
-                if missing_dimensions:
-                    raise ValueError(
-                        f"{owner}.required_dimensions lack required stories: {missing_dimensions}"
-                    )
-            allocated_story_ids.update(arc_story_ids)
-
-            raw_omitted_signals = arc["omitted_signals"]
-            if not isinstance(raw_omitted_signals, list):
-                raise ValueError(f"{owner}.omitted_signals must be a list")
-            omitted_signals: list[OmittedRoleSignal] = []
-            seen_signals: set[str] = set()
-            for signal_index, raw_signal in enumerate(raw_omitted_signals):
-                signal_owner = f"{owner}.omitted_signals[{signal_index}]"
-                signal = object_value(raw_signal, signal_owner)
-                exact_fields(signal, {"signal", "fact_ids", "reason"}, signal_owner)
-                signal_name = nonempty_string(signal["signal"], f"{signal_owner}.signal")
-                if signal_name in seen_signals:
-                    raise ValueError(f"duplicate omitted role signal in {owner}: {signal_name}")
-                seen_signals.add(signal_name)
-                signal_fact_ids = string_list(signal["fact_ids"], f"{signal_owner}.fact_ids")
-                unknown_signal_facts = sorted(set(signal_fact_ids) - facts.keys())
-                if unknown_signal_facts:
-                    raise ValueError(f"{signal_owner} cites unknown facts: {unknown_signal_facts}")
-                omitted_signals.append(
-                    OmittedRoleSignal(
-                        signal=signal_name,
-                        fact_ids=tuple(signal_fact_ids),
-                        reason=nonempty_string(signal["reason"], f"{signal_owner}.reason"),
-                    )
-                )
-
-            arc_entries.append(
-                RoleArc(
-                    role_ids=tuple(arc_role_ids),
-                    emphasis=emphasis,
-                    arc_focus=nonempty_string(arc["arc_focus"], f"{owner}.arc_focus"),
-                    story_ids=tuple(arc_story_ids),
-                    selection_rationale=nonempty_string(
-                        arc["selection_rationale"], f"{owner}.selection_rationale"
-                    ),
-                    omitted_signals=tuple(omitted_signals),
-                    required_dimensions=tuple(required_dimensions),
-                    required_story_ids=tuple(required_story_ids),
-                    optional_story_ids=tuple(optional_story_ids),
-                    role_anchor_story_ids=tuple(role_anchor_story_ids),
-                    role_selling_story_ids=tuple(role_selling_story_ids),
-                    core_job_candidates=tuple(core_job_candidates),
-                    selected_core_job_id=selected_core_job_id,
-                    core_job_decision=core_job_decision,
-                )
-            )
-
-        missing_allocations = sorted(experience_story_ids - allocated_story_ids)
-        if missing_allocations:
-            raise ValueError(
-                f"synthesis experience stories missing from role_arcs: {missing_allocations}"
-            )
-        missing_arc_roles = sorted(set(progression) - roles_in_arcs)
-        if missing_arc_roles:
-            raise ValueError(
-                f"synthesis progression roles missing from role_arcs: {missing_arc_roles}"
-            )
-        if not lead_arc_found:
-            raise ValueError("synthesis role_arcs must identify at least one lead arc")
-        planned_compressed_roles = set(presentation.compressed_role_ids)
-        if compressed_arc_roles != planned_compressed_roles:
-            raise ValueError(
-                "synthesis role_arcs compressed emphasis disagrees with presentation: "
-                f"role_arcs={sorted(compressed_arc_roles)}, "
-                f"presentation={sorted(planned_compressed_roles)}"
-            )
-        role_arcs = tuple(arc_entries)
+    role_arcs = parse_role_arcs(
+        data.get("role_arcs"),
+        version=version,
+        presentation=presentation,
+        progression=progression,
+        stories=stories,
+        facts=facts,
+    )
 
     return SynthesisPlan(
         source=source,
