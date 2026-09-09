@@ -11,7 +11,7 @@ from typing import Any
 import yaml
 
 from .atomic import atomic_write_json
-from .layout import contained_path
+from .vault.layout import contained_path
 
 GAP_KEY = re.compile(r"^[a-z0-9]+(?:[.-][a-z0-9]+)*$")
 SOURCE_ID = re.compile(r"^SRC-[0-9a-f]{12}$")

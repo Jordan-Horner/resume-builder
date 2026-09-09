@@ -11,7 +11,7 @@ from ..artifact_paths import resume_output_base
 from ..artifact_status import build_manifest_freshness
 from ..atomic import atomic_write_json
 from ..compilation import relative_output, sha256_file
-from ..layout import contained_path
+from ..vault.layout import contained_path
 from .blocks import NarrativeReviewBlock, narrative_block_inventory
 from .schema import sha256_text
 

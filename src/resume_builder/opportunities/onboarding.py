@@ -24,9 +24,9 @@ from ..integrations import (
     interactive_integration_setup,
     parse_integration_choices,
 )
-from ..layout import VaultLayout
-from ..source_import import load_manifest
-from ..validation import validate_vault
+from ..vault.layout import VaultLayout
+from ..vault.source_import import load_manifest
+from ..vault.validation import validate_vault
 from ..workspace_state import WorkspaceError, discover_workspace
 from .cli import _load_preferences
 from .defaults import (

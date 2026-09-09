@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from ..layout import contained_path
+from ..vault.layout import contained_path
 from .blocks import narrative_block_inventory
 from .feedback_resolution import manifest_guidance_freshness
 from .schema import ReviewRecord, load_review_record, sha256_file, sha256_text

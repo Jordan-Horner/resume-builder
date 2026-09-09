@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from ..atomic import atomic_write_json
-from ..layout import contained_path
+from ..vault.layout import contained_path
 from .feedback_resolution import (
     KINDS,
     PROMOTIONS,

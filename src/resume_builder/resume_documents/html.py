@@ -14,7 +14,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from ..atomic import atomic_write_text
-from ..layout import VaultLayout
+from ..vault.layout import VaultLayout
 
 PLACEHOLDER = re.compile(r"\{\{[A-Z_]+\}\}")
 PAGE_FORMATS = {

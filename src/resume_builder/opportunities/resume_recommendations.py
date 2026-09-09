@@ -9,9 +9,9 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-from ..evidence import claim_blocks
 from ..matching.grading import classify_match
 from ..resume_documents.markdown import compile_markdown
+from ..vault.evidence import claim_blocks
 
 ResumeMatchLabel = Literal["Strong match", "Partial match", "Weak match", "Unknown match"]
 ResumeText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]

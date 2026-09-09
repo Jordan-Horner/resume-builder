@@ -13,11 +13,11 @@ from typing import Any
 from ..atomic import atomic_write_text
 from ..compilation import compile_markdown
 from ..document_export.pdf import extraction_blocks
-from ..evidence import audit_claims, claim_blocks
-from ..layout import VaultLayout
 from ..resume_documents.html import contained_project_path, object_value
 from ..synthesis import SynthesisPlan, load_synthesis_plan
-from ..validation import parse_frontmatter
+from ..vault.evidence import audit_claims, claim_blocks
+from ..vault.layout import VaultLayout
+from ..vault.validation import parse_frontmatter
 from .diagnostics import direction_style_diagnostics, normalize_phrase, phrase_present
 from .schema import (
     ALLOWED_FIELDS,

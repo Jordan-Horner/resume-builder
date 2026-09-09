@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Any
 
 from .atomic import atomic_write_json, atomic_write_text
-from .layout import VaultLayout
 from .opportunities.defaults import scaffold_job_search
+from .vault.layout import VaultLayout
 
 
 def _walk_resources(node: Any, prefix: Path = Path()) -> list[tuple[Path, str]]:

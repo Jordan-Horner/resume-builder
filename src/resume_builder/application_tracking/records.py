@@ -19,7 +19,7 @@ from job_puller.config import load_config, resolve_database_path
 from job_puller.database import InventoryDatabase
 
 from ..atomic import atomic_write_bytes, atomic_write_json
-from ..evidence import load_fact_evidence
+from ..vault.evidence import load_fact_evidence
 
 SCHEMA_VERSION = 1
 DEFAULT_ROOT = Path("applications")

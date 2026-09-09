@@ -10,10 +10,10 @@ from typing import Any
 
 from ..atomic import atomic_write_json
 from ..compilation import sha256_file
-from ..layout import contained_path
 from ..planning.models import summary_strategy_payload
 from ..synthesis import SynthesisPlan
-from ..validation import parse_frontmatter
+from ..vault.layout import contained_path
+from ..vault.validation import parse_frontmatter
 from .selection_guard import selection_digest
 
 SELECTION_DECISIONS = {"approved", "strategy-revise", "needs-user-decision"}

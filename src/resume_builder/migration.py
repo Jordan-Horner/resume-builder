@@ -17,8 +17,8 @@ from pathlib import Path
 from typing import cast
 
 from .atomic import atomic_write_json, atomic_write_text
-from .layout import DEFAULT_CONFIG
-from .validation import (
+from .vault.layout import DEFAULT_CONFIG
+from .vault.validation import (
     ALLOWED_STATUSES,
     ALLOWED_TYPES,
     FACT_ID,

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from ..atomic import atomic_write_text
-from ..layout import contained_path
+from ..vault.layout import contained_path
 from .blocks import (
     narrative_block_inventory_from_markdown,
 )

@@ -39,7 +39,6 @@ from .application_tracking.records import (
 from .assistant.config import DEFAULT_AGENT_CONFIG, load_agent_config, render_default_agent_config
 from .assistant.openrouter import OpenRouterAdapter
 from .atomic import atomic_write_json, atomic_write_text
-from .layout import VaultLayout
 from .opportunities.cli import _load_preferences, _prescreen, get_job_screening_packet
 from .opportunities.defaults import PORTFOLIO_PATH, PREFERENCES_PATH, scaffold_job_search
 from .opportunities.discovery_activation import MANAGED_FAMILY_PREFIX, preview_activation
@@ -115,7 +114,8 @@ from .opportunities.screening_service import (
 )
 from .opportunities.targets import parse_target
 from .project_report import project_report
-from .source_import import (
+from .vault.layout import VaultLayout
+from .vault.source_import import (
     SUPPORTED,
     apply_import_plan,
     build_import_plan,

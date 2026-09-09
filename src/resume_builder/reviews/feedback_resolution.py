@@ -8,8 +8,8 @@ import re
 from pathlib import Path
 from typing import Any
 
-from ..layout import contained_path
 from ..synthesis import SynthesisPlan, load_synthesis_plan
+from ..vault.layout import contained_path
 
 SESSION_ID = re.compile(r"^FB-[0-9a-f]{12}$")
 RULE_ID = re.compile(r"^ER-[0-9a-f]{12}$")

@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING, Annotated, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-from ..layout import VaultLayout
-from ..validation import parse_frontmatter
+from ..vault.layout import VaultLayout
+from ..vault.validation import parse_frontmatter
 
 if TYPE_CHECKING:
     from .posting import PostingCriterion, PostingInterpretation

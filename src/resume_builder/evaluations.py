@@ -14,9 +14,9 @@ from typing import Any
 import yaml
 
 from .compilation import build_resume
-from .layout import VaultLayout, contained_path, load_json_object
 from .synthesis import SynthesisPlan, load_synthesis_plan
-from .validation import parse_frontmatter
+from .vault.layout import VaultLayout, contained_path, load_json_object
+from .vault.validation import parse_frontmatter
 
 DIMENSIONS = {
     "relevance",

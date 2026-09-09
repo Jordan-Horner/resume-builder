@@ -23,7 +23,7 @@ from .project_report import project_report
 from .resume_documents.html import known_fact_ids, render_payload
 from .resume_documents.markdown import compile_markdown
 from .resume_templates import load_rendering_theme, rendering_theme_text
-from .source_import import is_metadata_name
+from .vault.source_import import is_metadata_name
 
 
 def _preview_url(resume_id: str, version: int) -> str:

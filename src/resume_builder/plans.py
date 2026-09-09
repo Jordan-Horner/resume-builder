@@ -14,8 +14,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .atomic import atomic_write_bytes, atomic_write_text
-from .layout import LayoutError, VaultLayout, contained_path
-from .validation import SHA256, validate_vault
+from .vault.layout import LayoutError, VaultLayout, contained_path
+from .vault.validation import SHA256, validate_vault
 
 
 @dataclass(frozen=True)

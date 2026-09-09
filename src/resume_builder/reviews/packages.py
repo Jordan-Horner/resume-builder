@@ -11,8 +11,8 @@ from .. import __version__
 from ..artifact_paths import resume_output_base
 from ..artifact_status import build_manifest_freshness
 from ..atomic import atomic_write_json
-from ..layout import contained_path
 from ..synthesis import load_synthesis_plan, role_arc_payloads
+from ..vault.layout import contained_path
 from .blocks import (
     NarrativeReviewBlock,
     narrative_block_inventory,

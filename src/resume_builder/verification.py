@@ -36,7 +36,7 @@ from .reviews.selection_review import (
 )
 from .role_profiles.profiles import audit_direction, parse_direction
 from .synthesis import load_synthesis_plan
-from .validation import validate_vault
+from .vault.validation import validate_vault
 
 
 def _path_record(path: Path, project_root: Path) -> dict[str, str]:

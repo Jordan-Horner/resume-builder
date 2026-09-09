@@ -14,8 +14,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .atomic import atomic_write_bytes, atomic_write_json, atomic_write_text
-from .layout import DEFAULT_CONFIG, contained_path
-from .validation import parse_frontmatter, validate_vault
+from .vault.layout import DEFAULT_CONFIG, contained_path
+from .vault.validation import parse_frontmatter, validate_vault
 
 
 @dataclass(frozen=True)

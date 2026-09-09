@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ..layout import contained_path
+from ..vault.layout import contained_path
 from .blocks import BLOCK_ID
 from .feedback_resolution import RULE_ID, SESSION_ID
 

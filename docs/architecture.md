@@ -93,6 +93,14 @@ layering model. `atomic`, `layout`, `rendering`, and `validation` provide shared
 boundaries. Higher-level modules orchestrate source import, synthesis,
 compilation, verification, feedback, review, matching, preview, and minting.
 
+Career-vault foundations live under `resume_builder.vault`. `layout.py` owns
+containment-safe canonical paths, `validation.py` enforces vault structure and
+provenance, `source_import.py` registers immutable source evidence, and
+`evidence.py` audits resume claims against canonical facts. The established
+root modules remain compatibility facades, and the `hydrate` and `validate`
+commands are unchanged. Migration, approved change-plan application, and
+evidence-question workflows remain higher-level vault operations.
+
 Pre-application job work lives under `resume_builder.opportunities`. That domain
 turns external postings into a personalized, reviewable opportunity queue: it
 owns discovery coordination, source enrichment, deterministic eligibility,

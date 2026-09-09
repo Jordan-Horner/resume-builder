@@ -13,7 +13,6 @@ from typing import Any
 
 from ..atomic import atomic_write_json, atomic_write_text
 from ..compilation import compile_markdown, relative_output, sha256_file
-from ..evidence import audit_claims, claim_blocks
 from ..opportunities.targets import (
     CRITERION_FIELDS,
     IMPORTANCE,
@@ -29,6 +28,7 @@ from ..opportunities.targets import (
 )
 from ..resume_documents.html import contained_project_path, object_value
 from ..role_profiles.profiles import normalize_phrase, phrase_present, string_list
+from ..vault.evidence import audit_claims, claim_blocks
 from .grading import (
     classify_match,
     load_classification_case,

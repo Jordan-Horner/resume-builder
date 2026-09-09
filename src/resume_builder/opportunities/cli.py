@@ -28,7 +28,7 @@ from job_puller.locations import location_key, matches_search_location, matching
 from ..application_tracking.records import DEFAULT_ROOT as DEFAULT_APPLICATIONS_ROOT
 from ..application_tracking.records import application_job_dispositions
 from ..atomic import atomic_write_json, atomic_write_text
-from ..source_import import is_metadata_name
+from ..vault.source_import import is_metadata_name
 from .resume_recommendations import DirectionalResumeCandidate, load_directional_resume_candidates
 from .screening import (
     ScreeningPacket,

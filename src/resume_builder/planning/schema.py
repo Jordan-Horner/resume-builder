@@ -7,8 +7,8 @@ from typing import Any
 
 import yaml
 
-from ..layout import VaultLayout
-from ..validation import parse_frontmatter
+from ..vault.layout import VaultLayout
+from ..vault.validation import parse_frontmatter
 from .models import STORY_ID, CoreJobCandidate
 
 
