@@ -46,6 +46,7 @@ dev = [
   "google-api-python-client>=2.180,<3",
   "google-auth-httplib2>=0.2,<1",
   "google-auth-oauthlib>=1.2,<2",
+  "httpx2>=2,<3",
   "python-multipart>=0.0.20,<1",
   "build>=1.2,<2",
   "mypy>=1.15,<2",
