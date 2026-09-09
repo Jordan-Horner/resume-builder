@@ -10,7 +10,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from ..evidence import claim_blocks
-from ..match_grading import classify_match
+from ..matching.grading import classify_match
 from ..resume_parser import compile_markdown
 
 ResumeMatchLabel = Literal["Strong match", "Partial match", "Weak match", "Unknown match"]

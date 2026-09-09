@@ -155,9 +155,10 @@ original module and list it in `__all__`. A regression test pins that surface so
 future extractions cannot silently break callers while moving implementation.
 
 The same dependency direction applies to the other orchestration domains.
-Job matching keeps untrusted posting validation and Markdown rendering in
-separate boundary modules while its public facade owns retrieval orchestration
-and CLI compatibility.
+Job-to-resume evidence auditing lives under `resume_builder.matching`, where
+exact retrieval, semantic grading, and human-readable reporting remain separate
+modules. The root `job_matching.py`, `match_grading.py`, and `job_report.py`
+modules preserve existing imports, and the `match` CLI remains unchanged.
 Application history is a sibling workflow rooted in the private workspace. Its
 records pin targets and submitted resumes by hash, while canonical facts remain
 the only permitted evidence source for answer claims. Job prescreening reads
