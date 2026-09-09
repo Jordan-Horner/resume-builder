@@ -19,6 +19,8 @@ from ..build_artifacts.status import build_manifest_freshness
 from ..construction.compiler import build_resume, relative_output, sha256_file
 from ..construction.templates import rendering_theme_text
 from ..opportunities.targets import parse_target, project_target_path
+from ..planning.loader import load_synthesis_plan
+from ..planning.models import SynthesisPlan
 from ..resume_documents.html import (
     contained_project_path,
     known_fact_ids,
@@ -36,7 +38,6 @@ from ..reviews.selection_review import (
     selection_strategy_digest,
 )
 from ..role_profiles.profiles import audit_direction, parse_direction
-from ..synthesis import SynthesisPlan, load_synthesis_plan
 from ..vault.questions import open_questions
 
 APPROVED_NOTICE = "Language reviewed · Edit or mint when ready"

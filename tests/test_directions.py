@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
+from resume_builder.planning.models import ConceptFit, SynthesisPlan
 from resume_builder.role_profiles import profiles as directions
-from resume_builder.synthesis import ConceptFit, SynthesisPlan
 
 
 def direction_markdown(*, basis: str = "user-confirmed", source_kind: str = "user") -> str:

@@ -12,12 +12,12 @@ from pydantic import BaseModel, Field
 from ..agent_contracts import ModelAdapter, StructuredModelRequest
 from ..atomic import atomic_write_json, atomic_write_text
 from ..construction.compiler import build_resume
+from ..planning.loader import load_synthesis_plan
 from ..publishing.preview import preview_resume
 from ..reviews.blocks import narrative_block_inventory_from_markdown
 from ..reviews.feedback_recording import record_feedback
 from ..reviews.feedback_resolution import resolve_for_plan
 from ..reviews.language_review import finalize_language_review, prepare_language_review
-from ..synthesis import load_synthesis_plan
 from ..vault.layout import contained_path
 
 

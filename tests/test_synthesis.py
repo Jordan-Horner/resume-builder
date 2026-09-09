@@ -5,8 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from resume_builder import synthesis
-from resume_builder.planning.models import summary_strategy_payload
+from resume_builder.planning.audit import audit_synthesis, role_arc_payloads
+from resume_builder.planning.loader import load_synthesis_plan
+from resume_builder.planning.models import PageBudget, summary_strategy_payload
 from resume_builder.reviews import selection_guard, selection_review
 
 
@@ -441,7 +442,7 @@ summary_strategy:
 
 def test_synthesis_plan_validates_and_audits_compiled_stories(tmp_path: Path) -> None:
     vault, path = project(tmp_path)
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
     payload = {
         "experience": [
             {
@@ -458,7 +459,7 @@ def test_synthesis_plan_validates_and_audits_compiled_stories(tmp_path: Path) ->
         "projects": [],
     }
 
-    result = synthesis.audit_synthesis(payload, plan)
+    result = audit_synthesis(payload, plan)
 
     assert result["valid"] is True
     assert result["stories"] == 1
@@ -466,7 +467,7 @@ def test_synthesis_plan_validates_and_audits_compiled_stories(tmp_path: Path) ->
 
 def test_synthesis_audit_rejects_missing_or_misplaced_story(tmp_path: Path) -> None:
     vault, path = project(tmp_path)
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
     payload = {
         "experience": [
             {
@@ -478,7 +479,7 @@ def test_synthesis_audit_rejects_missing_or_misplaced_story(tmp_path: Path) -> N
     }
 
     with pytest.raises(ValueError, match="requires a planned story ID"):
-        synthesis.audit_synthesis(payload, plan)
+        audit_synthesis(payload, plan)
 
 
 def test_synthesis_plan_rejects_duplicate_jobs_for_one_role(tmp_path: Path) -> None:
@@ -500,7 +501,7 @@ exclusions: []""",
     )
 
     with pytest.raises(ValueError, match="duplicate primary job"):
-        synthesis.load_synthesis_plan(path, tmp_path, vault)
+        load_synthesis_plan(path, tmp_path, vault)
 
 
 def test_synthesis_plan_rejects_role_scoped_fact_under_another_role(tmp_path: Path) -> None:
@@ -517,13 +518,13 @@ def test_synthesis_plan_rejects_role_scoped_fact_under_another_role(tmp_path: Pa
     add_fact(vault / "facts" / "profile" / "ROLE-002.md", "ROLE-002", "role")
 
     with pytest.raises(ValueError, match="outside its roles"):
-        synthesis.load_synthesis_plan(path, tmp_path, vault)
+        load_synthesis_plan(path, tmp_path, vault)
 
 
 def test_v2_reports_omitted_supporting_story(tmp_path: Path) -> None:
     vault, path = project(tmp_path)
     upgrade_to_v2(path)
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
     payload = {
         "summary_evidence": ["FACT-001"],
         "experience": [
@@ -541,7 +542,7 @@ def test_v2_reports_omitted_supporting_story(tmp_path: Path) -> None:
         "projects": [],
     }
 
-    result = synthesis.audit_synthesis(payload, plan)
+    result = audit_synthesis(payload, plan)
 
     assert result["version"] == 2
     assert result["used_story_ids"] == ["operational-improvement"]
@@ -552,7 +553,7 @@ def test_v2_reports_omitted_supporting_story(tmp_path: Path) -> None:
 def test_v2_still_requires_core_stories(tmp_path: Path) -> None:
     vault, path = project(tmp_path)
     upgrade_to_v2(path)
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
     payload = {
         "summary_evidence": ["FACT-001"],
         "experience": [{"evidence": ["ROLE-001"], "bullets": []}],
@@ -560,13 +561,13 @@ def test_v2_still_requires_core_stories(tmp_path: Path) -> None:
     }
 
     with pytest.raises(ValueError, match="core synthesis stories absent"):
-        synthesis.audit_synthesis(payload, plan)
+        audit_synthesis(payload, plan)
 
 
 def test_v2_requires_planned_summary_evidence(tmp_path: Path) -> None:
     vault, path = project(tmp_path)
     upgrade_to_v2(path)
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
     payload = {
         "summary_evidence": [],
         "experience": [
@@ -585,13 +586,13 @@ def test_v2_requires_planned_summary_evidence(tmp_path: Path) -> None:
     }
 
     with pytest.raises(ValueError, match="summary evidence disagrees"):
-        synthesis.audit_synthesis(payload, plan)
+        audit_synthesis(payload, plan)
 
 
 def test_v2_rejects_unplanned_summary_evidence(tmp_path: Path) -> None:
     vault, path = project(tmp_path)
     upgrade_to_v2(path)
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
     payload = {
         "summary_evidence": ["FACT-001", "FACT-002"],
         "experience": [
@@ -610,7 +611,7 @@ def test_v2_rejects_unplanned_summary_evidence(tmp_path: Path) -> None:
     }
 
     with pytest.raises(ValueError, match=r"unexpected=.*FACT-002"):
-        synthesis.audit_synthesis(payload, plan)
+        audit_synthesis(payload, plan)
 
 
 def test_v2_requires_role_scoped_summary_evidence_later_in_resume(tmp_path: Path) -> None:
@@ -631,7 +632,7 @@ def test_v2_requires_role_scoped_summary_evidence_later_in_resume(tmp_path: Path
         ),
         encoding="utf-8",
     )
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
     payload = {
         "summary_evidence": ["FACT-001", "FACT-002"],
         "experience": [
@@ -650,7 +651,7 @@ def test_v2_requires_role_scoped_summary_evidence_later_in_resume(tmp_path: Path
     }
 
     with pytest.raises(ValueError, match=r"role-scoped.*not demonstrated later.*FACT-002"):
-        synthesis.audit_synthesis(payload, plan)
+        audit_synthesis(payload, plan)
 
 
 def test_v2_allows_organization_scoped_summary_evidence_without_role_guessing(
@@ -672,7 +673,7 @@ def test_v2_allows_organization_scoped_summary_evidence_without_role_guessing(
         ),
         encoding="utf-8",
     )
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
     payload = {
         "summary_evidence": ["FACT-001", "FACT-002"],
         "experience": [
@@ -690,7 +691,7 @@ def test_v2_allows_organization_scoped_summary_evidence_without_role_guessing(
         "projects": [],
     }
 
-    result = synthesis.audit_synthesis(payload, plan)
+    result = audit_synthesis(payload, plan)
 
     assert result["valid"] is True
     assert result["summary_body_fact_ids"] == []
@@ -699,7 +700,7 @@ def test_v2_allows_organization_scoped_summary_evidence_without_role_guessing(
 def test_v3_persists_fit_risks_and_presentation_strategy(tmp_path: Path) -> None:
     vault, path = project(tmp_path)
     upgrade_to_v3(path)
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
     payload = {
         "summary_evidence": ["FACT-001"],
         "competencies": [],
@@ -718,7 +719,7 @@ def test_v3_persists_fit_risks_and_presentation_strategy(tmp_path: Path) -> None
         "projects": [],
     }
 
-    result = synthesis.audit_synthesis(payload, plan)
+    result = audit_synthesis(payload, plan)
 
     assert result["version"] == 3
     assert result["target_mode"] == "direct"
@@ -746,7 +747,7 @@ def test_reviewer_risk_can_cite_intentionally_excluded_evidence(tmp_path: Path) 
     )
     path.write_text(text, encoding="utf-8")
 
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
 
     assert plan.reviewer_risks[0].fact_ids == ("FACT-003", "FACT-001")
     assert plan.exclusions[0][0] == "FACT-003"
@@ -764,7 +765,7 @@ def test_unresolved_reviewer_risk_rejects_whitespace_only_gap(tmp_path: Path) ->
     path.write_text(text, encoding="utf-8")
 
     with pytest.raises(ValueError, match="synthesis gaps must be a list of non-empty strings"):
-        synthesis.load_synthesis_plan(path, tmp_path, vault)
+        load_synthesis_plan(path, tmp_path, vault)
 
 
 def test_unresolved_reviewer_risk_still_requires_a_gap(tmp_path: Path) -> None:
@@ -780,7 +781,7 @@ def test_unresolved_reviewer_risk_still_requires_a_gap(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ValueError, match="unresolved synthesis reviewer risks require"):
-        synthesis.load_synthesis_plan(path, tmp_path, vault)
+        load_synthesis_plan(path, tmp_path, vault)
 
 
 def test_synthesis_lists_strip_meaningful_values(tmp_path: Path) -> None:
@@ -796,7 +797,7 @@ def test_synthesis_lists_strip_meaningful_values(tmp_path: Path) -> None:
     text = text.replace("gaps: []", 'gaps: ["  Missing verified scale  "]', 1)
     path.write_text(text, encoding="utf-8")
 
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
 
     assert plan.progression == ("ROLE-001",)
     assert plan.gaps == ("Missing verified scale",)
@@ -814,7 +815,7 @@ def test_synthesis_lists_reject_duplicates_after_stripping(tmp_path: Path) -> No
     )
 
     with pytest.raises(ValueError, match="synthesis gaps must not contain duplicates"):
-        synthesis.load_synthesis_plan(path, tmp_path, vault)
+        load_synthesis_plan(path, tmp_path, vault)
 
 
 def test_v3_requires_every_direction_concept_classification(tmp_path: Path) -> None:
@@ -830,7 +831,7 @@ def test_v3_requires_every_direction_concept_classification(tmp_path: Path) -> N
     )
 
     with pytest.raises(ValueError, match=r"classify every direction concept.*second-concept"):
-        synthesis.load_synthesis_plan(path, tmp_path, vault)
+        load_synthesis_plan(path, tmp_path, vault)
 
 
 def test_v3_rejects_unsupported_concept_with_evidence(tmp_path: Path) -> None:
@@ -845,13 +846,13 @@ def test_v3_rejects_unsupported_concept_with_evidence(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ValueError, match="fact_ids must be empty when status is unsupported"):
-        synthesis.load_synthesis_plan(path, tmp_path, vault)
+        load_synthesis_plan(path, tmp_path, vault)
 
 
 def test_v3_enforces_competencies_decision(tmp_path: Path) -> None:
     vault, path = project(tmp_path)
     upgrade_to_v3(path)
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
     payload = {
         "summary_evidence": ["FACT-001"],
         "competencies": [{"text": "Operations", "evidence": ["FACT-001"]}],
@@ -871,13 +872,13 @@ def test_v3_enforces_competencies_decision(tmp_path: Path) -> None:
     }
 
     with pytest.raises(ValueError, match="competencies section disagrees"):
-        synthesis.audit_synthesis(payload, plan)
+        audit_synthesis(payload, plan)
 
 
 def test_v4_allows_focused_evidence_and_reports_unused_optional_facts(tmp_path: Path) -> None:
     vault, path = project(tmp_path)
     upgrade_to_v4(path)
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
     payload = {
         "summary_evidence": ["FACT-001"],
         "competencies": [],
@@ -896,7 +897,7 @@ def test_v4_allows_focused_evidence_and_reports_unused_optional_facts(tmp_path: 
         "projects": [],
     }
 
-    result = synthesis.audit_synthesis(payload, plan)
+    result = audit_synthesis(payload, plan)
 
     assert plan.stories[0].claim_focus == "Show the supported operational improvement."
     assert plan.stories[0].core_fact_ids == ("FACT-001",)
@@ -919,7 +920,7 @@ def test_v4_allows_focused_evidence_and_reports_unused_optional_facts(tmp_path: 
 def test_v4_rejects_missing_core_or_unplanned_story_evidence(tmp_path: Path) -> None:
     vault, path = project(tmp_path)
     upgrade_to_v4(path)
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
     payload = {
         "summary_evidence": ["FACT-001"],
         "competencies": [],
@@ -939,11 +940,11 @@ def test_v4_rejects_missing_core_or_unplanned_story_evidence(tmp_path: Path) -> 
     }
 
     with pytest.raises(ValueError, match=r"missing_core=.*FACT-001"):
-        synthesis.audit_synthesis(payload, plan)
+        audit_synthesis(payload, plan)
 
     payload["experience"][0]["bullets"][0]["evidence"] = ["FACT-001", "FACT-999"]
     with pytest.raises(ValueError, match=r"unexpected=.*FACT-999"):
-        synthesis.audit_synthesis(payload, plan)
+        audit_synthesis(payload, plan)
 
 
 def test_v4_requires_core_facts_to_belong_to_the_story(tmp_path: Path) -> None:
@@ -959,7 +960,7 @@ def test_v4_requires_core_facts_to_belong_to_the_story(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ValueError, match=r"cites unknown facts|subset of fact_ids"):
-        synthesis.load_synthesis_plan(path, tmp_path, vault)
+        load_synthesis_plan(path, tmp_path, vault)
 
 
 def test_v5_reports_role_story_allocation_without_imposing_a_fixed_count(
@@ -967,7 +968,7 @@ def test_v5_reports_role_story_allocation_without_imposing_a_fixed_count(
 ) -> None:
     vault, path = project(tmp_path)
     upgrade_to_v5(path)
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
     payload = {
         "summary_evidence": ["FACT-001"],
         "competencies": [],
@@ -986,7 +987,7 @@ def test_v5_reports_role_story_allocation_without_imposing_a_fixed_count(
         "projects": [],
     }
 
-    result = synthesis.audit_synthesis(payload, plan)
+    result = audit_synthesis(payload, plan)
 
     assert result["version"] == 5
     assert result["role_arcs"] == [
@@ -1020,7 +1021,7 @@ def test_v5_rejects_story_missing_from_role_arc(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ValueError, match=r"stories missing from role_arcs.*supporting-detail"):
-        synthesis.load_synthesis_plan(path, tmp_path, vault)
+        load_synthesis_plan(path, tmp_path, vault)
 
 
 def test_v5_requires_compression_strategy_to_match_role_arcs(tmp_path: Path) -> None:
@@ -1036,7 +1037,7 @@ def test_v5_requires_compression_strategy_to_match_role_arcs(tmp_path: Path) -> 
     )
 
     with pytest.raises(ValueError, match="compressed emphasis disagrees with presentation"):
-        synthesis.load_synthesis_plan(path, tmp_path, vault)
+        load_synthesis_plan(path, tmp_path, vault)
 
 
 def test_v5_rejects_role_arc_story_from_another_placement(tmp_path: Path) -> None:
@@ -1051,16 +1052,16 @@ def test_v5_rejects_role_arc_story_from_another_placement(tmp_path: Path) -> Non
     )
 
     with pytest.raises(ValueError, match="story_ids disagree with role placement"):
-        synthesis.load_synthesis_plan(path, tmp_path, vault)
+        load_synthesis_plan(path, tmp_path, vault)
 
 
 def test_v6_resolves_page_budget_and_structured_claims(tmp_path: Path) -> None:
     vault, path = project(tmp_path)
     upgrade_to_v6(path)
 
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
 
-    assert plan.page_budget == synthesis.PageBudget(max_pages=2, source="direction-default")
+    assert plan.page_budget == PageBudget(max_pages=2, source="direction-default")
     assert plan.stories[0].claim is not None
     assert plan.stories[0].claim.evidence.fact_ids == ("FACT-001",)
     assert plan.role_arcs[0].required_story_ids == ("operational-improvement",)
@@ -1071,7 +1072,7 @@ def test_v7_loads_named_content_template_and_theme(tmp_path: Path) -> None:
     vault, path = project(tmp_path)
     upgrade_to_v7(path)
 
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
 
     assert plan.resume_template is not None
     assert plan.resume_template.content.template_id == "technical-classic"
@@ -1083,7 +1084,7 @@ def test_v8_requires_role_anchor_from_required_stories(tmp_path: Path) -> None:
     vault, path = project(tmp_path)
     upgrade_to_v8(path)
 
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
 
     assert plan.role_arcs[0].role_anchor_story_ids == ("operational-improvement",)
 
@@ -1100,7 +1101,7 @@ def test_v8_rejects_optional_story_as_role_anchor(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ValueError, match="role_anchor_story_ids must reference required"):
-        synthesis.load_synthesis_plan(path, tmp_path, vault)
+        load_synthesis_plan(path, tmp_path, vault)
 
 
 def test_v8_rejects_missing_role_anchor_field(tmp_path: Path) -> None:
@@ -1115,14 +1116,14 @@ def test_v8_rejects_missing_role_anchor_field(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ValueError, match="role_anchor_story_ids"):
-        synthesis.load_synthesis_plan(path, tmp_path, vault)
+        load_synthesis_plan(path, tmp_path, vault)
 
 
 def test_v9_requires_distinct_selling_story_from_required_stories(tmp_path: Path) -> None:
     vault, path = project(tmp_path)
     upgrade_to_v9(path)
 
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
 
     assert plan.role_arcs[0].role_anchor_story_ids == ("operational-improvement",)
     assert plan.role_arcs[0].role_selling_story_ids == ("supporting-detail",)
@@ -1140,7 +1141,7 @@ def test_v9_rejects_role_anchor_reused_as_selling_story(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ValueError, match="both role anchors and selling stories"):
-        synthesis.load_synthesis_plan(path, tmp_path, vault)
+        load_synthesis_plan(path, tmp_path, vault)
 
 
 def test_v9_rejects_missing_selling_story_field(tmp_path: Path) -> None:
@@ -1155,14 +1156,14 @@ def test_v9_rejects_missing_selling_story_field(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ValueError, match="role_selling_story_ids"):
-        synthesis.load_synthesis_plan(path, tmp_path, vault)
+        load_synthesis_plan(path, tmp_path, vault)
 
 
 def test_v10_loads_scored_core_job_candidates(tmp_path: Path) -> None:
     vault, path = project(tmp_path)
     upgrade_to_v10(path)
 
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
 
     arc = plan.role_arcs[0]
     assert arc.selected_core_job_id == "operational-owner"
@@ -1184,7 +1185,7 @@ def test_v10_requires_user_confirmation_when_core_job_scores_are_close(
     )
 
     with pytest.raises(ValueError, match=r"core job candidates are close \(6 point margin\)"):
-        synthesis.load_synthesis_plan(path, tmp_path, vault)
+        load_synthesis_plan(path, tmp_path, vault)
 
 
 def test_v10_accepts_user_confirmed_close_core_job_scores(tmp_path: Path) -> None:
@@ -1197,7 +1198,7 @@ def test_v10_accepts_user_confirmed_close_core_job_scores(tmp_path: Path) -> Non
         encoding="utf-8",
     )
 
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
 
     assert plan.role_arcs[0].core_job_decision == "user-confirmed"
 
@@ -1205,10 +1206,10 @@ def test_v10_accepts_user_confirmed_close_core_job_scores(tmp_path: Path) -> Non
 def test_v10_reports_core_job_scores_in_role_arc_payload(tmp_path: Path) -> None:
     vault, path = project(tmp_path)
     upgrade_to_v10(path)
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
 
     assert plan.summary_strategy is None
-    payload = synthesis.role_arc_payloads(plan)[0]
+    payload = role_arc_payloads(plan)[0]
 
     assert payload["core_job"] == {
         "selected_id": "operational-owner",
@@ -1232,7 +1233,7 @@ def test_v11_loads_and_reports_structured_summary_strategy(tmp_path: Path) -> No
     vault, path = project(tmp_path)
     upgrade_to_v11(path)
 
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
     assert plan.summary_strategy is not None
     assert plan.summary_strategy.fit_posture.classification == "direct"
     assert plan.summary_strategy.operating_scope_fact_ids == ("FACT-001",)
@@ -1284,7 +1285,7 @@ def test_v11_loads_and_reports_structured_summary_strategy(tmp_path: Path) -> No
         "certifications": [],
         "skills": [],
     }
-    audited = synthesis.audit_synthesis(payload, plan)
+    audited = audit_synthesis(payload, plan)
     assert audited["summary_strategy"] == summary_strategy_payload(plan.summary_strategy)
     selected = selection_guard.build_selection(plan, audited)
     assert selected["summary_strategy"] == summary_strategy_payload(plan.summary_strategy)
@@ -1314,7 +1315,7 @@ def test_v11_accepts_direct_fit_with_bounded_gaps(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
 
     assert plan.summary_strategy is not None
     assert plan.summary_strategy.fit_posture.bounded_criterion_ids == ("criterion-b",)
@@ -1357,7 +1358,7 @@ def test_v11_rejects_incoherent_summary_strategy(
     )
 
     with pytest.raises(ValueError, match=message):
-        synthesis.load_synthesis_plan(path, tmp_path, vault)
+        load_synthesis_plan(path, tmp_path, vault)
 
 
 def test_v11_requires_bounded_gap_for_direct_bounded_posture(tmp_path: Path) -> None:
@@ -1371,7 +1372,7 @@ def test_v11_requires_bounded_gap_for_direct_bounded_posture(tmp_path: Path) -> 
     )
 
     with pytest.raises(ValueError, match="requires bounded criteria"):
-        synthesis.load_synthesis_plan(path, tmp_path, vault)
+        load_synthesis_plan(path, tmp_path, vault)
 
 
 def test_v7_rejects_duplicate_content_template_sections(tmp_path: Path) -> None:
@@ -1387,7 +1388,7 @@ def test_v7_rejects_duplicate_content_template_sections(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ValueError, match="section_order must not contain duplicates"):
-        synthesis.load_synthesis_plan(path, tmp_path, vault)
+        load_synthesis_plan(path, tmp_path, vault)
 
 
 @pytest.mark.parametrize(
@@ -1416,13 +1417,13 @@ def test_v7_rejects_theme_renderer_that_can_omit_or_reorder_sections(
     (tmp_path / "templates" / "resume-template.html").write_text(renderer, encoding="utf-8")
 
     with pytest.raises(ValueError, match=message):
-        synthesis.load_synthesis_plan(path, tmp_path, vault)
+        load_synthesis_plan(path, tmp_path, vault)
 
 
 def test_v7_rejects_section_architecture_drift(tmp_path: Path) -> None:
     vault, path = project(tmp_path)
     upgrade_to_v7(path)
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
     payload = {
         "section_order": ["summary", "skills", "experience"],
         "summary_evidence": ["FACT-001"],
@@ -1446,7 +1447,7 @@ def test_v7_rejects_section_architecture_drift(tmp_path: Path) -> None:
     }
 
     with pytest.raises(ValueError, match="section architecture disagrees"):
-        synthesis.audit_synthesis(payload, plan)
+        audit_synthesis(payload, plan)
 
 
 def test_v6_rejects_page_budget_drift(tmp_path: Path) -> None:
@@ -1458,13 +1459,13 @@ def test_v6_rejects_page_budget_drift(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ValueError, match="page budget disagrees"):
-        synthesis.load_synthesis_plan(path, tmp_path, vault)
+        load_synthesis_plan(path, tmp_path, vault)
 
 
 def test_v6_requires_resume_evidence_to_match_claim_boundary(tmp_path: Path) -> None:
     vault, path = project(tmp_path)
     upgrade_to_v6(path)
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
     payload = {
         "summary_evidence": ["FACT-001"],
         "competencies": [],
@@ -1484,7 +1485,7 @@ def test_v6_requires_resume_evidence_to_match_claim_boundary(tmp_path: Path) -> 
     }
 
     with pytest.raises(ValueError, match="structured claim"):
-        synthesis.audit_synthesis(payload, plan)
+        audit_synthesis(payload, plan)
 
 
 def test_v3_keeps_exact_story_evidence_behavior(tmp_path: Path) -> None:
@@ -1498,7 +1499,7 @@ def test_v3_keeps_exact_story_evidence_behavior(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
-    plan = synthesis.load_synthesis_plan(path, tmp_path, vault)
+    plan = load_synthesis_plan(path, tmp_path, vault)
     payload = {
         "summary_evidence": ["FACT-001"],
         "competencies": [],
@@ -1518,4 +1519,4 @@ def test_v3_keeps_exact_story_evidence_behavior(tmp_path: Path) -> None:
     }
 
     with pytest.raises(ValueError, match="evidence disagrees"):
-        synthesis.audit_synthesis(payload, plan)
+        audit_synthesis(payload, plan)

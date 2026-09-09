@@ -13,8 +13,9 @@ from typing import Any
 from ..atomic import atomic_write_text
 from ..construction.compiler import compile_markdown
 from ..document_export.pdf import extraction_blocks
+from ..planning.loader import load_synthesis_plan
+from ..planning.models import SynthesisPlan
 from ..resume_documents.html import contained_project_path, object_value
-from ..synthesis import SynthesisPlan, load_synthesis_plan
 from ..vault.evidence import audit_claims, claim_blocks
 from ..vault.layout import VaultLayout
 from ..vault.validation import parse_frontmatter

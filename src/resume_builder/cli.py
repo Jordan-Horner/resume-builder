@@ -7,11 +7,6 @@ import os
 import sys
 from collections.abc import Callable, Sequence
 
-from . import (
-    feedback_memory,
-    review_records,
-    synthesis,
-)
 from .application_tracking import records as applications
 from .assistant import runtime as agent
 from .construction import compiler as compilation
@@ -21,12 +16,15 @@ from .opportunities import cli as jobs
 from .opportunities import evaluation as screening_evaluation
 from .opportunities import onboarding as job_onboarding
 from .opportunities import preferences
+from .planning import command as synthesis
 from .project_status import report as project_report
 from .publishing import mint as minting
 from .publishing import preview as previewing
 from .publishing import verification
 from .quality_assurance import regression as evaluations
 from .resume_documents import html as rendering
+from .reviews import command as review_records
+from .reviews import feedback_command as feedback_memory
 from .role_profiles import profiles as directions
 from .scheduled_tasks import scheduler as automation
 from .scheduled_tasks import supervisor as service

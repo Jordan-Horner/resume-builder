@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from resume_builder.review_records import (
+from resume_builder.reviews.command import (
     load_review_record,
     main,
     narrative_block_inventory,

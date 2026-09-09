@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from resume_builder.synthesis import ClaimEvidence, ClaimSpec
+from resume_builder.planning.models import ClaimEvidence, ClaimSpec
 from resume_builder.vault import evidence
 
 

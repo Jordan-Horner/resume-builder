@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from resume_builder import feedback_memory
+from resume_builder.reviews import feedback_command as feedback_memory
 
 
 def _fact(path: Path, fact_id: str, fact_type: str) -> None:

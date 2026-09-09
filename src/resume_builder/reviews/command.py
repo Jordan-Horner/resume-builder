@@ -7,28 +7,30 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from .reviews.approval import require_editorial_approval, review_freshness
-from .reviews.blocks import (
+from ..vault.layout import contained_path
+from ..vault.questions import question_plan, resolve_question
+from .approval import require_editorial_approval, review_freshness
+from .blocks import (
     BLOCK_ID,
     NarrativeReviewBlock,
     narrative_block_inventory,
     narrative_block_inventory_from_markdown,
     narrative_blocks,
 )
-from .reviews.cli import (
+from .cli import (
     HYBRID_REVIEW_ACTIONS,
     add_hybrid_review_parsers,
     run_hybrid_review_action,
 )
-from .reviews.decisions import finalize_review_record
-from .reviews.language_review import (
+from .decisions import finalize_review_record
+from .language_review import (
     finalize_language_review,
     language_review_freshness,
     prepare_language_review,
 )
-from .reviews.packages import build_review_package
-from .reviews.repairs import apply_review_repairs
-from .reviews.schema import (
+from .packages import build_review_package
+from .repairs import apply_review_repairs
+from .schema import (
     EDITORIAL_DECISIONS,
     EDITORIAL_SCOPE,
     EDITORIAL_STATUSES,
@@ -48,15 +50,13 @@ from .reviews.schema import (
     sha256_file,
     sha256_text,
 )
-from .reviews.selection_guard import (
+from .selection_guard import (
     approve_proposal,
 )
-from .reviews.selection_review import (
+from .selection_review import (
     finalize_selection_review,
     selection_review_freshness,
 )
-from .vault.layout import contained_path
-from .vault.questions import question_plan, resolve_question
 
 __all__ = [
     "BLOCK_ID",

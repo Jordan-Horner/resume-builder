@@ -93,6 +93,6 @@ vault names that make backups harder to recognize later.
 - The current CLI favors explicit artifacts over a graphical interface.
 - Versioned synthesis schemas remain deliberately detailed. Optional review
   schemas preserve rigorous critique when requested, without adding ceremony to
-  ordinary preview and editing. Their workflow facades remain small, while
+  ordinary preview and editing. Their workflow command modules remain small, while
   architecture checks prevent reverse imports and orchestration cycles from
   returning as those contracts grow.

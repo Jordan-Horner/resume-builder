@@ -8,53 +8,16 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from .reviews.feedback_acceptance import (
-    _acceptance_result,
-    retire_feedback_rule,
-)
-from .reviews.feedback_acceptance import (
-    accept_feedback as _accept_feedback,
-)
-from .reviews.feedback_recording import record_feedback
-from .reviews.feedback_resolution import (
-    KINDS,
-    PROMOTIONS,
-    RULE_ID,
-    RULE_STATUSES,
-    SCOPE_LEVELS,
-    SESSION_ID,
-    SESSION_STATUSES,
-    STRENGTHS,
-    SUBJECT_KEY,
+from ..planning.loader import load_synthesis_plan
+from .feedback_acceptance import _acceptance_result, retire_feedback_rule
+from .feedback_acceptance import accept_feedback as _accept_feedback
+from .feedback_recording import record_feedback
+from .feedback_resolution import (
     _read_json,
     _validate_rule,
     _validate_session,
-    guidance_snapshot,
-    manifest_guidance_freshness,
     resolve_for_plan,
 )
-from .synthesis import load_synthesis_plan
-
-__all__ = [
-    "KINDS",
-    "PROMOTIONS",
-    "RULE_ID",
-    "RULE_STATUSES",
-    "SCOPE_LEVELS",
-    "SESSION_ID",
-    "SESSION_STATUSES",
-    "STRENGTHS",
-    "SUBJECT_KEY",
-    "accept_feedback",
-    "guidance_snapshot",
-    "main",
-    "manifest_guidance_freshness",
-    "record_feedback",
-    "resolve_feedback",
-    "resolve_for_plan",
-    "retire_feedback_rule",
-    "validate_feedback_memory",
-]
 
 
 def accept_feedback(
@@ -65,7 +28,7 @@ def accept_feedback(
     preview: Path | None = None,
     remember_approved_wording: bool = False,
 ) -> dict[str, object]:
-    """Accept feedback through the compatibility facade's preview validator."""
+    """Accept feedback after validating its published preview."""
     return _accept_feedback(
         project_root,
         session_id=session_id,

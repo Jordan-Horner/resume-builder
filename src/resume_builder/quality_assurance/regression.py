@@ -14,7 +14,8 @@ from typing import Any
 import yaml
 
 from ..construction.compiler import build_resume
-from ..synthesis import SynthesisPlan, load_synthesis_plan
+from ..planning.loader import load_synthesis_plan
+from ..planning.models import SynthesisPlan
 from ..vault.layout import VaultLayout, contained_path, load_json_object
 from ..vault.validation import parse_frontmatter
 

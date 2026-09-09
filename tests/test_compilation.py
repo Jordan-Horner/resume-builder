@@ -6,13 +6,15 @@ from pathlib import Path
 
 import pytest
 
-from resume_builder import feedback_memory, review_records, synthesis
 from resume_builder.construction import compiler as compilation
 from resume_builder.document_export import pdf as pdf_rendering
+from resume_builder.planning import loader as synthesis
 from resume_builder.project_status import report as project_report
 from resume_builder.publishing import mint as minting
 from resume_builder.publishing import preview as previewing
 from resume_builder.publishing import verification
+from resume_builder.reviews import command as review_records
+from resume_builder.reviews import feedback_command as feedback_memory
 from resume_builder.reviews import language_review, selection_guard, selection_review
 from resume_builder.reviews import policy as review_policy
 

@@ -9,7 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from resume_builder import synthesis
+from resume_builder.planning import loader as synthesis
 from resume_builder.reviews import selection_guard
 
 FIXTURE_ROOT = Path(__file__).parents[1] / "examples" / "phoenix-wright"

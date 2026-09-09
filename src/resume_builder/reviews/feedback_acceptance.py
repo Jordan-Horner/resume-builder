@@ -219,7 +219,8 @@ def _acceptance_result(
         "effective_digest": digest,
     }
     if preview_data.get("version") == 2:
-        from .review_records import load_review_record, review_freshness
+        from .approval import review_freshness
+        from .schema import load_review_record
 
         review_record = _object(preview_data.get("review_record"), "preview review record")
         review_path = _project_file(

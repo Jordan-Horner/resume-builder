@@ -10,8 +10,7 @@ from typing import Any
 
 from ..atomic import atomic_write_json
 from ..construction.compiler import sha256_file
-from ..planning.models import summary_strategy_payload
-from ..synthesis import SynthesisPlan
+from ..planning.models import SynthesisPlan, summary_strategy_payload
 from ..vault.layout import contained_path
 from ..vault.validation import parse_frontmatter
 from .selection_guard import selection_digest

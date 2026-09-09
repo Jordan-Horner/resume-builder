@@ -16,13 +16,12 @@ from ..build_artifacts.paths import resume_output_base
 from ..build_artifacts.status import build_manifest_freshness
 from ..construction.compiler import build_resume, relative_output, sha256_file
 from ..matching.audit import match_job, project_target_path
+from ..planning.loader import load_synthesis_plan
 from ..resume_documents.html import contained_project_path
-from ..review_records import (
-    build_review_package,
-    narrative_block_inventory,
-)
 from ..reviews.approval import carried_career_review
+from ..reviews.blocks import narrative_block_inventory
 from ..reviews.language_review import current_language_review
+from ..reviews.packages import build_review_package
 from ..reviews.selection_guard import build_selection, guard_selection
 from ..reviews.selection_review import (
     additive_summary_evidence_only,
@@ -35,7 +34,6 @@ from ..reviews.selection_review import (
     selection_strategy_payload,
 )
 from ..role_profiles.profiles import audit_direction, parse_direction
-from ..synthesis import load_synthesis_plan
 from ..vault.validation import validate_vault
 
 

@@ -6,42 +6,29 @@ import ast
 from collections.abc import Mapping
 from pathlib import Path
 
-FACADE_LINE_BUDGETS = {
-    "feedback_memory": 250,
-    "review_records": 300,
-    "synthesis": 180,
-}
-
 FORBIDDEN_IMPORTS = {
     "construction.compiler": {
-        "feedback_memory",
         "reviews.feedback_acceptance",
         "reviews.feedback_recording",
     },
     "reviews.feedback_resolution": {
         "construction.compiler",
         "reviews.feedback_acceptance",
-        "feedback_memory",
         "reviews.feedback_recording",
-        "review_records",
     },
     "reviews.schema": {
         "reviews.feedback_acceptance",
-        "feedback_memory",
         "reviews.feedback_recording",
-        "review_records",
     },
     "reviews.approval": {
         "reviews.feedback_acceptance",
-        "feedback_memory",
         "reviews.feedback_recording",
-        "review_records",
     },
-    "planning.audit": {"synthesis", "planning.loader"},
-    "planning.loader": {"synthesis", "planning.audit"},
-    "planning.models": {"synthesis", "planning.audit", "planning.loader"},
-    "planning.schema": {"synthesis", "planning.audit", "planning.loader"},
-    "planning.summary": {"synthesis", "planning.audit", "planning.loader"},
+    "planning.audit": {"planning.loader"},
+    "planning.loader": {"planning.audit"},
+    "planning.models": {"planning.audit", "planning.loader"},
+    "planning.schema": {"planning.audit", "planning.loader"},
+    "planning.summary": {"planning.audit", "planning.loader"},
 }
 
 FORBIDDEN_PACKAGE_IMPORTS: dict[str, set[str]] = {
@@ -237,12 +224,10 @@ def _cycles(graph: dict[str, set[str]]) -> list[tuple[str, ...]]:
 def audit_architecture(
     package: Path,
     *,
-    facade_line_budgets: Mapping[str, int] | None = None,
     forbidden_imports: Mapping[str, set[str]] | None = None,
     forbidden_package_imports: Mapping[str, set[str]] | None = None,
 ) -> list[str]:
     """Return deterministic architecture violations for one package directory."""
-    budgets = FACADE_LINE_BUDGETS if facade_line_budgets is None else facade_line_budgets
     forbidden_rules = FORBIDDEN_IMPORTS if forbidden_imports is None else forbidden_imports
     package_rules = (
         FORBIDDEN_PACKAGE_IMPORTS
@@ -261,11 +246,6 @@ def audit_architecture(
         for name, path in paths.items()
     }
     errors: list[str] = []
-    for module, budget in budgets.items():
-        path = paths[module]
-        lines = len(path.read_text(encoding="utf-8").splitlines())
-        if lines > budget:
-            errors.append(f"{module}.py has {lines} lines; facade budget is {budget}")
     for module, forbidden in forbidden_rules.items():
         unexpected = sorted(graph[module] & forbidden)
         if unexpected:

@@ -17,6 +17,8 @@ from .. import __version__
 from ..atomic import atomic_write_json, atomic_write_text
 from ..build_artifacts.paths import default_resume_output_base
 from ..document_export.normalization import normalize_payload
+from ..planning.audit import audit_synthesis
+from ..planning.loader import load_synthesis_plan
 from ..resume_documents.html import contained_project_path, known_fact_ids, render_payload
 from ..resume_documents.markdown import (
     EVIDENCE,
@@ -34,7 +36,6 @@ from ..resume_documents.markdown import (
     story_id,
 )
 from ..reviews.feedback_resolution import guidance_snapshot
-from ..synthesis import audit_synthesis, load_synthesis_plan
 from ..vault.evidence import audit_claims
 from .templates import rendering_theme_text
 

@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 from typing import Any
 
-from ..synthesis import load_synthesis_plan
+from ..planning.loader import load_synthesis_plan
 from ..vault.layout import contained_path
 from .language_review import (
     finalize_language_review,

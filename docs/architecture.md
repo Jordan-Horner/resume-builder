@@ -195,8 +195,8 @@ the `stories`, `targeting`, `presentation`, and `role_arcs` modules validate
 their respective plan sections. `resume_builder.reviews` owns narrative-block
 review, feedback memory, selection checks, decisions, repairs, and review
 packaging.
-The root `synthesis.py`, `feedback_memory.py`, and `review_records.py` modules
-remain compatibility facades for established commands and public imports.
+`planning/command.py`, `reviews/feedback_command.py`, and `reviews/command.py`
+own their respective CLI orchestration without duplicating root import surfaces.
 
 Dependency-neutral modules separate canonical Markdown parsing, feedback
 resolution, review schema enforcement, and synthesis models from the workflows
@@ -209,10 +209,8 @@ proof anchor, and body-delegated detail. The selection reviewer receives this
 non-prose strategy, while the independent language and career reviews continue
 to judge visible wording without builder rationale.
 
-`review_records.py` historically owned package construction, decision
-finalization, wording-only repair, record loading, freshness, and approval
-enforcement. Those responsibilities now live behind a small compatibility
-facade:
+Review package construction, decision finalization, wording-only repair, record
+loading, freshness, and approval enforcement are split by responsibility:
 
 - `reviews/blocks.py` inventories narrative prose and deterministic advisories;
 - `reviews/language_review.py` prepares, carries forward, finalizes, and
@@ -226,15 +224,10 @@ facade:
 - `reviews/approval.py` enforces freshness for route-required or explicitly
   requested deeper critiques.
 
-Compatibility facades keep every pre-split public symbol importable from its
-original module and list it in `__all__`. A regression test pins that surface so
-future extractions cannot silently break callers while moving implementation.
-
 The same dependency direction applies to the other orchestration domains.
 Job-to-resume evidence auditing lives under `resume_builder.matching`, where
 exact retrieval, semantic grading, and human-readable reporting remain separate
-modules. The root `job_matching.py`, `match_grading.py`, and `job_report.py`
-modules preserve existing imports, and the `match` CLI remains unchanged.
+modules. The `match` CLI dispatches directly to `matching/audit.py`.
 Application history is a sibling workflow rooted in the private workspace. Its
 records pin targets and submitted resumes by hash, while canonical facts remain
 the only permitted evidence source for answer claims. Job prescreening reads
@@ -402,13 +395,12 @@ review packaging, verification, preview, and project reporting. It covers the
 resume source, template, synthesis plan, generated payload, canonical facts,
 builder version, and applicable feedback guidance so one workflow cannot reuse
 an artifact another workflow considers stale.
-`resume_parser.py` is independent of build orchestration; feedback recording,
+Canonical Markdown parsing is independent of build orchestration; feedback recording,
 acceptance, and resolution are separate; synthesis models, loading, and auditing
 are separate; synthesis schema primitives and direction-derived inputs are kept
 outside the version-aware plan assembler; direction parsing and diagnostics are
 separate; and report policy is pure workflow logic. The architecture check
-rejects package cycles, forbidden reverse imports, and facade growth beyond
-their reviewed budgets.
+rejects package cycles and forbidden reverse imports.
 
 ## Release invariants
 

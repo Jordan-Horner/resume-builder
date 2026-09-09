@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from resume_builder import review_records
+from resume_builder.reviews import command as review_records
 from resume_builder.vault import questions as evidence_questions
 
 

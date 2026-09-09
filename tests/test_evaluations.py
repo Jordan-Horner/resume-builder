@@ -6,8 +6,8 @@ from typing import Any
 
 import yaml
 
+from resume_builder.planning.models import SynthesisPlan, SynthesisStory
 from resume_builder.quality_assurance import regression as evaluations
-from resume_builder.synthesis import SynthesisPlan, SynthesisStory
 
 
 def test_case_validation_does_not_require_or_open_resume(tmp_path: Path) -> None:
