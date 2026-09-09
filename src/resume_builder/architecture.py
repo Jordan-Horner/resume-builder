@@ -48,6 +48,7 @@ FACADE_LINE_BUDGETS = {
     "resume_templates": 30,
     "review_records": 300,
     "schema_upgrade": 40,
+    "service": 35,
     "source_import": 80,
     "synthesis": 180,
     "workspace": 40,

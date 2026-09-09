@@ -16,6 +16,8 @@ Background quick-screen replenishment lives beside it in
 `resume_builder.background_screening` import remains compatible.
 The scheduler itself lives in `resume_builder.scheduled_tasks.scheduler`; the
 `resume_builder.automation` module remains the stable CLI and import facade.
+The local process supervisor lives in `resume_builder.scheduled_tasks.supervisor`;
+the `resume_builder.service` module remains its executable compatibility facade.
 
 ## What runs automatically
 

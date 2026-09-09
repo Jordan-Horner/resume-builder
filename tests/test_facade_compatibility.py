@@ -549,6 +549,14 @@ FACADE_EXPORTS = {
         "validate_staged_upgrade",
         "validate_vault",
     },
+    "service": {
+        "SUPERVISOR_CONFIG_ENV",
+        "main",
+        "managed_service_status",
+        "render_supervisor_config",
+        "set_scheduler_enabled",
+        "telegram_configuration_status",
+    },
     "source_import": {
         "DOCUMENT_KINDS",
         "SUPPORTED",

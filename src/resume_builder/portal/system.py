@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from ..assistant.state import AgentState, default_agent_state_path
-from ..service import telegram_configuration_status
+from ..scheduled_tasks.supervisor import telegram_configuration_status
 from .schedule import schedule_status
 
 

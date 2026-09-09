@@ -23,7 +23,6 @@ from . import (
     rendering,
     review_records,
     schema_upgrade,
-    service,
     source_import,
     synthesis,
     validation,
@@ -36,6 +35,7 @@ from .opportunities import evaluation as screening_evaluation
 from .opportunities import onboarding as job_onboarding
 from .opportunities import preferences
 from .scheduled_tasks import scheduler as automation
+from .scheduled_tasks import supervisor as service
 
 Command = tuple[Callable[[Sequence[str] | None], int], str]
 COMMANDS: dict[str, Command] = {

@@ -1,8 +1,11 @@
 from pathlib import Path
 
-from resume_builder import service
 from resume_builder.automation import load_config, render_default_config
-from resume_builder.service import render_supervisor_config, telegram_configuration_status
+from resume_builder.scheduled_tasks import supervisor as service
+from resume_builder.scheduled_tasks.supervisor import (
+    render_supervisor_config,
+    telegram_configuration_status,
+)
 
 
 def test_portal_managed_automation_defaults_are_inactive(tmp_path: Path) -> None:

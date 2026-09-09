@@ -26,7 +26,7 @@ from ..scheduled_tasks.screening import (
     background_screening_configured,
     replenishment_running,
 )
-from ..service import managed_service_status, set_scheduler_enabled
+from ..scheduled_tasks.supervisor import managed_service_status, set_scheduler_enabled
 
 
 def _default_timezone() -> str:
