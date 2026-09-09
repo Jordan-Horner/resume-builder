@@ -34,6 +34,14 @@ FACADE_EXPORTS = {
         "validate_history",
         "validate_record",
     },
+    "ats": {"REPLACEMENTS", "normalize_payload", "normalize_text"},
+    "ats_readability": {
+        "MAX_RECOMMENDED_BYTES",
+        "REPORT_VERSION",
+        "SECTION_TITLES",
+        "ReadabilityCheck",
+        "build_ats_readability_report",
+    },
     "compilation": {
         "EVIDENCE",
         "HEADING",
@@ -131,6 +139,14 @@ FACADE_EXPORTS = {
         "load_classification_case",
         "validate_against_match",
         "validate_classification_case",
+    },
+    "pdf_rendering": {
+        "BAD_GLYPHS",
+        "audit_pdf",
+        "extraction_blocks",
+        "normalized_tokens",
+        "render_pdf",
+        "tokens_recovered",
     },
     "gmail_semantic": {
         "ACTIONABLE_EVENT_TYPES",

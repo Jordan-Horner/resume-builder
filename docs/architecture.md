@@ -115,6 +115,12 @@ that domain rather than appearing as unrelated root modules. The established
 `directions.py`, `direction_schema.py`, and `direction_diagnostics.py` imports
 remain compatibility facades, and the `direction` CLI is unchanged.
 
+Employer-ready document output lives under `resume_builder.document_export`.
+It normalizes troublesome characters before rendering, audits the minted PDF's
+ATS readability, and verifies text extraction and browser layout. The root
+`ats.py`, `ats_readability.py`, and `pdf_rendering.py` modules remain compatibility
+facades for established imports.
+
 Resume construction is split into two internal domains. `resume_builder.planning`
 owns synthesis-plan models, schema helpers, loading, summary strategy, role
 balance, and plan audits. `resume_builder.reviews` owns narrative-block review,

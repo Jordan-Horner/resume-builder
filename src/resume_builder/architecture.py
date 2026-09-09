@@ -8,6 +8,8 @@ from pathlib import Path
 
 FACADE_LINE_BUDGETS = {
     "applications": 90,
+    "ats": 10,
+    "ats_readability": 20,
     "compilation": 250,
     "directions": 450,
     "direction_diagnostics": 20,
@@ -18,6 +20,7 @@ FACADE_LINE_BUDGETS = {
     "job_report": 10,
     "jobs": 40,
     "match_grading": 50,
+    "pdf_rendering": 25,
     "project_report": 560,
     "review_records": 300,
     "synthesis": 180,
@@ -58,6 +61,17 @@ FORBIDDEN_IMPORTS = {
 
 FORBIDDEN_PACKAGE_IMPORTS: dict[str, set[str]] = {
     "application_tracking": {"automation", "opportunities", "portal"},
+    "document_export": {
+        "application_tracking",
+        "assistant",
+        "automation",
+        "matching",
+        "opportunities",
+        "planning",
+        "portal",
+        "reviews",
+        "role_profiles",
+    },
     "opportunities": {"assistant", "automation", "portal"},
     "planning": {"assistant", "automation", "opportunities", "portal", "reviews"},
     "matching": {"application_tracking", "assistant", "automation", "portal", "reviews"},

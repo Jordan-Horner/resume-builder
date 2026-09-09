@@ -16,7 +16,7 @@ from typing import Any
 from . import __version__
 from .artifact_paths import default_resume_output_base
 from .atomic import atomic_write_json, atomic_write_text
-from .ats import normalize_payload
+from .document_export.normalization import normalize_payload
 from .evidence import audit_claims
 from .rendering import contained_project_path, known_fact_ids, render_payload
 from .resume_parser import (

@@ -17,7 +17,7 @@ from . import __version__
 from .artifact_paths import default_resume_output_base
 from .atomic import atomic_write_bytes, atomic_write_json
 from .compilation import relative_output, sha256_file
-from .pdf_rendering import render_pdf
+from .document_export.pdf import render_pdf
 from .previewing import _current_build
 from .rendering import contained_project_path
 from .reviews.language_review import current_language_review
