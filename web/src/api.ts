@@ -141,10 +141,14 @@ export async function getSavedJobSalary(jobId: string): Promise<SalaryEstimateRe
   )) ?? null;
 }
 
-export function markJobApplied(jobId: string): Promise<unknown> {
+export function markJobApplied(jobId: string, resumeId?: string): Promise<unknown> {
   return requestWithTimeout(
     `/api/jobs/${encodeURIComponent(jobId)}/applied`,
-    { method: "POST" },
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resume_id: resumeId ?? null }),
+    },
     10_000,
     "Saving the application took too long. Please try again.",
   );

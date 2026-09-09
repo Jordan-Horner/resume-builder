@@ -372,6 +372,7 @@ export function JobsPage() {
 
   async function dispositionSelected(
     disposition: JobFeedbackAction | "applied",
+    resumeId?: string,
   ): Promise<JobFeedback | null> {
     if (!selected || pendingAction || companyBusy) return null;
     const job = selected;
@@ -388,7 +389,7 @@ export function JobsPage() {
         setNotice(`${job.title} saved to Interested jobs.`);
         return result;
       }
-      if (disposition === "applied") await markJobApplied(job.id);
+      if (disposition === "applied") await markJobApplied(job.id, resumeId);
       else {
         const result = await saveJobFeedback(job.id, disposition, []);
         const followUp = result.dismissal_follow_up;

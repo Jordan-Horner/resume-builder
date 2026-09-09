@@ -330,6 +330,7 @@ export interface ResumeLibrary { sections: ResumeSection[]; }
 export interface ResumeRecommendation {
   status: "available" | "unavailable";
   recommended_resume: { id: string; name: string; kind: "directional" | "tailored" } | null;
+  available_resumes: { id: string; name: string; kind: "directional" | "tailored" }[];
   target: string | null;
   match: { label: "Strong match" | "Partial match" | "Weak match" | "Unknown match" } | null;
   message: string | null;

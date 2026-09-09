@@ -14,7 +14,7 @@ interface Props {
   queueLoading: boolean;
   onClose: () => void;
   onChangeCompany: (company: string, blocked: boolean) => Promise<void>;
-  onDisposition: (disposition: JobFeedbackAction | "applied") => Promise<JobFeedback | null>;
+  onDisposition: (disposition: JobFeedbackAction | "applied", resumeId?: string) => Promise<JobFeedback | null>;
   onHide: (reason: JobHideReason) => Promise<void>;
   onScreened: (screen: JobScreenResult) => void;
 }
@@ -61,6 +61,7 @@ export function JobDetailPanel({
   const hideReasons = useRef<HTMLElement>(null);
   const [recommendation, setRecommendation] = useState<ResumeRecommendation | null>(null);
   const [recommendationError, setRecommendationError] = useState("");
+  const [selectedResumeId, setSelectedResumeId] = useState("");
   const [jobScreen, setJobScreen] = useState<JobScreenResult | null>(null);
   const [screeningJobId, setScreeningJobId] = useState<string | null>(null);
   const [screeningMessage, setScreeningMessage] = useState("");
@@ -84,6 +85,7 @@ export function JobDetailPanel({
     const pollToken = ++screenPollToken.current;
     setRecommendation(null);
     setRecommendationError("");
+    setSelectedResumeId("");
     setJobScreen(null);
     setScreeningJobId(null);
     setScreeningMessage("");
@@ -112,7 +114,10 @@ export function JobDetailPanel({
       setScreenError(reason instanceof Error ? reason.message : "Could not load this job screen.");
     });
     void getResumeRecommendation(job.id, controller.signal).then((value) => {
-      if (active) setRecommendation(value);
+      if (active) {
+        setRecommendation(value);
+        setSelectedResumeId(value.recommended_resume?.id ?? (value.available_resumes.length === 1 ? value.available_resumes[0].id : ""));
+      }
     }).catch((reason: unknown) => {
       if (active && !isAbortError(reason)) {
         setRecommendationError(reason instanceof Error ? reason.message : "Could not load the resume recommendation.");
@@ -267,6 +272,13 @@ export function JobDetailPanel({
           {recommendation.match && <em>{recommendation.match.label}</em>}
         </div>}
         {!jobScreen && recommendation?.status === "unavailable" && recommendation.message && <p className="recommendation-empty">{recommendation.message}</p>}
+        {recommendation?.status === "unavailable" && recommendation.available_resumes.length > 0 && <label className="resume-choice">
+          <span>Resume used</span>
+          <select value={selectedResumeId} onChange={(event) => setSelectedResumeId(event.target.value)}>
+            <option value="">Choose a resume</option>
+            {recommendation.available_resumes.map((resume) => <option key={resume.id} value={resume.id}>{resume.name}</option>)}
+          </select>
+        </label>}
         {recommendationError && <p className="recommendation-error" role="status">{recommendationError}</p>}
         <section className="job-screen-card" aria-label="Job screen">
           {screening && !jobScreen ? <>
@@ -367,8 +379,8 @@ export function JobDetailPanel({
         </section>
         <div className="job-actions" aria-label="Update job status">
           {job.url && <a className="secondary-button original-link" href={job.url} target="_blank" rel="noreferrer" onClick={() => { void recordJobPostingOpened(job.id).catch((reason: unknown) => console.warn("Could not record posting open", reason)); }}>Open posting <ArrowIcon /></a>}
-          <button className="primary-button apply-button" onClick={() => void onDisposition("applied")} disabled={pendingAction !== null}>
-            {pendingAction === "applied" ? "Moving to Applications…" : "Mark as applied"}
+          <button className="primary-button apply-button" onClick={() => void onDisposition("applied", selectedResumeId || undefined)} disabled={pendingAction !== null || (recommendation?.status === "unavailable" && recommendation.available_resumes.length > 0 && !selectedResumeId)}>
+            {pendingAction === "applied" ? "Moving to Applications…" : recommendation?.status === "unavailable" && recommendation.available_resumes.length > 0 && !selectedResumeId ? "Choose resume first" : "Mark as applied"}
           </button>
           <button className="secondary-button hide-posting-button" aria-expanded={showHideReasons} aria-controls="hide-posting-reasons" onClick={toggleHideReasons} disabled={pendingAction !== null}>
             {pendingAction === "hide" ? "Hiding…" : "Hide posting"}

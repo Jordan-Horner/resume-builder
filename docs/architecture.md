@@ -432,6 +432,11 @@ rejects package cycles and forbidden reverse imports.
 The portal renders authoritative backend state after job dispositions, including
 both queue counts and replacement rows under the current filters. A failed refresh
 can be retried without repeating a successful application or dismissal action.
+An application retry checks the durable record before reloading job inventory. The
+first save reuses its already-loaded job and an existing quick-screen result; a
+skipped screen is never rebuilt in the request. When several active directional
+resumes exist without a defensible recommendation, the portal requires the resume
+used so Applications can link to an immutable snapshot rather than guessing.
 The schedule editor cannot mutate configuration until its initial load succeeds,
 and locks its controls while saving.
 

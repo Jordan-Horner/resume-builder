@@ -47,6 +47,42 @@ def _client(tmp_path: Path) -> TestClient:
     return TestClient(create_app(workspace))
 
 
+def test_mark_applied_api_forwards_the_resume_used(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    received: dict[str, object] = {}
+
+    def mark_applied(
+        _service: DashboardService, job_id: str, *, resume_id: str | None = None
+    ) -> dict[str, object]:
+        received.update(job_id=job_id, resume_id=resume_id)
+        return {"application": {"id": "APP-1"}}
+
+    monkeypatch.setattr(DashboardService, "mark_applied", mark_applied)
+    client = _client(tmp_path)
+
+    response = client.post(
+        "/api/jobs/job-1/applied",
+        json={"resume_id": "resumes/baselines/platform.md"},
+    )
+
+    assert response.status_code == 201
+    assert received == {
+        "job_id": "job-1",
+        "resume_id": "resumes/baselines/platform.md",
+    }
+
+
+def test_mark_applied_api_rejects_an_invalid_resume_id(tmp_path: Path) -> None:
+    response = _client(tmp_path).post(
+        "/api/jobs/job-1/applied",
+        json={"resume_id": ["resumes/baselines/platform.md"]},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "choose a current directional resume"
+
+
 def test_openrouter_can_be_configured_without_onboarding(tmp_path: Path, monkeypatch) -> None:
     import httpx
 

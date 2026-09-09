@@ -80,6 +80,26 @@ describe("dashboard API client", () => {
     expect(fetchMock).toHaveBeenCalledWith(endpoint, expect.objectContaining({ method: "POST" }));
   });
 
+  it("records the resume used with an application", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({}), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await markJobApplied("job-1", "resumes/baselines/platform.md");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/jobs/job-1/applied",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resume_id: "resumes/baselines/platform.md" }),
+      }),
+    );
+  });
+
   it("records an explicit reapplication", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({}), {

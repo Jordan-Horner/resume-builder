@@ -464,13 +464,20 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.post("/api/jobs/{job_id}/applied", status_code=201)
-    def mark_applied(job_id: str) -> dict[str, Any]:
+    def mark_applied(job_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         try:
-            result = service.mark_applied(job_id)
+            resume_id = payload.get("resume_id") if payload else None
+            if resume_id is not None and not isinstance(resume_id, str):
+                raise ValueError("choose a current directional resume")
+            result = service.mark_applied(
+                job_id,
+                resume_id=resume_id,
+            )
             continue_recommendation_screening()
             return result
         except ValueError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
+            status = 404 if str(exc).startswith("job not found:") else 400
+            raise HTTPException(status_code=status, detail=str(exc)) from exc
 
     @app.get("/api/applications")
     def applications() -> dict[str, Any]:

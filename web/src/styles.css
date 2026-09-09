@@ -760,6 +760,8 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
 .resume-recommendation > span { color: var(--muted); }
 .resume-recommendation strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .resume-recommendation em { color: var(--accent-strong); font-style: normal; font-weight: 700; }
+.resume-choice { display: grid; grid-template-columns: auto minmax(180px, 1fr); align-items: center; gap: 12px; margin-top: 12px; color: var(--muted); font-size: 12px; }
+.resume-choice select { min-width: 0; }
 .recommendation-empty { margin: 12px 0 0; color: var(--muted); font-size: 12px; }
 .recommendation-error { margin: 10px 0 0; color: var(--warning); font-size: 12px; }
 .job-screen-card { margin: 16px 0 0; padding: 18px 0; border-block: 1px solid var(--line); font-size: 12px; }

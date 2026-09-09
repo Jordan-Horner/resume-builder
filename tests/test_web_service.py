@@ -116,6 +116,46 @@ def write_screening_output(
     )
 
 
+def test_feedback_snapshot_does_not_rebuild_a_skipped_screen(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for relative in (
+        web_service.JOBS_CONFIG,
+        web_service.PREFERENCES_PATH,
+        DEFAULT_AGENT_CONFIG,
+    ):
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("configured\n", encoding="utf-8")
+    output = tmp_path / web_service.JOB_SCREENING_OUTPUT
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "jobs": [
+                    {
+                        "id": "job-1",
+                        "screening": {
+                            "status": "skipped",
+                            "reason": "no_saved_search_signal",
+                        },
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    service = DashboardService(tmp_path, inventory_loader=lambda: [])
+    monkeypatch.setattr(
+        service,
+        "_screening_packet",
+        lambda _job_id: pytest.fail("skipped screen rebuilt a screening packet"),
+    )
+
+    assert service._feedback_screen_snapshot("job-1") is None
+
+
 def test_screening_backfill_rebuilds_current_inventory_without_source_refresh(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1013,9 +1053,7 @@ def test_retrying_identical_job_feedback_does_not_duplicate_the_event(
     assert second["latest"] == first["latest"]
 
 
-def test_opening_posting_records_one_weak_positive_with_screen_snapshot(
-    tmp_path, inventory, monkeypatch
-):
+def test_opening_posting_records_one_weak_positive_with_screen_snapshot(tmp_path, inventory):
     for path in (
         tmp_path / "job-search/config/search.yml",
         tmp_path / "job-search/preferences.yml",
@@ -1024,25 +1062,21 @@ def test_opening_posting_records_one_weak_positive_with_screen_snapshot(
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("configured: true\n", encoding="utf-8")
     service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
-    monkeypatch.setattr(
-        service,
-        "saved_job_screen",
-        lambda _job_id: {
-            "status": "complete",
-            "result": {
-                "fit": "good_match",
-                "recommendation": "pursue",
-                "confidence": "medium",
-                "resume_match": {
-                    "resume_id": "resumes/baselines/support.md",
-                    "name": "Support Engineer",
-                    "label": "Strong match",
-                },
-                "criterion_evidence": [{"criterion_id": "incidents", "label": "Incident response"}],
-                "criterion_assessments": [{"criterion_id": "incidents", "outcome": "supported"}],
+    service._screening_states["remote-1"] = {
+        "status": "complete",
+        "result": {
+            "fit": "good_match",
+            "recommendation": "pursue",
+            "confidence": "medium",
+            "resume_match": {
+                "resume_id": "resumes/baselines/support.md",
+                "name": "Support Engineer",
+                "label": "Strong match",
             },
+            "criterion_evidence": [{"criterion_id": "incidents", "label": "Incident response"}],
+            "criterion_assessments": [{"criterion_id": "incidents", "outcome": "supported"}],
         },
-    )
+    }
 
     service.record_job_open("remote-1")
     service.record_job_open("remote-1")
@@ -1545,6 +1579,58 @@ def test_mark_applied_creates_application_and_removes_job_from_queue(tmp_path, i
     assert service.job_feedback("remote-1")["latest"]["action"] == "applied"
 
 
+def test_mark_applied_loads_the_selected_job_only_once(tmp_path, inventory, monkeypatch):
+    loads = 0
+
+    def load_inventory():
+        nonlocal loads
+        loads += 1
+        return inventory
+
+    preferences = tmp_path / web_service.PREFERENCES_PATH
+    preferences.parent.mkdir(parents=True, exist_ok=True)
+    preferences.write_text("schema_version: 1\n", encoding="utf-8")
+    config = tmp_path / DEFAULT_AGENT_CONFIG
+    config.parent.mkdir(parents=True, exist_ok=True)
+    config.write_text(render_default_agent_config(), encoding="utf-8")
+    output = tmp_path / web_service.JOB_SCREENING_OUTPUT
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "jobs": [
+                    {
+                        "id": "remote-1",
+                        "screening": {"status": "skipped", "reason": "not_selected"},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    service = DashboardService(tmp_path, inventory_loader=load_inventory)
+    monkeypatch.setattr(
+        service,
+        "_screening_packet",
+        lambda _job_id: pytest.fail("application save rebuilt screening input"),
+    )
+
+    service.mark_applied("remote-1")
+
+    assert loads == 1
+
+
+def test_mark_applied_retry_returns_existing_record_without_loading_jobs(tmp_path, inventory):
+    service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
+    original = service.mark_applied("remote-1")
+    service._inventory_loader = lambda: pytest.fail("retry reloaded job inventory")
+
+    repeated = service.mark_applied("remote-1")
+
+    assert repeated == original
+
+
 def test_mark_applied_pins_the_only_directional_resume_when_no_target_exists(tmp_path, inventory):
     resume = tmp_path / "resumes" / "baselines" / "support.md"
     resume.parent.mkdir(parents=True)
@@ -1576,20 +1662,38 @@ def test_resume_recommendation_reports_no_match_when_directional_resumes_exist(t
     assert result["message"] == "No matching directional resume was identified for this job."
 
 
-def test_mark_applied_does_not_guess_between_multiple_directional_resumes(tmp_path, inventory):
+def test_mark_applied_requires_a_choice_between_multiple_directional_resumes(tmp_path, inventory):
     folder = tmp_path / "resumes" / "baselines"
     folder.mkdir(parents=True)
     (folder / "support.md").write_text("# Support\n", encoding="utf-8")
     (folder / "platform.md").write_text("# Platform\n", encoding="utf-8")
     service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
 
-    record = service.mark_applied("remote-1")
+    with pytest.raises(ValueError, match="choose the resume you used"):
+        service.mark_applied("remote-1")
 
-    assert record["application"]["resume"] is None
-    assert service.list_applications()[0]["resume_attribution"] == "not_recorded"
+    assert service.list_applications() == []
 
 
-def test_mark_applied_pins_resume_selected_by_cached_quick_screen(tmp_path, inventory, monkeypatch):
+def test_mark_applied_records_the_explicit_directional_resume(tmp_path, inventory):
+    folder = tmp_path / "resumes" / "baselines"
+    folder.mkdir(parents=True)
+    selected = folder / "support.md"
+    selected.write_text("# Support\n", encoding="utf-8")
+    (folder / "platform.md").write_text("# Platform\n", encoding="utf-8")
+    service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
+
+    record = service.mark_applied("remote-1", resume_id="resumes/baselines/support.md")
+
+    assert record["application"]["resume"]["path"] == "resumes/baselines/support.md"
+    application = service.list_applications()[0]
+    assert application["resume_attribution"] == "directional"
+    assert application["resume"]["preview_url"] == (
+        f"/api/applications/{application['id']}/resume-preview"
+    )
+
+
+def test_mark_applied_pins_resume_selected_by_cached_quick_screen(tmp_path, inventory):
     folder = tmp_path / "resumes" / "baselines"
     folder.mkdir(parents=True)
     selected = folder / "support.md"
@@ -1597,26 +1701,22 @@ def test_mark_applied_pins_resume_selected_by_cached_quick_screen(tmp_path, inve
     (folder / "platform.md").write_text("# Platform\n", encoding="utf-8")
     preferences = tmp_path / "job-search" / "preferences.yml"
     preferences.parent.mkdir(parents=True)
-    preferences.write_text("version: 4\n", encoding="utf-8")
+    preferences.write_text("schema_version: 1\n", encoding="utf-8")
     config = tmp_path / DEFAULT_AGENT_CONFIG
     config.parent.mkdir(parents=True, exist_ok=True)
     config.write_text(render_default_agent_config(), encoding="utf-8")
     service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
-    monkeypatch.setattr(
-        service,
-        "saved_job_screen",
-        lambda _job_id: {
-            "status": "complete",
-            "result": {
-                "resume_match": {
-                    "resume_id": "resumes/baselines/support.md",
-                    "name": "Support Engineer",
-                    "sha256": hashlib.sha256(selected.read_bytes()).hexdigest(),
-                    "label": "Strong match",
-                }
-            },
+    service._screening_states["remote-1"] = {
+        "status": "complete",
+        "result": {
+            "resume_match": {
+                "resume_id": "resumes/baselines/support.md",
+                "name": "Support Engineer",
+                "sha256": hashlib.sha256(selected.read_bytes()).hexdigest(),
+                "label": "Strong match",
+            }
         },
-    )
+    }
 
     record = service.mark_applied("remote-1")
 

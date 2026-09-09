@@ -30,7 +30,7 @@ beforeEach(() => {
   vi.mocked(api.getBlockedCompanies).mockResolvedValue({ companies: [] });
   vi.mocked(api.getJob).mockResolvedValue(job);
   vi.mocked(api.getScrapeSchedule).mockResolvedValue({ configured: true, enabled: true, times: ["08:00"], timezone: "America/New_York", next_run: null, last_run: null, service_status: "online", screening_enabled: true, screening_max_jobs: 15, screening_available: true, current_stage: "idle" });
-  vi.mocked(api.getResumeRecommendation).mockResolvedValue({ status: "unavailable", recommended_resume: null, match: null, target: null, message: "None" });
+  vi.mocked(api.getResumeRecommendation).mockResolvedValue({ status: "unavailable", recommended_resume: null, available_resumes: [], match: null, target: null, message: "None" });
   vi.mocked(api.getJobs).mockResolvedValue({ jobs: [job], count: 1, reviewable_count: 1 });
   vi.mocked(api.markJobApplied).mockResolvedValue({});
   vi.mocked(api.hideJobPosting).mockResolvedValue({ job_id: "one", reason: "closed", personalization_updated: false });
@@ -345,6 +345,33 @@ it("retries a failed refresh without repeating the successful mutation", async (
   await click("Try again");
   expect(api.markJobApplied).toHaveBeenCalledTimes(1);
   expect(host.textContent).toContain("Build your job queue");
+});
+
+it("requires and records the resume used when no single resume was recommended", async () => {
+  vi.mocked(api.getResumeRecommendation).mockResolvedValue({
+    status: "unavailable",
+    recommended_resume: null,
+    available_resumes: [
+      { id: "resumes/baselines/devops.md", name: "DevOps", kind: "directional" },
+      { id: "resumes/baselines/support.md", name: "Support", kind: "directional" },
+    ],
+    match: null,
+    target: null,
+    message: "Choose the resume you used.",
+  });
+  await openJob();
+
+  const apply = [...host.querySelectorAll("button")].find((button) => button.textContent === "Choose resume first") as HTMLButtonElement;
+  expect(apply.disabled).toBe(true);
+  const select = host.querySelector(".resume-choice select") as HTMLSelectElement;
+  await act(async () => {
+    select.value = "resumes/baselines/devops.md";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await click("Mark as applied");
+
+  expect(api.markJobApplied).toHaveBeenCalledWith("one", "resumes/baselines/devops.md");
+  expect(host.textContent).toContain("moved to Applications");
 });
 
 it("automatically clears action confirmations after eight seconds", async () => {

@@ -1023,6 +1023,11 @@ class DashboardService:
         job = self.get_job(job_id)
         if job is None:
             raise ValueError(f"job not found: {job_id}")
+        return self._job_resume_recommendation(job)
+
+    def _job_resume_recommendation(self, job: dict[str, Any]) -> dict[str, Any]:
+        """Resolve a recommendation for an already-loaded portal job."""
+        job_id = str(job["id"])
         target_path: Path | None = None
         target_data: dict[str, Any] | None = None
         for candidate in sorted((self.workspace / "targets").glob("*.md")):
@@ -1088,7 +1093,7 @@ class DashboardService:
             kind = "directional"
         if selected is None:
             saved_screen = (
-                self.saved_job_screen(job_id)
+                self._completed_job_screen(job_id)
                 if (self.workspace / PREFERENCES_PATH).is_file()
                 and (self.workspace / DEFAULT_AGENT_CONFIG).is_file()
                 else None
@@ -1113,10 +1118,19 @@ class DashboardService:
                     kind = "directional"
                     match_label = str(resume_match.get("label") or "Unknown match")
 
+        available_resumes = [
+            {
+                "id": candidate.relative_to(self.workspace).as_posix(),
+                "name": candidate.stem.replace("-", " ").title(),
+                "kind": "directional",
+            }
+            for candidate in baselines
+        ]
         if selected is None:
             return {
                 "status": "unavailable",
                 "recommended_resume": None,
+                "available_resumes": available_resumes,
                 "target": target_path.relative_to(self.workspace).as_posix()
                 if target_path
                 else None,
@@ -1134,6 +1148,7 @@ class DashboardService:
                 "name": selected.stem.replace("-", " ").title(),
                 "kind": kind,
             },
+            "available_resumes": available_resumes,
             "target": target_path.relative_to(self.workspace).as_posix() if target_path else None,
             "match": {"label": match_label or "Unknown match"},
             "match_report": (
@@ -1314,7 +1329,7 @@ class DashboardService:
             for path in (JOBS_CONFIG, PREFERENCES_PATH, DEFAULT_AGENT_CONFIG)
         ):
             return None
-        screen = self.saved_job_screen(job_id)
+        screen = self._completed_job_screen(job_id)
         result = screen.get("result") if isinstance(screen, dict) else None
         if not isinstance(result, dict):
             return None
@@ -2454,20 +2469,9 @@ class DashboardService:
 
     def saved_job_screen(self, job_id: str) -> dict[str, Any] | None:
         """Return a cached quick screen without invoking a model."""
-        persisted = self._quick_screen_items().get(job_id)
-        persisted_screen = persisted.get("screening") if persisted else None
-        persisted_result = (
-            persisted_screen.get("result") if isinstance(persisted_screen, dict) else None
-        )
-        if (
-            isinstance(persisted_screen, dict)
-            and persisted_screen.get("status") == "complete"
-            and isinstance(persisted_result, dict)
-        ):
-            return self._present_screen(
-                self._restore_resume_guidance(ScreeningResult.model_validate(persisted_result)),
-                cached=bool(persisted_screen.get("cached", True)),
-            )
+        completed = self._completed_job_screen(job_id)
+        if completed is not None:
+            return completed
         packet = self._screening_packet(job_id)
         config_path = self.workspace / DEFAULT_AGENT_CONFIG
         if not config_path.is_file():
@@ -2487,6 +2491,32 @@ class DashboardService:
             if result
             else None
         )
+
+    def _completed_job_screen(self, job_id: str) -> dict[str, Any] | None:
+        """Return only an already-persisted screen; never rebuild screening input."""
+        with self._screening_state_lock:
+            current = self._screening_states.get(job_id)
+            if (
+                isinstance(current, dict)
+                and current.get("status") == "complete"
+                and isinstance(current.get("result"), dict)
+            ):
+                return dict(current)
+        persisted = self._quick_screen_items().get(job_id)
+        persisted_screen = persisted.get("screening") if persisted else None
+        persisted_result = (
+            persisted_screen.get("result") if isinstance(persisted_screen, dict) else None
+        )
+        if (
+            isinstance(persisted_screen, dict)
+            and persisted_screen.get("status") == "complete"
+            and isinstance(persisted_result, dict)
+        ):
+            return self._present_screen(
+                self._restore_resume_guidance(ScreeningResult.model_validate(persisted_result)),
+                cached=bool(persisted_screen.get("cached", True)),
+            )
+        return None
 
     def job_screen_status(self, job_id: str) -> dict[str, Any]:
         """Return current asynchronous screen state without waiting on its provider call."""
@@ -2588,7 +2618,18 @@ class DashboardService:
     def mark_not_interested(self, job_id: str) -> dict[str, Any]:
         return self.record_job_feedback(job_id, "not_interested", [])
 
-    def mark_applied(self, job_id: str) -> dict[str, Any]:
+    def mark_applied(self, job_id: str, *, resume_id: str | None = None) -> dict[str, Any]:
+        with self._state_lock:
+            existing = next(
+                (
+                    record
+                    for _, record in iter_records(self.workspace / APPLICATIONS_ROOT)
+                    if str(record["application"].get("job_id")) == job_id
+                ),
+                None,
+            )
+        if existing is not None:
+            return existing
         job = self.get_job(job_id)
         if job is None:
             raise ValueError(f"job not found: {job_id}")
@@ -2596,7 +2637,7 @@ class DashboardService:
             for _, record in iter_records(self.workspace / APPLICATIONS_ROOT):
                 if str(record["application"].get("job_id")) == job_id:
                     return record
-            return self._record_job_application(job)
+            return self._record_job_application(job, resume_id=resume_id)
 
     def mark_reapplied(self, application_id: str) -> dict[str, Any]:
         opportunity = next(
@@ -2621,11 +2662,29 @@ class DashboardService:
             )
 
     def _record_job_application(
-        self, job: dict[str, Any], *, note: str | None = None
+        self,
+        job: dict[str, Any],
+        *,
+        note: str | None = None,
+        resume_id: str | None = None,
     ) -> dict[str, Any]:
         job_id = str(job["id"])
-        recommendation = self.job_resume_recommendation(job_id)
+        recommendation = self._job_resume_recommendation(job)
         resume_record = recommendation.get("recommended_resume")
+        if resume_id is not None:
+            chosen = next(
+                (
+                    item
+                    for item in recommendation.get("available_resumes", [])
+                    if isinstance(item, dict) and item.get("id") == resume_id
+                ),
+                None,
+            )
+            if chosen is None:
+                raise ValueError("choose a current directional resume")
+            resume_record = chosen
+        elif resume_record is None and recommendation.get("available_resumes"):
+            raise ValueError("choose the resume you used before marking this job applied")
         resume_path = (
             self.workspace / resume_record["id"] if isinstance(resume_record, dict) else None
         )

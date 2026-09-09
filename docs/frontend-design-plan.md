@@ -231,8 +231,10 @@ Opening a job asks FastAPI for its full description and recommended resume. The 
 preserved target, its direction, a matching tailored resume, and an existing match
 report when those artifacts exist. Without a target, the only directional resume
 may be used as an unscored fallback; multiple baselines are never guessed between.
-Marking the job applied pins the recommendation through the existing application
-record, and Applications displays the server-provided attribution.
+When several directional resumes exist and no screen identifies one clear match,
+the detail pane requires the user to choose the resume actually used. Marking the
+job applied pins that recommendation or explicit choice through the existing
+application record, and Applications links to its preserved snapshot.
 
 When Jobs has no reviewable inventory, its empty state offers Find jobs now and
 polls the existing manual scan status through completion. When jobs exist but filters
@@ -277,8 +279,9 @@ Opening a job is read-only. It stays in the review queue until the user chooses
 `Hide posting` or `Applied`. Hiding asks whether the posting is closed, duplicated,
 or not relevant. Only `Not interested` records negative
 preference feedback; the neutral reasons simply clear the posting from the queue.
-Applied creates an application record and moves it to Applications. Store
-disposition state in the backend so it is consistent across browser sessions.
+Applied creates an application record, records the resume used when active resumes
+are available, and moves the job to Applications. Store disposition state in the
+backend so it is consistent across browser sessions.
 
 The detail pane also offers `Interested` without asking the user to classify the
 decision. Interested feedback keeps the job in the queue. The backend combines a
