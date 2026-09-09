@@ -179,27 +179,23 @@ and `system.py` expose scheduler controls and content-free health, and
 `job_sources.py` controls manual provider scans while preserving the existing
 collector workflow. `career.py` presents generated and retired résumés, renders
 read-only portal previews, and preserves application-linked copies during
-lifecycle changes. The established `web_career.py`, `web_filters.py`,
-`web_schedule.py`, `web_system.py`, `web_integrations.py`, and
-`web_job_sources.py` modules remain compatibility facades; the manual-scan
-worker entry point is unchanged.
+lifecycle changes. Portal callers import these modules directly, and the
+manual-scan worker runs through `resume_builder.portal.job_sources`.
 
 The portal assistant is split by runtime responsibility within the same
 package. `assistant_routes.py` owns same-origin HTTP and process supervision,
 `conversation_state.py` persists portal threads and proposal state,
 `resume_editing.py` applies bounded wording changes through the existing review
 workflow, and `assistant_worker.py` runs isolated model turns and confirmed
-proposals. The established `web_agent.py`, `web_agent_state.py`,
-`web_agent_resume.py`, and `web_agent_worker.py` paths remain compatibility
-facades, including the worker module entry point.
+proposals. The isolated worker runs through
+`resume_builder.portal.assistant_worker`.
 
 `portal/app.py` composes these portal capabilities into the local FastAPI
-application and owns the dashboard server launcher. The established `web.py`
-module, `resume-builder-web` command, and module entry point remain compatible.
+application and owns the dashboard server launcher. The `resume-builder-web`
+command points directly to that module.
 `portal/service.py` coordinates dashboard use cases across the vault,
 opportunity inventory, screening, applications, integrations, and career
-library. The established `web_service.py` module remains its compatibility
-facade.
+library. Portal code imports that service directly.
 
 Resume construction is split into two internal domains. `resume_builder.planning`
 owns synthesis-plan models, schema helpers, loading, summary strategy, role

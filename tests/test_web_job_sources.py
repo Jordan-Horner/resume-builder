@@ -74,7 +74,7 @@ def test_manual_scan_uses_snapshot_not_activation(tmp_path: Path, monkeypatch) -
     snapshot = yaml.safe_load(path.with_name("web-manual-scan.yml").read_text())
     assert snapshot["enabled"] is True
     assert Path(snapshot["database_path"]).is_absolute()
-    assert calls[0][0][2] == "resume_builder.web_job_sources"
+    assert calls[0][0][2] == "resume_builder.portal.job_sources"
     assert calls[0][1]["cwd"] == tmp_path
 
 

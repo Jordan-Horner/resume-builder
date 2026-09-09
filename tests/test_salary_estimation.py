@@ -20,8 +20,8 @@ from resume_builder.opportunities.salary import (
     build_salary_packet,
     validate_salary_estimate,
 )
+from resume_builder.portal.app import create_app
 from resume_builder.portal.service import DashboardService
-from resume_builder.web import create_app
 
 
 def posting(**changes: object) -> dict:

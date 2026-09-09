@@ -2,8 +2,9 @@ import json
 
 import pytest
 
+from resume_builder.portal.app import create_app
+from resume_builder.portal.filters import ViewFilters, matches_view
 from resume_builder.portal.service import DashboardService
-from resume_builder.web_filters import ViewFilters, matches_view
 
 
 def listing(**overrides):
@@ -255,8 +256,6 @@ def test_reject_invalid_filter_payload(tmp_path, values):
 def test_api_filters_before_count_and_limit(tmp_path, monkeypatch):
     pytest.importorskip("multipart")
     from fastapi.testclient import TestClient
-
-    from resume_builder.web import create_app
 
     inventory_loads = 0
 

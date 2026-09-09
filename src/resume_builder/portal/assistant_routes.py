@@ -85,7 +85,7 @@ def install_assistant(app: FastAPI, workspace: Path) -> None:
             process = await asyncio.create_subprocess_exec(
                 sys.executable,
                 "-m",
-                "resume_builder.web_agent_worker",
+                "resume_builder.portal.assistant_worker",
                 "--workspace",
                 str(workspace),
                 "--state",

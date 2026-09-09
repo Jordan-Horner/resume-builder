@@ -60,7 +60,7 @@ dev = [
 
 [project.scripts]
 resume-builder = "resume_builder.cli:main"
-resume-builder-web = "resume_builder.web:main"
+resume-builder-web = "resume_builder.portal.app:main"
 job-puller = "job_puller.cli:main"
 
 [tool.setuptools.packages.find]

@@ -113,7 +113,7 @@ def test_entrypoint_keeps_existing_roots_and_nests_fresh_read_only_parents():
 def test_version_api_is_read_only(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
-    from resume_builder.web import create_app
+    from resume_builder.portal.app import create_app
 
     monkeypatch.delenv("RESUME_BUILDER_BUILD_REVISION", raising=False)
     client = TestClient(create_app(tmp_path))

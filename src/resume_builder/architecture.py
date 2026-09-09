@@ -60,18 +60,6 @@ FACADE_LINE_BUDGETS = {
     "workspace_templates": 15,
     "validation": 70,
     "verification": 30,
-    "web": 15,
-    "web_agent": 10,
-    "web_agent_resume": 30,
-    "web_agent_state": 10,
-    "web_agent_worker": 25,
-    "web_career": 45,
-    "web_filters": 10,
-    "web_integrations": 20,
-    "web_job_sources": 40,
-    "web_schedule": 25,
-    "web_service": 70,
-    "web_system": 10,
 }
 
 FORBIDDEN_IMPORTS = {

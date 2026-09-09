@@ -127,7 +127,7 @@ def start_scan(root: Path) -> dict[str, Any]:
                 [
                     sys.executable,
                     "-m",
-                    "resume_builder.web_job_sources",
+                    "resume_builder.portal.job_sources",
                     str(root),
                     str(snapshot),
                     str(lock.fileno()),
