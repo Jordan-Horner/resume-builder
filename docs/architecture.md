@@ -173,6 +173,15 @@ lifecycle changes. The established `web_career.py`, `web_filters.py`,
 `web_job_sources.py` modules remain compatibility facades; the manual-scan
 worker entry point is unchanged.
 
+The portal assistant is split by runtime responsibility within the same
+package. `assistant_routes.py` owns same-origin HTTP and process supervision,
+`conversation_state.py` persists portal threads and proposal state,
+`resume_editing.py` applies bounded wording changes through the existing review
+workflow, and `assistant_worker.py` runs isolated model turns and confirmed
+proposals. The established `web_agent.py`, `web_agent_state.py`,
+`web_agent_resume.py`, and `web_agent_worker.py` paths remain compatibility
+facades, including the worker module entry point.
+
 Resume construction is split into two internal domains. `resume_builder.planning`
 owns synthesis-plan models, schema helpers, loading, summary strategy, role
 balance, and plan audits. `resume_builder.reviews` owns narrative-block review,

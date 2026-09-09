@@ -1,7 +1,7 @@
 from pathlib import Path
 
-import resume_builder.web_agent_worker as worker
-from resume_builder.web_agent_state import WebAgentState
+from resume_builder.portal import assistant_worker as worker
+from resume_builder.portal.conversation_state import WebAgentState
 
 
 def test_job_window_identity_is_included_as_untrusted_context() -> None:

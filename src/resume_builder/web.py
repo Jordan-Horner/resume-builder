@@ -62,7 +62,7 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         redoc_url=None,
         lifespan=lifespan,
     )
-    from .web_agent import install_assistant
+    from .portal.assistant_routes import install_assistant
 
     install_assistant(app, workspace)
 

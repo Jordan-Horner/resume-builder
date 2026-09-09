@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 from test_feedback_memory import project
 
-from resume_builder import web_agent_resume as editing
+from resume_builder.portal import resume_editing as editing
 
 
 def proposal(tmp_path: Path) -> tuple[Path, dict[str, str]]:

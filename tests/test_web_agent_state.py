@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from resume_builder.web_agent_state import WebAgentState
+from resume_builder.portal.conversation_state import WebAgentState
 
 
 def test_threads_and_turns_survive_reopening(tmp_path: Path) -> None:
