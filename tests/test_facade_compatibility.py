@@ -432,6 +432,12 @@ FACADE_EXPORTS = {
         "GmailRuntimeState",
         "sender_domain_hash",
     },
+    "integrations": {
+        "INTEGRATION_CHOICES",
+        "integration_setup_guide",
+        "interactive_integration_setup",
+        "parse_integration_choices",
+    },
     "jobs": {
         "DEFAULT_CONFIG",
         "DEFAULT_LATEST_REFRESH",

@@ -32,6 +32,7 @@ FACADE_LINE_BUDGETS = {
     "gmail_semantic": 30,
     "gmail_automation": 150,
     "gmail_state": 20,
+    "integrations": 20,
     "job_matching": 400,
     "job_report": 10,
     "jobs": 40,

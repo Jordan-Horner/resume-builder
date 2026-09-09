@@ -13,8 +13,8 @@ from pathlib import Path
 
 from ..atomic import atomic_write_json
 from ..construction.templates import scaffold_template, select_catalog_item, template_catalog
-from ..integrations import interactive_integration_setup
 from ..opportunities.defaults import scaffold_job_search
+from .integrations import interactive_integration_setup
 from .state import (
     DEFAULT_VAULT_REPOSITORY_NAME,
     DEFAULT_WORKSPACE,

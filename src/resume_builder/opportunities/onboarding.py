@@ -19,14 +19,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from job_puller.normalize import normalized_key
 
 from ..atomic import atomic_write_text
-from ..integrations import (
+from ..vault.layout import VaultLayout
+from ..vault.source_import import load_manifest
+from ..vault.validation import validate_vault
+from ..workspace_management.integrations import (
     integration_setup_guide,
     interactive_integration_setup,
     parse_integration_choices,
 )
-from ..vault.layout import VaultLayout
-from ..vault.source_import import load_manifest
-from ..vault.validation import validate_vault
 from ..workspace_management.state import WorkspaceError, discover_workspace
 from .cli import _load_preferences
 from .defaults import (
