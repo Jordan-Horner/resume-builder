@@ -13,18 +13,18 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ..atomic import atomic_write_text
 from ..automation import AutomationState, default_state_path, next_job_run
-from ..automation_config import (
-    DEFAULT_CONFIG,
-    AutomationConfig,
-    configure,
-    load_config,
-    render_default_config,
-)
 from ..background_screening import (
     DEFAULT_REPLENISHMENT_STATE,
     DEFAULT_SCREENING_OUTPUT,
     background_screening_configured,
     replenishment_running,
+)
+from ..scheduled_tasks.config import (
+    DEFAULT_CONFIG,
+    AutomationConfig,
+    configure,
+    load_config,
+    render_default_config,
 )
 from ..service import managed_service_status, set_scheduler_enabled
 

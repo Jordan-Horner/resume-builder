@@ -6,10 +6,11 @@ is the supported always-on deployment wrapper. No web server or inbound port is
 required.
 
 Automation configuration is an independent boundary in
-`resume_builder.automation_config`: it owns schedule models, YAML validation,
+`resume_builder.scheduled_tasks.config`: it owns schedule models, YAML validation,
 serialization, and atomic configuration updates. The established
-`resume_builder.automation` imports remain compatible, while runtime services
-can depend on configuration without importing the full scheduler orchestrator.
+`resume_builder.automation_config` facade and configuration exports from
+`resume_builder.automation` remain compatible, while runtime services can depend
+on configuration without importing the full scheduler orchestrator.
 
 ## What runs automatically
 
