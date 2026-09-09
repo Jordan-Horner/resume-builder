@@ -103,9 +103,7 @@ def test_audit_rejects_cycle_between_nested_packages(tmp_path: Path) -> None:
         package,
         facade_line_budgets={},
         forbidden_imports={},
-    ) == [
-        "package import cycle: alpha.service -> beta.worker -> alpha.service"
-    ]
+    ) == ["package import cycle: alpha.service -> beta.worker -> alpha.service"]
 
 
 def test_audit_rejects_forbidden_nested_package_dependency(tmp_path: Path) -> None:

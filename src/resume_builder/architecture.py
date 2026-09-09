@@ -289,15 +289,12 @@ def audit_architecture(
                 dependency
                 for dependency in dependencies
                 if any(
-                    dependency == forbidden
-                    or dependency.startswith(f"{forbidden}.")
+                    dependency == forbidden or dependency.startswith(f"{forbidden}.")
                     for forbidden in forbidden_packages
                 )
             )
             if unexpected:
-                errors.append(
-                    f"{module} imports forbidden packages: {unexpected}"
-                )
+                errors.append(f"{module} imports forbidden packages: {unexpected}")
     for cycle in _cycles(graph):
         errors.append(f"package import cycle: {' -> '.join(cycle)}")
     return errors
