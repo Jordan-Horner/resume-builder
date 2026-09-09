@@ -182,6 +182,10 @@ proposals. The established `web_agent.py`, `web_agent_state.py`,
 `web_agent_resume.py`, and `web_agent_worker.py` paths remain compatibility
 facades, including the worker module entry point.
 
+`portal/app.py` composes these portal capabilities into the local FastAPI
+application and owns the dashboard server launcher. The established `web.py`
+module, `resume-builder-web` command, and module entry point remain compatible.
+
 Resume construction is split into two internal domains. `resume_builder.planning`
 owns synthesis-plan models, schema helpers, loading, summary strategy, role
 balance, and plan audits. `resume_builder.reviews` owns narrative-block review,

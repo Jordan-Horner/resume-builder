@@ -114,6 +114,7 @@ FACADE_EXPORTS = {
         "restore_directional_resume",
     },
     "web_agent": {"install_assistant"},
+    "web": {"create_app", "main"},
     "web_agent_resume": {
         "LanguageBlock",
         "LanguageDecisions",

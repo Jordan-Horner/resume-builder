@@ -46,6 +46,7 @@ FACADE_LINE_BUDGETS = {
     "workspace_state": 50,
     "workspace_templates": 15,
     "validation": 70,
+    "web": 15,
     "web_agent": 10,
     "web_agent_resume": 30,
     "web_agent_state": 10,
