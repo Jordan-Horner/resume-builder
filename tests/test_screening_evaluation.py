@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from resume_builder.screening_evaluation import (
+from resume_builder.opportunities.evaluation import (
     ScreeningEvaluationCase,
     _load_results,
     evaluate_screening_results,

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from resume_builder.provider_comparison import compare_providers
+from resume_builder.opportunities.provider_comparison import compare_providers
 
 
 class ComparisonDatabase:

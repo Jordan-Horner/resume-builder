@@ -10,7 +10,7 @@ from job_puller.work_modes import WorkMode
 def test_first_party_boards_are_bundled_and_local_entries_override_them(tmp_path):
     import yaml
 
-    from resume_builder.job_setup_defaults import scaffold_job_search
+    from resume_builder.opportunities.defaults import scaffold_job_search
 
     scaffold_job_search(tmp_path)
     path = tmp_path / "job-search/config/search.yml"

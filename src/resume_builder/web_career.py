@@ -271,13 +271,10 @@ def list_resumes(root: Path) -> dict[str, Any]:
         kind = "directional" if record["kind"] == "baseline" else "tailored"
         direction = record.get("direction")
         _, headline_detail = _headline_parts(path, payload)
-        detail = (
-            headline_detail
-            or (
-                f"Direction · {_direction_label(path, direction)}"
-                if kind == "directional"
-                else "Minted application resume"
-            )
+        detail = headline_detail or (
+            f"Direction · {_direction_label(path, direction)}"
+            if kind == "directional"
+            else "Minted application resume"
         )
         generated[kind].append(
             {

@@ -16,7 +16,12 @@ from .compilation import compile_markdown, relative_output, sha256_file
 from .directions import normalize_phrase, phrase_present, string_list
 from .evidence import audit_claims, claim_blocks
 from .job_report import markdown_report
-from .job_target import (
+from .match_grading import (
+    classify_match,
+    load_classification_case,
+    validate_against_match,
+)
+from .opportunities.targets import (
     CRITERION_FIELDS,
     IMPORTANCE,
     SEARCH_FIELDS,
@@ -28,11 +33,6 @@ from .job_target import (
     project_target_path,
     target_paths,
     validate_target,
-)
-from .match_grading import (
-    classify_match,
-    load_classification_case,
-    validate_against_match,
 )
 from .rendering import contained_project_path, object_value
 

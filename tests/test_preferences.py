@@ -5,9 +5,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-import resume_builder.preferences as preference_module
-from resume_builder.job_setup_defaults import PREFERENCES_PATH
-from resume_builder.preferences import PreferenceChangeRequest, apply, propose
+import resume_builder.opportunities.preferences as preference_module
+from resume_builder.opportunities.defaults import PREFERENCES_PATH
+from resume_builder.opportunities.preferences import PreferenceChangeRequest, apply, propose
 from resume_builder.workspace import initialize_workspace
 
 

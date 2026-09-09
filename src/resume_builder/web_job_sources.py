@@ -16,7 +16,7 @@ import yaml
 from job_puller.config import InventoryConfig, load_config, resolve_database_path
 
 from .atomic import atomic_write_json, atomic_write_text
-from .discovery_activation import load_portfolio, preview_activation
+from .opportunities.discovery_activation import load_portfolio, preview_activation
 
 CONFIG = Path("job-search/config/search.yml")
 STATE = Path("job-search/web-scan.json")
@@ -154,7 +154,7 @@ def start_scan(root: Path) -> dict[str, Any]:
 
 
 def run_worker(root: Path, snapshot: Path) -> None:
-    from .jobs import main
+    from .opportunities.cli import main
 
     try:
         refresh_path = root / "job-search/latest-refresh.json"
@@ -164,38 +164,6 @@ def run_worker(root: Path, snapshot: Path) -> None:
         if after is None or after == before:
             raise ValueError("The collector did not produce a new scan result.")
         manifest = json.loads(after)
-        screening_status = "disabled"
-        screened_jobs = 0
-        try:
-            from .automation import DEFAULT_CONFIG as AUTOMATION_CONFIG
-            from .automation import load_config as load_automation
-            from .background_screening import run_background_quick_screening
-
-            schedule_path = root / AUTOMATION_CONFIG
-            if schedule_path.is_file():
-                schedule = load_automation(schedule_path)
-                if schedule.jobs.semantic_screening_enabled:
-                    shortlist_code = main(
-                        [
-                            "--config",
-                            str(snapshot),
-                            "shortlist",
-                            "--limit",
-                            str(schedule.jobs.limit),
-                        ]
-                    )
-                    if shortlist_code != 0:
-                        raise RuntimeError("active job shortlist could not be prepared")
-                    summary = run_background_quick_screening(
-                        root,
-                        max_jobs=schedule.jobs.semantic_screening_max_jobs,
-                        input_path=root / "job-search/shortlist.json",
-                    )
-                    screening_status = "complete" if summary.failed == 0 else "partial"
-                    screened_jobs = summary.completed
-        except (OSError, RuntimeError, ValueError, json.JSONDecodeError):
-            # Discovery remains successful when optional provider screening is unavailable.
-            screening_status = "unavailable"
         errors = [
             {
                 "provider": run.get("provider"),
@@ -206,17 +174,47 @@ def run_worker(root: Path, snapshot: Path) -> None:
             for run in manifest.get("provider_runs", [])
             if not run.get("success", False)
         ]
+        discovery_state = {
+            "status": manifest.get("status", "failed"),
+            "new_jobs": len(manifest.get("new_to_database_job_ids", [])),
+            "screening_status": "running",
+            "screened_jobs": 0,
+            "errors": errors,
+            "message": (
+                "Scan complete"
+                if code == 0
+                else "Some sources could not complete. You can try again."
+            ),
+        }
+        # Discovery is complete; recommendation runs independently in the browser from here.
+        atomic_write_json(root / STATE, discovery_state)
+        screening_status = "disabled"
+        screened_jobs = 0
+        try:
+            from .automation import DEFAULT_CONFIG as AUTOMATION_CONFIG
+            from .automation import load_config as load_automation
+            from .background_screening import run_background_replenishment
+
+            schedule_path = root / AUTOMATION_CONFIG
+            if schedule_path.is_file():
+                schedule = load_automation(schedule_path)
+                if schedule.jobs.semantic_screening_enabled:
+                    summary = run_background_replenishment(
+                        root,
+                        max_jobs=schedule.jobs.semantic_screening_max_jobs,
+                        display_limit=schedule.jobs.limit,
+                    )
+                    screening_status = "complete" if summary.failed == 0 else "partial"
+                    screened_jobs = summary.completed
+        except (OSError, RuntimeError, ValueError, json.JSONDecodeError):
+            # Discovery remains successful when optional provider screening is unavailable.
+            screening_status = "unavailable"
         atomic_write_json(
             root / STATE,
             {
-                "status": manifest.get("status", "failed"),
-                "new_jobs": len(manifest.get("new_to_database_job_ids", [])),
+                **discovery_state,
                 "screening_status": screening_status,
                 "screened_jobs": screened_jobs,
-                "errors": errors,
-                "message": "Scan complete"
-                if code == 0
-                else "Some sources could not complete. You can try again.",
             },
         )
     except Exception:

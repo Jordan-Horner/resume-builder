@@ -190,7 +190,7 @@ def test_local_state_filter_preserves_remote_but_not_foreign_remote():
 def test_defaults_load_preferences_without_mutation(tmp_path):
     import yaml
 
-    from resume_builder.job_setup_defaults import neutral_preferences
+    from resume_builder.opportunities.defaults import neutral_preferences
 
     preferences = neutral_preferences()
     preferences.update(
@@ -222,7 +222,7 @@ def test_defaults_load_preferences_without_mutation(tmp_path):
 def test_excluding_clearance_jobs_changes_only_the_saved_view_default(tmp_path):
     import yaml
 
-    from resume_builder.job_setup_defaults import neutral_preferences
+    from resume_builder.opportunities.defaults import neutral_preferences
 
     preferences = neutral_preferences()
     preferences["clearance_preference"] = "exclude"

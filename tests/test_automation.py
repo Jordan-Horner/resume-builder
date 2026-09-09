@@ -12,7 +12,6 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from resume_builder import jobs as jobs_module
 from resume_builder.automation import (
     LOGGER,
     AutomationService,
@@ -34,6 +33,7 @@ from resume_builder.automation import (
     run_forever,
 )
 from resume_builder.automation import main as automation_main
+from resume_builder.opportunities import cli as jobs_module
 
 
 def write_config(path: Path, **updates: object) -> None:
@@ -651,13 +651,13 @@ def test_semantic_screening_failure_does_not_turn_collection_into_a_retry(
     monkeypatch.setattr(jobs_module, "DEFAULT_NEW_OUTPUT", new_jobs)
     monkeypatch.setattr(jobs_module, "main", collect)
     monkeypatch.setattr(
-        "resume_builder.automation.run_background_quick_screening",
+        "resume_builder.automation.run_background_replenishment",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("fictional invalid config")),
     )
 
     result = _run_jobs(load_config(config_path))
 
-    assert calls == 2
+    assert calls == 1
     assert result["refresh_status"] == "complete"
     assert result["screening_status"] == "unavailable"
     assert result["needs_review_jobs"] == 1
@@ -692,6 +692,154 @@ def test_restart_with_persistent_state_does_not_rescan(
         assert run_forever(service, OneLoopEvent()) == 0
 
     assert calls == []
+
+
+def test_restart_resumes_pending_screening_without_rescanning_sources(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, configured_logs: Callable[[], None]
+) -> None:
+    configured_logs()
+    config_path = tmp_path / "config.yml"
+    write_config(
+        config_path,
+        jobs={
+            "enabled": True,
+            "times": ["08:00"],
+            "run_on_start": False,
+            "semantic_screening": {"enabled": True, "max_jobs_per_run": 4},
+        },
+        gmail={"enabled": False, "every_hours": 4, "run_on_start": False},
+    )
+    state = AutomationState(tmp_path / "runtime" / "automation.sqlite")
+    state.record_run("jobs", datetime.now(UTC), "success", {})
+    screening_state = tmp_path / "job-search/screening-replenishment.json"
+    screening_state.parent.mkdir(parents=True)
+    screening_state.write_text(
+        '{"schema_version":1,"status":"partial","pending_jobs":3}', encoding="utf-8"
+    )
+    source_runs: list[str] = []
+    screening_runs: list[tuple[Path, int, int]] = []
+    monkeypatch.setattr(
+        "resume_builder.automation.background_screening_configured", lambda _root: True
+    )
+    monkeypatch.setattr(
+        "resume_builder.automation.run_background_replenishment",
+        lambda root, *, max_jobs, display_limit: screening_runs.append(
+            (root, max_jobs, display_limit)
+        ),
+    )
+
+    class OneLoopEvent(threading.Event):
+        def wait(self, timeout: float | None = None) -> bool:
+            self.set()
+            return True
+
+    service = AutomationService(
+        workspace=tmp_path,
+        config=load_config(config_path),
+        state=state,
+        job_runner=lambda: source_runs.append("jobs") or {},
+        gmail_runner=lambda: {},
+    )
+
+    assert run_forever(service, OneLoopEvent(), ("jobs",)) == 0
+    assert source_runs == []
+    assert screening_runs == [(tmp_path, 4, service.config.jobs.limit)]
+
+
+def test_restart_skips_screening_when_saved_backlog_is_complete(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, configured_logs: Callable[[], None]
+) -> None:
+    configured_logs()
+    config_path = tmp_path / "config.yml"
+    write_config(
+        config_path,
+        jobs={
+            "enabled": True,
+            "times": ["08:00"],
+            "run_on_start": False,
+            "semantic_screening": {"enabled": True, "max_jobs_per_run": 4},
+        },
+        gmail={"enabled": False, "every_hours": 4, "run_on_start": False},
+    )
+    state = AutomationState(tmp_path / "runtime" / "automation.sqlite")
+    state.record_run("jobs", datetime.now(UTC), "success", {})
+    screening_state = tmp_path / "job-search/screening-replenishment.json"
+    screening_state.parent.mkdir(parents=True)
+    screening_state.write_text(
+        '{"schema_version":1,"status":"complete","pending_jobs":0}', encoding="utf-8"
+    )
+    screening_runs: list[str] = []
+    monkeypatch.setattr(
+        "resume_builder.automation.background_screening_configured", lambda _root: True
+    )
+    monkeypatch.setattr(
+        "resume_builder.automation.run_background_replenishment",
+        lambda *_args, **_kwargs: screening_runs.append("screen"),
+    )
+
+    class OneLoopEvent(threading.Event):
+        def wait(self, timeout: float | None = None) -> bool:
+            self.set()
+            return True
+
+    service = AutomationService(
+        workspace=tmp_path,
+        config=load_config(config_path),
+        state=state,
+        job_runner=lambda: {},
+        gmail_runner=lambda: {},
+    )
+
+    assert run_forever(service, OneLoopEvent(), ("jobs",)) == 0
+    assert screening_runs == []
+
+
+def test_due_discovery_runs_before_any_backlog_recovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, configured_logs: Callable[[], None]
+) -> None:
+    configured_logs()
+    config_path = tmp_path / "config.yml"
+    write_config(
+        config_path,
+        jobs={
+            "enabled": True,
+            "times": ["08:00"],
+            "run_on_start": True,
+            "semantic_screening": {"enabled": True, "max_jobs_per_run": 4},
+        },
+        gmail={"enabled": False, "every_hours": 4, "run_on_start": False},
+    )
+    screening_state = tmp_path / "job-search/screening-replenishment.json"
+    screening_state.parent.mkdir(parents=True)
+    screening_state.write_text(
+        '{"schema_version":1,"status":"partial","pending_jobs":3}', encoding="utf-8"
+    )
+    source_runs: list[str] = []
+    screening_runs: list[str] = []
+    monkeypatch.setattr(
+        "resume_builder.automation.background_screening_configured", lambda _root: True
+    )
+    monkeypatch.setattr(
+        "resume_builder.automation.run_background_replenishment",
+        lambda *_args, **_kwargs: screening_runs.append("screen"),
+    )
+
+    class OneLoopEvent(threading.Event):
+        def wait(self, timeout: float | None = None) -> bool:
+            self.set()
+            return True
+
+    service = AutomationService(
+        workspace=tmp_path,
+        config=load_config(config_path),
+        state=AutomationState(tmp_path / "runtime" / "automation.sqlite"),
+        job_runner=lambda: source_runs.append("jobs") or {},
+        gmail_runner=lambda: {},
+    )
+
+    assert run_forever(service, OneLoopEvent(), ("jobs",)) == 0
+    assert source_runs == ["jobs"]
+    assert screening_runs == []
 
 
 def test_running_service_reloads_schedule_configuration(tmp_path: Path) -> None:

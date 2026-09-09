@@ -22,7 +22,12 @@ from .automation import (
     next_job_run,
     render_default_config,
 )
-from .background_screening import background_screening_configured
+from .background_screening import (
+    DEFAULT_REPLENISHMENT_STATE,
+    DEFAULT_SCREENING_OUTPUT,
+    background_screening_configured,
+    replenishment_running,
+)
 from .service import managed_service_status, set_scheduler_enabled
 
 
@@ -91,11 +96,19 @@ def _current_job_stage(
         return "searching"
     if status not in {"complete", "partial"} or not screening_enabled:
         return "idle"
+    replenishment_path = root / DEFAULT_REPLENISHMENT_STATE
+    if replenishment_path.is_file():
+        try:
+            replenishment = json.loads(replenishment_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            replenishment = {}
+        if replenishment.get("status") == "running":
+            return "screening" if replenishment_running(root) else "idle"
     started_at = str(refresh.get("started_at") or "")
     finished_at = str(last_run.get("finished_at") or "") if last_run else ""
     if started_at and finished_at >= started_at:
         return "idle"
-    screen_path = root / "job-search/new-job-screens.json"
+    screen_path = root / DEFAULT_SCREENING_OUTPUT
     try:
         if (
             screen_path.is_file()
@@ -118,6 +131,11 @@ def schedule_status(
     current = now or datetime.now(UTC)
     service_status, last_run = _state_status(state_path or default_state_path())
     next_run = next_job_run(current, config.jobs, config.timezone) if config.jobs.enabled else None
+    screen_path = root / DEFAULT_SCREENING_OUTPUT
+    try:
+        recommendation_revision = str(screen_path.stat().st_mtime_ns)
+    except OSError:
+        recommendation_revision = "0"
     return {
         "configured": configured,
         "enabled": config.jobs.enabled,
@@ -136,6 +154,7 @@ def schedule_status(
             screening_enabled=config.jobs.semantic_screening_enabled,
             last_run=last_run,
         ),
+        "recommendation_revision": recommendation_revision,
     }
 
 

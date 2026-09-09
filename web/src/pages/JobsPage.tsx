@@ -76,6 +76,7 @@ export function JobsPage() {
   const results = useRef<HTMLElement | null>(null);
   const focusQueueAfterRefresh = useRef(false);
   const silentQueueRefresh = useRef(false);
+  const recommendationRevision = useRef<string | null>(null);
   const queueCache = useRef(new Map<string, JobQueuePayload>());
   const queueRequests = useRef(new Map<string, Promise<JobQueuePayload>>());
   const queueControllers = useRef(new Map<string, AbortController>());
@@ -244,14 +245,28 @@ export function JobsPage() {
         const schedule = await getScrapeSchedule();
         if (!active) return;
         setRecommendationStage(schedule.current_stage);
+        const nextRecommendationRevision = schedule.recommendation_revision ?? "0";
+        if (recommendationRevision.current === null) {
+          recommendationRevision.current = nextRecommendationRevision;
+        } else if (recommendationRevision.current !== nextRecommendationRevision) {
+          recommendationRevision.current = nextRecommendationRevision;
+          silentQueueRefresh.current = true;
+          setQueueRefreshing(true);
+          setQueueRevision((value) => value + 1);
+        }
         if (schedule.current_stage !== "idle") {
           observedRunning = true;
           timer = window.setTimeout(() => void poll(), 3000);
-        } else if (observedRunning) {
-          setQueueRevision((value) => value + 1);
+        } else {
+          if (observedRunning) {
+            observedRunning = false;
+            setQueueRevision((value) => value + 1);
+          }
+          timer = window.setTimeout(() => void poll(), 30_000);
         }
       } catch (reason) {
         console.warn("Could not load recommendation progress", reason);
+        if (active) timer = window.setTimeout(() => void poll(), 30_000);
       }
     };
     void poll();
@@ -259,7 +274,7 @@ export function JobsPage() {
       active = false;
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [queueView, reloadKey]);
+  }, [queueView, reloadKey, scanning]);
 
   useEffect(() => {
     if (loading || queueRefreshing || !focusQueueAfterRefresh.current) return;
@@ -423,7 +438,7 @@ export function JobsPage() {
           ? { title: "No Interested jobs yet", message: "Jobs you mark Interested stay here until you apply or pass on them.", actions: <button className="primary-button" onClick={() => selectQueue("recommended")}>Review recommendations</button> }
           : queueView === "recommended"
             ? recommendationStage === "searching"
-              ? { title: "Finding new jobs…", message: "Your scheduled search is running. Strong deterministic matches will appear here immediately.", actions: <button className="primary-button" onClick={() => selectQueue("all")}>Review all jobs</button> }
+              ? { title: "Finding new jobs…", message: "Your scheduled search is running. New matches will be screened automatically as they arrive.", actions: <button className="primary-button" onClick={() => selectQueue("all")}>Review all jobs</button> }
               : recommendationStage === "screening"
                 ? { title: "Screening recommendations…", message: "The search finished. Career-fit screening is preparing your Recommended Jobs.", actions: <button className="primary-button" onClick={() => selectQueue("all")}>Review all jobs</button> }
                 : { title: "No Recommended Jobs right now", message: "Recommendations use your saved roles, location, work setup, pay, and seniority. The strongest matches are screened automatically.", actions: <button className="primary-button" onClick={() => selectQueue("all")}>Review all jobs</button> }

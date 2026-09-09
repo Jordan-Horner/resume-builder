@@ -9,18 +9,16 @@ import pytest
 from resume_builder import (
     compilation,
     feedback_memory,
-    language_review,
     minting,
     pdf_rendering,
     previewing,
     project_report,
-    review_policy,
     review_records,
-    selection_guard,
-    selection_review,
     synthesis,
     verification,
 )
+from resume_builder.reviews import language_review, selection_guard, selection_review
+from resume_builder.reviews import policy as review_policy
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = (ROOT / "templates" / "resume-template.html").read_text(encoding="utf-8")

@@ -7,9 +7,13 @@ from pathlib import Path
 import yaml
 
 from resume_builder import source_import
-from resume_builder.discovery_evidence import ResumeDocument, evidence_set, extract_title_seed
-from resume_builder.discovery_portfolio import ColdStartLane, ColdStartPortfolio
-from resume_builder.job_onboarding import (
+from resume_builder.opportunities.discovery_evidence import (
+    ResumeDocument,
+    evidence_set,
+    extract_title_seed,
+)
+from resume_builder.opportunities.discovery_portfolio import ColdStartLane, ColdStartPortfolio
+from resume_builder.opportunities.onboarding import (
     JobSearchSetupAnswer,
     SetupStatus,
     SetupStep,

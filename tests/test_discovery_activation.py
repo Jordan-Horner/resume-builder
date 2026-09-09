@@ -4,7 +4,7 @@ import pytest
 import yaml
 
 from job_puller.config import InventoryConfig
-from resume_builder.discovery_activation import (
+from resume_builder.opportunities.discovery_activation import (
     MANAGED_FAMILY_PREFIX,
     DiscoveryActivationRecord,
     activate_portfolio,
@@ -16,8 +16,12 @@ from resume_builder.discovery_activation import (
     rollback_confirmation,
     save_portfolio,
 )
-from resume_builder.discovery_evidence import TitlePosture
-from resume_builder.discovery_portfolio import ColdStartLane, ColdStartPortfolio, ColdStartQuery
+from resume_builder.opportunities.discovery_evidence import TitlePosture
+from resume_builder.opportunities.discovery_portfolio import (
+    ColdStartLane,
+    ColdStartPortfolio,
+    ColdStartQuery,
+)
 
 
 def portfolio() -> ColdStartPortfolio:

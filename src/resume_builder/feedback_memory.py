@@ -8,15 +8,15 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from .feedback_acceptance import (
+from .reviews.feedback_acceptance import (
     _acceptance_result,
     retire_feedback_rule,
 )
-from .feedback_acceptance import (
+from .reviews.feedback_acceptance import (
     accept_feedback as _accept_feedback,
 )
-from .feedback_recording import record_feedback
-from .feedback_resolution import (
+from .reviews.feedback_recording import record_feedback
+from .reviews.feedback_resolution import (
     KINDS,
     PROMOTIONS,
     RULE_ID,

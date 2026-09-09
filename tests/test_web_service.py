@@ -2,6 +2,7 @@ import hashlib
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from threading import Event, Thread
 from types import SimpleNamespace
 
 import pytest
@@ -10,7 +11,7 @@ import yaml
 from resume_builder import web_service
 from resume_builder.agent_config import DEFAULT_AGENT_CONFIG, render_default_agent_config
 from resume_builder.applications import record_application
-from resume_builder.job_screening import (
+from resume_builder.opportunities.screening import (
     Confidence,
     build_screening_packet,
     deterministic_ineligible_result,
@@ -328,7 +329,7 @@ def test_screening_backfill_drains_bounded_batches_and_stops_without_progress(
     assert status["cost_usd"] == "0.025"
 
 
-def test_recommendation_replenishment_runs_only_one_bounded_batch(
+def test_recommendation_replenishment_drains_the_current_backlog(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     service = DashboardService(tmp_path, inventory_loader=lambda: [])
@@ -342,14 +343,14 @@ def test_recommendation_replenishment_runs_only_one_bounded_batch(
 
     service.replenish_recommendations()
 
-    assert calls == [False]
+    assert calls == [True]
 
 
 def test_screening_backfill_input_is_built_only_from_local_inventory(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from resume_builder import background_screening
-    from resume_builder.jobs import DEFAULT_CONFIG, DEFAULT_OUTPUT, DEFAULT_PREFERENCES
+    from resume_builder.opportunities.cli import DEFAULT_CONFIG, DEFAULT_OUTPUT, DEFAULT_PREFERENCES
 
     calls: list[tuple[Path, Path, int, Path, Path]] = []
 
@@ -409,7 +410,7 @@ def test_direct_bright_enrichment_reads_existing_inventory(tmp_path, monkeypatch
     from job_puller.database import InventoryDatabase
     from job_puller.models import JobObservation, ProviderResult
     from job_puller.work_modes import WorkMode, explicit_arrangement
-    from resume_builder import bright_data
+    from resume_builder.opportunities import bright_data
 
     workspace = tmp_path / "workspace"
     initialize_workspace(workspace, git_name="Example", git_email="example@example.invalid")
@@ -485,6 +486,50 @@ def test_shallow_insufficient_screen_is_presented_as_incomplete() -> None:
     assert "not a judgment" in presented["reasoning_summary"]
 
 
+def test_saved_job_screen_uses_persisted_background_result_without_rebuilding_packet(
+    tmp_path, monkeypatch
+) -> None:
+    packet = build_screening_packet(
+        job("screen-me", title="Support Engineer", mode="remote"),
+        {"accepted_work_modes": ["remote"], "screening_profile": {}},
+        {},
+    )
+    result = deterministic_insufficient_evidence_result(packet)
+    output = tmp_path / web_service.JOB_SCREENING_OUTPUT
+    output.parent.mkdir(parents=True)
+    output.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "jobs": [
+                    {
+                        "id": "screen-me",
+                        "screening": {
+                            "status": "complete",
+                            "cached": False,
+                            "result": result.model_dump(mode="json"),
+                        },
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    service = DashboardService(tmp_path)
+    monkeypatch.setattr(
+        service,
+        "_screening_packet",
+        lambda _job_id: (_ for _ in ()).throw(AssertionError("must use persisted result")),
+    )
+
+    saved = service.saved_job_screen("screen-me")
+
+    assert saved is not None
+    assert saved["status"] == "complete"
+    assert saved["cached"] is False
+    assert saved["result"]["job_id"] == "screen-me"
+
+
 def test_interactive_job_screen_uses_one_bounded_candidate_screen(tmp_path, monkeypatch) -> None:
     packet = build_screening_packet(
         job("screen-me", title="Support Engineer", mode="remote"),
@@ -550,6 +595,45 @@ def test_job_screen_runs_behind_non_blocking_status(tmp_path, monkeypatch) -> No
     assert service.job_screen_status("screen-me") == complete
 
 
+def test_idle_job_screen_status_restores_saved_screen(tmp_path, monkeypatch) -> None:
+    service = DashboardService(tmp_path)
+    output = tmp_path / web_service.JOB_SCREENING_OUTPUT
+    output.parent.mkdir(parents=True)
+    output.write_text('{"schema_version":1,"jobs":[]}', encoding="utf-8")
+    saved = {"status": "complete", "cached": True, "result": {"job_id": "screen-me"}}
+    monkeypatch.setattr(
+        service,
+        "saved_job_screen",
+        lambda _job_id: saved,
+    )
+
+    assert service.job_screen_status("screen-me") == saved
+
+
+def test_idle_job_screen_status_needs_no_screening_setup(tmp_path) -> None:
+    service = DashboardService(tmp_path)
+
+    assert service.job_screen_status("screen-me") == {
+        "status": "idle",
+        "job_id": "screen-me",
+    }
+
+
+def test_active_job_screen_status_wins_over_saved_screen(tmp_path, monkeypatch) -> None:
+    service = DashboardService(tmp_path)
+    service._screening_states["screen-me"] = {"status": "running", "job_id": "screen-me"}
+    monkeypatch.setattr(
+        service,
+        "saved_job_screen",
+        lambda _job_id: (_ for _ in ()).throw(AssertionError("active status must return first")),
+    )
+
+    assert service.job_screen_status("screen-me") == {
+        "status": "running",
+        "job_id": "screen-me",
+    }
+
+
 def test_failed_queued_job_screen_surfaces_retryable_state(tmp_path, monkeypatch) -> None:
     service = DashboardService(tmp_path)
     service._screening_states["screen-me"] = {"status": "queued", "job_id": "screen-me"}
@@ -606,6 +690,134 @@ def test_background_quick_screen_has_one_short_provider_attempt(tmp_path, monkey
         "retries": 0,
     }
     assert captured["queue"]["max_provider_jobs"] == 25
+
+
+def test_background_replenishment_runs_bounded_batches_until_pending_is_empty(
+    tmp_path, monkeypatch
+) -> None:
+    from resume_builder import background_screening
+
+    summaries = iter(
+        [
+            SimpleNamespace(
+                active=8,
+                completed=3,
+                pending=5,
+                failed=0,
+                recommended=2,
+                succeeded=3,
+            ),
+            SimpleNamespace(
+                active=8,
+                completed=8,
+                pending=0,
+                failed=0,
+                recommended=6,
+                succeeded=5,
+            ),
+        ]
+    )
+    calls: list[int] = []
+    monkeypatch.setattr(
+        background_screening,
+        "run_background_quick_screening",
+        lambda _root, *, max_jobs, input_path: calls.append(max_jobs) or next(summaries),
+    )
+
+    summary = background_screening.run_background_replenishment(
+        tmp_path,
+        max_jobs=5,
+        input_path=tmp_path / "job-search/shortlist.json",
+    )
+
+    assert calls == [5, 5]
+    assert summary.pending == 0
+    state = json.loads((tmp_path / background_screening.DEFAULT_REPLENISHMENT_STATE).read_text())
+    assert state["status"] == "complete"
+    assert state["batch_count"] == 2
+    assert state["recommended_jobs"] == 6
+
+
+def test_background_replenishment_stops_when_a_batch_makes_no_progress(
+    tmp_path, monkeypatch
+) -> None:
+    from resume_builder import background_screening
+
+    summary = SimpleNamespace(
+        active=4,
+        completed=0,
+        pending=4,
+        failed=4,
+        recommended=0,
+        succeeded=0,
+    )
+    calls = 0
+
+    def no_progress(*_args, **_kwargs):
+        nonlocal calls
+        calls += 1
+        return summary
+
+    monkeypatch.setattr(background_screening, "run_background_quick_screening", no_progress)
+
+    result = background_screening.run_background_replenishment(tmp_path, max_jobs=4)
+
+    assert result is summary
+    assert calls == 1
+    state = json.loads((tmp_path / background_screening.DEFAULT_REPLENISHMENT_STATE).read_text())
+    assert state["status"] == "partial"
+
+
+def test_background_replenishment_serializes_workspace_writers(tmp_path, monkeypatch) -> None:
+    from resume_builder import background_screening
+
+    first_entered = Event()
+    second_started = Event()
+    second_entered = Event()
+    release_first = Event()
+    calls = 0
+
+    def run_batch(*_args, **_kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            first_entered.set()
+            assert release_first.wait(2)
+        else:
+            second_entered.set()
+        return SimpleNamespace(
+            active=1,
+            completed=1,
+            pending=0,
+            failed=0,
+            recommended=1,
+            succeeded=1,
+        )
+
+    monkeypatch.setattr(background_screening, "run_background_quick_screening", run_batch)
+
+    first = Thread(
+        target=background_screening.run_background_replenishment,
+        kwargs={"workspace": tmp_path, "max_jobs": 1},
+    )
+
+    def run_second() -> None:
+        second_started.set()
+        background_screening.run_background_replenishment(tmp_path, max_jobs=1)
+
+    second = Thread(target=run_second)
+    first.start()
+    assert first_entered.wait(1)
+    second.start()
+    assert second_started.wait(1)
+    assert not second_entered.wait(0.1)
+    release_first.set()
+    first.join(2)
+    second.join(2)
+
+    assert not first.is_alive()
+    assert not second.is_alive()
+    assert calls == 2
 
 
 def test_interactive_job_screen_wraps_input_decoding_failure(tmp_path, monkeypatch, caplog):
@@ -882,7 +1094,7 @@ def test_job_list_exposes_existing_background_screen_metadata(tmp_path, inventor
 
     assert jobs["remote-1"]["quick_screen"] == {
         "status": "complete",
-        "label": "Strong",
+        "label": "Good fit",
         "resume_name": "Support Engineer",
         "generated_at": "2026-09-06T12:00:00+00:00",
     }
@@ -1027,7 +1239,7 @@ def test_recommended_queue_demotes_a_completed_non_strong_screen(
     assert service.list_jobs(queue="recommended") == []
 
 
-def test_recommended_queue_keeps_the_deterministic_backlog(tmp_path, monkeypatch):
+def test_recommended_queue_hides_the_unscreened_deterministic_backlog(tmp_path, monkeypatch):
     inventory = [
         job(f"job-{index}", title="Support Engineer", mode="remote") for index in range(15)
     ]
@@ -1045,7 +1257,47 @@ def test_recommended_queue_keeps_the_deterministic_backlog(tmp_path, monkeypatch
     )
     service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
 
-    assert len(service.list_jobs(queue="recommended")) == 15
+    assert service.list_jobs(queue="recommended") == []
+
+
+def test_recommended_queue_is_a_rolling_twelve_job_shelf(tmp_path, monkeypatch):
+    inventory = [
+        {
+            **job(f"job-{index}", title="Support Engineer", mode="remote"),
+            "posted_at": f"2026-09-{index + 1:02d}T12:00:00+00:00",
+        }
+        for index in range(15)
+    ]
+    preferences_path = tmp_path / "job-search/preferences.yml"
+    preferences_path.parent.mkdir(parents=True)
+    preferences_path.write_text("schema_version: 1\n", encoding="utf-8")
+    monkeypatch.setattr(web_service, "_load_preferences", lambda _path: {"configured": True})
+    monkeypatch.setattr(
+        web_service,
+        "_prescreen",
+        lambda _raw, _preferences, _resume_terms: {
+            "queue_state": "ready",
+            "interest": {"desired_title_terms": ["support engineer"], "interest_terms": []},
+        },
+    )
+    write_screening_output(tmp_path, [item["id"] for item in inventory])
+    service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
+
+    recommended = service.list_jobs(queue="recommended")
+
+    assert len(recommended) == 12
+    assert [item["id"] for item in recommended[:2]] == ["job-14", "job-13"]
+    assert {item["id"] for item in service.list_jobs(queue="all")} >= {
+        "job-0",
+        "job-1",
+        "job-2",
+    }
+    inventory.pop()
+
+    replenished = service.list_jobs(queue="recommended")
+
+    assert len(replenished) == 12
+    assert "job-2" in {item["id"] for item in replenished}
 
 
 def test_recommended_queue_suppresses_a_three_rejection_role_pattern(

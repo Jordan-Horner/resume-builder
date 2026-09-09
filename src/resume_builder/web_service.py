@@ -39,21 +39,24 @@ from .applications import (
     record_application,
 )
 from .atomic import atomic_write_json, atomic_write_text
-from .discovery_activation import MANAGED_FAMILY_PREFIX, preview_activation
-from .discovery_evidence import (
+from .layout import VaultLayout
+from .opportunities.cli import _load_preferences, _prescreen, get_job_screening_packet
+from .opportunities.defaults import PORTFOLIO_PATH, PREFERENCES_PATH, scaffold_job_search
+from .opportunities.discovery_activation import MANAGED_FAMILY_PREFIX, preview_activation
+from .opportunities.discovery_evidence import (
     ResumeDocument,
     extract_query_expansion,
     extract_title_seed,
     interpret_resume_evidence,
 )
-from .discovery_portfolio import (
+from .opportunities.discovery_portfolio import (
     ColdStartLane,
     ColdStartPortfolio,
     build_cold_start_portfolio,
     generate_title_suggestions,
     load_cached_title_generation,
 )
-from .job_onboarding import (
+from .opportunities.onboarding import (
     CompensationAnswers,
     EligibilityAnswers,
     JobSearchSetupAnswer,
@@ -69,42 +72,49 @@ from .job_onboarding import (
     portfolio_from_setup_state,
     start_setup,
 )
-from .job_onboarding import (
+from .opportunities.onboarding import (
     activate as activate_setup,
 )
-from .job_onboarding import (
+from .opportunities.onboarding import (
     load_state as load_setup_state,
 )
-from .job_onboarding import (
+from .opportunities.onboarding import (
     save_state as save_setup_state,
 )
-from .job_personalization import (
+from .opportunities.personalization import (
     extract_preference_traits,
     extract_seniority,
     load_feedback_events,
     score_shadow_job,
 )
-from .job_screening import EligibilityStatus, ScreeningCache, deterministic_ineligible_result
-from .job_setup_defaults import PORTFOLIO_PATH, PREFERENCES_PATH, scaffold_job_search
-from .job_target import parse_target
-from .jobs import _load_preferences, _prescreen, get_job_screening_packet
-from .layout import VaultLayout
-from .posting_interpretation import PostingInterpretationCache
-from .preferences import _validated as validate_preferences
-from .project_report import project_report
-from .role_policy import MAX_TITLE_LENGTH, MIN_TITLE_LENGTH, check_query_capacity, clean_titles
-from .salary_estimation import (
+from .opportunities.posting import PostingInterpretationCache
+from .opportunities.preferences import _validated as validate_preferences
+from .opportunities.role_policy import (
+    MAX_TITLE_LENGTH,
+    MIN_TITLE_LENGTH,
+    check_query_capacity,
+    clean_titles,
+)
+from .opportunities.salary import (
     SALARY_CACHE_PATH,
     SalaryEstimationService,
     build_salary_packet,
     has_posted_salary,
 )
-from .screening_service import (
+from .opportunities.screening import (
+    EligibilityStatus,
+    ScreeningCache,
+    ScreeningResult,
+    deterministic_ineligible_result,
+)
+from .opportunities.screening_service import (
     BACKGROUND_SCREEN_TIMEOUT_SECONDS,
     QUICK_SCREEN_PROVIDER_RETRIES,
     ScreeningService,
     enrich_packet_from_cached_interpretation,
 )
+from .opportunities.targets import parse_target
+from .project_report import project_report
 from .source_import import (
     SUPPORTED,
     apply_import_plan,
@@ -174,17 +184,7 @@ JOB_FEEDBACK_REASONS = frozenset(
     }
 )
 LOGGER = logging.getLogger(__name__)
-
-
-def _is_recommended_prescreen(prescreen: object) -> bool:
-    """Return whether deterministic evidence admits a job to recommendations."""
-    if not isinstance(prescreen, dict) or prescreen.get("queue_state") != "ready":
-        return False
-    interest = prescreen.get("interest")
-    return bool(
-        isinstance(interest, dict)
-        and any(interest.get(key) for key in ("desired_title_terms", "interest_terms"))
-    )
+RECOMMENDATION_SHELF_SIZE = 12
 
 
 class ScreeningInputError(RuntimeError):
@@ -458,7 +458,7 @@ class DashboardService:
     def configure_bright_data(
         self, api_key: Any, enabled: Any, max_records_per_refresh: Any
     ) -> dict[str, Any]:
-        from .bright_data import (
+        from .opportunities.bright_data import (
             BrightDataSettings,
             bright_data_key,
             bright_data_secret_path,
@@ -504,7 +504,7 @@ class DashboardService:
             resolve_linkedin_sources,
         )
 
-        from .bright_data import (
+        from .opportunities.bright_data import (
             bright_data_key,
             enrich_linkedin_targets,
             load_bright_data_settings,
@@ -1374,9 +1374,13 @@ class DashboardService:
         return action, cleaned
 
     def job_feedback(self, job_id: str) -> dict[str, Any]:
-        job = self.get_job(job_id)
-        if job is None:
+        raw_job = next(
+            (item for item in self._inventory_loader() if str(item.get("id") or "") == job_id),
+            None,
+        )
+        if raw_job is None:
             raise ValueError(f"job not found: {job_id}")
+        job = self._serialize_job(raw_job)
         events = self._feedback_events()
         latest = next(
             (
@@ -1390,14 +1394,14 @@ class DashboardService:
         )
         deterministic: dict[str, Any] = {"interest": {}, "hard_conflicts": []}
         clearance_preference = "neutral"
+        preferences: dict[str, Any] = {}
         if (self.workspace / PREFERENCES_PATH).is_file():
-            from .jobs import _load_preferences
+            from .opportunities.cli import _load_preferences
 
             preferences = _load_preferences(self.workspace / PREFERENCES_PATH)
             clearance_preference = str(preferences.get("clearance_preference", "neutral"))
         if (self.workspace / JOBS_CONFIG).is_file():
-            packet = self._screening_packet(job_id)
-            prescreen = packet.deterministic_prescreen
+            prescreen = _prescreen(raw_job, preferences, set())
             constraints = prescreen.get("constraints") if isinstance(prescreen, dict) else None
             deterministic = {
                 "interest": prescreen.get("interest", {}) if isinstance(prescreen, dict) else {},
@@ -1410,7 +1414,8 @@ class DashboardService:
                     else False
                 ),
             }
-            screen = self.saved_job_screen(job_id)
+            screened_item = self._quick_screen_items().get(job_id)
+            screen = screened_item.get("screening") if screened_item else None
         else:
             screen = None
         positive_titles = [
@@ -1522,6 +1527,8 @@ class DashboardService:
 
     def queue_screening_backfill(self, *, drain: bool = True) -> tuple[bool, dict[str, Any]]:
         """Reserve one standalone backfill without starting provider discovery."""
+        from .background_screening import publish_replenishment_state
+
         status = self.screening_backfill_status()
         if not status["enabled"]:
             raise ValueError("Turn on background quick screening before starting a backfill")
@@ -1544,6 +1551,7 @@ class DashboardService:
                 }
         if already_running:
             return False, self.screening_backfill_status()
+        publish_replenishment_state(self.workspace, status="running", batch_count=0)
         return True, self.screening_backfill_status()
 
     def run_queued_screening_backfill(self, *, drain: bool = True) -> None:
@@ -1553,15 +1561,11 @@ class DashboardService:
         try:
             from .automation import load_config as load_automation
             from .background_screening import (
-                prepare_background_screening_input,
-                run_background_quick_screening,
+                publish_replenishment_state,
+                run_background_replenishment,
             )
 
             schedule = load_automation(self.workspace / "automation/config.yml")
-            shortlist = prepare_background_screening_input(
-                self.workspace,
-                display_limit=schedule.jobs.limit,
-            )
             batch_limit = schedule.jobs.semantic_screening_max_jobs
             attempted_jobs = 0
             screened_jobs = 0
@@ -1571,16 +1575,12 @@ class DashboardService:
             cost_usd = Decimal("0")
             duration_seconds = 0.0
             failure_attempts: Counter[str] = Counter()
-            previous_completed: int | None = None
             batch_count = 0
-            max_batches: int | None = None
-            while True:
-                summary = run_background_quick_screening(
-                    self.workspace,
-                    max_jobs=batch_limit,
-                    input_path=shortlist,
-                )
-                batch_count += 1
+
+            def record_batch(summary: Any, current_batch: int) -> None:
+                nonlocal attempted_jobs, screened_jobs, provider_requests
+                nonlocal input_tokens, output_tokens, cost_usd, duration_seconds, batch_count
+                batch_count = current_batch
                 batch_attempted = int(getattr(summary, "attempted", summary.provider_calls))
                 batch_screened = int(
                     getattr(summary, "succeeded", max(0, batch_attempted - summary.failed))
@@ -1594,11 +1594,6 @@ class DashboardService:
                 duration_seconds += float(getattr(summary, "duration_seconds", 0.0))
                 failure_attempts.update(getattr(summary, "failure_categories", {}))
                 pending_jobs = int(getattr(summary, "pending", 0))
-                completed_jobs = int(getattr(summary, "completed", summary.cached))
-                if max_batches is None:
-                    max_batches = max(1, (int(summary.active) + batch_limit - 1) // batch_limit + 1)
-                made_progress = previous_completed is None or completed_jobs > previous_completed
-                previous_completed = completed_jobs
                 with self._screening_state_lock:
                     self._screening_backfill_state = {
                         "status": "running",
@@ -1613,13 +1608,13 @@ class DashboardService:
                         "batch_count": batch_count,
                         "pending_screening_jobs": pending_jobs,
                     }
-                if (
-                    not drain
-                    or pending_jobs == 0
-                    or not made_progress
-                    or batch_count >= max_batches
-                ):
-                    break
+
+            summary = run_background_replenishment(
+                self.workspace,
+                max_jobs=batch_limit,
+                display_limit=schedule.jobs.limit,
+                on_batch=record_batch,
+            )
             duration_seconds = round(duration_seconds, 3)
             final_pending_jobs = int(getattr(summary, "pending", 0))
             status = "complete" if final_pending_jobs == 0 else "partial"
@@ -1656,6 +1651,12 @@ class DashboardService:
                     "recommended_jobs": summary.recommended,
                     "needs_review_jobs": summary.needs_review,
                 }
+            publish_replenishment_state(
+                self.workspace,
+                status=status,
+                batch_count=batch_count,
+                summary=summary,
+            )
             LOGGER.info(
                 "screening_backfill_completed status=%s duration_seconds=%.3f attempted_jobs=%d "
                 "screened_jobs=%d cached_jobs=%d failed_jobs=%d provider_requests=%d "
@@ -1682,6 +1683,13 @@ class DashboardService:
             )
         except (OSError, RuntimeError, ValueError):
             LOGGER.warning("recommendation screening backfill failed", exc_info=True)
+            from .background_screening import publish_replenishment_state
+
+            publish_replenishment_state(
+                self.workspace,
+                status="failed",
+                batch_count=0,
+            )
             with self._screening_state_lock:
                 self._screening_backfill_state = {
                     "status": "failed",
@@ -1695,11 +1703,11 @@ class DashboardService:
     def replenish_recommendations(self) -> None:
         """Continue the current-inventory backlog after a user decision."""
         try:
-            started, _ = self.queue_screening_backfill(drain=False)
+            started, _ = self.queue_screening_backfill(drain=True)
         except ValueError:
             return
         if started:
-            self.run_queued_screening_backfill(drain=False)
+            self.run_queued_screening_backfill(drain=True)
 
     @staticmethod
     def _serialize_job(job: dict[str, Any]) -> dict[str, Any]:
@@ -1743,20 +1751,9 @@ class DashboardService:
         preferences: dict[str, Any] | None = None,
         include_personalization: bool = True,
     ) -> dict[str, dict[str, Any]]:
-        path = self.workspace / JOB_SCREENING_OUTPUT
-        if not path.is_file():
+        raw_jobs = self._quick_screen_items()
+        if not raw_jobs:
             return {}
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError) as exc:
-            raise ValueError(f"invalid job screening output: {path}") from exc
-        raw_jobs = payload.get("jobs") if isinstance(payload, dict) else None
-        if (
-            not isinstance(payload, dict)
-            or payload.get("schema_version") != 1
-            or not isinstance(raw_jobs, list)
-        ):
-            raise ValueError(f"invalid job screening output: {path}")
         reason_labels = {
             "hard_constraint_conflict": "Outside required preferences",
             "incomplete_listing": "Incomplete listing",
@@ -1779,7 +1776,7 @@ class DashboardService:
             )
         clearance_preference = str(preferences.get("clearance_preference", "neutral"))
         summaries: dict[str, dict[str, Any]] = {}
-        for item in raw_jobs:
+        for item in raw_jobs.values():
             if not isinstance(item, dict) or not item.get("id"):
                 continue
             screen = item.get("screening")
@@ -1802,9 +1799,7 @@ class DashboardService:
                     "weak_fit": "Weak fit",
                     "insufficient_information": "Unknown",
                 }
-                label = str(resume.get("label") or "").removesuffix(" match") or fit_labels.get(
-                    str(result.get("fit")), "Unknown"
-                )
+                label = fit_labels.get(str(result.get("fit")), "Needs review")
             elif status == "skipped":
                 label = reason_labels.get(str(screen.get("reason")), "Skipped")
             else:
@@ -1831,6 +1826,26 @@ class DashboardService:
             }
         return summaries
 
+    def _quick_screen_items(self) -> dict[str, dict[str, Any]]:
+        """Load persisted background-screen items without rebuilding candidate evidence."""
+        path = self.workspace / JOB_SCREENING_OUTPUT
+        if not path.is_file():
+            return {}
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise ValueError(f"invalid job screening output: {path}") from exc
+        raw_jobs = payload.get("jobs") if isinstance(payload, dict) else None
+        if (
+            not isinstance(payload, dict)
+            or payload.get("schema_version") != 1
+            or not isinstance(raw_jobs, list)
+        ):
+            raise ValueError(f"invalid job screening output: {path}")
+        return {
+            str(item["id"]): item for item in raw_jobs if isinstance(item, dict) and item.get("id")
+        }
+
     def blocked_companies(self) -> list[str]:
         import yaml
 
@@ -1848,8 +1863,8 @@ class DashboardService:
     def set_company_blocked(self, company: str, blocked: bool) -> list[str]:
         import yaml
 
-        from .job_setup_defaults import neutral_preferences
-        from .preferences import _validated
+        from .opportunities.defaults import neutral_preferences
+        from .opportunities.preferences import _validated
 
         if (
             not isinstance(company, str)
@@ -1876,7 +1891,7 @@ class DashboardService:
         return values
 
     def job_filter_defaults(self) -> dict[str, Any]:
-        from .jobs import _load_preferences
+        from .opportunities.cli import _load_preferences
         from .web_filters import ViewFilters
 
         path = self.workspace / "job-search/preferences.yml"
@@ -2128,8 +2143,8 @@ class DashboardService:
                 if (
                     job["id"] in explicitly_interested
                     or (isinstance(role_pattern, dict) and role_pattern.get("suppressed") is True)
-                    or (completed and not personalized_hot)
-                    or (not completed and not _is_recommended_prescreen(deterministic))
+                    or not completed
+                    or not personalized_hot
                 ):
                     continue
             if not matches_view(job, view):
@@ -2175,6 +2190,7 @@ class DashboardService:
                 return (0 if hot else 1), -score, -(posted.timestamp() if posted else 0.0)
 
             jobs.sort(key=recommendation_order)
+            jobs = jobs[:RECOMMENDATION_SHELF_SIZE]
         total = len(jobs)
         if _limit is not None:
             jobs = jobs[:_limit]
@@ -2187,7 +2203,7 @@ class DashboardService:
         return jobs
 
     def get_job(self, job_id: str) -> dict[str, Any] | None:
-        screen_summaries = self._quick_screen_summaries()
+        screen_summaries = self._quick_screen_summaries(include_personalization=False)
         for raw in self._inventory_loader():
             if str(raw.get("id")) == job_id:
                 job = self._serialize_job(raw)
@@ -2348,6 +2364,20 @@ class DashboardService:
 
     def saved_job_screen(self, job_id: str) -> dict[str, Any] | None:
         """Return a cached quick screen without invoking a model."""
+        persisted = self._quick_screen_items().get(job_id)
+        persisted_screen = persisted.get("screening") if persisted else None
+        persisted_result = (
+            persisted_screen.get("result") if isinstance(persisted_screen, dict) else None
+        )
+        if (
+            isinstance(persisted_screen, dict)
+            and persisted_screen.get("status") == "complete"
+            and isinstance(persisted_result, dict)
+        ):
+            return self._present_screen(
+                ScreeningResult.model_validate(persisted_result),
+                cached=bool(persisted_screen.get("cached", True)),
+            )
         packet = self._screening_packet(job_id)
         config_path = self.workspace / DEFAULT_AGENT_CONFIG
         if not config_path.is_file():
@@ -2368,12 +2398,17 @@ class DashboardService:
         """Return current asynchronous screen state without waiting on its provider call."""
         with self._screening_state_lock:
             state = self._screening_states.get(job_id)
-            if state is not None:
-                return dict(state)
-        saved = self.saved_job_screen(job_id)
-        if saved is not None:
-            return saved
-        return {"status": "idle", "job_id": job_id}
+            current = dict(state) if state is not None else None
+        if current is not None:
+            return current
+        if (self.workspace / JOB_SCREENING_OUTPUT).is_file() or (
+            (self.workspace / PREFERENCES_PATH).is_file()
+            and (self.workspace / DEFAULT_AGENT_CONFIG).is_file()
+        ):
+            saved = self.saved_job_screen(job_id)
+            if saved is not None:
+                return saved
+        return current or {"status": "idle", "job_id": job_id}
 
     def queue_job_screen(self, job_id: str, *, refresh: bool = False) -> dict[str, Any]:
         """Validate and queue one screen without making the caller wait for a provider."""
@@ -2395,7 +2430,7 @@ class DashboardService:
             return dict(state)
 
     def run_queued_job_screen(self, job_id: str, *, refresh: bool = False) -> None:
-        """Complete a queued screen and retain only its public status in memory."""
+        """Complete a queued screen and retain its public result for fast polling."""
         with self._screening_state_lock:
             current = self._screening_states.get(job_id)
             if current is None or current["status"] != "queued":
@@ -2415,10 +2450,7 @@ class DashboardService:
                 "message": "The background analysis could not finish. You can try again.",
             }
         with self._screening_state_lock:
-            if result["status"] == "complete":
-                self._screening_states.pop(job_id, None)
-            else:
-                self._screening_states[job_id] = result
+            self._screening_states[job_id] = result
 
     def screen_job(self, job_id: str, *, refresh: bool = False) -> dict[str, Any]:
         """Run the existing bounded job screen after an explicit user request."""
@@ -2622,7 +2654,7 @@ class DashboardService:
         agent_config_path = self.workspace / "agent/config.yml"
         telegram_configured = False
         openrouter_connected = self._openrouter_configured()
-        from .bright_data import bright_data_key, load_bright_data_settings
+        from .opportunities.bright_data import bright_data_key, load_bright_data_settings
 
         bright_data_settings = load_bright_data_settings(self.workspace)
         bright_data_connected = bool(bright_data_key(self.workspace))

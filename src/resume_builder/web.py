@@ -329,14 +329,6 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    @app.get("/api/jobs/{job_id}/screen")
-    def saved_job_screen(job_id: str) -> Any:
-        try:
-            result = service.saved_job_screen(job_id)
-            return result if result is not None else Response(status_code=204)
-        except ValueError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
-
     @app.get("/api/jobs/{job_id}/screen-status")
     def job_screen_status(job_id: str) -> dict[str, Any]:
         try:

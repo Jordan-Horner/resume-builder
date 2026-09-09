@@ -64,7 +64,6 @@ export function JobDetailPanel({
   const [jobScreen, setJobScreen] = useState<JobScreenResult | null>(null);
   const [screeningJobId, setScreeningJobId] = useState<string | null>(null);
   const [screeningMessage, setScreeningMessage] = useState("");
-  const [checkedScreenStatusJobId, setCheckedScreenStatusJobId] = useState<string | null>(null);
   const [screenError, setScreenError] = useState("");
   const [feedback, setFeedback] = useState<JobFeedback | null>(null);
   const [feedbackError, setFeedbackError] = useState("");
@@ -75,7 +74,6 @@ export function JobDetailPanel({
   const screenPollToken = useRef(0);
   currentJobId.current = job.id;
   const screening = screeningJobId === job.id;
-  const checkingScreenStatus = checkedScreenStatusJobId !== job.id;
 
   useEffect(() => {
     if (window.matchMedia?.("(max-width: 900px)").matches) heading.current?.focus();
@@ -112,8 +110,6 @@ export function JobDetailPanel({
     }).catch((reason: unknown) => {
       if (!active) return;
       setScreenError(reason instanceof Error ? reason.message : "Could not load this job screen.");
-    }).finally(() => {
-      if (active) setCheckedScreenStatusJobId(job.id);
     });
     void Promise.allSettled([getResumeRecommendation(job.id), getJobFeedback(job.id), descriptionRequest]).then(([resumeResult, feedbackResult, descriptionResult]) => {
       if (!active) return;
@@ -217,9 +213,10 @@ export function JobDetailPanel({
 
   const postedSalary = formatPayRange(job);
   const contextName = `${job.title} at ${job.company}`;
-  const recommendationLabel = feedback?.personalization.hot_label === "Hot job"
+  const personalization = feedback?.personalization ?? job.personalization;
+  const recommendationLabel = personalization?.hot_label === "Hot job"
     ? "Hot recommendation"
-    : feedback?.personalization.hot_label ?? "Learning your preferences";
+    : personalization?.hot_label ?? "Learning your preferences";
   const checkedCriteria = jobScreen?.result.evidence_strategy === "criterion-driven"
     ? jobScreen.result.criterion_evidence?.filter((item) => item.status !== "not-resume-evaluable").length ?? 0
     : 0;
@@ -250,13 +247,7 @@ export function JobDetailPanel({
         {recommendation?.status === "unavailable" && recommendation.message && !jobScreen?.result.resume_match && <p className="recommendation-empty">{recommendation.message}</p>}
         {recommendationError && <p className="recommendation-error" role="status">{recommendationError}</p>}
         <section className="job-screen-card" aria-label="Job screen">
-          {checkingScreenStatus && !jobScreen ? <>
-            <div>
-              <strong>Checking screen status…</strong>
-              <p>Confirming whether analysis is already running.</p>
-            </div>
-            <div className="job-screen-actions"><button className="text-button" onClick={() => assistant.discussJob(job.id, contextName)}>Discuss job</button></div>
-          </> : screening && !jobScreen ? <>
+          {screening && !jobScreen ? <>
             <div>
               <strong>{screeningMessage || "Analysis queued"}</strong>
               <p>You can close this job and keep reviewing. The result will be saved here.</p>
@@ -304,13 +295,13 @@ export function JobDetailPanel({
                 <ul>{jobScreen.result.evidence_used.map((item) => <li key={item.fact_id}><strong>{item.title}</strong><span>{item.strength}</span></li>)}</ul>
               </details>}
             </div>
-            <div className="job-screen-actions"><button className="text-button" onClick={() => void runJobScreen()} disabled={screening}>{screening ? "Screening…" : "Refresh screen"}</button><button className="text-button" onClick={() => assistant.discussJob(job.id, contextName)}>Discuss job</button></div>
+            <div className="job-screen-actions"><button className="text-button" onClick={() => assistant.discussJob(job.id, contextName)}>Discuss job</button></div>
           </> : job.quick_screen?.status === "complete" ? <>
             <div>
-              <strong>Screened in background</strong>
-              <p>The background quick screen completed with a {job.quick_screen.label === "Unknown" ? "unclear" : job.quick_screen.label.toLowerCase()} result. Run it again to view a current evidence check.</p>
+              <strong>{job.quick_screen.label}</strong>
+              <p>Quick screen complete.</p>
             </div>
-            <div className="job-screen-actions"><button className="secondary-button" onClick={() => void runJobScreen()} disabled={screening}>{screening ? "Screening job…" : "Run screen again"}</button><button className="text-button" onClick={() => assistant.discussJob(job.id, contextName)}>Discuss job</button></div>
+            <div className="job-screen-actions"><button className="text-button" onClick={() => assistant.discussJob(job.id, contextName)}>Discuss job</button></div>
           </> : job.quick_screen?.status === "failed" ? <>
             <div>
               <strong>Background screen failed</strong>
@@ -336,9 +327,9 @@ export function JobDetailPanel({
           <div className="job-preference-heading">
             <div>
               <strong>{recommendationLabel}</strong>
-              {jobScreen && feedback && <span>{feedback.personalization.interest_label} interest alignment{feedback.personalization.company_label !== "Neutral" ? ` · ${feedback.personalization.company_label} company preference` : ""}</span>}
-              {!jobScreen && feedback && <span>Based on your saved requirements and interests.</span>}
-              {!jobScreen && !feedback && <span>Loading recommendation details…</span>}
+              {jobScreen && personalization?.interest_label && <span>{personalization.interest_label} interest alignment{personalization.company_label && personalization.company_label !== "Neutral" ? ` · ${personalization.company_label} company preference` : ""}</span>}
+              {!jobScreen && personalization && <span>Based on your saved requirements and interests.</span>}
+              {!personalization && <span>Learning from the jobs you pursue.</span>}
             </div>
             <button className="secondary-button interested-button" aria-pressed={feedback?.latest?.action === "interested"} disabled={pendingAction !== null} onClick={() => void markInterested()}>
               {pendingAction === "interested" ? "Saving…" : feedback?.latest?.action === "interested" ? "Interested ✓" : "Interested"}

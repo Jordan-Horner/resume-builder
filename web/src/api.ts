@@ -227,9 +227,6 @@ export function restoreResume(resumeId: string): Promise<{ restored: boolean; me
 export function getResumeRecommendation(jobId: string): Promise<ResumeRecommendation> {
   return request(`/api/jobs/${encodeURIComponent(jobId)}/resume-recommendation`);
 }
-export async function getSavedJobScreen(jobId: string): Promise<JobScreenResult | null> {
-  return (await request<JobScreenResult | null>(`/api/jobs/${encodeURIComponent(jobId)}/screen`)) ?? null;
-}
 export function getJobScreenStatus(jobId: string): Promise<JobScreenState> {
   return request(`/api/jobs/${encodeURIComponent(jobId)}/screen-status`);
 }
@@ -293,6 +290,7 @@ export interface ScrapeSchedule {
   screening_max_jobs: number;
   screening_available: boolean;
   current_stage: "idle" | "searching" | "screening";
+  recommendation_revision?: string;
 }
 export function getScrapeSchedule(): Promise<ScrapeSchedule> { return request("/api/scrape-schedule"); }
 export function saveScrapeSchedule(enabled: boolean, times: string[], screeningEnabled = false, screeningMaxJobs = 6): Promise<ScrapeSchedule> {

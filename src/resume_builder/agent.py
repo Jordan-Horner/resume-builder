@@ -34,7 +34,9 @@ from .agent_state import AgentState, default_agent_state_path
 from .agent_tools import build_read_only_tools
 from .atomic import atomic_write_text
 from .automation import default_state_path
-from .discovery_activation import (
+from .opportunities.cli import DEFAULT_CONFIG as DEFAULT_JOBS_CONFIG
+from .opportunities.cli import DEFAULT_PREFERENCES, get_job_screening_packet
+from .opportunities.discovery_activation import (
     DiscoveryActivationRecord,
     activate_portfolio,
     edit_portfolio,
@@ -44,13 +46,13 @@ from .discovery_activation import (
     rollback_confirmation,
     save_portfolio,
 )
-from .discovery_evidence import (
+from .opportunities.discovery_evidence import (
     ResumeDocument,
     extract_query_expansion,
     extract_title_seed,
     interpret_resume_evidence,
 )
-from .discovery_portfolio import (
+from .opportunities.discovery_portfolio import (
     TITLE_GENERATION_INSTRUCTIONS,
     ColdStartLane,
     build_cold_start_portfolio,
@@ -58,7 +60,8 @@ from .discovery_portfolio import (
     load_cached_title_generation,
     title_generation_prompt,
 )
-from .job_screening import (
+from .opportunities.posting import PostingInterpretationCache
+from .opportunities.screening import (
     SCREENING_INSTRUCTIONS,
     EligibilityStatus,
     ScreeningCache,
@@ -66,14 +69,11 @@ from .job_screening import (
     deterministic_ineligible_result,
     screening_prompt,
 )
-from .job_screening_queue import (
+from .opportunities.screening_queue import (
     DEFAULT_SCREENING_OUTPUT,
     build_screening_queue,
 )
-from .jobs import DEFAULT_CONFIG as DEFAULT_JOBS_CONFIG
-from .jobs import DEFAULT_PREFERENCES, get_job_screening_packet
-from .posting_interpretation import PostingInterpretationCache
-from .screening_service import (
+from .opportunities.screening_service import (
     INTERACTIVE_SCREEN_TIMEOUT_SECONDS,
     QUICK_SCREEN_PROVIDER_RETRIES,
     ScreeningService,

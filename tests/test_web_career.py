@@ -340,9 +340,7 @@ def test_directional_resume_uses_a_compact_headline_when_plan_has_no_direction(
     )
 
     assert directional["items"][0]["name"] == "Forward Deployed Engineer"
-    assert directional["items"][0]["detail"] == (
-        "Customer Technical Delivery · Cloud & Automation"
-    )
+    assert directional["items"][0]["detail"] == ("Customer Technical Delivery · Cloud & Automation")
 
 
 def test_portal_reader_renders_current_markdown_instead_of_old_preview(

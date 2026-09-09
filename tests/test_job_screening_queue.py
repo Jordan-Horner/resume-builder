@@ -7,20 +7,23 @@ from pathlib import Path
 
 import pytest
 
-import resume_builder.job_screening_queue as queue_module
+import resume_builder.opportunities.screening_queue as queue_module
 from resume_builder.agent_contracts import StructuredModelReply, StructuredModelRequest
 from resume_builder.agent_openrouter import AgentProviderError
-from resume_builder.job_screening import (
+from resume_builder.opportunities.posting import (
+    ProposedPostingCriterion,
+    ProposedPostingInterpretation,
+    SectionReview,
+)
+from resume_builder.opportunities.screening import (
     Confidence,
     FitOutcome,
     SemanticScreen,
     build_screening_packet,
 )
-from resume_builder.job_screening_queue import build_screening_queue, load_notification_jobs
-from resume_builder.posting_interpretation import (
-    ProposedPostingCriterion,
-    ProposedPostingInterpretation,
-    SectionReview,
+from resume_builder.opportunities.screening_queue import (
+    build_screening_queue,
+    load_notification_jobs,
 )
 
 
@@ -152,7 +155,7 @@ def _input(path: Path, ids: list[str]) -> None:
 def test_queue_keeps_every_job_and_bounds_provider_work(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    caplog.set_level("INFO", logger="resume_builder.job_screening_queue")
+    caplog.set_level("INFO", logger="resume_builder.opportunities.screening_queue")
     source = tmp_path / "new.json"
     output = tmp_path / "screens.json"
     _input(source, ["recommended", "blocked", "waiting"])
@@ -535,3 +538,36 @@ def test_provider_failure_remains_visible_and_consumes_the_attempt_budget(
     assert summary.needs_review == 2
     assert summary.pending == 2
     assert adapter.calls == 1
+
+
+def test_historical_failure_does_not_hide_current_batch_progress(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "new.json"
+    output = tmp_path / "screens.json"
+    _input(source, ["fails", "waiting"])
+    monkeypatch.setattr(
+        queue_module, "get_job_screening_packet", lambda job_id, **_: _packet(job_id)
+    )
+    build_screening_queue(
+        adapter=QueueAdapter(fail=True),
+        model="fictional/model",
+        cache_path=tmp_path / "cache.sqlite",
+        input_path=source,
+        output_path=output,
+        max_provider_jobs=1,
+        allow_provider=True,
+    )
+
+    summary = build_screening_queue(
+        adapter=QueueAdapter(),
+        model="fictional/model",
+        cache_path=tmp_path / "cache.sqlite",
+        input_path=source,
+        output_path=output,
+        max_provider_jobs=1,
+        allow_provider=True,
+    )
+
+    assert summary.failed == 1
+    assert summary.succeeded == 1

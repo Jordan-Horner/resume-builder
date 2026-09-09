@@ -101,10 +101,20 @@ without needing container-log access.
 A manual portal backfill drains the eligible current-inventory backlog through
 sequential batches of `max_jobs_per_run`. It stops when no automatic screens are
 pending, when a retry makes no progress, or at a shortlist-derived safety bound.
-Scheduled collection and recommendation replenishment remain single bounded
-batches. Backfill status reports `pending_screening_jobs` separately from
+Scheduled and portal-started collection use the same rolling replenishment loop,
+so newly published inventory continues through bounded batches without another
+user action. Feedback decisions also resume the loop. Backfill status reports
+`pending_screening_jobs` separately from
 `needs_review_jobs`, because the latter also includes completed screens whose
 result requires a human eligibility or evidence decision.
+
+Discovery publishes its new-job result before semantic screening drains, so a
+manual search does not wait for the screening backlog. A workspace file lock
+serializes scheduler, portal, and feedback-triggered screening workers; the
+operating system releases it automatically if a worker exits.
+On scheduler startup, due discovery runs before screening. When discovery is not
+due, the scheduler resumes screening only when the saved replenishment state
+reports pending jobs; a completed backlog is left alone.
 
 Provider output is validated against both its structural schema and the exact
 posting packet while the provider retry loop is still active. This includes
@@ -119,10 +129,11 @@ merely because the model provider was unavailable. Notifications report
 recommended, unresolved, additional, and total job counts; every job remains in
 the full queue.
 
-Deterministic matches enter the Recommended Jobs backlog before model screening.
-The bounded screen worker processes the highest-ranked unscreened matches first;
-strong completed screens that pass the other recommendation requirements are promoted to Hot, while completed non-strong screens return
-to All jobs. Cached jobs are not sent to the provider again.
+Deterministic matches enter a private screening backlog before model screening.
+The bounded worker processes the highest-ranked unscreened matches first. Only
+completed screens that pass the recommendation requirements may enter the
+12-job Recommended shelf; incomplete, failed, skipped, and non-qualifying screens
+remain in All jobs. Cached jobs are not sent to the provider again.
 
 ATS source resolution is also enrichment rather than a discovery gate. Its
 status and counts are recorded under `source_resolution` in
@@ -158,19 +169,23 @@ reconciliation. The **Background quick screening** control sets the bounded
 first-pass allowance. **Screen recommendations now** runs that pass directly from
 the current local inventory without refreshing LinkedIn, Indeed, or company boards.
 Search completion and feedback decisions may also ask the same independent worker
-to continue the backlog. It ranks the active inventory
+to continue the backlog automatically. It ranks the active inventory
 with the existing local preference score, then attempts the best unscreened jobs
 that pass the title, location, work-mode, seniority, completeness, and compensation
-gates and have a saved role or interest signal. Provider work stops when the
-12-job recommendation shelf is full or the configured per-run cost cap is reached.
-Cached results do not consume the cap. Deterministic candidates populate Recommended Jobs
-immediately. Direct matches require a completed Strong fit with medium-or-high confidence
+gates and have a saved role or interest signal. Each provider batch is bounded by
+`max_jobs_per_run`; another batch starts while eligible work is still advancing.
+Cached results do not consume the batch allowance. Direct matches require a
+completed Strong fit with medium-or-high confidence
 and cited candidate evidence; unfamiliar adjacent titles
 may remain recommended after a Good or Strong fit with at least medium confidence.
-Other completed screens return to All jobs. Failures and unfinished screens remain in
-the recommendation backlog.
+The 12 highest-ranked qualifying results form Recommended Jobs. A stronger new
+result displaces the lowest-ranked visible result to All jobs without deleting its
+screen, so it can return when a higher-ranked job leaves the shelf. Failures and
+unfinished screens remain in the private screening backlog. Fit remains the
+dominant order signal, with a freshness boost capped at 0.03 that decays to zero
+over 30 days.
 Interested, applied, and dismissed decisions immediately re-rank existing results
-and schedule a bounded background refill. Discovery failures do not require or
+and resume background replenishment. Discovery failures do not require or
 trigger a repeated source refresh before that backlog can continue. The manual
 per-job Screen button is a retry or override, not the normal workflow.
 

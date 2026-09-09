@@ -6,8 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import resume_builder.jobs as jobs_module
-from resume_builder.jobs import (
+import resume_builder.opportunities.cli as jobs_module
+from resume_builder.opportunities.cli import (
     _contains_bounded,
     _load_preferences,
     _new_jobs,
@@ -753,7 +753,7 @@ def test_automatic_source_resolution_uses_enabled_bright_data_after_free_funnel(
     tmp_path: Path, monkeypatch
 ):
     import job_puller.source_resolution as resolution_module
-    import resume_builder.bright_data as bright_data_module
+    import resume_builder.opportunities.bright_data as bright_data_module
 
     started_at = jobs_module.datetime.now(jobs_module.UTC)
     settings = SimpleNamespace(

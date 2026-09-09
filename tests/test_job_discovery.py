@@ -1,7 +1,7 @@
 import pytest
 
 from resume_builder.agent_contracts import StructuredModelReply
-from resume_builder.discovery_evidence import (
+from resume_builder.opportunities.discovery_evidence import (
     HistoricalTitleState,
     ResumeDocument,
     ResumeInterpretation,
@@ -10,7 +10,7 @@ from resume_builder.discovery_evidence import (
     extract_title_seed,
     interpret_resume_evidence,
 )
-from resume_builder.discovery_portfolio import (
+from resume_builder.opportunities.discovery_portfolio import (
     MAX_TOTAL_QUERIES,
     ColdStartLane,
     GeneratedTitleSuggestion,

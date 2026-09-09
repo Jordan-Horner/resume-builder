@@ -12,18 +12,7 @@ from resume_builder.agent_contracts import (
     StructuredModelReply,
     StructuredModelRequest,
 )
-from resume_builder.job_screening import (
-    Confidence,
-    CriterionAssessment,
-    CriterionAssessmentOutcome,
-    FitOutcome,
-    ScreeningCache,
-    ScreeningJob,
-    SemanticScreen,
-    build_screening_packet,
-    screening_prompt,
-)
-from resume_builder.posting_interpretation import (
+from resume_builder.opportunities.posting import (
     MAX_INTERPRETATION_CHARS,
     PostingInterpretationCache,
     PostingInterpretationService,
@@ -36,7 +25,18 @@ from resume_builder.posting_interpretation import (
     section_posting,
     validate_interpretation,
 )
-from resume_builder.screening_service import (
+from resume_builder.opportunities.screening import (
+    Confidence,
+    CriterionAssessment,
+    CriterionAssessmentOutcome,
+    FitOutcome,
+    ScreeningCache,
+    ScreeningJob,
+    SemanticScreen,
+    build_screening_packet,
+    screening_prompt,
+)
+from resume_builder.opportunities.screening_service import (
     ScreeningService,
     enrich_packet_from_cached_interpretation,
 )

@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import resume_builder.jobs as jobs_module
-from resume_builder.jobs import get_job_screening_packet
-from resume_builder.posting_interpretation import (
+import resume_builder.opportunities.cli as jobs_module
+from resume_builder.opportunities.cli import get_job_screening_packet
+from resume_builder.opportunities.posting import (
     PostingCriterion,
     PostingInterpretation,
     SectionReview,
 )
-from resume_builder.screening_evidence import (
+from resume_builder.opportunities.screening_evidence import (
     MAX_CRITERION_EVIDENCE_CARDS,
     MAX_EVIDENCE_CARDS,
     MAX_EVIDENCE_CHARACTERS,

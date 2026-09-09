@@ -5,7 +5,7 @@ from job_puller.detail_cache import CachedProviderDetail
 from job_puller.models import JobObservation, ProviderResult
 from job_puller.source_resolution import linkedin_targets
 from job_puller.work_modes import WorkMode, explicit_arrangement
-from resume_builder import bright_data
+from resume_builder.opportunities import bright_data
 
 
 def test_legacy_not_found_attempt_retries_after_seven_days():

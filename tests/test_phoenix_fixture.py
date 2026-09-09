@@ -9,7 +9,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from resume_builder import selection_guard, synthesis
+from resume_builder import synthesis
+from resume_builder.reviews import selection_guard
 
 FIXTURE_ROOT = Path(__file__).parents[1] / "examples" / "phoenix-wright"
 SOURCE_ID = re.compile(r"SRC-[0-9a-f]{12}")

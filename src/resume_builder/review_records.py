@@ -8,24 +8,29 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from .evidence_questions import question_plan, resolve_question
-from .language_review import (
-    finalize_language_review,
-    language_review_freshness,
-    prepare_language_review,
-)
 from .layout import contained_path
-from .review_approval import require_editorial_approval, review_freshness
-from .review_blocks import (
+from .reviews.approval import require_editorial_approval, review_freshness
+from .reviews.blocks import (
     BLOCK_ID,
     NarrativeReviewBlock,
     narrative_block_inventory,
     narrative_block_inventory_from_markdown,
     narrative_blocks,
 )
-from .review_decisions import finalize_review_record
-from .review_packages import build_review_package
-from .review_repairs import apply_review_repairs
-from .review_schema import (
+from .reviews.cli import (
+    HYBRID_REVIEW_ACTIONS,
+    add_hybrid_review_parsers,
+    run_hybrid_review_action,
+)
+from .reviews.decisions import finalize_review_record
+from .reviews.language_review import (
+    finalize_language_review,
+    language_review_freshness,
+    prepare_language_review,
+)
+from .reviews.packages import build_review_package
+from .reviews.repairs import apply_review_repairs
+from .reviews.schema import (
     EDITORIAL_DECISIONS,
     EDITORIAL_SCOPE,
     EDITORIAL_STATUSES,
@@ -45,15 +50,10 @@ from .review_schema import (
     sha256_file,
     sha256_text,
 )
-from .review_workflow_cli import (
-    HYBRID_REVIEW_ACTIONS,
-    add_hybrid_review_parsers,
-    run_hybrid_review_action,
-)
-from .selection_guard import (
+from .reviews.selection_guard import (
     approve_proposal,
 )
-from .selection_review import (
+from .reviews.selection_review import (
     finalize_selection_review,
     selection_review_freshness,
 )

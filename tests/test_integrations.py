@@ -11,7 +11,7 @@ from resume_builder.integrations import (
     interactive_integration_setup,
     parse_integration_choices,
 )
-from resume_builder.job_onboarding import main as onboarding_main
+from resume_builder.opportunities.onboarding import main as onboarding_main
 from resume_builder.workspace import initialize_workspace
 
 

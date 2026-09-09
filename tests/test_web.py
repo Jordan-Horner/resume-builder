@@ -72,7 +72,10 @@ def test_openrouter_can_be_configured_without_onboarding(tmp_path: Path, monkeyp
 
 
 def test_bright_data_is_configured_from_integrations(tmp_path: Path) -> None:
-    from resume_builder.bright_data import BRIGHT_DATA_SECRET_PATH, BRIGHT_DATA_SETTINGS_PATH
+    from resume_builder.opportunities.bright_data import (
+        BRIGHT_DATA_SECRET_PATH,
+        BRIGHT_DATA_SETTINGS_PATH,
+    )
 
     client = _client(tmp_path)
     workspace = tmp_path / "workspace"
@@ -119,13 +122,12 @@ def test_bright_data_enrichment_has_a_direct_api(tmp_path: Path, monkeypatch) ->
     assert response.json() == result
 
 
-def test_job_screen_routes_separate_cached_read_from_explicit_run(
+def test_job_screen_routes_use_one_status_read_and_an_explicit_run(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from resume_builder.web_service import DashboardService
 
     result = {"status": "queued", "job_id": "job-1"}
-    monkeypatch.setattr(DashboardService, "saved_job_screen", lambda self, job_id: None)
     monkeypatch.setattr(DashboardService, "job_screen_status", lambda self, job_id: result)
     monkeypatch.setattr(
         DashboardService, "queue_job_screen", lambda self, job_id, refresh=False: result
@@ -138,7 +140,6 @@ def test_job_screen_routes_separate_cached_read_from_explicit_run(
     )
     client = _client(tmp_path)
 
-    assert client.get("/api/jobs/job-1/screen").status_code == 204
     assert client.get("/api/jobs/job-1/screen-status").json() == result
     response = client.post("/api/jobs/job-1/screen")
     assert response.status_code == 202

@@ -5,8 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from resume_builder import selection_guard, selection_review, synthesis
-from resume_builder.synthesis_models import summary_strategy_payload
+from resume_builder import synthesis
+from resume_builder.planning.models import summary_strategy_payload
+from resume_builder.reviews import selection_guard, selection_review
 
 
 def add_fact(path: Path, fact_id: str, fact_type: str, extra: str = "") -> None:

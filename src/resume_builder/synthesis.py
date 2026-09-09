@@ -9,8 +9,8 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from .synthesis_audit import audit_synthesis, body_evidence_ids, role_arc_payloads
-from .synthesis_loader import (
+from .planning.audit import audit_synthesis, body_evidence_ids, role_arc_payloads
+from .planning.loader import (
     direction_concept_ids,
     direction_page_budget,
     exact_fields,
@@ -21,7 +21,7 @@ from .synthesis_loader import (
     optional_string,
     string_list,
 )
-from .synthesis_models import (
+from .planning.models import (
     CLAIM_COMPOSITIONS,
     COMPETENCY_DECISIONS,
     FIT_STATUSES,

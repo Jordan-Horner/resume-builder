@@ -8,7 +8,8 @@ from pathlib import Path
 import pytest
 
 from resume_builder.agent_contracts import StructuredModelReply, StructuredModelRequest
-from resume_builder.job_screening import (
+from resume_builder.opportunities.resume_recommendations import DirectionalResumeCandidate
+from resume_builder.opportunities.screening import (
     SCREENING_INSTRUCTIONS,
     CandidateScreeningProfile,
     Confidence,
@@ -31,8 +32,7 @@ from resume_builder.job_screening import (
     with_directional_resumes,
     with_screening_evidence,
 )
-from resume_builder.resume_screening import DirectionalResumeCandidate
-from resume_builder.screening_evidence import (
+from resume_builder.opportunities.screening_evidence import (
     CriterionEvidenceMatch,
     CriterionEvidenceStatus,
     EvidenceStrategy,
@@ -40,7 +40,7 @@ from resume_builder.screening_evidence import (
     ScreeningEvidenceCard,
     ScreeningEvidenceSelection,
 )
-from resume_builder.screening_service import ScreeningService
+from resume_builder.opportunities.screening_service import ScreeningService
 
 CASES = json.loads(
     (Path(__file__).parent / "fixtures" / "job_screening_cases.json").read_text(encoding="utf-8")
@@ -420,7 +420,7 @@ class FakeStructuredAdapter:
 def test_screening_service_uses_validated_output_and_content_hash_cache(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
-    caplog.set_level("INFO", logger="resume_builder.screening_service")
+    caplog.set_level("INFO", logger="resume_builder.opportunities.screening_service")
     packet = build_screening_packet(
         {
             "id": "fictional-cache",

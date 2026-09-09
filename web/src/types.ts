@@ -58,6 +58,9 @@ export interface Job {
     hot?: boolean;
     hot_reasons?: string[];
     hot_score: number;
+    hot_label?: "Hot job" | "Recommended" | "Promising" | "Learning your preferences" | "Low priority";
+    interest_label?: "High" | "Neutral" | "Low";
+    company_label?: "Positive" | "Neutral" | "Low";
   } | null;
 }
 

@@ -18,7 +18,6 @@ from .artifact_paths import default_resume_output_base
 from .atomic import atomic_write_json, atomic_write_text
 from .ats import normalize_payload
 from .evidence import audit_claims
-from .feedback_resolution import guidance_snapshot
 from .rendering import contained_project_path, known_fact_ids, render_payload
 from .resume_parser import (
     EVIDENCE,
@@ -36,6 +35,7 @@ from .resume_parser import (
     story_id,
 )
 from .resume_templates import rendering_theme_text
+from .reviews.feedback_resolution import guidance_snapshot
 from .synthesis import audit_synthesis, load_synthesis_plan
 
 __all__ = [

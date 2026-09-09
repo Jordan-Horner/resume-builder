@@ -1,17 +1,17 @@
 from pathlib import Path
 
-from resume_builder.job_screening import (
-    Confidence,
-    CriterionAssessment,
-    CriterionAssessmentOutcome,
-)
-from resume_builder.resume_screening import (
+from resume_builder.opportunities.resume_recommendations import (
     DirectionalResumeCandidate,
     classify_directional_resumes,
     load_directional_resume_candidates,
     match_directional_resumes_by_cited_facts,
 )
-from resume_builder.screening_evidence import (
+from resume_builder.opportunities.screening import (
+    Confidence,
+    CriterionAssessment,
+    CriterionAssessmentOutcome,
+)
+from resume_builder.opportunities.screening_evidence import (
     CriterionEvidenceMatch,
     CriterionEvidenceStatus,
 )

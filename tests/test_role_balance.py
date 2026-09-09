@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from resume_builder.role_balance import role_balance_diagnostic
-from resume_builder.synthesis_models import RoleArc, SynthesisPlan, SynthesisStory
+from resume_builder.planning.models import RoleArc, SynthesisPlan, SynthesisStory
+from resume_builder.planning.role_balance import role_balance_diagnostic
 
 
 def _story(

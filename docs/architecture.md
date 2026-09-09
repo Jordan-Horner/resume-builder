@@ -93,7 +93,23 @@ layering model. `atomic`, `layout`, `rendering`, and `validation` provide shared
 boundaries. Higher-level modules orchestrate source import, synthesis,
 compilation, verification, feedback, review, matching, preview, and minting.
 
-Dependency-neutral modules now separate canonical Markdown parsing, feedback
+Pre-application job work lives under `resume_builder.opportunities`. That domain
+turns external postings into a personalized, reviewable opportunity queue: it
+owns discovery coordination, source enrichment, deterministic eligibility,
+semantic screening, bounded evidence retrieval, recommendations, and preference
+signals. It stops at the application boundary. Application history and Gmail
+lifecycle reconciliation remain sibling workflows, while the portal, assistant,
+and automation layers compose both domains. The root `jobs.py` module is a
+compatibility facade for the established CLI and import surface.
+
+Resume construction is split into two internal domains. `resume_builder.planning`
+owns synthesis-plan models, schema helpers, loading, summary strategy, role
+balance, and plan audits. `resume_builder.reviews` owns narrative-block review,
+feedback memory, selection checks, decisions, repairs, and review packaging.
+The root `synthesis.py`, `feedback_memory.py`, and `review_records.py` modules
+remain compatibility facades for established commands and public imports.
+
+Dependency-neutral modules separate canonical Markdown parsing, feedback
 resolution, review schema enforcement, and synthesis models from the workflows
 that write artifacts. Feedback acceptance pins the user-approved preview, while
 compilation depends only on feedback resolution; neither relationship points
@@ -109,16 +125,16 @@ finalization, wording-only repair, record loading, freshness, and approval
 enforcement. Those responsibilities now live behind a small compatibility
 facade:
 
-- `review_blocks.py` inventories narrative prose and deterministic advisories;
-- `language_review.py` prepares, carries forward, finalizes, and validates the
-  standalone natural-language record;
-- `review_packages.py` builds cold-read and evidence-appendix artifacts;
-- `review_policy.py` selects the transparent hybrid review path from the
+- `reviews/blocks.py` inventories narrative prose and deterministic advisories;
+- `reviews/language_review.py` prepares, carries forward, finalizes, and
+  validates the standalone natural-language record;
+- `reviews/packages.py` builds cold-read and evidence-appendix artifacts;
+- `reviews/policy.py` selects the transparent hybrid review path from the
   synthesis plan;
-- `review_decisions.py` finalizes reviewer-owned decisions;
-- `review_repairs.py` applies the guarded wording-only repair pass;
-- `review_schema.py` strictly loads compatible record versions;
-- `review_approval.py` enforces freshness for route-required or explicitly
+- `reviews/decisions.py` finalizes reviewer-owned decisions;
+- `reviews/repairs.py` applies the guarded wording-only repair pass;
+- `reviews/schema.py` strictly loads compatible record versions;
+- `reviews/approval.py` enforces freshness for route-required or explicitly
   requested deeper critiques.
 
 Compatibility facades keep every pre-split public symbol importable from its
@@ -251,8 +267,9 @@ fit model in one provider call and never waits for that deeper stage.
 Interactive manual quick screens use the already-built posting-wide evidence
 packet in one provider stage and do not retry automatically. The portal queues the existing
 screen and returns immediately, exposes queued/running/failed status separately,
-and polls that lightweight status while the job remains open. Closing the job
-does not cancel the analysis; a successful result is saved in the shared cache.
+and polls one authoritative status endpoint while the job remains open. That same
+endpoint recovers a completed result from the shared cache when no live process
+state exists. Closing the job does not cancel the analysis.
 Queued portal and scheduled screens have a 25-second provider deadline. The
 blocking CLI command uses a shorter 15-second deadline.
 Criterion-driven posting

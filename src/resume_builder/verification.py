@@ -17,15 +17,15 @@ from .atomic import atomic_write_json
 from .compilation import build_resume, relative_output, sha256_file
 from .directions import audit_direction, parse_direction
 from .job_matching import match_job, project_target_path
-from .language_review import current_language_review
 from .rendering import contained_project_path
-from .review_approval import carried_career_review
 from .review_records import (
     build_review_package,
     narrative_block_inventory,
 )
-from .selection_guard import build_selection, guard_selection
-from .selection_review import (
+from .reviews.approval import carried_career_review
+from .reviews.language_review import current_language_review
+from .reviews.selection_guard import build_selection, guard_selection
+from .reviews.selection_review import (
     additive_summary_evidence_only,
     build_selection_review_package,
     carry_forward_selection_review,

@@ -5,7 +5,6 @@ import {
   getJobScreenStatus,
   estimateJobSalary,
   getSavedJobSalary,
-  getSavedJobScreen,
   getOnboardingStatus,
   getSystemStatus,
   getScrapeSchedule,
@@ -117,9 +116,8 @@ describe("dashboard API client", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/jobs/job-1/salary-estimate", undefined);
   });
 
-  it("loads cached screening separately from an explicit screen", async () => {
+  it("loads the authoritative screening status separately from an explicit screen", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ status: "queued", job_id: "job-1" }), {
         status: 200, headers: { "Content-Type": "application/json" },
       }))
@@ -127,13 +125,11 @@ describe("dashboard API client", () => {
         status: 202, headers: { "Content-Type": "application/json" },
       }));
 
-    expect(await getSavedJobScreen("job-1")).toBeNull();
     await getJobScreenStatus("job-1");
     await screenJob("job-1");
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/jobs/job-1/screen", undefined);
-    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/jobs/job-1/screen-status", undefined);
-    expect(fetchMock).toHaveBeenNthCalledWith(3, "/api/jobs/job-1/screen", { method: "POST" });
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/jobs/job-1/screen-status", undefined);
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/jobs/job-1/screen", { method: "POST" });
   });
 
   it("loads and defers onboarding through explicit endpoints", async () => {

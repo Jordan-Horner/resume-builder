@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
-from .feedback_resolution import manifest_guidance_freshness
 from .layout import contained_path
+from .reviews.feedback_resolution import manifest_guidance_freshness
 
 
 @dataclass(frozen=True)

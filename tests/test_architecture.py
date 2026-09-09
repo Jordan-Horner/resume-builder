@@ -82,3 +82,45 @@ def test_audit_accepts_clean_package(tmp_path: Path) -> None:
         )
         == []
     )
+
+
+def test_audit_rejects_cycle_between_nested_packages(tmp_path: Path) -> None:
+    package = tmp_path / "sample_package"
+    (package / "alpha").mkdir(parents=True)
+    (package / "beta").mkdir()
+    (package / "alpha" / "__init__.py").write_text("", encoding="utf-8")
+    (package / "beta" / "__init__.py").write_text("", encoding="utf-8")
+    (package / "alpha" / "service.py").write_text(
+        "from ..beta.worker import run\n",
+        encoding="utf-8",
+    )
+    (package / "beta" / "worker.py").write_text(
+        "from sample_package.alpha.service import start\n",
+        encoding="utf-8",
+    )
+
+    assert audit_architecture(
+        package,
+        facade_line_budgets={},
+        forbidden_imports={},
+    ) == [
+        "package import cycle: alpha.service -> beta.worker -> alpha.service"
+    ]
+
+
+def test_audit_rejects_forbidden_nested_package_dependency(tmp_path: Path) -> None:
+    package = tmp_path / "sample_package"
+    (package / "domain").mkdir(parents=True)
+    (package / "portal").mkdir()
+    (package / "domain" / "service.py").write_text(
+        "from ..portal.app import create_app\n",
+        encoding="utf-8",
+    )
+    (package / "portal" / "app.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    assert audit_architecture(
+        package,
+        facade_line_budgets={},
+        forbidden_imports={},
+        forbidden_package_imports={"domain": {"portal"}},
+    ) == ["domain.service imports forbidden packages: ['portal.app']"]

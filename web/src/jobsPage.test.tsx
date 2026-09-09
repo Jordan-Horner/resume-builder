@@ -13,7 +13,7 @@ vi.mock("./api", () => ({
   hideJobPosting: vi.fn(), markJobNotInterested: vi.fn(), setCompanyBlocked: vi.fn(), activateJobSearch: vi.fn(),
   getJobSources: vi.fn(), startJobScan: vi.fn(), estimateJobSalary: vi.fn(),
   getSavedJobSalary: vi.fn(),
-  getSavedJobScreen: vi.fn(), getJobScreenStatus: vi.fn(), screenJob: vi.fn(),
+  getJobScreenStatus: vi.fn(), screenJob: vi.fn(),
   getJobFeedback: vi.fn(), saveJobFeedback: vi.fn(), recordJobPostingOpened: vi.fn(),
   getScrapeSchedule: vi.fn(),
 }));
@@ -35,7 +35,6 @@ beforeEach(() => {
   vi.mocked(api.markJobApplied).mockResolvedValue({});
   vi.mocked(api.hideJobPosting).mockResolvedValue({ job_id: "one", reason: "closed", personalization_updated: false });
   vi.mocked(api.getSavedJobSalary).mockResolvedValue(null);
-  vi.mocked(api.getSavedJobScreen).mockResolvedValue(null);
   vi.mocked(api.getJobScreenStatus).mockResolvedValue({ status: "idle", job_id: "one" });
   vi.mocked(api.getJobFeedback).mockResolvedValue({ job_id: "one", latest: null, personalization: { hot_label: "Learning your preferences", fit_score: 0.25, interest_score: 0.5, company_score: 0.5, fit_label: "Low", interest_label: "Neutral", company_label: "Neutral", confidence: "unknown", reasons: [], hot: false, hot_reasons: [] } });
   vi.mocked(api.saveJobFeedback).mockResolvedValue({ job_id: "one", latest: { action: "interested", reasons: [], created_at: "2026-09-06T12:00:00Z" }, personalization: { hot_label: "Low priority", fit_score: 0.25, interest_score: 0.85, company_score: 0.5, fit_label: "Low", interest_label: "High", company_label: "Neutral", confidence: "unknown", reasons: ["You marked this job positively."], hot: false, hot_reasons: [] } });
@@ -241,7 +240,7 @@ it("shows when the scheduled search is still preparing recommendations", async (
   await act(async () => root.render(<JobsPage />));
 
   expect(host.textContent).toContain("Finding new jobs…");
-  expect(host.textContent).toContain("deterministic matches will appear here immediately");
+  expect(host.textContent).toContain("New matches will be screened automatically");
 });
 
 it("keeps failed automatic-screen metadata out of the queue", async () => {
@@ -266,8 +265,8 @@ it("does not call a completed background screen unscreened in job details", asyn
 
   await openJob();
 
-  expect(host.textContent).toContain("Screened in background");
-  expect(host.textContent).toContain("Run screen again");
+  expect(host.textContent).toContain("Quick screen complete");
+  expect(host.textContent).not.toContain("Refresh screen");
   expect(host.textContent).not.toContain("Not screened yet");
 });
 
@@ -417,6 +416,25 @@ it("queues a slow screen and renders its background result without blocking the 
   expect(host.textContent).toContain("Relevant support experience.");
 });
 
+it("shows persisted screening and recommendation metadata without waiting for detail calls", async () => {
+  const screenedJob: Job = {
+    ...job,
+    quick_screen: { status: "complete", label: "Good fit", resume_name: "Support Engineer", generated_at: "2026-09-08T12:00:00Z" },
+    personalization: { hot: true, hot_reasons: ["career_fit"], hot_score: 0.9, hot_label: "Hot job", interest_label: "High", company_label: "Positive" },
+  };
+  vi.mocked(api.getJobs).mockResolvedValue({ jobs: [screenedJob], count: 1, reviewable_count: 1 });
+  vi.mocked(api.getJobScreenStatus).mockImplementation(() => new Promise(() => {}));
+  vi.mocked(api.getJobFeedback).mockImplementation(() => new Promise(() => {}));
+  vi.mocked(api.getResumeRecommendation).mockImplementation(() => new Promise(() => {}));
+
+  await openJob();
+
+  expect(host.textContent).toContain("Quick screen complete");
+  expect(host.textContent).toContain("Hot recommendation");
+  expect(host.textContent).not.toContain("Checking screen status");
+  expect(host.textContent).not.toContain("Loading recommendation details");
+});
+
 it("restores an in-progress screen when the job is reopened before other details finish loading", async () => {
   vi.useFakeTimers();
   vi.mocked(api.screenJob).mockResolvedValue({ status: "queued", job_id: "one", message: "Analysis queued." });
@@ -454,6 +472,28 @@ it("keeps a long-running screen visibly active past the old polling cutoff", asy
   expect(host.textContent).not.toContain("You can try again");
   expect([...host.querySelectorAll("button")].some((button) => button.textContent === "Screen job")).toBe(false);
   expect(api.screenJob).toHaveBeenCalledTimes(1);
+});
+
+it("notices a scheduled recommendation refresh after starting idle", async () => {
+  vi.useFakeTimers();
+  vi.mocked(api.getJobs).mockResolvedValue({ jobs: [], count: 0, reviewable_count: 1 });
+  const base: Omit<api.ScrapeSchedule, "current_stage"> = {
+    configured: true, enabled: true, times: ["08:00"], timezone: "America/New_York",
+    next_run: null, last_run: null, service_status: "online", screening_enabled: true,
+    screening_max_jobs: 15, screening_available: true,
+  };
+  vi.mocked(api.getScrapeSchedule)
+    .mockResolvedValueOnce({ ...base, current_stage: "idle", recommendation_revision: "0" })
+    .mockResolvedValueOnce({ ...base, current_stage: "searching", recommendation_revision: "0" })
+    .mockResolvedValue({ ...base, current_stage: "screening", recommendation_revision: "1" });
+
+  await act(async () => root.render(<JobsPage />));
+  await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+  expect(host.textContent).toContain("Finding new jobs");
+  await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+
+  expect(api.getJobs).toHaveBeenCalledTimes(2);
+  expect(host.textContent).toContain("Screening recommendations");
 });
 
 it("keeps screening state and late results attached to the job that started them", async () => {

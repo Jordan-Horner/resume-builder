@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_vali
 from job_puller.compensation import convert_compensation_period
 from job_puller.locations import matches_local_location, matches_search_location
 
-from .job_screening import has_clearance_requirement
+from .opportunities.screening import has_clearance_requirement
 
 FilterTerm = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 

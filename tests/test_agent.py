@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from resume_builder import agent as agent_module
-from resume_builder import agent_tools, jobs
+from resume_builder import agent_tools
 from resume_builder.agent import AgentService, ConsoleAdapter, main
 from resume_builder.agent_config import load_agent_config, render_default_agent_config
 from resume_builder.agent_contracts import (
@@ -22,9 +22,10 @@ from resume_builder.agent_contracts import (
     StructuredModelRequest,
 )
 from resume_builder.agent_openrouter import OpenRouterAdapter
-from resume_builder.discovery_activation import preview_activation, save_portfolio
-from resume_builder.discovery_evidence import ResumeDocument, TitlePosture
-from resume_builder.discovery_portfolio import (
+from resume_builder.opportunities import cli as jobs
+from resume_builder.opportunities.discovery_activation import preview_activation, save_portfolio
+from resume_builder.opportunities.discovery_evidence import ResumeDocument, TitlePosture
+from resume_builder.opportunities.discovery_portfolio import (
     ColdStartLane,
     ColdStartPortfolio,
     ColdStartQuery,
@@ -34,7 +35,7 @@ from resume_builder.discovery_portfolio import (
     TitleGenerationResult,
     generation_request_hash,
 )
-from resume_builder.job_screening import (
+from resume_builder.opportunities.screening import (
     Confidence,
     FitOutcome,
     SemanticScreen,

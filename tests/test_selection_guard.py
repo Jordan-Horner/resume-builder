@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from resume_builder import selection_guard
+from resume_builder.reviews import selection_guard
 
 
 def selection() -> dict[str, object]:

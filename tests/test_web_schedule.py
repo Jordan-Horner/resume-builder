@@ -57,6 +57,54 @@ def test_schedule_reports_searching_and_screening_artifact_stages(
     assert screening["current_stage"] == "screening"
 
 
+def test_stale_replenishment_state_does_not_report_screening(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / DEFAULT_CONFIG
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        render_default_config("America/New_York").replace("enabled: false", "enabled: true", 1),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(web_schedule, "background_screening_configured", lambda _root: True)
+    refresh = tmp_path / "job-search/latest-refresh.json"
+    refresh.parent.mkdir(parents=True)
+    refresh.write_text(
+        json.dumps({"status": "complete", "started_at": "2026-09-05T12:00:00+00:00"}),
+        encoding="utf-8",
+    )
+    replenishment = tmp_path / web_schedule.DEFAULT_REPLENISHMENT_STATE
+    replenishment.write_text(json.dumps({"status": "running"}), encoding="utf-8")
+
+    status = web_schedule.schedule_status(tmp_path, state_path=tmp_path / "state.sqlite")
+
+    assert status["current_stage"] == "idle"
+
+
+def test_stale_replenishment_state_does_not_report_live_screening(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / DEFAULT_CONFIG
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        render_default_config("America/New_York").replace("enabled: false", "enabled: true", 1),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(web_schedule, "background_screening_configured", lambda _root: True)
+    refresh = tmp_path / "job-search/latest-refresh.json"
+    refresh.parent.mkdir(parents=True)
+    refresh.write_text(
+        json.dumps({"status": "complete", "started_at": "2026-09-05T12:00:00+00:00"}),
+        encoding="utf-8",
+    )
+    replenishment = tmp_path / web_schedule.DEFAULT_REPLENISHMENT_STATE
+    replenishment.write_text(json.dumps({"status": "running"}), encoding="utf-8")
+
+    status = web_schedule.schedule_status(tmp_path, state_path=tmp_path / "state.sqlite")
+
+    assert status["current_stage"] == "idle"
+
+
 def test_save_schedule_reuses_automation_config_and_preserves_other_settings(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -30,14 +30,16 @@ import yaml
 
 from job_puller.config import load_config as load_job_config
 
-from . import gmail_automation, jobs
+from . import gmail_automation
 from .applications import reapplication_opportunities
 from .atomic import atomic_write_text
 from .background_screening import (
+    DEFAULT_REPLENISHMENT_STATE,
     background_screening_configured,
-    run_background_quick_screening,
+    run_background_replenishment,
 )
-from .job_screening_queue import (
+from .opportunities import cli as jobs
+from .opportunities.screening_queue import (
     DEFAULT_SCREENING_OUTPUT,
     load_notification_jobs,
 )
@@ -1032,17 +1034,10 @@ def _run_jobs(config: AutomationConfig) -> dict[str, object]:
         matches = _reviewable_jobs(jobs.DEFAULT_NEW_OUTPUT)
         if config.jobs.semantic_screening_enabled:
             try:
-                # Screening the full active shortlist seeds existing installations and
-                # lets cached results advance the bounded provider budget on later runs.
-                with Path(os.devnull).open("w", encoding="utf-8") as null_stream:
-                    with redirect_stdout(null_stream), redirect_stderr(null_stream):
-                        shortlist_code = jobs.main(["shortlist", "--limit", str(config.jobs.limit)])
-                if shortlist_code != 0:
-                    raise RuntimeError("active job shortlist could not be prepared")
-                queue_summary = run_background_quick_screening(
+                queue_summary = run_background_replenishment(
                     workspace,
                     max_jobs=config.jobs.semantic_screening_max_jobs,
-                    input_path=workspace / jobs.DEFAULT_OUTPUT,
+                    display_limit=config.jobs.limit,
                 )
                 new_job_ids = {
                     str(value)
@@ -1336,6 +1331,18 @@ def _gmail_due(now: datetime, config: AutomationConfig, state: AutomationState) 
     return config.gmail.run_on_start if last is None else now >= last + config.gmail.every
 
 
+def _screening_backlog_pending(workspace: Path) -> bool:
+    path = workspace / DEFAULT_REPLENISHMENT_STATE
+    if not path.is_file():
+        return False
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    pending = payload.get("pending_jobs") if isinstance(payload, dict) else None
+    return type(pending) is int and pending > 0
+
+
 def _local_timestamp(value: datetime, timezone: ZoneInfo) -> str:
     return value.astimezone(timezone).isoformat(timespec="minutes")
 
@@ -1371,13 +1378,36 @@ def run_forever(
         service.state.initialize()
         service.state.record_service_heartbeat(running=True, service=service_name)
         now = datetime.now(UTC)
-        job_last = _last_finished(service.state, "jobs")
+        jobs_due_now = (
+            "jobs" in selected
+            and service.config.jobs.enabled
+            and _jobs_due(now, service.config, service.state)
+        )
+        if (
+            "jobs" in selected
+            and service.config.jobs.enabled
+            and service.config.jobs.semantic_screening_enabled
+            and background_screening_configured(service.workspace)
+            and not jobs_due_now
+            and _screening_backlog_pending(service.workspace)
+        ):
+            try:
+                run_background_replenishment(
+                    service.workspace,
+                    max_jobs=service.config.jobs.semantic_screening_max_jobs,
+                    display_limit=service.config.jobs.limit,
+                )
+            except (OSError, RuntimeError, ValueError):
+                _log(
+                    logging.WARNING,
+                    "screening_resume_unavailable",
+                    stage="screen",
+                )
         gmail_last = _last_finished(service.state, "gmail")
         due = {
             "jobs": (
                 now
-                if (job_last is None and service.config.jobs.run_on_start)
-                or _jobs_due(now, service.config, service.state)
+                if jobs_due_now
                 else next_job_run(now, service.config.jobs, service.config.timezone)
             ),
             "gmail": (
@@ -1409,7 +1439,6 @@ def run_forever(
             service.state.record_service_heartbeat(running=True, service=service_name)
             now = datetime.now(UTC)
             if service.reload_config():
-                job_last = _last_finished(service.state, "jobs")
                 gmail_last = _last_finished(service.state, "gmail")
                 due["jobs"] = next_job_run(now, service.config.jobs, service.config.timezone)
                 due["gmail"] = (

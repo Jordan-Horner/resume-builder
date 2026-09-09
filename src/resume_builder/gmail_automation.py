@@ -37,7 +37,7 @@ from .applications import (
     iter_records,
 )
 from .gmail_semantic import SemanticEmailClassifier, SemanticLifecycleOutcome
-from .jobs import DEFAULT_CONFIG
+from .opportunities.cli import DEFAULT_CONFIG
 
 GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
 CLASSIFIER_VERSION = "application-lifecycle-rules-v8"

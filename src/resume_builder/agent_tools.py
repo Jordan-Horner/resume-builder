@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from . import jobs
 from .agent_contracts import AgentTool
 from .automation import AutomationState
+from .opportunities import cli as jobs
 
 
 def build_read_only_tools(state_path: Path) -> tuple[AgentTool, ...]:

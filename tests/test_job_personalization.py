@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from resume_builder.job_personalization import (
+from datetime import UTC, datetime, timedelta
+
+from resume_builder.opportunities.personalization import (
     build_shadow_order,
     extract_preference_traits,
     extract_seniority,
@@ -111,6 +113,20 @@ def test_company_recognition_is_a_capped_tiebreaker_not_a_fit_override():
     assert scores["job-1"]["score"] > scores["job-2"]["score"]
     assert scores["job-3"]["score"] < scores["job-2"]["score"]
     assert scores["job-1"]["hot"] is False
+
+
+def test_recent_posting_gets_only_a_small_ranking_boost():
+    recent = _item("job-1", "strong")
+    old = _item("job-2", "strong")
+    recent["posted_at"] = datetime.now(UTC).isoformat()
+    old["posted_at"] = (datetime.now(UTC) - timedelta(days=45)).isoformat()
+
+    recent_score = score_shadow_job(recent, positive_titles=[])
+    old_score = score_shadow_job(old, positive_titles=[])
+
+    assert 0 < recent_score["freshness_boost"] <= 0.03
+    assert old_score["freshness_boost"] == 0
+    assert recent_score["score"] > old_score["score"]
 
 
 def test_exact_optional_preferences_refine_deterministic_interest_score():
