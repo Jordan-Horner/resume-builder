@@ -12,14 +12,12 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ..atomic import atomic_write_text
-from ..automation import (
+from ..automation import AutomationState, default_state_path, next_job_run
+from ..automation_config import (
     DEFAULT_CONFIG,
     AutomationConfig,
-    AutomationState,
     configure,
-    default_state_path,
     load_config,
-    next_job_run,
     render_default_config,
 )
 from ..background_screening import (

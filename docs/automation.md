@@ -5,6 +5,12 @@ low-noise schedule. The scheduler is a native engine capability; Docker Compose
 is the supported always-on deployment wrapper. No web server or inbound port is
 required.
 
+Automation configuration is an independent boundary in
+`resume_builder.automation_config`: it owns schedule models, YAML validation,
+serialization, and atomic configuration updates. The established
+`resume_builder.automation` imports remain compatible, while runtime services
+can depend on configuration without importing the full scheduler orchestrator.
+
 ## What runs automatically
 
 - Job discovery runs at one or more local times each day. Each run refreshes
