@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from job_puller.config import load_config, resolve_database_path
 
 from ..atomic import atomic_write_json, atomic_write_text
+from ..vault.source_import import is_metadata_name
 from ..workspace_management.state import discover_workspace
 from .cli import (
     DEFAULT_OUTPUT,
@@ -160,7 +161,14 @@ def _resume_terms(root: Path, preferences: dict[str, Any]) -> set[str]:
         "resumes/baselines/*.md",
         "resumes/tailored/*.md",
     ]
-    paths = sorted({path for pattern in patterns for path in root.glob(pattern) if path.is_file()})
+    paths = sorted(
+        {
+            path
+            for pattern in patterns
+            for path in root.glob(pattern)
+            if path.is_file() and not is_metadata_name(path.name)
+        }
+    )
     return _terms("\n".join(path.read_text(encoding="utf-8") for path in paths))
 
 

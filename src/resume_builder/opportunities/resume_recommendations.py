@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from ..matching.grading import classify_match
 from ..resume_documents.markdown import compile_markdown
 from ..vault.evidence import claim_blocks
+from ..vault.source_import import is_metadata_name
 
 ResumeMatchLabel = Literal["Strong match", "Partial match", "Weak match", "Unknown match"]
 ResumeText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]
@@ -56,13 +57,21 @@ class ResumeMatchGuidance(_StrictModel):
     detail: ResumeText
 
 
+def directional_resume_paths(workspace: Path) -> list[Path]:
+    """Return visible directional resume files in stable order."""
+    root = workspace.expanduser().resolve()
+    return [
+        path
+        for path in sorted((root / "resumes" / "baselines").glob("*.md"))
+        if not is_metadata_name(path.name) and path.name.casefold() != "readme.md"
+    ]
+
+
 def load_directional_resume_candidates(workspace: Path) -> list[DirectionalResumeCandidate]:
     """Load valid, active directional resumes; archived and tailored files stay out."""
     candidates: list[DirectionalResumeCandidate] = []
     root = workspace.expanduser().resolve()
-    for path in sorted((root / "resumes" / "baselines").glob("*.md")):
-        if path.name.casefold() == "readme.md":
-            continue
+    for path in directional_resume_paths(root):
         try:
             content = path.read_text(encoding="utf-8")
             payload = compile_markdown(content)

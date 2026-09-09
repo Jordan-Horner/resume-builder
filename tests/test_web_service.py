@@ -1653,6 +1653,7 @@ def test_resume_recommendation_reports_no_match_when_directional_resumes_exist(t
     folder.mkdir(parents=True)
     (folder / "support.md").write_text("# Support\n", encoding="utf-8")
     (folder / "platform.md").write_text("# Platform\n", encoding="utf-8")
+    (folder / "._support.md").write_text("metadata", encoding="utf-8")
 
     result = DashboardService(
         tmp_path, inventory_loader=lambda: inventory
@@ -1660,6 +1661,10 @@ def test_resume_recommendation_reports_no_match_when_directional_resumes_exist(t
 
     assert result["status"] == "unavailable"
     assert result["message"] == "No matching directional resume was identified for this job."
+    assert [resume["id"] for resume in result["available_resumes"]] == [
+        "resumes/baselines/platform.md",
+        "resumes/baselines/support.md",
+    ]
 
 
 def test_mark_applied_requires_a_choice_between_multiple_directional_resumes(tmp_path, inventory):

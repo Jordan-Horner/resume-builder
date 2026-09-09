@@ -89,6 +89,7 @@ from ..opportunities.personalization import (
 from ..opportunities.posting import PostingInterpretationCache
 from ..opportunities.preferences import _validated as validate_preferences
 from ..opportunities.resume_recommendations import (
+    directional_resume_paths,
     load_directional_resume_candidates,
     resume_match_guidance,
 )
@@ -1045,7 +1046,7 @@ class DashboardService:
                 target_path, target_data = candidate, data
                 break
 
-        baselines = sorted((self.workspace / "resumes" / "baselines").glob("*.md"))
+        baselines = directional_resume_paths(self.workspace)
         selected: Path | None = None
         kind: str | None = None
         match_report: Path | None = None

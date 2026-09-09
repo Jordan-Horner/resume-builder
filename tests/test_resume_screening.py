@@ -151,6 +151,10 @@ Operates reliable production services. <!-- evidence: FACT-SRE -->
         encoding="utf-8",
     )
     (folder / "broken.md").write_text("# Not a canonical resume\n", encoding="utf-8")
+    (folder / "._sre.md").write_text(
+        (folder / "sre.md").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
 
     candidates = load_directional_resume_candidates(tmp_path)
 

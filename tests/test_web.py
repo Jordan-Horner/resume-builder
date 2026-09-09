@@ -73,6 +73,88 @@ def test_mark_applied_api_forwards_the_resume_used(
     }
 
 
+def test_mark_applied_api_moves_job_to_applications_with_resume_preview(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = _client(tmp_path)
+    workspace = tmp_path / "workspace"
+    fact = workspace / "vault" / "facts" / "skills" / "FACT-DEVOPS.md"
+    fact.parent.mkdir(parents=True, exist_ok=True)
+    fact.write_text(
+        """---
+schema_version: 2
+id: FACT-DEVOPS
+title: DevOps engineering
+type: responsibility
+status: confirmed
+category: skills
+sources: [SRC-example]
+---
+
+# DevOps engineering
+
+Builds and operates cloud platforms.
+""",
+        encoding="utf-8",
+    )
+    resume = workspace / "resumes" / "baselines" / "devops-engineer.md"
+    resume.parent.mkdir(parents=True, exist_ok=True)
+    resume.write_text(
+        """---
+version: 1
+lang: en
+page_format: letter
+candidate:
+  name: Example User
+  headline: DevOps Engineer
+  email: example@example.invalid
+  evidence: [FACT-DEVOPS]
+---
+
+# Professional Summary
+
+DevOps engineer. <!-- evidence: FACT-DEVOPS -->
+""",
+        encoding="utf-8",
+    )
+    job = {
+        "id": "job-1",
+        "company": "Example Company",
+        "title": "Platform Engineer",
+        "url": "https://example.invalid/jobs/1",
+        "location": "Remote, US",
+        "work_modes": ["remote"],
+        "salary_min": 125_000,
+        "salary_max": 145_000,
+        "salary_currency": "USD",
+        "description": "Build and operate a cloud platform.",
+    }
+    monkeypatch.setattr(
+        DashboardService,
+        "get_job",
+        lambda _service, job_id: job if job_id == "job-1" else None,
+    )
+
+    response = client.post(
+        "/api/jobs/job-1/applied",
+        json={"resume_id": "resumes/baselines/devops-engineer.md"},
+    )
+
+    assert response.status_code == 201
+    applications = client.get("/api/applications").json()["applications"]
+    assert len(applications) == 1
+    application = applications[0]
+    assert application["job_id"] == "job-1"
+    assert application["current_status"] == "applied"
+    assert application["resume"]["path"] == "resumes/baselines/devops-engineer.md"
+    assert application["resume"]["preview_url"] == (
+        f"/api/applications/{application['id']}/resume-preview"
+    )
+    preview = client.get(application["resume"]["preview_url"])
+    assert preview.status_code == 200, preview.text
+    assert "DevOps Engineer" in preview.text
+
+
 def test_mark_applied_api_rejects_an_invalid_resume_id(tmp_path: Path) -> None:
     response = _client(tmp_path).post(
         "/api/jobs/job-1/applied",
