@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -241,7 +242,7 @@ def test_telegram_lock_prevents_a_second_consumer(tmp_path: Path) -> None:
 
 def test_legacy_pending_payload_is_discarded_during_migration(tmp_path: Path) -> None:
     state_path = tmp_path / "legacy.sqlite"
-    with sqlite3.connect(state_path) as connection:
+    with closing(sqlite3.connect(state_path)) as connection, connection:
         connection.execute(
             """
             CREATE TABLE telegram_updates(

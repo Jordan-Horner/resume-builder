@@ -8,6 +8,8 @@ import logging
 import re
 import sqlite3
 import unicodedata
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -685,7 +687,8 @@ class PostingInterpretationCache:
     def __init__(self, path: Path):
         self.path = path
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         connection = sqlite3.connect(self.path)
         connection.execute(
@@ -695,7 +698,11 @@ class PostingInterpretationCache:
                 created_at TEXT NOT NULL
             )"""
         )
-        return connection
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
 
     @staticmethod
     def key(packet: PostingInterpretationPacket, model: str) -> str:

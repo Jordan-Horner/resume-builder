@@ -566,6 +566,15 @@ class AutomationState:
         self.path = path.expanduser().resolve()
 
     @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        connection = sqlite3.connect(self.path)
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
+
+    @contextmanager
     def locked(self, service: str | None = None) -> Iterator[None]:
         suffix = f".{service}.lock" if service else ".lock"
         lock_path = self.path.with_suffix(f"{self.path.suffix}{suffix}")
@@ -587,7 +596,7 @@ class AutomationState:
         os.close(descriptor)
         os.chmod(self.path, 0o600)
 
-        with sqlite3.connect(self.path) as connection:
+        with self._connect() as connection:
             connection.executescript(
                 """
                 PRAGMA journal_mode=WAL;
@@ -628,7 +637,7 @@ class AutomationState:
         """Return whether the scheduler has a fresh heartbeat or holds its lock."""
         if self.path.is_file():
             try:
-                with sqlite3.connect(self.path) as connection:
+                with self._connect() as connection:
                     if service:
                         row = connection.execute(
                             "SELECT running, updated_at FROM service_heartbeats WHERE service = ?",
@@ -662,7 +671,7 @@ class AutomationState:
         """Persist a content-free scheduler heartbeat for portable liveness checks."""
         if not self.path.is_file():
             self.initialize()
-        with sqlite3.connect(self.path) as connection:
+        with self._connect() as connection:
             if service:
                 connection.execute(
                     """
@@ -695,7 +704,7 @@ class AutomationState:
         error_category: str | None = None,
     ) -> None:
         self.initialize()
-        with sqlite3.connect(self.path) as connection:
+        with self._connect() as connection:
             connection.execute(
                 """INSERT INTO task_runs(
                        task, started_at, finished_at, status, summary_json, error_category
@@ -713,7 +722,7 @@ class AutomationState:
     def last_run(self, task: str) -> dict[str, object] | None:
         if not self.path.is_file():
             return None
-        with sqlite3.connect(self.path) as connection:
+        with self._connect() as connection:
             row = connection.execute(
                 """SELECT started_at, finished_at, status, summary_json, error_category
                    FROM task_runs WHERE task=? ORDER BY id DESC LIMIT 1""",
@@ -731,7 +740,7 @@ class AutomationState:
 
     def enqueue(self, notification: Notification) -> None:
         self.initialize()
-        with sqlite3.connect(self.path) as connection:
+        with self._connect() as connection:
             connection.execute(
                 """INSERT OR IGNORE INTO notification_outbox(
                        notification_key, title, body, priority, created_at
@@ -748,7 +757,7 @@ class AutomationState:
     def pending_notifications(self) -> list[Notification]:
         if not self.path.is_file():
             return []
-        with sqlite3.connect(self.path) as connection:
+        with self._connect() as connection:
             rows = connection.execute(
                 """SELECT notification_key, title, body, priority
                    FROM notification_outbox WHERE delivered_at IS NULL ORDER BY created_at"""
@@ -756,7 +765,7 @@ class AutomationState:
         return [Notification(*map(str, row)) for row in rows]
 
     def delivery_succeeded(self, key: str) -> None:
-        with sqlite3.connect(self.path) as connection:
+        with self._connect() as connection:
             connection.execute(
                 """UPDATE notification_outbox
                    SET delivered_at=?, attempts=attempts+1, last_error=NULL
@@ -765,7 +774,7 @@ class AutomationState:
             )
 
     def delivery_failed(self, key: str, error: str) -> None:
-        with sqlite3.connect(self.path) as connection:
+        with self._connect() as connection:
             connection.execute(
                 """UPDATE notification_outbox
                    SET attempts=attempts+1, last_error=? WHERE notification_key=?""",
@@ -775,7 +784,7 @@ class AutomationState:
     def status(self) -> dict[str, object]:
         pending = 0
         if self.path.is_file():
-            with sqlite3.connect(self.path) as connection:
+            with self._connect() as connection:
                 pending = int(
                     connection.execute(
                         "SELECT COUNT(*) FROM notification_outbox WHERE delivered_at IS NULL"

@@ -379,6 +379,15 @@ class GmailRuntimeState:
         self.path = path.expanduser().resolve()
 
     @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        conn = sqlite3.connect(self.path)
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
+
+    @contextmanager
     def locked(self) -> Iterator[None]:
         """Prevent overlapping scans from applying the same mailbox changes."""
         lock_path = self.path.with_suffix(f"{self.path.suffix}.lock")
@@ -399,7 +408,7 @@ class GmailRuntimeState:
         descriptor = os.open(self.path, os.O_WRONLY | os.O_CREAT, 0o600)
         os.close(descriptor)
         os.chmod(self.path, 0o600)
-        with sqlite3.connect(self.path) as conn:
+        with self._connect() as conn:
             conn.executescript(
                 """
                 PRAGMA journal_mode=WAL;
@@ -434,7 +443,7 @@ class GmailRuntimeState:
     def history_id(self, account_id: str) -> str | None:
         if not self.path.is_file():
             return None
-        with sqlite3.connect(self.path) as conn:
+        with self._connect() as conn:
             row = conn.execute(
                 "SELECT history_id FROM mailbox_state WHERE account_id=?", (account_id,)
             ).fetchone()
@@ -443,7 +452,7 @@ class GmailRuntimeState:
     def set_history_id(self, account_id: str, history_id: str) -> None:
         self.initialize()
         now = datetime.now(UTC).isoformat()
-        with sqlite3.connect(self.path) as conn:
+        with self._connect() as conn:
             conn.execute(
                 """INSERT INTO mailbox_state(account_id, history_id, updated_at)
                    VALUES (?, ?, ?)
@@ -462,7 +471,7 @@ class GmailRuntimeState:
     ) -> bool:
         if not self.path.is_file():
             return False
-        with sqlite3.connect(self.path) as conn:
+        with self._connect() as conn:
             row = conn.execute(
                 """SELECT disposition, classifier_version FROM processed_messages
                    WHERE account_id=? AND message_id=?""",
@@ -493,7 +502,7 @@ class GmailRuntimeState:
         """Resolve a prior content-free thread association, when unique."""
         if not self.path.is_file() or not thread_id:
             return None
-        with sqlite3.connect(self.path) as conn:
+        with self._connect() as conn:
             rows = conn.execute(
                 """SELECT DISTINCT application_id FROM processed_messages
                    WHERE account_id=? AND thread_id=? AND application_id IS NOT NULL""",
@@ -507,7 +516,7 @@ class GmailRuntimeState:
         domain_hash = _sender_domain_hash(sender)
         if not self.path.is_file() or domain_hash is None:
             return None
-        with sqlite3.connect(self.path) as conn:
+        with self._connect() as conn:
             rows = conn.execute(
                 """SELECT DISTINCT application_id FROM processed_messages
                    WHERE account_id=? AND sender_domain_hash=? AND application_id IS NOT NULL""",
@@ -527,7 +536,7 @@ class GmailRuntimeState:
         classifier_version: str = CLASSIFIER_VERSION,
     ) -> None:
         self.initialize()
-        with sqlite3.connect(self.path) as conn:
+        with self._connect() as conn:
             conn.execute(
                 """INSERT INTO processed_messages(
                        account_id, message_id, thread_id, received_at, disposition,
@@ -563,7 +572,7 @@ class GmailRuntimeState:
     def status(self) -> dict[str, object]:
         if not self.path.is_file():
             return {"initialized": False, "path": str(self.path), "mailboxes": 0, "messages": 0}
-        with sqlite3.connect(self.path) as conn:
+        with self._connect() as conn:
             mailboxes = conn.execute("SELECT COUNT(*) FROM mailbox_state").fetchone()[0]
             messages = conn.execute("SELECT COUNT(*) FROM processed_messages").fetchone()[0]
             dispositions = {

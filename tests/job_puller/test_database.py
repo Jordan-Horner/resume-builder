@@ -1,5 +1,8 @@
 import json
+import sqlite3
 from datetime import UTC, datetime, timedelta
+
+import pytest
 
 from job_puller.database import MIGRATION_1, InventoryDatabase
 from job_puller.models import JobObservation, ProviderResult
@@ -49,6 +52,16 @@ def test_migrate_and_insert(tmp_path):
     assert db.stats()["jobs"] == 1
     assert db.stats()["observations"] == 1
     assert db.stats()["complete_descriptions"] == 1
+
+
+def test_connect_closes_connection_after_context(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+
+    with db.connect() as connection:
+        connection.execute("SELECT 1")
+
+    with pytest.raises(sqlite3.ProgrammingError, match="closed database"):
+        connection.execute("SELECT 1")
 
 
 def test_active_inventory_exposes_stable_consumer_projection(tmp_path):

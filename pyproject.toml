@@ -80,6 +80,10 @@ resume_builder = [
 [tool.pytest.ini_options]
 addopts = "-q --strict-markers --cov=resume_builder --cov-report=term-missing --cov-fail-under=75"
 testpaths = ["tests"]
+filterwarnings = [
+  "error",
+  "ignore:The anyio\\.abc\\.BlockingPortal alias is deprecated.*:DeprecationWarning:starlette\\.testclient",
+]
 markers = [
   "browser: requires the installed Playwright Chromium runtime",
 ]

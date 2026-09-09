@@ -277,14 +277,19 @@ class InventoryDatabase:
         self.raw_retention_days = raw_retention_days
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
-    def connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def connect(self) -> Iterator[sqlite3.Connection]:
         conn = sqlite3.connect(self.path)
         conn.text_factory = _decode_inventory_text
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("PRAGMA journal_mode = WAL")
         conn.execute("PRAGMA busy_timeout = 5000")
-        return conn
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
 
     def migrate(self) -> None:
         existed = self.path.exists() and self.path.stat().st_size > 0
@@ -322,16 +327,9 @@ class InventoryDatabase:
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
-        conn = self.connect()
-        try:
+        with self.connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             yield conn
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
 
     def checkpoint(self, source_key: str) -> datetime | None:
         with self.connect() as conn:

@@ -33,6 +33,10 @@ The complete test suite installs Chromium through Playwright. A pull request
 should pass the same test, lint, format, type, build, distribution, and fictional
 fixture checks defined in `.github/workflows/ci.yml`.
 
+Pytest treats warnings as errors so resource leaks and deprecations cannot hide
+in otherwise passing output. Keep any temporary exception narrowly scoped to a
+specific upstream warning and remove it when that dependency resolves the issue.
+
 CI runs lint, formatting, and type checks once on Python 3.11 before starting
 the Python matrix and pull-request container build. Both Python 3.11 and 3.14 run the full
 test suite, including Chromium PDF tests. Architecture and committed demo-asset

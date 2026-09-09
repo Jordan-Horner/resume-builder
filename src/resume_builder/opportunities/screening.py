@@ -6,7 +6,8 @@ import hashlib
 import json
 import re
 import sqlite3
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -1289,7 +1290,8 @@ class ScreeningCache:
     def __init__(self, path: Path):
         self.path = path
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         connection = sqlite3.connect(self.path)
         connection.execute(
@@ -1299,7 +1301,11 @@ class ScreeningCache:
                 created_at TEXT NOT NULL
             )"""
         )
-        return connection
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
 
     @staticmethod
     def key(packet: ScreeningPacket, model: str) -> str:
