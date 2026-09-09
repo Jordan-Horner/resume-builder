@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from resume_builder.updates import UpdateChecker
+from resume_builder.portal.updates import UpdateChecker
 
 
 def release(revision="b" * 40, built_at="2026-09-05T12:00:00Z"):

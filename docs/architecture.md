@@ -116,8 +116,8 @@ owns discovery coordination, source enrichment, deterministic eligibility,
 semantic screening, bounded evidence retrieval, recommendations, and preference
 signals. It stops at the application boundary. Application history and Gmail
 lifecycle reconciliation remain sibling workflows, while the portal, assistant,
-and automation layers compose both domains. The root `jobs.py` module is a
-compatibility facade for the established CLI and import surface.
+and automation layers compose both domains. The `jobs` CLI dispatches directly
+to `opportunities/cli.py`.
 
 Post-application history lives under `resume_builder.application_tracking`.
 Its records module owns append-only application events, submitted-answer history,
@@ -128,9 +128,8 @@ runtime state remain an integration workflow.
 
 Role targeting lives under `resume_builder.role_profiles`. Schema validation,
 terminology diagnostics, profile creation, and resume-to-direction audits share
-that domain rather than appearing as unrelated root modules. The established
-`directions.py`, `direction_schema.py`, and `direction_diagnostics.py` imports
-remain compatibility facades, and the `direction` CLI is unchanged.
+that domain rather than appearing as unrelated root modules. The `direction`
+CLI dispatches directly to `role_profiles/profiles.py`.
 
 Employer-ready document output lives under `resume_builder.document_export`.
 It normalizes troublesome characters before rendering, audits the minted PDF's

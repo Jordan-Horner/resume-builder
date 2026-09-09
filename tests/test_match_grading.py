@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from resume_builder import job_matching
-from resume_builder.match_grading import classify_match
+from resume_builder.matching import audit as job_matching
+from resume_builder.matching.grading import classify_match
 
 
 def judgment(

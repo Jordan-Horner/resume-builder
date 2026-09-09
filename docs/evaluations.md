@@ -1,10 +1,8 @@
 # Resume regression evaluations
 
 Resume Builder keeps reproducible, fictional evaluation cases separate from the
-private career vault. The implementation lives in
-`resume_builder.quality_assurance.regression`; the established
-`resume_builder.evaluations` import and `resume-builder eval` command remain
-compatible.
+private career vault. The implementation and `resume-builder eval` command live
+in `resume_builder.quality_assurance.regression`.
 
 An evaluation case pins its original source and expected material evidence. The
 runner validates the sealed case before opening the generated resume, compiles

@@ -7,7 +7,8 @@ from typing import Any
 
 import pytest
 
-from resume_builder import job_matching, previewing
+from resume_builder.matching import audit as job_matching
+from resume_builder.publishing import preview as previewing
 
 
 def direction_markdown() -> str:

@@ -6,7 +6,7 @@ from typing import Any
 
 import yaml
 
-from resume_builder import evaluations
+from resume_builder.quality_assurance import regression as evaluations
 from resume_builder.synthesis import SynthesisPlan, SynthesisStory
 
 

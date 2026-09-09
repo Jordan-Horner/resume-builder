@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from resume_builder import directions
+from resume_builder.role_profiles import profiles as directions
 from resume_builder.synthesis import ConceptFit, SynthesisPlan
 
 
