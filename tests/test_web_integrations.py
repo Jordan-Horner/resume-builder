@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from resume_builder.agent_config import load_agent_config
+from resume_builder.assistant.config import load_agent_config
 from resume_builder.portal.app import create_app
 from resume_builder.portal.integrations import GmailOAuthSession, PortalIntegrationService
 from resume_builder.workspace import initialize_workspace

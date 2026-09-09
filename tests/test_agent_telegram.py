@@ -8,10 +8,14 @@ from pathlib import Path
 
 import pytest
 
-from resume_builder.agent_config import AgentConfig, load_agent_config, render_default_agent_config
 from resume_builder.agent_contracts import InboundMessage, OutboundMessage
-from resume_builder.agent_state import AgentState
-from resume_builder.agent_telegram import TelegramAdapter, split_message
+from resume_builder.assistant.config import (
+    AgentConfig,
+    load_agent_config,
+    render_default_agent_config,
+)
+from resume_builder.assistant.state import AgentState
+from resume_builder.assistant.telegram import TelegramAdapter, split_message
 
 
 def telegram_config(tmp_path: Path) -> AgentConfig:

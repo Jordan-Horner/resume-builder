@@ -7,13 +7,6 @@ from collections.abc import Mapping
 from pathlib import Path
 
 FACADE_LINE_BUDGETS = {
-    "agent": 20,
-    "agent_config": 40,
-    "agent_openrouter": 10,
-    "agent_state": 10,
-    "agent_telegram": 35,
-    "agent_telegram_setup": 35,
-    "agent_tools": 10,
     "applications": 90,
     "artifact_paths": 10,
     "artifact_status": 25,

@@ -9,7 +9,7 @@ import pytest
 
 import resume_builder.opportunities.screening_queue as queue_module
 from resume_builder.agent_contracts import StructuredModelReply, StructuredModelRequest
-from resume_builder.agent_openrouter import AgentProviderError
+from resume_builder.assistant.openrouter import AgentProviderError
 from resume_builder.opportunities.posting import (
     ProposedPostingCriterion,
     ProposedPostingInterpretation,

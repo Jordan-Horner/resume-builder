@@ -8,8 +8,8 @@ from types import SimpleNamespace
 import pytest
 import yaml
 
-from resume_builder.agent_config import DEFAULT_AGENT_CONFIG, render_default_agent_config
 from resume_builder.applications import record_application
+from resume_builder.assistant.config import DEFAULT_AGENT_CONFIG, render_default_agent_config
 from resume_builder.opportunities.screening import (
     Confidence,
     build_screening_packet,

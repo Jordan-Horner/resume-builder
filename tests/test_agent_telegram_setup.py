@@ -10,9 +10,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from resume_builder.agent_config import load_agent_config, render_default_agent_config
-from resume_builder.agent_state import AgentState
-from resume_builder.agent_telegram_setup import (
+from resume_builder.assistant.config import load_agent_config, render_default_agent_config
+from resume_builder.assistant.state import AgentState
+from resume_builder.assistant.telegram_setup import (
     enable_private_telegram,
     require_external_token_path,
     resolve_telegram_token,

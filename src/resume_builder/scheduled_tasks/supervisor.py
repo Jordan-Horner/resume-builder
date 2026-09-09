@@ -233,7 +233,7 @@ def _telegram_worker(argv: Sequence[str]) -> int:
     while not stop.is_set():
         status = telegram_configuration_status(args.workspace)
         if status == "ready":
-            from .. import agent
+            from ..assistant import runtime as agent
 
             try:
                 result = agent.main(["serve", "--channel", "telegram"])

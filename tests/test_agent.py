@@ -10,10 +10,6 @@ from pathlib import Path
 
 import pytest
 
-from resume_builder import agent as agent_module
-from resume_builder import agent_tools
-from resume_builder.agent import AgentService, ConsoleAdapter, main
-from resume_builder.agent_config import load_agent_config, render_default_agent_config
 from resume_builder.agent_contracts import (
     ConversationTurn,
     InboundMessage,
@@ -21,7 +17,11 @@ from resume_builder.agent_contracts import (
     ModelRequest,
     StructuredModelRequest,
 )
-from resume_builder.agent_openrouter import OpenRouterAdapter
+from resume_builder.assistant import runtime as agent_module
+from resume_builder.assistant import tools as agent_tools
+from resume_builder.assistant.config import load_agent_config, render_default_agent_config
+from resume_builder.assistant.openrouter import OpenRouterAdapter
+from resume_builder.assistant.runtime import AgentService, ConsoleAdapter, main
 from resume_builder.opportunities import cli as jobs
 from resume_builder.opportunities.discovery_activation import preview_activation, save_portfolio
 from resume_builder.opportunities.discovery_evidence import ResumeDocument, TitlePosture
@@ -130,7 +130,7 @@ def test_service_uses_model_and_channel_adapters(tmp_path: Path) -> None:
 
 
 def test_service_supplies_bounded_conversation_history(tmp_path: Path) -> None:
-    from resume_builder.agent_state import AgentState
+    from resume_builder.assistant.state import AgentState
 
     config = load_agent_config(config_path(tmp_path))
 

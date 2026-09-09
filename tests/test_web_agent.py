@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from resume_builder.agent_config import DEFAULT_AGENT_CONFIG, render_default_agent_config
+from resume_builder.assistant.config import DEFAULT_AGENT_CONFIG, render_default_agent_config
 from resume_builder.portal.app import create_app
 from resume_builder.portal.assistant_routes import asyncio as web_agent_asyncio
 from resume_builder.portal.service import DashboardService

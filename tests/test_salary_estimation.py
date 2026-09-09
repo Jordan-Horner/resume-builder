@@ -11,8 +11,8 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from resume_builder.agent_config import render_default_agent_config
 from resume_builder.agent_contracts import ModelAdapter, ModelProviderError, StructuredModelReply
+from resume_builder.assistant.config import render_default_agent_config
 from resume_builder.opportunities.salary import (
     SALARY_CACHE_PATH,
     SalaryEstimate,

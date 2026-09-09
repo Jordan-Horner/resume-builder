@@ -46,7 +46,7 @@ def _client(tmp_path: Path) -> TestClient:
 def test_openrouter_can_be_configured_without_onboarding(tmp_path: Path, monkeypatch) -> None:
     import httpx
 
-    from resume_builder.agent_config import DEFAULT_AGENT_CONFIG
+    from resume_builder.assistant.config import DEFAULT_AGENT_CONFIG
     from resume_builder.portal.service import OPENROUTER_SECRET_PATH
 
     client = _client(tmp_path)
