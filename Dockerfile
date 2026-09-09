@@ -61,7 +61,7 @@ USER resume-builder
 WORKDIR /workspace
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/api/system/status', timeout=5)"]
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/api/system/health', timeout=5)"]
 
 ENTRYPOINT ["resume-builder-entrypoint"]
 CMD ["serve"]

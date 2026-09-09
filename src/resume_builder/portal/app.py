@@ -66,6 +66,8 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
 
     @app.middleware("http")
     async def protect_workspace(request: Request, call_next: Any) -> Any:
+        if request.url.path == "/api/system/health":
+            return await call_next(request)
         exclusive = request.method not in {"GET", "HEAD", "OPTIONS"}
         async with async_workspace_lock(workspace, exclusive=exclusive):
             return await call_next(request)
@@ -81,6 +83,10 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
     @app.get("/api/system/version")
     def system_version() -> dict[str, Any]:
         return updates.status()
+
+    @app.get("/api/system/health")
+    def system_health() -> dict[str, str]:
+        return {"status": "healthy"}
 
     @app.get("/api/system/status")
     def runtime_status() -> dict[str, Any]:

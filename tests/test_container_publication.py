@@ -109,7 +109,21 @@ def test_image_starts_the_portal_first_service_and_checks_its_health():
     dockerfile = Path("Dockerfile").read_text()
     assert 'ENTRYPOINT ["resume-builder-entrypoint"]' in dockerfile
     assert 'CMD ["serve"]' in dockerfile
-    assert "/api/system/status" in dockerfile
+    assert "/api/system/health" in dockerfile
+
+
+def test_liveness_api_does_not_wait_for_workspace_lock(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from resume_builder.portal import app as portal_app
+
+    def unexpected_lock(*_args, **_kwargs):
+        raise AssertionError("liveness must not acquire the workspace lock")
+
+    monkeypatch.setattr(portal_app, "async_workspace_lock", unexpected_lock)
+    client = TestClient(portal_app.create_app(tmp_path))
+
+    assert client.get("/api/system/health").json() == {"status": "healthy"}
 
 
 def test_entrypoint_keeps_existing_roots_and_nests_fresh_read_only_parents():
