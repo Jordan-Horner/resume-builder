@@ -32,6 +32,7 @@ FACADE_LINE_BUDGETS = {
     "layout": 30,
     "match_grading": 50,
     "migration": 60,
+    "minting": 20,
     "pdf_rendering": 25,
     "plans": 40,
     "previewing": 35,

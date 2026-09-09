@@ -117,6 +117,13 @@ FACADE_EXPORTS = {
         "verify_resume",
         "workflow_state",
     },
+    "minting": {
+        "_filename_part",
+        "_submission_path",
+        "main",
+        "mint_resume",
+        "render_pdf",
+    },
     "report_policy": {
         "_initial_draft_readiness",
         "_next_action",

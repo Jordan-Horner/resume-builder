@@ -149,8 +149,9 @@ compilation, preview, verification, and minting remain separate orchestration
 boundaries because they coordinate planning, reviews, or release state.
 Reviewed publication workflows live under `resume_builder.publishing`.
 `publishing/preview.py` owns the continuously refreshed HTML approval surface,
-while `publishing/verification.py` prepares hash-pinned review inputs and reports
-workflow readiness. The established `previewing.py` and `verification.py`
+`publishing/verification.py` prepares hash-pinned review inputs and reports
+workflow readiness, and `publishing/mint.py` releases the explicitly approved
+PDF. The established `previewing.py`, `verification.py`, and `minting.py`
 modules and their CLI commands remain compatible.
 
 Generated-build metadata lives under `resume_builder.build_artifacts`.

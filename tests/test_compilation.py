@@ -2193,7 +2193,7 @@ def test_mint_command_creates_audited_pdf(tmp_path: Path, run_main, monkeypatch)
             },
         }
 
-    monkeypatch.setattr(minting, "render_pdf", fake_render_pdf)
+    monkeypatch.setattr("resume_builder.publishing.mint.render_pdf", fake_render_pdf)
 
     assert run_main(minting.main, resume, "--vault-root", vault) == 0
     assert called["html"] == tmp_path / "build" / "resumes" / "support-operations" / "resume.html"
@@ -2372,7 +2372,7 @@ def test_strict_page_budget_retains_audited_draft(tmp_path: Path, run_main, monk
             "extraction": {"pages": 3, "extractable_pages": 3, "claims_recovered": 9},
         }
 
-    monkeypatch.setattr(minting, "render_pdf", oversized_pdf)
+    monkeypatch.setattr("resume_builder.publishing.mint.render_pdf", oversized_pdf)
 
     assert (
         run_main(
