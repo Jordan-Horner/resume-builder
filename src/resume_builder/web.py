@@ -31,20 +31,20 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         ) from exc
 
     service = DashboardService(workspace)
-    from .web_integrations import GMAIL_CLIENT_MAX_BYTES, PortalIntegrationService
+    from .portal.integrations import GMAIL_CLIENT_MAX_BYTES, PortalIntegrationService
 
     integration_service = PortalIntegrationService(workspace)
     resolved_static = static_dir.expanduser().resolve() if static_dir else None
     from .updates import UpdateChecker
 
     updates = UpdateChecker()
-    from .web_job_sources import source_status, start_scan, toggle_source
-    from .web_schedule import save_schedule, schedule_status
-    from .web_system import system_status
+    from .portal.job_sources import source_status, start_scan, toggle_source
+    from .portal.schedule import save_schedule, schedule_status
+    from .portal.system import system_status
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> Any:
-        from .web_filters import ViewFilters
+        from .portal.filters import ViewFilters
 
         if (workspace / JOBS_CONFIG).is_file():
             defaults = service.job_filter_defaults()

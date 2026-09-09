@@ -161,6 +161,15 @@ current onboarding stage and next action. Root `project_report.py` and
 `report_policy.py` remain compatibility facades, and the `report` command is
 unchanged.
 
+Local portal adapters live under `resume_builder.portal`. `filters.py` applies
+inventory-view filters without changing discovery configuration, `schedule.py`
+and `system.py` expose scheduler controls and content-free health, and
+`integrations.py` coordinates short-lived Gmail and Telegram setup sessions.
+`job_sources.py` controls manual provider scans while preserving the existing
+collector workflow. The established `web_filters.py`, `web_schedule.py`,
+`web_system.py`, `web_integrations.py`, and `web_job_sources.py` modules remain
+compatibility facades; the manual-scan worker entry point is unchanged.
+
 Resume construction is split into two internal domains. `resume_builder.planning`
 owns synthesis-plan models, schema helpers, loading, summary strategy, role
 balance, and plan audits. `resume_builder.reviews` owns narrative-block review,

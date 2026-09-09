@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 
 from resume_builder.agent_config import load_agent_config
+from resume_builder.portal.integrations import GmailOAuthSession, PortalIntegrationService
 from resume_builder.web import create_app
-from resume_builder.web_integrations import GmailOAuthSession, PortalIntegrationService
 from resume_builder.workspace import initialize_workspace
 
 testclient = pytest.importorskip("fastapi.testclient")
@@ -77,7 +77,7 @@ def test_gmail_oauth_callback_verifies_before_saving_owner_only_token(
 ) -> None:
     import googleapiclient.discovery
 
-    import resume_builder.web_integrations as integrations
+    from resume_builder.portal import integrations
 
     token_path = tmp_path / "runtime" / "gmail-token.json"
 
@@ -127,7 +127,7 @@ def test_gmail_oauth_callback_verifies_before_saving_owner_only_token(
 def test_telegram_pairing_validates_and_saves_one_private_identity(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import resume_builder.web_integrations as integrations
+    from resume_builder.portal import integrations
 
     workspace = _workspace(tmp_path)
     runtime = tmp_path / "runtime"

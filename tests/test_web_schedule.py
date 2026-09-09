@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from resume_builder import web_schedule
 from resume_builder.automation import DEFAULT_CONFIG, load_config, render_default_config
+from resume_builder.portal import schedule as web_schedule
 
 
 def test_missing_schedule_is_reported_without_creating_configuration(tmp_path: Path) -> None:

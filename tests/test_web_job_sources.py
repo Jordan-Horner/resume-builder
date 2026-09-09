@@ -5,9 +5,9 @@ from threading import Event, Thread
 import pytest
 import yaml
 
-from resume_builder import web_job_sources as sources
 from resume_builder.automation import DEFAULT_CONFIG, render_default_config
 from resume_builder.opportunities.defaults import scaffold_job_search
+from resume_builder.portal import job_sources as sources
 
 
 def test_fresh_workspace_enables_every_builtin_job_source(tmp_path: Path) -> None:

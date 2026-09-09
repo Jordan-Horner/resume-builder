@@ -1892,7 +1892,7 @@ class DashboardService:
 
     def job_filter_defaults(self) -> dict[str, Any]:
         from .opportunities.cli import _load_preferences
-        from .web_filters import ViewFilters
+        from .portal.filters import ViewFilters
 
         path = self.workspace / "job-search/preferences.yml"
         preferences = _load_preferences(path) if path.exists() else {}
@@ -1951,7 +1951,7 @@ class DashboardService:
     ) -> dict[str, Any]:
         """Return a reusable lightweight queue projection for browser refreshes."""
         if view_filters:
-            from .web_filters import ViewFilters
+            from .portal.filters import ViewFilters
 
             view_filters = ViewFilters.model_validate_json(view_filters).model_dump_json()
         return self._cached_job_rows(
@@ -2011,7 +2011,7 @@ class DashboardService:
         _include_description: bool = True,
         _limit: int | None = None,
     ) -> list[dict[str, Any]]:
-        from .web_filters import ViewFilters, matches_view
+        from .portal.filters import ViewFilters, matches_view
 
         view = ViewFilters.model_validate_json(view_filters) if view_filters else ViewFilters()
         if queue not in {"all", "recommended", "interested", "matches", "hot"}:
