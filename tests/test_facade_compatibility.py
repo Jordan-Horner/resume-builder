@@ -105,6 +105,18 @@ FACADE_EXPORTS = {
         "main",
         "preview_resume",
     },
+    "verification": {
+        "_cached_receipt",
+        "_load_json",
+        "_optional_path_record",
+        "_path_record",
+        "_preview_freshness",
+        "_record_freshness",
+        "build_manifest_freshness",
+        "main",
+        "verify_resume",
+        "workflow_state",
+    },
     "report_policy": {
         "_initial_draft_readiness",
         "_next_action",

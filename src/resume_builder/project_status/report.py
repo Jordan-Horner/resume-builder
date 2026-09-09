@@ -29,12 +29,12 @@ from ..evaluations import load_case
 from ..feedback_memory import validate_feedback_memory
 from ..matching.audit import validate_target
 from ..opportunities.onboarding import onboarding_status as job_onboarding_status
+from ..publishing.verification import workflow_state
 from ..review_records import load_review_record, review_freshness
 from ..role_profiles.profiles import parse_direction
 from ..synthesis import load_synthesis_plan
 from ..vault.layout import contained_path
 from ..vault.validation import validate_vault
-from ..verification import workflow_state
 from .policy import _initial_draft_readiness, _next_action, _onboarding_status
 
 __all__ = [

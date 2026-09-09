@@ -148,8 +148,10 @@ modules preserve established imports and the `render` CLI. Template selection,
 compilation, preview, verification, and minting remain separate orchestration
 boundaries because they coordinate planning, reviews, or release state.
 Reviewed publication workflows live under `resume_builder.publishing`.
-`publishing/preview.py` owns the continuously refreshed HTML approval surface;
-the established `previewing.py` module and `preview` command remain compatible.
+`publishing/preview.py` owns the continuously refreshed HTML approval surface,
+while `publishing/verification.py` prepares hash-pinned review inputs and reports
+workflow readiness. The established `previewing.py` and `verification.py`
+modules and their CLI commands remain compatible.
 
 Generated-build metadata lives under `resume_builder.build_artifacts`.
 `paths.py` owns the canonical internal output locations for each resume, while
