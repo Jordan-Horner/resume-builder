@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Any
 
 from ..agent_contracts import ModelProviderError, ModelProviderTimeoutError
-from ..web_service import JOBS_CONFIG, DashboardService, ScreeningInputError
 from ..workspace_management.state import discover_workspace
+from .service import JOBS_CONFIG, DashboardService, ScreeningInputError
 
 
 def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:

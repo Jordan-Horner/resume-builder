@@ -5,8 +5,8 @@ from fastapi.testclient import TestClient
 
 from resume_builder.agent_config import DEFAULT_AGENT_CONFIG, render_default_agent_config
 from resume_builder.portal.assistant_routes import asyncio as web_agent_asyncio
+from resume_builder.portal.service import DashboardService
 from resume_builder.web import create_app
-from resume_builder.web_service import DashboardService
 
 
 @pytest.fixture

@@ -8,7 +8,6 @@ from types import SimpleNamespace
 import pytest
 import yaml
 
-from resume_builder import web_service
 from resume_builder.agent_config import DEFAULT_AGENT_CONFIG, render_default_agent_config
 from resume_builder.applications import record_application
 from resume_builder.opportunities.screening import (
@@ -17,7 +16,8 @@ from resume_builder.opportunities.screening import (
     deterministic_ineligible_result,
     deterministic_insufficient_evidence_result,
 )
-from resume_builder.web_service import (
+from resume_builder.portal import service as web_service
+from resume_builder.portal.service import (
     DashboardService,
     ScreeningInputError,
     _clean_description,

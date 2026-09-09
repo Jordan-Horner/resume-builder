@@ -18,9 +18,9 @@ from fastapi.responses import Response, StreamingResponse
 
 from ..assistant.config import DEFAULT_AGENT_CONFIG
 from ..assistant.state import default_agent_state_path
-from ..web_service import DashboardService
 from .conversation_state import WebAgentState
 from .resume_editing import resume_path
+from .service import DashboardService
 
 
 def install_assistant(app: FastAPI, workspace: Path) -> None:

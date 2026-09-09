@@ -20,8 +20,8 @@ from resume_builder.opportunities.salary import (
     build_salary_packet,
     validate_salary_estimate,
 )
+from resume_builder.portal.service import DashboardService
 from resume_builder.web import create_app
-from resume_builder.web_service import DashboardService
 
 
 def posting(**changes: object) -> dict:
@@ -209,7 +209,7 @@ def test_endpoint_is_explicit_cached_and_leaves_browsing_unchanged(
     monkeypatch.setenv("OPENROUTER_API_KEY", "fictional-test-key")
     monkeypatch.setattr(DashboardService, "_load_inventory", lambda self: [posting()])
     adapter = adapter_for(estimate())
-    monkeypatch.setattr("resume_builder.web_service.OpenRouterAdapter", lambda *a, **kw: adapter)
+    monkeypatch.setattr("resume_builder.portal.service.OpenRouterAdapter", lambda *a, **kw: adapter)
     client = TestClient(create_app(tmp_path))
     assert client.get("/api/jobs").status_code == 200
     assert client.get("/api/jobs/fictional-job").json()["salary_min"] is None

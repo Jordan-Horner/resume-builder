@@ -2,8 +2,8 @@ import json
 
 import pytest
 
+from resume_builder.portal.service import DashboardService
 from resume_builder.web_filters import ViewFilters, matches_view
-from resume_builder.web_service import DashboardService
 
 
 def listing(**overrides):

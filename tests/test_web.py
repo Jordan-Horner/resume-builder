@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
+from resume_builder.portal.service import JOBS_CONFIG, DashboardService
 from resume_builder.web import create_app
-from resume_builder.web_service import JOBS_CONFIG, DashboardService
 from resume_builder.workspace import initialize_workspace
 
 testclient = pytest.importorskip("fastapi.testclient")
@@ -47,7 +47,7 @@ def test_openrouter_can_be_configured_without_onboarding(tmp_path: Path, monkeyp
     import httpx
 
     from resume_builder.agent_config import DEFAULT_AGENT_CONFIG
-    from resume_builder.web_service import OPENROUTER_SECRET_PATH
+    from resume_builder.portal.service import OPENROUTER_SECRET_PATH
 
     client = _client(tmp_path)
     workspace = tmp_path / "workspace"
@@ -104,7 +104,7 @@ def test_bright_data_is_configured_from_integrations(tmp_path: Path) -> None:
 
 
 def test_bright_data_enrichment_has_a_direct_api(tmp_path: Path, monkeypatch) -> None:
-    from resume_builder.web_service import DashboardService
+    from resume_builder.portal.service import DashboardService
 
     result = {
         "requested": 5,
@@ -125,7 +125,7 @@ def test_bright_data_enrichment_has_a_direct_api(tmp_path: Path, monkeypatch) ->
 def test_job_screen_routes_use_one_status_read_and_an_explicit_run(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from resume_builder.web_service import DashboardService
+    from resume_builder.portal.service import DashboardService
 
     result = {"status": "queued", "job_id": "job-1"}
     monkeypatch.setattr(DashboardService, "job_screen_status", lambda self, job_id: result)
@@ -148,7 +148,7 @@ def test_job_screen_routes_use_one_status_read_and_an_explicit_run(
 
 
 def test_job_screen_never_exposes_raw_decoding_errors(tmp_path: Path, monkeypatch) -> None:
-    from resume_builder.web_service import DashboardService
+    from resume_builder.portal.service import DashboardService
 
     decoding_error = UnicodeDecodeError("utf-8", b"\xa3", 0, 1, "invalid start byte")
     monkeypatch.setattr(
@@ -166,7 +166,7 @@ def test_job_screen_never_exposes_raw_decoding_errors(tmp_path: Path, monkeypatc
 
 
 def test_job_feedback_routes_are_backend_owned(tmp_path: Path, monkeypatch) -> None:
-    from resume_builder.web_service import DashboardService
+    from resume_builder.portal.service import DashboardService
 
     result = {"job_id": "job-1", "latest": {"action": "interested"}}
     monkeypatch.setattr(DashboardService, "job_feedback", lambda self, job_id: result)
@@ -187,7 +187,7 @@ def test_job_feedback_routes_are_backend_owned(tmp_path: Path, monkeypatch) -> N
 
 
 def test_job_hide_route_keeps_reason_explicit(tmp_path: Path, monkeypatch) -> None:
-    from resume_builder.web_service import DashboardService
+    from resume_builder.portal.service import DashboardService
 
     result = {"job_id": "job-1", "reason": "closed", "personalization_updated": False}
     monkeypatch.setattr(DashboardService, "hide_job", lambda self, job_id, reason: result)
@@ -199,7 +199,7 @@ def test_job_hide_route_keeps_reason_explicit(tmp_path: Path, monkeypatch) -> No
 
 
 def test_screening_backfill_route_starts_standalone_worker(tmp_path: Path, monkeypatch) -> None:
-    from resume_builder.web_service import DashboardService
+    from resume_builder.portal.service import DashboardService
 
     calls: list[str] = []
     state = {
@@ -231,7 +231,7 @@ def test_screening_backfill_route_starts_standalone_worker(tmp_path: Path, monke
 
 
 def test_open_posting_route_records_passive_positive_once(tmp_path: Path, monkeypatch) -> None:
-    from resume_builder.web_service import DashboardService
+    from resume_builder.portal.service import DashboardService
 
     calls: list[str] = []
     monkeypatch.setattr(
@@ -259,7 +259,7 @@ def test_openrouter_unexpected_response_does_not_save(
 ) -> None:
     import httpx
 
-    from resume_builder.web_service import OPENROUTER_SECRET_PATH
+    from resume_builder.portal.service import OPENROUTER_SECRET_PATH
 
     client = _client(tmp_path)
     monkeypatch.setattr(httpx, "get", lambda *a, **kw: httpx.Response(status, json=body))

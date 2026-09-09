@@ -185,6 +185,10 @@ facades, including the worker module entry point.
 `portal/app.py` composes these portal capabilities into the local FastAPI
 application and owns the dashboard server launcher. The established `web.py`
 module, `resume-builder-web` command, and module entry point remain compatible.
+`portal/service.py` coordinates dashboard use cases across the vault,
+opportunity inventory, screening, applications, integrations, and career
+library. The established `web_service.py` module remains its compatibility
+facade.
 
 Resume construction is split into two internal domains. `resume_builder.planning`
 owns synthesis-plan models, schema helpers, loading, summary strategy, role

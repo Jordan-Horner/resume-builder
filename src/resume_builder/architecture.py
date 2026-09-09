@@ -56,6 +56,7 @@ FACADE_LINE_BUDGETS = {
     "web_integrations": 20,
     "web_job_sources": 40,
     "web_schedule": 25,
+    "web_service": 70,
     "web_system": 10,
 }
 
