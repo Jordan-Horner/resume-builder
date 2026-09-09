@@ -21,7 +21,7 @@ from ..agent_telegram_setup import (
     write_telegram_token,
 )
 from ..assistant.state import AgentState, default_agent_state_path
-from ..gmail_automation import (
+from ..gmail_integration.orchestration import (
     GMAIL_READONLY_SCOPE,
     GMAIL_SETUP_STEPS,
     default_state_path,

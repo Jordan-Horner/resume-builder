@@ -930,7 +930,7 @@ def test_akamai_confirmation_links_exact_requisition(tmp_path: Path, monkeypatch
         }
     )
     monkeypatch.setattr(
-        "resume_builder.gmail_automation._inventory",
+        "resume_builder.gmail_integration.orchestration._inventory",
         lambda _workspace: [
             {
                 "id": "direct-3830",

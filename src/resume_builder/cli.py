@@ -15,7 +15,6 @@ from . import (
     directions,
     evaluations,
     feedback_memory,
-    gmail_automation,
     job_matching,
     migration,
     minting,
@@ -32,6 +31,7 @@ from . import (
     verification,
     workspace,
 )
+from .gmail_integration import orchestration as gmail_automation
 from .opportunities import cli as jobs
 from .opportunities import evaluation as screening_evaluation
 from .opportunities import onboarding as job_onboarding

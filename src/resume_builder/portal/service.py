@@ -2666,7 +2666,7 @@ class DashboardService:
                 if getattr(config.providers, name).enabled:
                     enabled_providers.append(name)
 
-        from ..gmail_automation import default_state_path, default_token_path
+        from ..gmail_integration.orchestration import default_state_path, default_token_path
 
         gmail_connected = default_token_path(default_state_path()).is_file()
 
