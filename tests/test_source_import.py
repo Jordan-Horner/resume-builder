@@ -8,7 +8,7 @@ from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls
 from reportlab.pdfgen import canvas
 
-from resume_builder import source_import
+from resume_builder.vault import source_import
 
 
 def manifest(vault: Path) -> dict:

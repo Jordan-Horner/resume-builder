@@ -27,7 +27,7 @@ from resume_builder.application_tracking.records import (
     record_application,
     validate_history,
 )
-from resume_builder.layout import VaultLayout
+from resume_builder.vault.layout import VaultLayout
 
 
 def arguments(**updates) -> argparse.Namespace:

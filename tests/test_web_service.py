@@ -23,7 +23,7 @@ from resume_builder.portal.service import (
     _clean_description,
     _company_recognition,
 )
-from resume_builder.workspace import initialize_workspace
+from resume_builder.workspace_management.setup import initialize_workspace
 
 
 def job(job_id: str, *, title: str, mode: str, company: str = "Example") -> dict:

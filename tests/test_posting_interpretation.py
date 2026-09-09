@@ -40,7 +40,7 @@ from resume_builder.opportunities.screening_service import (
     ScreeningService,
     enrich_packet_from_cached_interpretation,
 )
-from resume_builder.workspace import initialize_workspace
+from resume_builder.workspace_management.setup import initialize_workspace
 
 
 def _job(description: str, *, truncated: bool = False, digest: str = "a" * 64) -> ScreeningJob:

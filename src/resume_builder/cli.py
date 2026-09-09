@@ -12,19 +12,13 @@ from . import (
     directions,
     feedback_memory,
     job_matching,
-    migration,
     minting,
-    plans,
     previewing,
     project_report,
     rendering,
     review_records,
-    schema_upgrade,
-    source_import,
     synthesis,
-    validation,
     verification,
-    workspace,
 )
 from .application_tracking import records as applications
 from .assistant import runtime as agent
@@ -36,6 +30,10 @@ from .opportunities import preferences
 from .quality_assurance import regression as evaluations
 from .scheduled_tasks import scheduler as automation
 from .scheduled_tasks import supervisor as service
+from .vault import change_plans as plans
+from .vault import legacy_migration as migration
+from .vault import schema_upgrade, source_import, validation
+from .workspace_management import setup as workspace
 
 Command = tuple[Callable[[Sequence[str] | None], int], str]
 COMMANDS: dict[str, Command] = {

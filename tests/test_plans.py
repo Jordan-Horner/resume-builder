@@ -4,7 +4,8 @@ import hashlib
 import json
 from pathlib import Path
 
-from resume_builder import plans, source_import, validation
+from resume_builder.vault import change_plans as plans
+from resume_builder.vault import source_import, validation
 
 
 def fact_content(fact_id: str, source_id: str, title: str) -> str:

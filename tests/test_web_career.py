@@ -12,7 +12,7 @@ from resume_builder.portal.career import (
     resolve_resume_preview,
     restore_directional_resume,
 )
-from resume_builder.workspace import initialize_workspace
+from resume_builder.workspace_management.setup import initialize_workspace
 
 
 def _workspace(tmp_path: Path) -> Path:
@@ -48,8 +48,8 @@ Used {title} while supporting production systems.
 
 def test_resume_library_keeps_imported_sources_out_of_generated_resumes(tmp_path: Path) -> None:
     root = _workspace(tmp_path)
-    from resume_builder.layout import VaultLayout
-    from resume_builder.source_import import apply_import_plan, build_import_plan
+    from resume_builder.vault.layout import VaultLayout
+    from resume_builder.vault.source_import import apply_import_plan, build_import_plan
 
     upload = tmp_path / "Jordan Resume.md"
     upload.write_text("# Jordan Example\n\nProduction support engineer.\n", encoding="utf-8")
@@ -196,8 +196,8 @@ def test_resume_library_does_not_present_source_documents_as_resumes(
     tmp_path: Path,
 ) -> None:
     root = _workspace(tmp_path)
-    from resume_builder.layout import VaultLayout
-    from resume_builder.source_import import apply_import_plan, build_import_plan
+    from resume_builder.vault.layout import VaultLayout
+    from resume_builder.vault.source_import import apply_import_plan, build_import_plan
 
     uploads = tmp_path / "uploads"
     uploads.mkdir()

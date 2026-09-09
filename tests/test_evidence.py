@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from resume_builder import evidence
 from resume_builder.synthesis import ClaimEvidence, ClaimSpec
+from resume_builder.vault import evidence
 
 
 def write_fact(vault: Path, *, status: str = "confirmed", body: str) -> None:

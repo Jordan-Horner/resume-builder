@@ -6,13 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from resume_builder.integrations import (
+from resume_builder.opportunities.onboarding import main as onboarding_main
+from resume_builder.workspace_management.integrations import (
     integration_setup_guide,
     interactive_integration_setup,
     parse_integration_choices,
 )
-from resume_builder.opportunities.onboarding import main as onboarding_main
-from resume_builder.workspace import initialize_workspace
+from resume_builder.workspace_management.setup import initialize_workspace
 
 
 def test_parse_integration_choices_supports_names_numbers_and_all() -> None:

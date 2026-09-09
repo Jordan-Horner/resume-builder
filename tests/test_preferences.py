@@ -8,7 +8,7 @@ import yaml
 import resume_builder.opportunities.preferences as preference_module
 from resume_builder.opportunities.defaults import PREFERENCES_PATH
 from resume_builder.opportunities.preferences import PreferenceChangeRequest, apply, propose
-from resume_builder.workspace import initialize_workspace
+from resume_builder.workspace_management.setup import initialize_workspace
 
 
 class _Inventory:

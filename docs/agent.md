@@ -195,8 +195,7 @@ Discord setup guidance. Existing users can reopen the same guide with:
 resume-builder onboard integrations
 ```
 
-The reusable setup guide belongs to `resume_builder.workspace_management.integrations`;
-`resume_builder.integrations` remains its compatibility import.
+The reusable setup guide belongs to `resume_builder.workspace_management.integrations`.
 
 OpenRouter account-level prompt logging should remain disabled. Its API-key
 budget should also be configured as a second hard boundary outside Resume

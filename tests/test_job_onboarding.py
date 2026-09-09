@@ -6,7 +6,6 @@ from pathlib import Path
 
 import yaml
 
-from resume_builder import source_import
 from resume_builder.opportunities.discovery_evidence import (
     ResumeDocument,
     evidence_set,
@@ -25,7 +24,8 @@ from resume_builder.opportunities.onboarding import (
     scaffold_job_search,
     start_setup,
 )
-from resume_builder.workspace import initialize_workspace
+from resume_builder.vault import source_import
+from resume_builder.workspace_management.setup import initialize_workspace
 
 
 def _hydrated_workspace(tmp_path: Path) -> Path:

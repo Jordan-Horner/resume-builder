@@ -4,7 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from resume_builder import schema_upgrade
+from resume_builder.vault import schema_upgrade
 
 
 def source_registry(vault: Path) -> None:

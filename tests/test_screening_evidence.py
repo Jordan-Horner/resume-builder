@@ -23,7 +23,7 @@ from resume_builder.opportunities.screening_evidence import (
     select_criterion_screening_evidence,
     select_screening_evidence,
 )
-from resume_builder.workspace import initialize_workspace
+from resume_builder.workspace_management.setup import initialize_workspace
 
 
 def _fact(

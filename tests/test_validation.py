@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from resume_builder import source_import, validation
+from resume_builder.vault import source_import, validation
 
 
 def test_imported_source_passes_non_strict_validation(tmp_path: Path, run_main) -> None:

@@ -5,7 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from resume_builder import evidence_questions, review_records
+from resume_builder import review_records
+from resume_builder.vault import questions as evidence_questions
 
 
 def _project(tmp_path: Path) -> tuple[Path, Path]:

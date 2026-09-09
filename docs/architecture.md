@@ -96,21 +96,19 @@ compilation, verification, feedback, review, matching, preview, and minting.
 Career-vault foundations live under `resume_builder.vault`. `layout.py` owns
 containment-safe canonical paths, `validation.py` enforces vault structure and
 provenance, `source_import.py` registers immutable source evidence, and
-`evidence.py` audits resume claims against canonical facts. The established
-root modules remain compatibility facades, and the `hydrate` and `validate`
-commands are unchanged. Higher-level vault operations live alongside those
+`evidence.py` audits resume claims against canonical facts. The `hydrate` and
+`validate` commands dispatch directly to these modules. Higher-level vault operations live alongside those
 foundations: `change_plans.py` applies reviewed canonical writes,
 `questions.py` tracks prioritized evidence gaps, `legacy_migration.py`
 converts aggregate vaults, and `schema_upgrade.py` performs versioned upgrades.
-Their established root modules and CLI commands remain compatibility surfaces.
 
 Private-workspace lifecycle code lives under `resume_builder.workspace_management`.
 `state.py` discovers workspaces and inspects Git remote privacy without mutation,
 `templates.py` installs the packaged workspace skeleton and built-in templates,
 and `setup.py` coordinates initialization, connection, template synchronization,
 and the related CLI flows. The established `workspace.py`, `workspace_state.py`,
-and `workspace_templates.py` modules remain compatibility facades, and the
-`init` and `workspace` commands are unchanged.
+and `workspace_templates.py` compatibility modules have been removed; the
+`init` and `workspace` commands dispatch directly to `setup.py`.
 
 Pre-application job work lives under `resume_builder.opportunities`. That domain
 turns external postings into a personalized, reviewable opportunity queue: it

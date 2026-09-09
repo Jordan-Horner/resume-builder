@@ -14,7 +14,7 @@ from resume_builder.resume_templates import (
     scaffold_template,
     template_catalog,
 )
-from resume_builder.workspace import (
+from resume_builder.workspace_management.setup import (
     CommandResult,
     WorkspaceError,
     connect_existing_workspace,
@@ -26,7 +26,7 @@ from resume_builder.workspace import (
     sync_workspace_templates,
     workspace_status,
 )
-from resume_builder.workspace_templates import template_resources
+from resume_builder.workspace_management.templates import template_resources
 
 
 def test_default_github_repository_uses_authenticated_owner(tmp_path: Path) -> None:

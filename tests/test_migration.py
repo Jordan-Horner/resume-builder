@@ -4,7 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from resume_builder import migration
+from resume_builder.vault import legacy_migration as migration
 
 LEGACY_FACT = """### EMP-001 — Incident leadership
 

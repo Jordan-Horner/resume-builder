@@ -6,7 +6,7 @@ import pytest
 
 from resume_builder.portal.app import create_app
 from resume_builder.portal.service import JOBS_CONFIG, DashboardService
-from resume_builder.workspace import initialize_workspace
+from resume_builder.workspace_management.setup import initialize_workspace
 
 testclient = pytest.importorskip("fastapi.testclient")
 pytest.importorskip("multipart")
