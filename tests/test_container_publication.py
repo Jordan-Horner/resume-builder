@@ -53,6 +53,9 @@ def test_registry_deployment_preserves_volume_and_has_no_docker_control():
     assert service["image"].startswith("ghcr.io/jordan-horner/resume-builder:")
     assert service["command"] == ["serve"]
     assert service["environment"]["RESUME_BUILDER_WORKSPACE"] == "/workspace"
+    assert "RESUME_BUILDER_WORKSPACE_SYNC_SSH_KEY_FILE" in service["environment"]
+    assert "RESUME_BUILDER_WORKSPACE_SYNC_KNOWN_HOSTS_FILE" in service["environment"]
+    assert "RESUME_BUILDER_WORKSPACE_SYNC_TOKEN_FILE" in service["environment"]
     assert service["ports"] == [
         "${RESUME_BUILDER_WEB_BIND:-127.0.0.1}:${RESUME_BUILDER_WEB_PORT:-8766}:8765"
     ]
@@ -93,6 +96,13 @@ def test_local_compose_is_one_container_with_shared_workspace_and_state():
         "${RESUME_BUILDER_WORKSPACE_PATH:?Set RESUME_BUILDER_WORKSPACE_PATH}:/workspace",
         "${RESUME_BUILDER_RUNTIME_PATH:?Set RESUME_BUILDER_RUNTIME_PATH}:/state",
     ]
+    assert {item["path"] for item in service["develop"]["watch"]} == {
+        "./src",
+        "./web",
+        "./assistant-runtime",
+        "./pyproject.toml",
+        "./Dockerfile",
+    }
 
 
 def test_image_starts_the_portal_first_service_and_checks_its_health():

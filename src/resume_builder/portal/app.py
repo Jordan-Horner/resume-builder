@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from ..agent_contracts import ModelProviderError, ModelProviderTimeoutError
+from ..workspace_management.locking import async_workspace_lock, workspace_lock
 from ..workspace_management.state import discover_workspace
 from .service import JOBS_CONFIG, DashboardService, ScreeningInputError
 
@@ -62,6 +63,16 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         redoc_url=None,
         lifespan=lifespan,
     )
+
+    @app.middleware("http")
+    async def protect_workspace(request: Request, call_next: Any) -> Any:
+        exclusive = request.method not in {"GET", "HEAD", "OPTIONS"}
+        async with async_workspace_lock(workspace, exclusive=exclusive):
+            return await call_next(request)
+
+    def locked_background_task(callback: Any, *arguments: Any, **keywords: Any) -> None:
+        with workspace_lock(workspace, exclusive=True):
+            callback(*arguments, **keywords)
     from .assistant_routes import install_assistant
 
     install_assistant(app, workspace)
@@ -276,7 +287,9 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         try:
             started, status = service.queue_screening_backfill()
             if started:
-                background_tasks.add_task(service.run_queued_screening_backfill)
+                background_tasks.add_task(
+                    locked_background_task, service.run_queued_screening_backfill
+                )
             return status
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -343,7 +356,12 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         try:
             result = service.queue_job_screen(job_id, refresh=refresh)
             if result["status"] == "queued":
-                background_tasks.add_task(service.run_queued_job_screen, job_id, refresh=refresh)
+                background_tasks.add_task(
+                    locked_background_task,
+                    service.run_queued_job_screen,
+                    job_id,
+                    refresh=refresh,
+                )
             return result
         except ScreeningInputError as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -386,7 +404,9 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
                 payload.get("action"),
                 payload.get("reasons", []),
             )
-            background_tasks.add_task(service.replenish_recommendations)
+            background_tasks.add_task(
+                locked_background_task, service.replenish_recommendations
+            )
             return result
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -395,7 +415,9 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
     def mark_not_interested(job_id: str, background_tasks: BackgroundTasks) -> dict[str, Any]:
         try:
             result = service.mark_not_interested(job_id)
-            background_tasks.add_task(service.replenish_recommendations)
+            background_tasks.add_task(
+                locked_background_task, service.replenish_recommendations
+            )
             return result
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -406,7 +428,9 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
     ) -> dict[str, Any]:
         try:
             result = service.hide_job(job_id, payload.get("reason"))
-            background_tasks.add_task(service.replenish_recommendations)
+            background_tasks.add_task(
+                locked_background_task, service.replenish_recommendations
+            )
             return result
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -415,7 +439,9 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
     def mark_applied(job_id: str, background_tasks: BackgroundTasks) -> dict[str, Any]:
         try:
             result = service.mark_applied(job_id)
-            background_tasks.add_task(service.replenish_recommendations)
+            background_tasks.add_task(
+                locked_background_task, service.replenish_recommendations
+            )
             return result
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc

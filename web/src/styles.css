@@ -631,8 +631,10 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
 .system-health-list dd { margin: 0; color: var(--muted); }
 .service-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .service-dot.online { background: #3fb950; }
+.service-dot.current, .service-dot.updated { background: #3fb950; }
 .service-dot.offline, .service-dot.error { background: #f85149; }
-.service-dot.disabled, .service-dot.not_configured { background: #8b949e; }
+.service-dot.blocked, .service-dot.stale { background: #d29922; }
+.service-dot.disabled, .service-dot.not_configured, .service-dot.waiting, .service-dot.checking { background: #8b949e; }
 .company-block-tools { margin: 0 0 12px; }
 .jobs-search-tools { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 10px; position: relative; z-index: 3; }
 .jobs-search-tools .search-field { flex: 1 1 calc(60% - 5px); order: 0; }

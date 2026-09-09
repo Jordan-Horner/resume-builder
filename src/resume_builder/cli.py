@@ -32,6 +32,7 @@ from .vault import change_plans as plans
 from .vault import legacy_migration as migration
 from .vault import schema_upgrade, source_import, validation
 from .workspace_management import setup as workspace
+from .workspace_management.locking import workspace_lock
 
 Command = tuple[Callable[[Sequence[str] | None], int], str]
 COMMANDS: dict[str, Command] = {
@@ -140,7 +141,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if command == "report" and "--summary" not in forwarded:
         forwarded = [*forwarded, "--summary"]
     try:
-        return handler(forwarded)
+        if command in {"init", "serve"} or active_workspace is None:
+            return handler(forwarded)
+        with workspace_lock(active_workspace, exclusive=True):
+            return handler(forwarded)
     except KeyboardInterrupt:
         print("\nCanceled.", file=sys.stderr)
         return 130

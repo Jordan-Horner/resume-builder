@@ -50,10 +50,19 @@ export function AboutSection() {
   const [systemError, setSystemError] = useState("");
   useEffect(() => {
     let active = true;
-    getSystemStatus().then((next) => {
-      if (active) { setSystem(next); setSystemError(""); }
-    }).catch(() => { if (active) setSystemError("System status is temporarily unavailable."); });
-    return () => { active = false; };
+    let timer: ReturnType<typeof setTimeout>;
+    async function checkSystem() {
+      try {
+        const next = await getSystemStatus();
+        if (active) { setSystem(next); setSystemError(""); }
+      } catch {
+        if (active) setSystemError("System status is temporarily unavailable.");
+      } finally {
+        if (active) timer = setTimeout(() => void checkSystem(), 15 * 1000);
+      }
+    }
+    void checkSystem();
+    return () => { active = false; clearTimeout(timer); };
   }, []);
   return <section className="about-panel" aria-labelledby="about-heading">
     <h2 id="about-heading">About Resume Builder</h2>

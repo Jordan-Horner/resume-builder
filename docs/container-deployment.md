@@ -38,6 +38,42 @@ has no authentication boundary, so do not expose it directly to the public
 internet. Configure host ports, bind-mounted paths, TLS, and reverse proxies on
 the host. The container needs neither privileged mode nor the Docker socket.
 
+### Keep a mounted workspace current
+
+Git-backed workspaces can opt into a guarded update check by setting
+`RESUME_BUILDER_WORKSPACE_SYNC_ENABLED=true`. The image fetches the current
+branch's configured upstream at startup and every five minutes by default. Set
+`RESUME_BUILDER_WORKSPACE_SYNC_INTERVAL_SECONDS` to change that interval.
+
+The updater is repository-agnostic: it discovers the workspace, branch, remote,
+and upstream from Git. It only performs a fast-forward and never discards local
+changes. Local runtime files may remain in the workspace, but an overlapping
+upstream change, local commit, divergent history, missing credentials, or
+missing upstream blocks the update and appears in **Settings → About** and the
+container logs. Configure read-only repository credentials using the normal Git
+credential or deploy-key mechanism available to the container; never put a
+token in Compose or the repository.
+
+For an SSH remote, place a read-only deploy key and pinned `known_hosts` file in
+the mounted runtime directory, then set
+`RESUME_BUILDER_WORKSPACE_SYNC_SSH_KEY_FILE=/state/workspace-sync-ssh-key` and
+`RESUME_BUILDER_WORKSPACE_SYNC_KNOWN_HOSTS_FILE=/state/workspace-sync-known-hosts`.
+The updater requires both files and keeps strict host-key verification enabled.
+For a private HTTPS remote, the existing `compose.updates-private.yaml` token is
+reused automatically. Alternatively, mount a read-only Contents token and set
+`RESUME_BUILDER_WORKSPACE_SYNC_TOKEN_FILE` to its in-container path. The token
+is supplied through Git's credential prompt and is never placed in a command
+argument.
+
+Workspace synchronization updates career data under `/workspace`; it does not
+update the application installed under `/app`. Local application-code changes
+require rebuilding the development image.
+
+During application development, run `docker compose up --watch`. The local
+Compose file watches backend, frontend, assistant-runtime, packaging, and image
+changes and rebuilds the development image. This is separate from workspace
+synchronization.
+
 ## Update checks
 
 **Settings → About** shows the installed revision, release link, last successful

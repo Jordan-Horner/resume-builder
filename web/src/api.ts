@@ -14,9 +14,9 @@ export interface UpdateStatus {
 export function getUpdateStatus(): Promise<UpdateStatus> { return request("/api/system/version"); }
 
 export interface SystemComponent {
-  id: "portal" | "scheduler" | "telegram";
+  id: "portal" | "scheduler" | "workspace-sync" | "telegram";
   name: string;
-  status: "online" | "offline" | "disabled" | "not_configured" | "error" | "unknown";
+  status: "online" | "offline" | "disabled" | "not_configured" | "error" | "unknown" | "waiting" | "checking" | "stale" | "current" | "updated" | "blocked";
   detail: string;
 }
 export interface SystemStatus {

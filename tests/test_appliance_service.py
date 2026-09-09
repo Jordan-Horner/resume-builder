@@ -37,10 +37,12 @@ def test_supervisor_runs_portal_scheduler_and_managed_telegram(tmp_path: Path) -
     assert "[program:scheduler]" in rendered
     assert "[program:gmail]" in rendered
     assert "[program:telegram]" in rendered
+    assert "[program:workspace-sync]" in rendered
     assert "resume-builder-web" in rendered
     assert "resume-builder automation run --task jobs" in rendered
     assert "resume-builder automation run --task gmail" in rendered
     assert "resume_builder.scheduled_tasks.supervisor telegram-worker" in rendered
+    assert "resume_builder.workspace_management.sync" in rendered
     assert "[unix_http_server]" in rendered
     assert "[supervisorctl]" in rendered
     assert "stopasgroup=true" in rendered
@@ -61,6 +63,19 @@ def test_supervisor_can_start_jobs_independently_from_gmail(tmp_path: Path) -> N
     gmail = rendered.split("[program:gmail]", 1)[1].split("[program:telegram]", 1)[0]
     assert "autostart=false" in scheduler
     assert "autostart=true" in gmail
+
+
+def test_supervisor_can_enable_workspace_sync_independently(tmp_path: Path) -> None:
+    rendered = render_supervisor_config(
+        workspace=tmp_path,
+        host="0.0.0.0",
+        port=8765,
+        static_dir=Path("/app/web/dist"),
+        workspace_sync_autostart=True,
+    )
+
+    workspace_sync = rendered.split("[program:workspace-sync]", 1)[1]
+    assert "autostart=true" in workspace_sync
 
 
 def test_managed_telegram_waits_when_configuration_is_absent(tmp_path: Path) -> None:

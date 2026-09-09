@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -7,6 +9,7 @@ import pytest
 from resume_builder.portal.app import create_app
 from resume_builder.portal.service import JOBS_CONFIG, DashboardService
 from resume_builder.workspace_management.setup import initialize_workspace
+from resume_builder.workspace_management.sync import workspace_identity
 
 testclient = pytest.importorskip("fastapi.testclient")
 pytest.importorskip("multipart")
@@ -535,10 +538,81 @@ def test_system_status_keeps_optional_services_out_of_core_health(tmp_path: Path
         "status": "online",
         "detail": "Available",
     }
+    workspace_sync = next(
+        item for item in payload["components"] if item["id"] == "workspace-sync"
+    )
+    assert workspace_sync["status"] == "disabled"
     telegram = next(item for item in payload["components"] if item["id"] == "telegram")
     assert telegram["status"] == "not_configured"
     scheduler = next(item for item in payload["components"] if item["id"] == "scheduler")
     assert scheduler["status"] == "disabled"
+
+
+def test_system_status_surfaces_blocked_workspace_sync(tmp_path: Path, monkeypatch) -> None:
+    state = tmp_path / "state"
+    state.mkdir()
+    workspace = tmp_path / "workspace"
+    client = _client(tmp_path)
+    (state / "workspace-sync.json").write_text(
+        json.dumps(
+            {
+                "status": "blocked",
+                "detail": "Upstream changes overlap local work",
+                "checked_at": datetime.now(timezone.utc).isoformat(),
+                "workspace_id": workspace_identity(workspace),
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("RESUME_BUILDER_STATE_DIR", str(state))
+    monkeypatch.setenv("RESUME_BUILDER_WORKSPACE_SYNC_ENABLED", "true")
+
+    payload = client.get("/api/system/status").json()
+
+    workspace_sync = next(
+        item for item in payload["components"] if item["id"] == "workspace-sync"
+    )
+    assert workspace_sync == {
+        "id": "workspace-sync",
+        "name": "Workspace sync",
+        "status": "blocked",
+        "detail": "Upstream changes overlap local work",
+    }
+    assert payload["status"] == "degraded"
+
+
+def test_system_status_rejects_a_stopped_workspace_sync_worker(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from resume_builder.portal import system
+
+    state = tmp_path / "state"
+    state.mkdir()
+    workspace = tmp_path / "workspace"
+    client = _client(tmp_path)
+    (state / "workspace-sync.json").write_text(
+        json.dumps(
+            {
+                "status": "current",
+                "detail": "Workspace is current",
+                "checked_at": datetime.now(timezone.utc).isoformat(),
+                "workspace_id": workspace_identity(workspace),
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("RESUME_BUILDER_STATE_DIR", str(state))
+    monkeypatch.setenv("RESUME_BUILDER_WORKSPACE_SYNC_ENABLED", "true")
+    monkeypatch.setattr(system, "managed_service_status", lambda _service: "fatal")
+
+    payload = client.get("/api/system/status").json()
+
+    workspace_sync = next(
+        item for item in payload["components"] if item["id"] == "workspace-sync"
+    )
+    assert workspace_sync["status"] == "error"
+    assert workspace_sync["detail"] == "Workspace update worker is not running"
+    assert payload["status"] == "degraded"
 
 
 def test_resume_upload_route_returns_readable_validation_error(tmp_path: Path) -> None:

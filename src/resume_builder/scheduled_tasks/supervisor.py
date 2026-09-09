@@ -36,6 +36,7 @@ def render_supervisor_config(
     state_dir: Path = Path("/state"),
     scheduler_autostart: bool = True,
     gmail_autostart: bool = True,
+    workspace_sync_autostart: bool = False,
 ) -> str:
     """Render the small, explicit process group used by the container."""
     portal = _command(
@@ -63,12 +64,24 @@ def render_supervisor_config(
             workspace,
         )
     )
+    workspace_sync = _command(
+        (
+            sys.executable,
+            "-m",
+            "resume_builder.workspace_management.sync",
+            "--workspace",
+            workspace,
+            "--state-file",
+            state_dir / "workspace-sync.json",
+        )
+    )
     directory = str(workspace).replace("%", "%%")
     pidfile = str(state_dir / "resume-builder.pid").replace("%", "%%")
     childlogdir = str(state_dir).replace("%", "%%")
     socket = "/tmp/resume-builder-supervisor.sock"
     scheduler_start = str(scheduler_autostart).lower()
     gmail_start = str(gmail_autostart).lower()
+    workspace_sync_start = str(workspace_sync_autostart).lower()
     return f"""\
 [unix_http_server]
 file={socket}
@@ -147,6 +160,20 @@ command=node /app/assistant-runtime/server.mjs
 directory=/app/assistant-runtime
 priority=15
 autostart=true
+autorestart=true
+startsecs=2
+stopasgroup=true
+killasgroup=true
+stdout_logfile=/dev/fd/1
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/fd/2
+stderr_logfile_maxbytes=0
+
+[program:workspace-sync]
+command={workspace_sync}
+directory={directory}
+priority=35
+autostart={workspace_sync_start}
 autorestart=true
 startsecs=2
 stopasgroup=true
@@ -277,6 +304,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     config_path = state_root / "supervisord.conf"
     scheduler_autostart = False
     gmail_autostart = False
+    workspace_sync_autostart = os.environ.get(
+        "RESUME_BUILDER_WORKSPACE_SYNC_ENABLED", ""
+    ).strip().lower() in {"1", "true", "yes", "on"}
     automation_config = workspace / DEFAULT_CONFIG
     if automation_config.is_file():
         try:
@@ -297,6 +327,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             state_dir=state_root,
             scheduler_autostart=scheduler_autostart,
             gmail_autostart=gmail_autostart,
+            workspace_sync_autostart=workspace_sync_autostart,
         ),
     )
     os.execv(supervisor, (supervisor, "-n", "-c", str(config_path)))
