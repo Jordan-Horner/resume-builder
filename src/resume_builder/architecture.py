@@ -8,8 +8,6 @@ from pathlib import Path
 
 FACADE_LINE_BUDGETS = {
     "feedback_memory": 250,
-    "project_report": 60,
-    "report_policy": 15,
     "review_records": 300,
     "synthesis": 180,
 }

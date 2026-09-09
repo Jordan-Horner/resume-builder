@@ -6,9 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from resume_builder import feedback_memory, project_report, review_records, synthesis
+from resume_builder import feedback_memory, review_records, synthesis
 from resume_builder.construction import compiler as compilation
 from resume_builder.document_export import pdf as pdf_rendering
+from resume_builder.project_status import report as project_report
 from resume_builder.publishing import mint as minting
 from resume_builder.publishing import preview as previewing
 from resume_builder.publishing import verification

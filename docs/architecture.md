@@ -160,9 +160,8 @@ outputs, evidence, templates, and feedback guidance are still current.
 Project-wide readiness reporting lives under `resume_builder.project_status`.
 `report.py` assembles vault, direction, resume, review, preview, mint, target,
 and evaluation state into one report; `policy.py` converts that state into the
-current onboarding stage and next action. Root `project_report.py` and
-`report_policy.py` remain compatibility facades, and the `report` command is
-unchanged.
+current onboarding stage and next action. The `report` command dispatches
+directly to `project_status/report.py`.
 
 Local portal adapters live under `resume_builder.portal`. `filters.py` applies
 inventory-view filters without changing discovery configuration, `schedule.py`

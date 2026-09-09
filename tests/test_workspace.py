@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-from resume_builder import project_report
 from resume_builder.construction.templates import (
     load_content_template,
     load_rendering_theme,
@@ -14,6 +13,7 @@ from resume_builder.construction.templates import (
     scaffold_template,
     template_catalog,
 )
+from resume_builder.project_status import report as project_report
 from resume_builder.workspace_management.setup import (
     CommandResult,
     WorkspaceError,

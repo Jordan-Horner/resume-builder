@@ -9,7 +9,6 @@ from collections.abc import Callable, Sequence
 
 from . import (
     feedback_memory,
-    project_report,
     review_records,
     synthesis,
 )
@@ -22,6 +21,7 @@ from .opportunities import cli as jobs
 from .opportunities import evaluation as screening_evaluation
 from .opportunities import onboarding as job_onboarding
 from .opportunities import preferences
+from .project_status import report as project_report
 from .publishing import mint as minting
 from .publishing import preview as previewing
 from .publishing import verification
