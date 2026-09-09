@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ..atomic import atomic_write_json, atomic_write_text
-from .locking import workspace_lock
+from .locking import workspace_sync_lock
 from .state import discover_workspace
 
 SYNC_INTERVAL_ENV = "RESUME_BUILDER_WORKSPACE_SYNC_INTERVAL_SECONDS"
@@ -146,7 +146,7 @@ def sync_once(workspace: Path) -> SyncResult:
     _environment, credential_error = _git_environment()
     if credential_error:
         return _result("error", credential_error, workspace_id=identity)
-    with workspace_lock(workspace, exclusive=True):
+    with workspace_sync_lock(workspace):
         return _sync_once_locked(workspace, identity)
 
 

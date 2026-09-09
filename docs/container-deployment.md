@@ -69,6 +69,11 @@ Workspace synchronization updates career data under `/workspace`; it does not
 update the application installed under `/app`. Local application-code changes
 require rebuilding the development image.
 
+The sync worker waits for active workspace operations before fast-forwarding.
+Workspace mutations remain serialized, while read-only portal requests can
+continue during long-running scans and other background writes. Container
+liveness is checked independently of workspace availability.
+
 During application development, run `docker compose up --watch`. The local
 Compose file watches backend, frontend, assistant-runtime, packaging, and image
 changes and rebuilds the development image. This is separate from workspace

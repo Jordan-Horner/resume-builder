@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 
 
-def _lock_path(workspace: Path) -> Path:
+def _lock_path(workspace: Path, name: str) -> Path:
     root = workspace.expanduser().resolve()
     marker = root / ".git"
     if marker.is_dir():
@@ -23,28 +23,56 @@ def _lock_path(workspace: Path) -> Path:
             git_directory = (root / git_directory).resolve()
     else:
         git_directory = root
-    return git_directory / "resume-builder-workspace.lock"
+    return git_directory / name
 
 
 @contextmanager
-def workspace_lock(workspace: Path, *, exclusive: bool) -> Iterator[None]:
-    """Serialize workspace mutations while allowing concurrent readers."""
-    with _lock_path(workspace).open("a+b") as stream:
-        fcntl.flock(stream, fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
+def _file_lock(path: Path, operation: int) -> Iterator[None]:
+    with path.open("a+b") as stream:
+        fcntl.flock(stream, operation)
         try:
             yield
         finally:
             fcntl.flock(stream, fcntl.LOCK_UN)
 
 
+@contextmanager
+def workspace_lock(workspace: Path, *, exclusive: bool) -> Iterator[None]:
+    """Keep Git sync out of active work and serialize workspace mutations."""
+    sync_gate = _lock_path(workspace, "resume-builder-workspace.lock")
+    with _file_lock(sync_gate, fcntl.LOCK_SH):
+        if exclusive:
+            writes = _lock_path(workspace, "resume-builder-workspace-writes.lock")
+            with _file_lock(writes, fcntl.LOCK_EX):
+                yield
+        else:
+            yield
+
+
+@contextmanager
+def workspace_sync_lock(workspace: Path) -> Iterator[None]:
+    """Wait for active work, then give Git exclusive access to the workspace."""
+    path = _lock_path(workspace, "resume-builder-workspace.lock")
+    with _file_lock(path, fcntl.LOCK_EX):
+        yield
+
+
 @asynccontextmanager
 async def async_workspace_lock(workspace: Path, *, exclusive: bool) -> AsyncIterator[None]:
     """Asynchronously acquire the same lock without blocking the event loop."""
-    stream = _lock_path(workspace).open("a+b")
+    sync_stream = _lock_path(workspace, "resume-builder-workspace.lock").open("a+b")
+    write_stream = None
     try:
-        operation = fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH
-        await asyncio.to_thread(fcntl.flock, stream, operation)
+        await asyncio.to_thread(fcntl.flock, sync_stream, fcntl.LOCK_SH)
+        if exclusive:
+            write_stream = _lock_path(
+                workspace, "resume-builder-workspace-writes.lock"
+            ).open("a+b")
+            await asyncio.to_thread(fcntl.flock, write_stream, fcntl.LOCK_EX)
         yield
     finally:
-        await asyncio.to_thread(fcntl.flock, stream, fcntl.LOCK_UN)
-        stream.close()
+        if write_stream is not None:
+            await asyncio.to_thread(fcntl.flock, write_stream, fcntl.LOCK_UN)
+            write_stream.close()
+        await asyncio.to_thread(fcntl.flock, sync_stream, fcntl.LOCK_UN)
+        sync_stream.close()

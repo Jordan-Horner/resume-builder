@@ -258,3 +258,37 @@ def test_sync_waits_for_an_active_workspace_writer(tmp_path: Path) -> None:
     worker.join(timeout=5)
 
     assert finished.is_set()
+
+
+def test_workspace_reader_does_not_wait_for_an_active_writer(tmp_path: Path) -> None:
+    _source, checkout = _repositories(tmp_path)
+    finished = threading.Event()
+
+    def run_reader() -> None:
+        with workspace_lock(checkout, exclusive=False):
+            finished.set()
+
+    with workspace_lock(checkout, exclusive=True):
+        worker = threading.Thread(target=run_reader)
+        worker.start()
+        assert finished.wait(1)
+    worker.join(timeout=5)
+
+    assert finished.is_set()
+
+
+def test_workspace_writer_waits_for_an_active_writer(tmp_path: Path) -> None:
+    _source, checkout = _repositories(tmp_path)
+    finished = threading.Event()
+
+    def run_writer() -> None:
+        with workspace_lock(checkout, exclusive=True):
+            finished.set()
+
+    with workspace_lock(checkout, exclusive=True):
+        worker = threading.Thread(target=run_writer)
+        worker.start()
+        assert not finished.wait(0.1)
+    worker.join(timeout=5)
+
+    assert finished.is_set()
