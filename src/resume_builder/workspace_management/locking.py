@@ -65,9 +65,7 @@ async def async_workspace_lock(workspace: Path, *, exclusive: bool) -> AsyncIter
     try:
         await asyncio.to_thread(fcntl.flock, sync_stream, fcntl.LOCK_SH)
         if exclusive:
-            write_stream = _lock_path(
-                workspace, "resume-builder-workspace-writes.lock"
-            ).open("a+b")
+            write_stream = _lock_path(workspace, "resume-builder-workspace-writes.lock").open("a+b")
             await asyncio.to_thread(fcntl.flock, write_stream, fcntl.LOCK_EX)
         yield
     finally:
