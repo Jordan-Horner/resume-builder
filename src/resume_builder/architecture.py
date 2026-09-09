@@ -34,6 +34,7 @@ FACADE_LINE_BUDGETS = {
     "migration": 60,
     "pdf_rendering": 25,
     "plans": 40,
+    "previewing": 35,
     "project_report": 60,
     "report_policy": 15,
     "rendering": 80,

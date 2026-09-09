@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from ..agent_contracts import ModelAdapter, StructuredModelRequest
 from ..atomic import atomic_write_json, atomic_write_text
 from ..compilation import build_resume
-from ..previewing import preview_resume
+from ..publishing.preview import preview_resume
 from ..reviews.blocks import narrative_block_inventory_from_markdown
 from ..reviews.feedback_recording import record_feedback
 from ..reviews.feedback_resolution import resolve_for_plan
