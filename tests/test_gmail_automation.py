@@ -44,6 +44,15 @@ from resume_builder.gmail_automation import (
 from resume_builder.gmail_semantic import SemanticEmailClassifier, SemanticLifecycleDecision
 
 
+def test_gmail_automation_keeps_runtime_state_imports_compatible() -> None:
+    from resume_builder import gmail_automation, gmail_state
+
+    assert gmail_automation.CLASSIFIER_VERSION == gmail_state.CLASSIFIER_VERSION
+    assert gmail_automation.GmailMessage is gmail_state.GmailMessage
+    assert gmail_automation.GmailRuntimeState is gmail_state.GmailRuntimeState
+    assert gmail_automation._sender_domain_hash is gmail_state.sender_domain_hash
+
+
 def encoded(value: str) -> str:
     return base64.urlsafe_b64encode(value.encode()).decode().rstrip("=")
 
