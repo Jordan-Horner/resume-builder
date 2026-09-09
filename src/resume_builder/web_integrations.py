@@ -12,7 +12,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from .agent_state import AgentState, default_agent_state_path
 from .agent_telegram_setup import (
     default_telegram_token_path,
     enable_private_telegram,
@@ -21,6 +20,7 @@ from .agent_telegram_setup import (
     wait_for_pairing,
     write_telegram_token,
 )
+from .assistant.state import AgentState, default_agent_state_path
 from .gmail_automation import (
     GMAIL_READONLY_SCOPE,
     GMAIL_SETUP_STEPS,

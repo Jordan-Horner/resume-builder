@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from .agent_state import AgentState
+from .assistant.state import AgentState
 
 
 def _now() -> str:

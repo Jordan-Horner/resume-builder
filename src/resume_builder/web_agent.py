@@ -16,8 +16,8 @@ import httpx
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
 
-from .agent_config import DEFAULT_AGENT_CONFIG
-from .agent_state import default_agent_state_path
+from .assistant.config import DEFAULT_AGENT_CONFIG
+from .assistant.state import default_agent_state_path
 from .web_agent_resume import resume_path
 from .web_agent_state import WebAgentState
 from .web_service import DashboardService

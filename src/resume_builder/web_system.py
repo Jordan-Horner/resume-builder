@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from .agent_state import AgentState, default_agent_state_path
+from .assistant.state import AgentState, default_agent_state_path
 from .service import telegram_configuration_status
 from .web_schedule import schedule_status
 

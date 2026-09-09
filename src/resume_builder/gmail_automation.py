@@ -2006,8 +2006,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             if not 1 <= args.max_semantic_messages <= 25:
                 raise ValueError("--max-semantic-messages must be from 1 to 25")
-            from .agent_config import load_agent_config
-            from .agent_openrouter import OpenRouterAdapter
+            from .assistant.config import load_agent_config
+            from .assistant.openrouter import OpenRouterAdapter
 
             config_path = args.agent_config
             if not config_path.is_absolute():

@@ -29,15 +29,15 @@ from job_puller.database import InventoryDatabase
 from job_puller.locations import location_key, matching_location_terms
 from job_puller.normalize import normalized_key
 
-from .agent_config import DEFAULT_AGENT_CONFIG, load_agent_config, render_default_agent_config
 from .agent_contracts import ModelProviderError
-from .agent_openrouter import OpenRouterAdapter
 from .application_tracking.records import (
     current_application_status,
     iter_records,
     reapplication_opportunities,
     record_application,
 )
+from .assistant.config import DEFAULT_AGENT_CONFIG, load_agent_config, render_default_agent_config
+from .assistant.openrouter import OpenRouterAdapter
 from .atomic import atomic_write_json, atomic_write_text
 from .layout import VaultLayout
 from .opportunities.cli import _load_preferences, _prescreen, get_job_screening_packet
@@ -2659,8 +2659,8 @@ class DashboardService:
         bright_data_settings = load_bright_data_settings(self.workspace)
         bright_data_connected = bool(bright_data_key(self.workspace))
         if agent_config_path.is_file():
-            from .agent_config import load_agent_config
             from .agent_telegram_setup import default_telegram_token_path, resolve_telegram_token
+            from .assistant.config import load_agent_config
 
             agent_config = load_agent_config(agent_config_path)
             telegram_configured = bool(

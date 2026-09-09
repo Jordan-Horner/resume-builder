@@ -7,6 +7,12 @@ from collections.abc import Mapping
 from pathlib import Path
 
 FACADE_LINE_BUDGETS = {
+    "agent": 20,
+    "agent_config": 40,
+    "agent_openrouter": 10,
+    "agent_state": 10,
+    "agent_telegram": 35,
+    "agent_tools": 10,
     "applications": 90,
     "ats": 10,
     "ats_readability": 20,
@@ -61,6 +67,15 @@ FORBIDDEN_IMPORTS = {
 
 FORBIDDEN_PACKAGE_IMPORTS: dict[str, set[str]] = {
     "application_tracking": {"automation", "opportunities", "portal"},
+    "assistant": {
+        "application_tracking",
+        "document_export",
+        "matching",
+        "planning",
+        "portal",
+        "reviews",
+        "role_profiles",
+    },
     "document_export": {
         "application_tracking",
         "assistant",

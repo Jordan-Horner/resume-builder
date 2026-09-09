@@ -13,8 +13,8 @@ from pathlib import Path
 
 import yaml
 
-from .agent_config import TelegramChannel, render_default_agent_config
-from .agent_state import AgentState, default_agent_state_path
+from .assistant.config import TelegramChannel, render_default_agent_config
+from .assistant.state import AgentState, default_agent_state_path
 from .atomic import atomic_write_text
 from .workspace_state import discover_workspace
 

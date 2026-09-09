@@ -9,8 +9,8 @@ from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
-from .agent_config import DEFAULT_AGENT_CONFIG, load_agent_config
-from .agent_openrouter import OpenRouterAdapter
+from .assistant.config import DEFAULT_AGENT_CONFIG, load_agent_config
+from .assistant.openrouter import OpenRouterAdapter
 from .atomic import atomic_write_json
 from .opportunities.cli import (
     DEFAULT_CONFIG,

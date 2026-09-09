@@ -3,6 +3,35 @@ import importlib
 import pytest
 
 FACADE_EXPORTS = {
+    "agent": {"AGENT_INSTRUCTIONS", "AgentService", "ConsoleAdapter", "main"},
+    "agent_config": {
+        "DEFAULT_AGENT_CONFIG",
+        "DEFAULT_FAST_MODEL",
+        "LEGACY_GENERATED_FAST_MODELS",
+        "AgentChannels",
+        "AgentConfig",
+        "AgentLimits",
+        "AgentModels",
+        "AgentRouting",
+        "TelegramChannel",
+        "load_agent_config",
+        "render_default_agent_config",
+    },
+    "agent_openrouter": {"AgentProviderError", "OPENROUTER_BASE_URL", "OpenRouterAdapter"},
+    "agent_state": {"AgentState", "StoredUpdate", "default_agent_state_path"},
+    "agent_telegram": {
+        "LOGGER",
+        "TELEGRAM_CHUNK_SIZE",
+        "TELEGRAM_MESSAGE_LIMIT",
+        "AgentResponder",
+        "TelegramAdapter",
+        "discover_telegram_ids",
+        "run_telegram_service",
+        "split_message",
+        "validate_telegram_configuration",
+        "verify_telegram_identity",
+    },
+    "agent_tools": {"build_job_screening_tools", "build_read_only_tools"},
     "applications": {
         "ANSWER_STATES",
         "DEFAULT_ROOT",

@@ -189,6 +189,14 @@ PydanticAI/OpenRouter adapter receives only normalized turns and explicitly
 registered tools, while SQLite and the private workspace remain authoritative.
 The initial agent toolset is read-only and content-limited; model conversation
 cannot establish career facts, application state, or approvals.
+The runtime implementation lives under `resume_builder.assistant`: `runtime.py`
+coordinates bounded turns, `config.py` validates secret-free configuration,
+`openrouter.py` implements the model-provider adapter, `state.py` owns external
+conversation state, `telegram.py` delivers messages, and `tools.py` defines the
+registered tool surface. Root `agent*.py` compatibility facades preserve existing
+imports and the `agent` CLI. The provider-neutral `agent_contracts.py` remains
+shared infrastructure, and interactive Telegram credential setup remains a
+separate integration boundary.
 Structured job screening follows an additional split: local deterministic
 constraints own eligibility, while a provider-neutral structured model request
 owns only career-fit judgment. A model cannot override a confirmed eligibility

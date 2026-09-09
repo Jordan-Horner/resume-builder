@@ -8,10 +8,10 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .agent import AgentService
-from .agent_config import DEFAULT_AGENT_CONFIG, load_agent_config
 from .agent_contracts import AgentTool, InboundMessage
-from .agent_openrouter import OpenRouterAdapter
+from .assistant.config import DEFAULT_AGENT_CONFIG, load_agent_config
+from .assistant.openrouter import OpenRouterAdapter
+from .assistant.runtime import AgentService
 from .opportunities.cli import _load_preferences
 from .opportunities.defaults import PREFERENCES_PATH
 from .opportunities.preferences import PreferenceChangeRequest
