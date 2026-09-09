@@ -18,6 +18,7 @@ FACADE_LINE_BUDGETS = {
     "artifact_status": 25,
     "ats": 10,
     "ats_readability": 20,
+    "automation": 100,
     "automation_config": 40,
     "background_screening": 40,
     "compilation": 55,

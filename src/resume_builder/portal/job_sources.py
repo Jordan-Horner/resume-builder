@@ -191,8 +191,8 @@ def run_worker(root: Path, snapshot: Path) -> None:
         screening_status = "disabled"
         screened_jobs = 0
         try:
-            from ..automation import DEFAULT_CONFIG as AUTOMATION_CONFIG
-            from ..automation import load_config as load_automation
+            from ..scheduled_tasks.config import DEFAULT_CONFIG as AUTOMATION_CONFIG
+            from ..scheduled_tasks.config import load_config as load_automation
             from ..scheduled_tasks.screening import run_background_replenishment
 
             schedule_path = root / AUTOMATION_CONFIG

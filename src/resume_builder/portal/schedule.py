@@ -12,7 +12,6 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ..atomic import atomic_write_text
-from ..automation import AutomationState, default_state_path, next_job_run
 from ..scheduled_tasks.config import (
     DEFAULT_CONFIG,
     AutomationConfig,
@@ -20,6 +19,7 @@ from ..scheduled_tasks.config import (
     load_config,
     render_default_config,
 )
+from ..scheduled_tasks.scheduler import AutomationState, default_state_path, next_job_run
 from ..scheduled_tasks.screening import (
     DEFAULT_REPLENISHMENT_STATE,
     DEFAULT_SCREENING_OUTPUT,

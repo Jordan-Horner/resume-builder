@@ -10,7 +10,6 @@ from collections.abc import Callable, Sequence
 from . import (
     agent,
     applications,
-    automation,
     compilation,
     directions,
     evaluations,
@@ -36,6 +35,7 @@ from .opportunities import cli as jobs
 from .opportunities import evaluation as screening_evaluation
 from .opportunities import onboarding as job_onboarding
 from .opportunities import preferences
+from .scheduled_tasks import scheduler as automation
 
 Command = tuple[Callable[[Sequence[str] | None], int], str]
 COMMANDS: dict[str, Command] = {

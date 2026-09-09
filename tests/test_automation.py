@@ -667,7 +667,7 @@ def test_semantic_screening_failure_does_not_turn_collection_into_a_retry(
     monkeypatch.setattr(jobs_module, "DEFAULT_NEW_OUTPUT", new_jobs)
     monkeypatch.setattr(jobs_module, "main", collect)
     monkeypatch.setattr(
-        "resume_builder.automation.run_background_replenishment",
+        "resume_builder.scheduled_tasks.scheduler.run_background_replenishment",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("fictional invalid config")),
     )
 
@@ -735,10 +735,11 @@ def test_restart_resumes_pending_screening_without_rescanning_sources(
     source_runs: list[str] = []
     screening_runs: list[tuple[Path, int, int]] = []
     monkeypatch.setattr(
-        "resume_builder.automation.background_screening_configured", lambda _root: True
+        "resume_builder.scheduled_tasks.scheduler.background_screening_configured",
+        lambda _root: True,
     )
     monkeypatch.setattr(
-        "resume_builder.automation.run_background_replenishment",
+        "resume_builder.scheduled_tasks.scheduler.run_background_replenishment",
         lambda root, *, max_jobs, display_limit: screening_runs.append(
             (root, max_jobs, display_limit)
         ),
@@ -786,10 +787,11 @@ def test_restart_skips_screening_when_saved_backlog_is_complete(
     )
     screening_runs: list[str] = []
     monkeypatch.setattr(
-        "resume_builder.automation.background_screening_configured", lambda _root: True
+        "resume_builder.scheduled_tasks.scheduler.background_screening_configured",
+        lambda _root: True,
     )
     monkeypatch.setattr(
-        "resume_builder.automation.run_background_replenishment",
+        "resume_builder.scheduled_tasks.scheduler.run_background_replenishment",
         lambda *_args, **_kwargs: screening_runs.append("screen"),
     )
 
@@ -833,10 +835,11 @@ def test_due_discovery_runs_before_any_backlog_recovery(
     source_runs: list[str] = []
     screening_runs: list[str] = []
     monkeypatch.setattr(
-        "resume_builder.automation.background_screening_configured", lambda _root: True
+        "resume_builder.scheduled_tasks.scheduler.background_screening_configured",
+        lambda _root: True,
     )
     monkeypatch.setattr(
-        "resume_builder.automation.run_background_replenishment",
+        "resume_builder.scheduled_tasks.scheduler.run_background_replenishment",
         lambda *_args, **_kwargs: screening_runs.append("screen"),
     )
 

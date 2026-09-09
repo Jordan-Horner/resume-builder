@@ -6,8 +6,8 @@ import json
 from pathlib import Path
 
 from ..agent_contracts import AgentTool
-from ..automation import AutomationState
 from ..opportunities import cli as jobs
+from ..scheduled_tasks.scheduler import AutomationState
 
 
 def build_read_only_tools(state_path: Path) -> tuple[AgentTool, ...]:

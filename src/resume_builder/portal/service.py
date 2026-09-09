@@ -1511,7 +1511,7 @@ class DashboardService:
         max_jobs = 0
         if schedule_path.is_file():
             try:
-                from ..automation import load_config as load_automation
+                from ..scheduled_tasks.config import load_config as load_automation
 
                 schedule = load_automation(schedule_path)
                 enabled = schedule.jobs.semantic_screening_enabled
@@ -1563,7 +1563,7 @@ class DashboardService:
         self._screening_lock.acquire()
         started_at = datetime.now(UTC)
         try:
-            from ..automation import load_config as load_automation
+            from ..scheduled_tasks.config import load_config as load_automation
             from ..scheduled_tasks.screening import (
                 publish_replenishment_state,
                 run_background_replenishment,
@@ -2694,7 +2694,7 @@ class DashboardService:
         discord_configured = False
         discord_connected = False
         if automation_config_path.is_file():
-            from ..automation import load_config as load_automation_config
+            from ..scheduled_tasks.config import load_config as load_automation_config
 
             automation_config = load_automation_config(automation_config_path)
             discord_configured = automation_config.notifications.sink == "discord"

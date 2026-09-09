@@ -14,6 +14,8 @@ on configuration without importing the full scheduler orchestrator.
 Background quick-screen replenishment lives beside it in
 `resume_builder.scheduled_tasks.screening`; the established
 `resume_builder.background_screening` import remains compatible.
+The scheduler itself lives in `resume_builder.scheduled_tasks.scheduler`; the
+`resume_builder.automation` module remains the stable CLI and import facade.
 
 ## What runs automatically
 

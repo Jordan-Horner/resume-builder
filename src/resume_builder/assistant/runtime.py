@@ -24,7 +24,6 @@ from ..agent_contracts import (
     StructuredModelRequest,
 )
 from ..atomic import atomic_write_text
-from ..automation import default_state_path
 from ..opportunities.cli import DEFAULT_CONFIG as DEFAULT_JOBS_CONFIG
 from ..opportunities.cli import DEFAULT_PREFERENCES, get_job_screening_packet
 from ..opportunities.discovery_activation import (
@@ -70,6 +69,7 @@ from ..opportunities.screening_service import (
     ScreeningService,
     enrich_packet_from_cached_interpretation,
 )
+from ..scheduled_tasks.scheduler import default_state_path
 from .config import (
     DEFAULT_AGENT_CONFIG,
     AgentConfig,
