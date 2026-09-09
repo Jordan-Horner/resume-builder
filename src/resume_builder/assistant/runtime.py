@@ -562,7 +562,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "discovery-rollback":
             return _run_discovery_rollback(args)
         if args.command == "telegram-setup":
-            from ..agent_telegram_setup import run_personal_telegram_setup
+            from .telegram_setup import run_personal_telegram_setup
 
             return run_personal_telegram_setup(
                 config_path=args.config,

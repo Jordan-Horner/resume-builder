@@ -156,11 +156,11 @@ def test_personal_setup_validates_stores_and_pairs_without_printing_token(
         return 101, 202
 
     qr_urls: list[str] = []
-    monkeypatch.setattr("resume_builder.agent_telegram_setup.validate_personal_bot", validate)
-    monkeypatch.setattr("resume_builder.agent_telegram_setup.wait_for_pairing", pair)
-    monkeypatch.setattr("resume_builder.agent_telegram_setup._print_qr", qr_urls.append)
+    monkeypatch.setattr("resume_builder.assistant.telegram_setup.validate_personal_bot", validate)
+    monkeypatch.setattr("resume_builder.assistant.telegram_setup.wait_for_pairing", pair)
+    monkeypatch.setattr("resume_builder.assistant.telegram_setup._print_qr", qr_urls.append)
     monkeypatch.setattr(
-        "resume_builder.agent_telegram_setup.secrets.token_urlsafe",
+        "resume_builder.assistant.telegram_setup.secrets.token_urlsafe",
         lambda _size: "one-use-code",
     )
     config_path = tmp_path / "workspace" / "agent" / "config.yml"

@@ -9,9 +9,9 @@ from contextlib import suppress
 from typing import Protocol
 
 from ..agent_contracts import InboundMessage, OutboundMessage
-from ..agent_telegram_setup import default_telegram_token_path, resolve_telegram_token
 from .config import AgentConfig, TelegramChannel
 from .state import AgentState, StoredUpdate
+from .telegram_setup import default_telegram_token_path, resolve_telegram_token
 
 LOGGER = logging.getLogger(__name__)
 TELEGRAM_MESSAGE_LIMIT = 4096

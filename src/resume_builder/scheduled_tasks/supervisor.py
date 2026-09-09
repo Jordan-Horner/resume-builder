@@ -14,8 +14,8 @@ import threading
 from collections.abc import Sequence
 from pathlib import Path
 
-from ..agent_telegram_setup import resolve_telegram_token
 from ..assistant.config import DEFAULT_AGENT_CONFIG, load_agent_config
+from ..assistant.telegram_setup import resolve_telegram_token
 from ..atomic import atomic_write_text
 from ..workspace_management.state import discover_workspace
 from .config import DEFAULT_CONFIG, load_config

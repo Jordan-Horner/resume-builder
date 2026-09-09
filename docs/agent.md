@@ -175,6 +175,10 @@ current chat. `/status` asks the existing read-only agent for automation health.
 Unauthorized messages are ignored before any model request. Operational logs
 contain neither message bodies nor credentials.
 
+Telegram pairing and secret-safe bot setup live in
+`resume_builder.assistant.telegram_setup`. The established
+`resume_builder.agent_telegram_setup` import remains a compatibility facade.
+
 For Docker, enable the opt-in Compose profile after setting the token and the
 existing workspace, runtime, and OpenRouter variables:
 

@@ -12,6 +12,7 @@ FACADE_LINE_BUDGETS = {
     "agent_openrouter": 10,
     "agent_state": 10,
     "agent_telegram": 35,
+    "agent_telegram_setup": 35,
     "agent_tools": 10,
     "applications": 90,
     "artifact_paths": 10,

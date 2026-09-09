@@ -2678,8 +2678,11 @@ class DashboardService:
         bright_data_settings = load_bright_data_settings(self.workspace)
         bright_data_connected = bool(bright_data_key(self.workspace))
         if agent_config_path.is_file():
-            from ..agent_telegram_setup import default_telegram_token_path, resolve_telegram_token
             from ..assistant.config import load_agent_config
+            from ..assistant.telegram_setup import (
+                default_telegram_token_path,
+                resolve_telegram_token,
+            )
 
             agent_config = load_agent_config(agent_config_path)
             telegram_configured = bool(
