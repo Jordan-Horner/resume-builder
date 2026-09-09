@@ -19,8 +19,12 @@ from resume_builder.agent_contracts import (
     StructuredModelReply,
     StructuredModelRequest,
 )
-from resume_builder.applications import load_record
-from resume_builder.gmail_automation import (
+from resume_builder.application_tracking.email_classification import (
+    SemanticEmailClassifier,
+    SemanticLifecycleDecision,
+)
+from resume_builder.application_tracking.records import load_record
+from resume_builder.gmail_integration.orchestration import (
     DEFAULT_SCAN_QUERY,
     GMAIL_API_URL,
     GOOGLE_AUDIENCE_URL,
@@ -41,16 +45,6 @@ from resume_builder.gmail_automation import (
     process_messages,
     scan,
 )
-from resume_builder.gmail_semantic import SemanticEmailClassifier, SemanticLifecycleDecision
-
-
-def test_gmail_automation_keeps_runtime_state_imports_compatible() -> None:
-    from resume_builder import gmail_automation, gmail_state
-
-    assert gmail_automation.CLASSIFIER_VERSION == gmail_state.CLASSIFIER_VERSION
-    assert gmail_automation.GmailMessage is gmail_state.GmailMessage
-    assert gmail_automation.GmailRuntimeState is gmail_state.GmailRuntimeState
-    assert gmail_automation._sender_domain_hash is gmail_state.sender_domain_hash
 
 
 def encoded(value: str) -> str:
@@ -147,7 +141,7 @@ class FailingSemanticAdapter:
 
 
 def manual_application(workspace: Path, company: str, role: str):
-    from resume_builder.applications import _write_or_preview, build_record
+    from resume_builder.application_tracking.records import _write_or_preview, build_record
 
     record = build_record(
         argparse.Namespace(
@@ -521,7 +515,7 @@ def test_semantic_fallback_minimizes_message_and_requires_exact_evidence():
 
 
 def test_semantic_fallback_updates_only_a_uniquely_matched_existing_application(tmp_path: Path):
-    from resume_builder.applications import _write_or_preview, build_record
+    from resume_builder.application_tracking.records import _write_or_preview, build_record
 
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -979,7 +973,7 @@ def test_akamai_confirmation_links_exact_requisition(tmp_path: Path, monkeypatch
 
 
 def test_confirmation_links_matching_manual_application_without_duplicate(tmp_path: Path):
-    from resume_builder.applications import _write_or_preview, build_record
+    from resume_builder.application_tracking.records import _write_or_preview, build_record
 
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -1228,7 +1222,10 @@ def test_title_only_or_conflicting_company_rejection_preserves_history(
     ],
 )
 def test_lifecycle_identity_evidence(company, req, thread, sender, expected):
-    from resume_builder.gmail_automation import GmailLifecycleEvent, _resolve_existing_application
+    from resume_builder.gmail_integration.orchestration import (
+        GmailLifecycleEvent,
+        _resolve_existing_application,
+    )
 
     records = [
         {
@@ -1333,7 +1330,7 @@ def test_follow_up_lifecycle_events_update_a_unique_existing_application(
     counter: str,
     expected_status: str,
 ):
-    from resume_builder.applications import _write_or_preview, build_record
+    from resume_builder.application_tracking.records import _write_or_preview, build_record
 
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -1389,7 +1386,7 @@ def test_follow_up_lifecycle_events_update_a_unique_existing_application(
 
 
 def test_direct_company_domain_can_link_an_identity_free_interview_follow_up(tmp_path: Path):
-    from resume_builder.applications import _write_or_preview, build_record
+    from resume_builder.application_tracking.records import _write_or_preview, build_record
 
     workspace = tmp_path / "workspace"
     workspace.mkdir()

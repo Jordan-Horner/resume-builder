@@ -11,7 +11,7 @@ import pytest
 
 from job_puller.database import InventoryDatabase
 from job_puller.models import JobObservation, ProviderResult
-from resume_builder.applications import (
+from resume_builder.application_tracking.records import (
     RATE_SAMPLE_FLOOR,
     _write_or_preview,
     append_answer,

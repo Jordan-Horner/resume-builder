@@ -27,9 +27,8 @@ with an application event.
 
 The Gmail integration lives under `resume_builder.gmail_integration`.
 `state.py` owns the content-free runtime database and mailbox lock, while
-`orchestration.py` owns Gmail API access and lifecycle reconciliation. The
-established `resume_builder.gmail_state` and `resume_builder.gmail_automation`
-imports remain compatibility facades.
+`orchestration.py` owns Gmail API access and lifecycle reconciliation. Callers
+import both modules directly from `resume_builder.gmail_integration`.
 
 Shared recruiting platforms such as Workday, Greenhouse, Lever, Ashby, iCIMS,
 and SmartRecruiters are never treated as company-domain identity. Their domains

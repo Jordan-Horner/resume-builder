@@ -8,7 +8,6 @@ import sys
 from collections.abc import Callable, Sequence
 
 from . import (
-    applications,
     compilation,
     directions,
     feedback_memory,
@@ -27,6 +26,7 @@ from . import (
     verification,
     workspace,
 )
+from .application_tracking import records as applications
 from .assistant import runtime as agent
 from .gmail_integration import orchestration as gmail_automation
 from .opportunities import cli as jobs

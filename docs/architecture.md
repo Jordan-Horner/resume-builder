@@ -125,8 +125,8 @@ Post-application history lives under `resume_builder.application_tracking`.
 Its records module owns append-only application events, submitted-answer history,
 resume snapshots, outcomes, and reapplication signals. Its email-classification
 module contains the provider-neutral semantic decision boundary. The root
-`applications.py` and `gmail_semantic.py` modules remain compatibility facades;
-Gmail OAuth, mailbox scanning, and runtime state remain an integration workflow.
+package imports these modules directly; Gmail OAuth, mailbox scanning, and
+runtime state remain an integration workflow.
 
 Role targeting lives under `resume_builder.role_profiles`. Schema validation,
 terminology diagnostics, profile creation, and resume-to-direction audits share

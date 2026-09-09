@@ -88,7 +88,7 @@ def test_directional_resume_removal_archives_only_the_resume(tmp_path: Path) -> 
 def test_used_directional_resume_is_retired_after_application_copy_is_preserved(
     tmp_path: Path,
 ) -> None:
-    from resume_builder.applications import record_application
+    from resume_builder.application_tracking.records import record_application
 
     root = _workspace(tmp_path)
     resume = root / "resumes" / "baselines" / "support.md"
@@ -135,7 +135,7 @@ def test_retired_directional_resume_can_be_restored(tmp_path: Path) -> None:
 def test_application_preview_uses_preserved_copy_after_source_changes(
     tmp_path: Path, monkeypatch
 ) -> None:
-    from resume_builder.applications import record_application
+    from resume_builder.application_tracking.records import record_application
 
     root = _workspace(tmp_path)
     resume = root / "resumes" / "baselines" / "support.md"

@@ -7,7 +7,6 @@ from collections.abc import Mapping
 from pathlib import Path
 
 FACADE_LINE_BUDGETS = {
-    "applications": 90,
     "artifact_paths": 10,
     "artifact_status": 25,
     "ats": 10,
@@ -23,9 +22,6 @@ FACADE_LINE_BUDGETS = {
     "evidence": 50,
     "evidence_questions": 30,
     "evaluations": 30,
-    "gmail_semantic": 30,
-    "gmail_automation": 150,
-    "gmail_state": 20,
     "integrations": 20,
     "job_matching": 400,
     "job_report": 10,
