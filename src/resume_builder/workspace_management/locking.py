@@ -82,9 +82,7 @@ async def async_workspace_lock(
         await asyncio.to_thread(fcntl.flock, sync_stream, fcntl.LOCK_SH)
         if exclusive:
             operation = fcntl.LOCK_EX if wait else fcntl.LOCK_EX | fcntl.LOCK_NB
-            candidate = _lock_path(
-                workspace, "resume-builder-workspace-writes.lock"
-            ).open("a+b")
+            candidate = _lock_path(workspace, "resume-builder-workspace-writes.lock").open("a+b")
             try:
                 await asyncio.to_thread(fcntl.flock, candidate, operation)
             except BlockingIOError:
