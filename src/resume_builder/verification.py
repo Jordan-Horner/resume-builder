@@ -15,7 +15,6 @@ from .artifact_paths import resume_output_base
 from .artifact_status import build_manifest_freshness
 from .atomic import atomic_write_json
 from .compilation import build_resume, relative_output, sha256_file
-from .directions import audit_direction, parse_direction
 from .job_matching import match_job, project_target_path
 from .rendering import contained_project_path
 from .review_records import (
@@ -35,6 +34,7 @@ from .reviews.selection_review import (
     selection_strategy_digest,
     selection_strategy_payload,
 )
+from .role_profiles.profiles import audit_direction, parse_direction
 from .synthesis import load_synthesis_plan
 from .validation import validate_vault
 

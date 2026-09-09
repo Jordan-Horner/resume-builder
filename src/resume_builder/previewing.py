@@ -17,7 +17,6 @@ from .artifact_paths import default_resume_output_base
 from .artifact_status import build_manifest_freshness
 from .atomic import atomic_write_json, atomic_write_text
 from .compilation import build_resume, relative_output, sha256_file
-from .directions import audit_direction, parse_direction
 from .evidence_questions import open_questions
 from .opportunities.targets import parse_target, project_target_path
 from .rendering import contained_project_path, known_fact_ids, load_payload, render_payload
@@ -32,6 +31,7 @@ from .reviews.selection_review import (
     selection_review_paths,
     selection_strategy_digest,
 )
+from .role_profiles.profiles import audit_direction, parse_direction
 from .synthesis import SynthesisPlan, load_synthesis_plan
 
 APPROVED_NOTICE = "Language reviewed · Edit or mint when ready"

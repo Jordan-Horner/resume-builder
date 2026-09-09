@@ -10,7 +10,8 @@ from urllib.parse import urlparse
 
 import yaml
 
-from ..directions import (
+from ..rendering import contained_project_path, object_value
+from ..role_profiles.profiles import (
     SLUG,
     iso_date,
     nonempty_string,
@@ -18,7 +19,6 @@ from ..directions import (
     parse_direction,
     string_list,
 )
-from ..rendering import contained_project_path, object_value
 
 TARGET_FIELDS = {
     "schema_version",

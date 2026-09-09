@@ -6,8 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .directions import nonempty_string, string_list
 from .rendering import object_value
+from .role_profiles.profiles import nonempty_string, string_list
 
 CASE_FIELDS = {"version", "evidence_complete", "criteria"}
 JUDGMENT_FIELDS = {

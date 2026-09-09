@@ -13,7 +13,6 @@ from typing import Any
 
 from .atomic import atomic_write_json, atomic_write_text
 from .compilation import compile_markdown, relative_output, sha256_file
-from .directions import normalize_phrase, phrase_present, string_list
 from .evidence import audit_claims, claim_blocks
 from .job_report import markdown_report
 from .match_grading import (
@@ -35,6 +34,7 @@ from .opportunities.targets import (
     validate_target,
 )
 from .rendering import contained_project_path, object_value
+from .role_profiles.profiles import normalize_phrase, phrase_present, string_list
 
 __all__ = [
     "CRITERION_FIELDS",

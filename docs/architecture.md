@@ -109,6 +109,12 @@ module contains the provider-neutral semantic decision boundary. The root
 `applications.py` and `gmail_semantic.py` modules remain compatibility facades;
 Gmail OAuth, mailbox scanning, and runtime state remain an integration workflow.
 
+Role targeting lives under `resume_builder.role_profiles`. Schema validation,
+terminology diagnostics, profile creation, and resume-to-direction audits share
+that domain rather than appearing as unrelated root modules. The established
+`directions.py`, `direction_schema.py`, and `direction_diagnostics.py` imports
+remain compatibility facades, and the `direction` CLI is unchanged.
+
 Resume construction is split into two internal domains. `resume_builder.planning`
 owns synthesis-plan models, schema helpers, loading, summary strategy, role
 balance, and plan audits. `resume_builder.reviews` owns narrative-block review,

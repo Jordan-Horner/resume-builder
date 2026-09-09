@@ -10,6 +10,8 @@ FACADE_LINE_BUDGETS = {
     "applications": 90,
     "compilation": 250,
     "directions": 450,
+    "direction_diagnostics": 20,
+    "direction_schema": 60,
     "feedback_memory": 250,
     "gmail_semantic": 30,
     "job_matching": 400,
@@ -57,6 +59,14 @@ FORBIDDEN_PACKAGE_IMPORTS: dict[str, set[str]] = {
     "opportunities": {"assistant", "automation", "portal"},
     "planning": {"assistant", "automation", "opportunities", "portal", "reviews"},
     "reviews": {"assistant", "automation", "opportunities", "portal"},
+    "role_profiles": {
+        "application_tracking",
+        "assistant",
+        "automation",
+        "opportunities",
+        "portal",
+        "reviews",
+    },
 }
 
 
