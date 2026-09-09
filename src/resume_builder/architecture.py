@@ -29,6 +29,7 @@ FACADE_LINE_BUDGETS = {
     "feedback_memory": 250,
     "evidence": 50,
     "evidence_questions": 30,
+    "evaluations": 30,
     "gmail_semantic": 30,
     "gmail_automation": 150,
     "gmail_state": 20,

@@ -12,7 +12,6 @@ from . import (
     applications,
     compilation,
     directions,
-    evaluations,
     feedback_memory,
     job_matching,
     migration,
@@ -34,6 +33,7 @@ from .opportunities import cli as jobs
 from .opportunities import evaluation as screening_evaluation
 from .opportunities import onboarding as job_onboarding
 from .opportunities import preferences
+from .quality_assurance import regression as evaluations
 from .scheduled_tasks import scheduler as automation
 from .scheduled_tasks import supervisor as service
 

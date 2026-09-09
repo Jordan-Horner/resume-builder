@@ -388,6 +388,14 @@ FACADE_EXPORTS = {
         "question_plan",
         "resolve_question",
     },
+    "evaluations": {
+        "DIMENSIONS",
+        "_compiled_selection",
+        "_review",
+        "grade_case",
+        "load_case",
+        "main",
+    },
     "feedback_memory": {
         "KINDS",
         "PROMOTIONS",

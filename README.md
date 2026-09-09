@@ -241,6 +241,7 @@ the shorter [demo walkthrough](docs/demo.md).
 | Gmail setup and privacy | [Gmail automation](docs/gmail-automation.md) |
 | Scheduling and containers | [Automation](docs/automation.md) |
 | Deployment and updates | [Container deployment](docs/container-deployment.md) |
+| Resume regression checks | [Evaluations](docs/evaluations.md) |
 
 ## Contributing
 

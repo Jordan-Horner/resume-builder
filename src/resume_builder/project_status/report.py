@@ -25,11 +25,11 @@ from ..build_artifacts.status import (
 from ..build_artifacts.status import (
     sha256 as _sha256,
 )
-from ..evaluations import load_case
 from ..feedback_memory import validate_feedback_memory
 from ..matching.audit import validate_target
 from ..opportunities.onboarding import onboarding_status as job_onboarding_status
 from ..publishing.verification import workflow_state
+from ..quality_assurance.regression import load_case
 from ..review_records import load_review_record, review_freshness
 from ..role_profiles.profiles import parse_direction
 from ..synthesis import load_synthesis_plan
