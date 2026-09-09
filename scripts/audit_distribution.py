@@ -94,7 +94,7 @@ def audit_wheel(path: Path, denylist: tuple[bytes, ...]) -> None:
         required = {
             "job_puller/cli.py",
             "resume_builder/cli.py",
-            "resume_builder/evidence_questions.py",
+            "resume_builder/vault/questions.py",
             "resume_builder/resources/workspace/vault/README.md",
         }
         missing = sorted(required - set(names))
