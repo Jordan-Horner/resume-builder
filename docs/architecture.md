@@ -199,9 +199,10 @@ facade.
 Resume construction is split into two internal domains. `resume_builder.planning`
 owns synthesis-plan models, schema helpers, loading, summary strategy, role
 balance, and plan audits. Its loader coordinates version-aware assembly while
-the `stories` and `role_arcs` modules validate their respective plan sections.
-`resume_builder.reviews` owns narrative-block review, feedback memory, selection
-checks, decisions, repairs, and review packaging.
+the `stories`, `targeting`, `presentation`, and `role_arcs` modules validate
+their respective plan sections. `resume_builder.reviews` owns narrative-block
+review, feedback memory, selection checks, decisions, repairs, and review
+packaging.
 The root `synthesis.py`, `feedback_memory.py`, and `review_records.py` modules
 remain compatibility facades for established commands and public imports.
 
