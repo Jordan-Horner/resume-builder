@@ -380,15 +380,38 @@ it("screens a job only after the user requests it", async () => {
   expect(host.textContent).toContain("Good fit");
   expect(host.textContent).toContain("Strong production support evidence.");
   expect(host.querySelector<HTMLDetailsElement>(".job-screen-rationale")?.open).toBe(false);
+  expect(host.querySelectorAll(".job-fit-result")[0]?.textContent).toContain("Career fitGood fit");
+  expect(host.querySelectorAll(".job-fit-result")[1]?.textContent).toContain("Resume matchStrong match");
   expect(host.querySelector(".job-screen-coverage")?.textContent).toContain("1Verified fact");
   expect(host.querySelector(".job-screen-coverage")?.textContent).toContain("1Criterion checked");
   expect(host.textContent).toContain("Incident response: Supported");
-  expect(host.querySelector(".job-resume-heading > a")?.textContent).toBe("Production Support Engineer");
-  expect(host.querySelector(".job-resume-heading > strong")?.textContent).toBe("Strong match");
+  expect(host.querySelector(".job-resume-match > a")?.textContent).toBe("Production Support Engineer");
+  expect(host.querySelector(".job-resume-match > strong")?.textContent).toBe("Strong match");
   expect(host.querySelector(".job-resume-signals dd")?.textContent).toBe("Incident response");
   expect(host.querySelector<HTMLAnchorElement>('.job-resume-match a')?.getAttribute("href")).toContain("resumes%2Fbaselines%2Fsupport.md");
   expect(host.textContent).toContain("Verified incident leadership directly supports this requirement.");
   expect(host.textContent).toContain("Evidence used");
+});
+
+it("aligns career fit with vault-backed resume guidance", async () => {
+  vi.mocked(api.getJobScreenStatus).mockResolvedValue({ status: "complete", cached: true, result: {
+    job_id: "one", fit: "strong_match", fit_label: "Strong fit", screening_label: "Quick screen", eligibility: "eligible",
+    eligibility_label: "Eligible", recommendation: "pursue", recommendation_label: "Pursue", confidence: "high",
+    strengths: [], gaps: [], unknowns: [], reasoning_summary: "Strong infrastructure evidence.",
+    evidence_coverage: "good", evidence_strategy: "posting-wide", posting_coverage: "complete",
+    evidence_used: [{ fact_id: "OPS-001", title: "Infrastructure operations", category: "employment", strength: "demonstrated" }],
+    resume_match: null,
+    resume_guidance: { status: "multiple-matches", label: "Multiple matches", detail: "Two current resumes cover the same verified vault evidence." },
+  } });
+
+  await openJob();
+
+  const results = host.querySelectorAll(".job-fit-result");
+  expect(results).toHaveLength(2);
+  expect(results[0]?.textContent).toContain("Career fitStrong fit");
+  expect(results[1]?.textContent).toContain("Resume matchMultiple matches");
+  expect(results[1]?.textContent).toContain("same verified vault evidence");
+  expect(host.textContent).not.toContain("No matching directional resume was identified");
 });
 
 it("queues a slow screen and renders its background result without blocking the job panel", async () => {

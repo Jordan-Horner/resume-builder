@@ -111,6 +111,11 @@ export interface JobScreenResult {
         label: "Strong match" | "Partial match" | "Weak match" | "Unknown match";
       } | null;
     } | null;
+    resume_guidance?: {
+      status: "multiple-matches" | "needs-tailoring" | "no-resumes" | "not-enough-evidence";
+      label: string;
+      detail: string;
+    } | null;
     posting_coverage: "complete" | "partial";
     evidence_used: Array<{
       fact_id: string;

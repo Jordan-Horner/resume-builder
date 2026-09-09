@@ -239,12 +239,12 @@ export function JobDetailPanel({
           {job.company_recognition?.top_workplace && <span className="recognition-badge top-workplace">Top workplace</span>}
           {job.company_recognition?.major_employer && <span className="recognition-badge major-employer">Major employer</span>}
         </div>
-        {recommendation?.recommended_resume && !jobScreen?.result.resume_match && <div className="resume-recommendation">
+        {!jobScreen && recommendation?.recommended_resume && <div className="resume-recommendation">
           <span>Recommended resume</span>
           <strong>{recommendation.recommended_resume.name}</strong>
           {recommendation.match && <em>{recommendation.match.label}</em>}
         </div>}
-        {recommendation?.status === "unavailable" && recommendation.message && !jobScreen?.result.resume_match && <p className="recommendation-empty">{recommendation.message}</p>}
+        {!jobScreen && recommendation?.status === "unavailable" && recommendation.message && <p className="recommendation-empty">{recommendation.message}</p>}
         {recommendationError && <p className="recommendation-error" role="status">{recommendationError}</p>}
         <section className="job-screen-card" aria-label="Job screen">
           {screening && !jobScreen ? <>
@@ -254,25 +254,31 @@ export function JobDetailPanel({
             </div>
             <div className="job-screen-actions"><button className="text-button" onClick={() => assistant.discussJob(job.id, contextName)}>Discuss job</button></div>
           </> : jobScreen ? <>
-            <div className="job-screen-heading">
-              <div><span>{jobScreen.result.screening_label}</span><strong>{jobScreen.result.fit_label}</strong></div>
-              <em>{jobScreen.result.screening_label === "Quick screen" ? `${jobScreen.result.confidence} confidence · ` : ""}{jobScreen.result.eligibility_label}</em>
+            <div className="job-fit-comparison">
+              <div className="job-fit-result">
+                <span className="job-fit-label">Career fit</span>
+                <strong className="job-fit-rating">{jobScreen.result.fit_label}</strong>
+                <small>{jobScreen.result.screening_label}{jobScreen.result.screening_label === "Quick screen" ? ` · ${jobScreen.result.confidence} confidence` : ""} · {jobScreen.result.eligibility_label}</small>
+              </div>
+              <div className="job-fit-result job-resume-match">
+                <span className="job-fit-label">Resume match</span>
+                {jobScreen.result.resume_match ? <>
+                  <strong className="job-fit-rating job-fit-rating-accent">{jobScreen.result.resume_match.label}</strong>
+                  <a href={`/api/resume-preview?resume_id=${encodeURIComponent(jobScreen.result.resume_match.resume_id)}`} target="_blank" rel="noreferrer">{jobScreen.result.resume_match.name}</a>
+                  {(jobScreen.result.resume_match.strongest_overlap.length > 0 || jobScreen.result.resume_match.primary_gap) && <dl className="job-resume-signals">
+                    {jobScreen.result.resume_match.strongest_overlap.length > 0 && <div><dt>Strongest overlap</dt><dd>{jobScreen.result.resume_match.strongest_overlap.join(" · ")}</dd></div>}
+                    {jobScreen.result.resume_match.primary_gap && <div><dt>Primary gap</dt><dd>{jobScreen.result.resume_match.primary_gap}</dd></div>}
+                  </dl>}
+                </> : <>
+                  <strong className="job-fit-rating job-fit-rating-muted">{jobScreen.result.resume_guidance?.label ?? "Needs tailoring"}</strong>
+                  <small>{jobScreen.result.resume_guidance?.detail ?? `${jobScreen.result.evidence_used.length} verified vault ${jobScreen.result.evidence_used.length === 1 ? "fact supports" : "facts support"} this job, but the screen could not choose a single best current resume. Compare or tailor your resumes before applying.`}</small>
+                </>}
+              </div>
             </div>
             <details className="job-screen-rationale">
               <summary>Why this fit</summary>
               <p>{jobScreen.result.reasoning_summary}</p>
             </details>
-            {jobScreen.result.resume_match && <div className="job-resume-match">
-              <div className="job-resume-heading">
-                <span>Best resume</span>
-                <a href={`/api/resume-preview?resume_id=${encodeURIComponent(jobScreen.result.resume_match.resume_id)}`} target="_blank" rel="noreferrer">{jobScreen.result.resume_match.name}</a>
-                {jobScreen.result.resume_match.label !== "Unknown match" && <strong>{jobScreen.result.resume_match.label}</strong>}
-              </div>
-              {(jobScreen.result.resume_match.strongest_overlap.length > 0 || jobScreen.result.resume_match.primary_gap) && <dl className="job-resume-signals">
-                {jobScreen.result.resume_match.strongest_overlap.length > 0 && <div><dt>Strongest overlap</dt><dd>{jobScreen.result.resume_match.strongest_overlap.join(" · ")}</dd></div>}
-                {jobScreen.result.resume_match.primary_gap && <div><dt>Primary gap</dt><dd>{jobScreen.result.resume_match.primary_gap}</dd></div>}
-              </dl>}
-            </div>}
             {(jobScreen.result.evidence_used.length > 0 || checkedCriteria > 0) && <dl className="job-screen-coverage">
               {jobScreen.result.evidence_used.length > 0 && <div><dt>{jobScreen.result.evidence_used.length}</dt><dd>Verified {jobScreen.result.evidence_used.length === 1 ? "fact" : "facts"}</dd></div>}
               {checkedCriteria > 0 && <div><dt>{checkedCriteria}</dt><dd>{checkedCriteria === 1 ? "Criterion" : "Criteria"} checked</dd></div>}

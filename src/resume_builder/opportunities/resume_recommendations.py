@@ -48,6 +48,16 @@ class ResumeMatchSummary(_StrictModel):
     alternative: ResumeMatchAlternative | None = None
 
 
+class ResumeMatchGuidance(_StrictModel):
+    """Actionable explanation when no single directional resume can be selected."""
+
+    status: Literal[
+        "multiple-matches", "needs-tailoring", "no-resumes", "not-enough-evidence"
+    ]
+    label: ResumeText
+    detail: ResumeText
+
+
 def load_directional_resume_candidates(workspace: Path) -> list[DirectionalResumeCandidate]:
     """Load valid, active directional resumes; archived and tailored files stay out."""
     candidates: list[DirectionalResumeCandidate] = []
@@ -235,4 +245,58 @@ def match_directional_resumes_by_cited_facts(
         sha256=winner.sha256,
         label=label(top_overlap),
         alternative=alternative,
+    )
+
+
+def resume_match_guidance(
+    candidates: Sequence[DirectionalResumeCandidate],
+    supporting_fact_ids: Sequence[str],
+    match: ResumeMatchSummary | None,
+) -> ResumeMatchGuidance | None:
+    """Explain the vault-backed resume decision when the matcher cannot name a winner."""
+    if match is not None:
+        return None
+    cited = set(supporting_fact_ids)
+    if not candidates:
+        return ResumeMatchGuidance(
+            status="no-resumes",
+            label="Build a resume",
+            detail="The vault has relevant evidence, but there are no active directional resumes to compare.",
+        )
+    if not cited:
+        return ResumeMatchGuidance(
+            status="not-enough-evidence",
+            label="Not enough evidence",
+            detail="The screen did not cite enough verified vault evidence to assess resume coverage.",
+        )
+    overlaps = [len(cited & set(candidate.fact_ids)) for candidate in candidates]
+    top_overlap = max(overlaps)
+    fact_label = "fact" if len(cited) == 1 else "facts"
+    if top_overlap == 0:
+        return ResumeMatchGuidance(
+            status="needs-tailoring",
+            label="Needs tailoring",
+            detail=(
+                f"{len(cited)} verified vault {fact_label} support this job, but none appears in "
+                "a current resume. Tailor one from the vault before applying."
+            ),
+        )
+    tied_count = sum(overlap == top_overlap for overlap in overlaps)
+    if tied_count > 1:
+        return ResumeMatchGuidance(
+            status="multiple-matches",
+            label="Multiple matches",
+            detail=(
+                f"{tied_count} current resumes cover the same share of {len(cited)} verified "
+                f"vault {fact_label}, so there is no single best choice. Compare or tailor them "
+                "before applying."
+            ),
+        )
+    return ResumeMatchGuidance(
+        status="needs-tailoring",
+        label="Needs tailoring",
+        detail=(
+            f"{len(cited)} verified vault {fact_label} support this job, but no current resume "
+            "represents them clearly enough. Tailor one from the vault before applying."
+        ),
     )

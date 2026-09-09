@@ -88,6 +88,10 @@ from ..opportunities.personalization import (
 )
 from ..opportunities.posting import PostingInterpretationCache
 from ..opportunities.preferences import _validated as validate_preferences
+from ..opportunities.resume_recommendations import (
+    load_directional_resume_candidates,
+    resume_match_guidance,
+)
 from ..opportunities.role_policy import (
     MAX_TITLE_LENGTH,
     MIN_TITLE_LENGTH,
@@ -2362,6 +2366,17 @@ class DashboardService:
             workspace=self.workspace,
         )
 
+    def _restore_resume_guidance(self, result: ScreeningResult) -> ScreeningResult:
+        """Add vault-backed guidance to screens cached before the field existed."""
+        if result.resume_guidance is not None:
+            return result
+        guidance = resume_match_guidance(
+            load_directional_resume_candidates(self.workspace),
+            [item.fact_id for item in result.evidence_used],
+            result.resume_match,
+        )
+        return result.model_copy(update={"resume_guidance": guidance})
+
     def saved_job_screen(self, job_id: str) -> dict[str, Any] | None:
         """Return a cached quick screen without invoking a model."""
         persisted = self._quick_screen_items().get(job_id)
@@ -2375,7 +2390,7 @@ class DashboardService:
             and isinstance(persisted_result, dict)
         ):
             return self._present_screen(
-                ScreeningResult.model_validate(persisted_result),
+                self._restore_resume_guidance(ScreeningResult.model_validate(persisted_result)),
                 cached=bool(persisted_screen.get("cached", True)),
             )
         packet = self._screening_packet(job_id)
@@ -2392,7 +2407,11 @@ class DashboardService:
             vault_root=self.workspace / "vault",
         )
         result = cache.get(packet, config.models.fast)
-        return self._present_screen(result, cached=True) if result else None
+        return (
+            self._present_screen(self._restore_resume_guidance(result), cached=True)
+            if result
+            else None
+        )
 
     def job_screen_status(self, job_id: str) -> dict[str, Any]:
         """Return current asynchronous screen state without waiting on its provider call."""

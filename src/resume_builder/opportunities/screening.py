@@ -30,9 +30,11 @@ from .personalization import extract_seniority
 from .posting import bound_posting_description
 from .resume_recommendations import (
     DirectionalResumeCandidate,
+    ResumeMatchGuidance,
     ResumeMatchSummary,
     classify_directional_resumes,
     match_directional_resumes_by_cited_facts,
+    resume_match_guidance,
     resume_revision,
 )
 from .screening_evidence import (
@@ -278,6 +280,7 @@ class ScreeningResult(StrictModel):
     criterion_evidence: list[CriterionEvidenceMatch] = Field(default_factory=list, max_length=30)
     criterion_assessments: list[CriterionAssessment] = Field(default_factory=list, max_length=30)
     resume_match: ResumeMatchSummary | None = None
+    resume_guidance: ResumeMatchGuidance | None = None
 
 
 _NO_SPONSORSHIP_PATTERNS = (
@@ -1192,6 +1195,11 @@ def finalize_screen(
         criterion_evidence=packet.criterion_evidence,
         criterion_assessments=criterion_assessments,
         resume_match=resume_match,
+        resume_guidance=resume_match_guidance(
+            packet.directional_resumes,
+            sorted(cited_ids),
+            resume_match,
+        ),
     )
 
 

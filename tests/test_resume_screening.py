@@ -5,6 +5,7 @@ from resume_builder.opportunities.resume_recommendations import (
     classify_directional_resumes,
     load_directional_resume_candidates,
     match_directional_resumes_by_cited_facts,
+    resume_match_guidance,
 )
 from resume_builder.opportunities.screening import (
     Confidence,
@@ -198,4 +199,31 @@ def test_posting_wide_match_abstains_when_multiple_resumes_tie() -> None:
         for name, character in (("sre", "a"), ("support", "b"))
     ]
 
-    assert match_directional_resumes_by_cited_facts(candidates, ["FACT-SHARED"]) is None
+    match = match_directional_resumes_by_cited_facts(candidates, ["FACT-SHARED"])
+
+    assert match is None
+    guidance = resume_match_guidance(candidates, ["FACT-SHARED"], match)
+    assert guidance is not None
+    assert guidance.status == "multiple-matches"
+    assert guidance.label == "Multiple matches"
+    assert "2 current resumes" in guidance.detail
+
+
+def test_posting_wide_match_routes_unused_vault_evidence_to_tailoring() -> None:
+    candidates = [
+        DirectionalResumeCandidate(
+            resume_id="resumes/baselines/support.md",
+            name="Support Engineer",
+            sha256="a" * 64,
+            fact_ids=["FACT-SUPPORT"],
+        )
+    ]
+
+    match = match_directional_resumes_by_cited_facts(candidates, ["FACT-CLOUD", "FACT-AWS"])
+
+    assert match is None
+    guidance = resume_match_guidance(candidates, ["FACT-CLOUD", "FACT-AWS"], match)
+    assert guidance is not None
+    assert guidance.status == "needs-tailoring"
+    assert guidance.label == "Needs tailoring"
+    assert "2 verified vault facts" in guidance.detail
