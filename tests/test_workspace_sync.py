@@ -6,7 +6,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from resume_builder.workspace_management.locking import workspace_lock
+from resume_builder.workspace_management.locking import WorkspaceBusyError, workspace_lock
 from resume_builder.workspace_management.sync import (
     SSH_KEY_ENV,
     SSH_KNOWN_HOSTS_ENV,
@@ -292,3 +292,23 @@ def test_workspace_writer_waits_for_an_active_writer(tmp_path: Path) -> None:
     worker.join(timeout=5)
 
     assert finished.is_set()
+
+
+def test_workspace_writer_fails_fast_when_told_not_to_wait(tmp_path: Path) -> None:
+    _source, checkout = _repositories(tmp_path)
+    rejected = threading.Event()
+
+    def run_writer() -> None:
+        try:
+            with workspace_lock(checkout, exclusive=True, wait=False):
+                pass
+        except WorkspaceBusyError:
+            rejected.set()
+
+    with workspace_lock(checkout, exclusive=True):
+        worker = threading.Thread(target=run_writer)
+        worker.start()
+        assert rejected.wait(1)
+    worker.join(timeout=5)
+
+    assert rejected.is_set()

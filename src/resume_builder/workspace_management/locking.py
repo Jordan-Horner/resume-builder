@@ -36,15 +36,29 @@ def _file_lock(path: Path, operation: int) -> Iterator[None]:
             fcntl.flock(stream, fcntl.LOCK_UN)
 
 
+class WorkspaceBusyError(RuntimeError):
+    """Another operation holds the workspace writes lock."""
+
+
 @contextmanager
-def workspace_lock(workspace: Path, *, exclusive: bool) -> Iterator[None]:
-    """Keep Git sync out of active work and serialize workspace mutations."""
+def workspace_lock(workspace: Path, *, exclusive: bool, wait: bool = True) -> Iterator[None]:
+    """Keep Git sync out of active work and serialize workspace mutations.
+
+    With ``wait=False``, a contended exclusive acquisition fails fast with
+    ``WorkspaceBusyError`` instead of blocking behind the current holder.
+    """
     sync_gate = _lock_path(workspace, "resume-builder-workspace.lock")
     with _file_lock(sync_gate, fcntl.LOCK_SH):
         if exclusive:
             writes = _lock_path(workspace, "resume-builder-workspace-writes.lock")
-            with _file_lock(writes, fcntl.LOCK_EX):
-                yield
+            operation = fcntl.LOCK_EX if wait else fcntl.LOCK_EX | fcntl.LOCK_NB
+            try:
+                with _file_lock(writes, operation):
+                    yield
+            except BlockingIOError:
+                raise WorkspaceBusyError(
+                    "another workspace operation holds the write lock"
+                ) from None
         else:
             yield
 
@@ -58,15 +72,27 @@ def workspace_sync_lock(workspace: Path) -> Iterator[None]:
 
 
 @asynccontextmanager
-async def async_workspace_lock(workspace: Path, *, exclusive: bool) -> AsyncIterator[None]:
+async def async_workspace_lock(
+    workspace: Path, *, exclusive: bool, wait: bool = True
+) -> AsyncIterator[None]:
     """Asynchronously acquire the same lock without blocking the event loop."""
     sync_stream = _lock_path(workspace, "resume-builder-workspace.lock").open("a+b")
     write_stream = None
     try:
         await asyncio.to_thread(fcntl.flock, sync_stream, fcntl.LOCK_SH)
         if exclusive:
-            write_stream = _lock_path(workspace, "resume-builder-workspace-writes.lock").open("a+b")
-            await asyncio.to_thread(fcntl.flock, write_stream, fcntl.LOCK_EX)
+            operation = fcntl.LOCK_EX if wait else fcntl.LOCK_EX | fcntl.LOCK_NB
+            candidate = _lock_path(
+                workspace, "resume-builder-workspace-writes.lock"
+            ).open("a+b")
+            try:
+                await asyncio.to_thread(fcntl.flock, candidate, operation)
+            except BlockingIOError:
+                candidate.close()
+                raise WorkspaceBusyError(
+                    "another workspace operation holds the write lock"
+                ) from None
+            write_stream = candidate
         yield
     finally:
         if write_stream is not None:

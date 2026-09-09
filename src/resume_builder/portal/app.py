@@ -9,7 +9,11 @@ from pathlib import Path
 from typing import Any
 
 from ..agent_contracts import ModelProviderError, ModelProviderTimeoutError
-from ..workspace_management.locking import async_workspace_lock, workspace_lock
+from ..workspace_management.locking import (
+    WorkspaceBusyError,
+    async_workspace_lock,
+    workspace_lock,
+)
 from ..workspace_management.state import discover_workspace
 from .service import JOBS_CONFIG, DashboardService, ScreeningInputError
 
@@ -27,7 +31,7 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
             Response,
             UploadFile,
         )
-        from fastapi.responses import FileResponse, RedirectResponse
+        from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
         from fastapi.staticfiles import StaticFiles
     except ImportError as exc:
         raise RuntimeError(
@@ -78,9 +82,21 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
     async def protect_workspace(request: Request, call_next: Any) -> Any:
         if request.url.path == "/api/system/health":
             return await call_next(request)
-        exclusive = request.method not in {"GET", "HEAD", "OPTIONS"}
-        async with async_workspace_lock(workspace, exclusive=exclusive):
-            return await call_next(request)
+        if request.method in {"GET", "HEAD", "OPTIONS"}:
+            async with async_workspace_lock(workspace, exclusive=False):
+                return await call_next(request)
+        try:
+            # Writes fail fast instead of blocking past the browser timeout
+            # while a one-shot CLI command holds the workspace write lock.
+            async with async_workspace_lock(workspace, exclusive=True, wait=False):
+                return await call_next(request)
+        except WorkspaceBusyError:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "detail": "Another workspace operation is finishing. Try again in a moment."
+                },
+            )
 
     def locked_background_task(callback: Any, *arguments: Any, **keywords: Any) -> None:
         # Keep background work outside workspace sync without blocking unrelated

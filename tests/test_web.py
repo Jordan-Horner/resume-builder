@@ -9,6 +9,7 @@ import pytest
 
 from resume_builder.portal.app import create_app
 from resume_builder.portal.service import JOBS_CONFIG, DashboardService
+from resume_builder.workspace_management.locking import workspace_lock
 from resume_builder.workspace_management.setup import initialize_workspace
 from resume_builder.workspace_management.sync import workspace_identity
 
@@ -163,6 +164,24 @@ def test_mark_applied_api_rejects_an_invalid_resume_id(tmp_path: Path) -> None:
 
     assert response.status_code == 400
     assert response.json()["detail"] == "choose a current directional resume"
+
+
+def test_write_requests_fail_fast_while_the_workspace_is_busy(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    initialize_workspace(
+        workspace,
+        git_name="Example User",
+        git_email="example@example.invalid",
+    )
+    client = TestClient(create_app(workspace))
+    with workspace_lock(workspace, exclusive=True):
+        busy = client.post("/api/jobs/job-1/applied", json={})
+        assert busy.status_code == 503
+        assert busy.json()["detail"] == (
+            "Another workspace operation is finishing. Try again in a moment."
+        )
+        assert client.get("/api/onboarding").status_code == 200
+    assert client.post("/api/onboarding/skip").status_code == 204
 
 
 def test_openrouter_can_be_configured_without_onboarding(tmp_path: Path, monkeypatch) -> None:
