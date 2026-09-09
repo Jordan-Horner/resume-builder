@@ -16,8 +16,6 @@
 /.pytest_cache/
 /.ruff_cache/
 /.venv/
-/.agents/skills/gitnexus-*/
-/.claude/skills/gitnexus-*/
 /web/dist/
 /web/node_modules/
 /assistant-runtime/node_modules/
