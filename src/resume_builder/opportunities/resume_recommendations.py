@@ -51,9 +51,7 @@ class ResumeMatchSummary(_StrictModel):
 class ResumeMatchGuidance(_StrictModel):
     """Actionable explanation when no single directional resume can be selected."""
 
-    status: Literal[
-        "multiple-matches", "needs-tailoring", "no-resumes", "not-enough-evidence"
-    ]
+    status: Literal["multiple-matches", "needs-tailoring", "no-resumes", "not-enough-evidence"]
     label: ResumeText
     detail: ResumeText
 
