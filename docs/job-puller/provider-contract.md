@@ -101,9 +101,11 @@ job ID as the observation identity. Replacing the former `jobspy:linkedin` sourc
 checkpoint without duplicating existing observations. HTTP 401, 403, and 429 responses stop the provider and make
 the run unsuccessful; failed runs do not advance the checkpoint.
 
-Canonical inventory may merge observations only on an exact canonical URL or the combination of exact normalized
-company, exact normalized title, and exact non-empty description hash. The latter merge reason is
-`exact_company_title_description`; fuzzy title similarity remains review-only.
+Canonical inventory may merge observations on an exact canonical URL; exact normalized company, title, and
+non-empty description hash; or a conservative near-identical posting fingerprint. The fingerprint requires exact
+normalized company, title, location, work setup, and employment type; at least 50 distinct description tokens;
+95% token overlap; and posting dates within 14 days. Its merge reason is
+`high_confidence_posting_fingerprint`. Fuzzy title similarity remains review-only.
 
 Verified Greenhouse short-link redirects are stored as durable URL aliases. Workday syndicated copies may also
 merge on an exact requisition ID embedded in the commercial application URL when normalized company and title both

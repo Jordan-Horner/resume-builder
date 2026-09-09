@@ -424,8 +424,10 @@ derived safely from a display name.
 `data/inventory.db` separates provider observations from canonical jobs. Exact provider identity and canonical URLs
 merge automatically. Separate observations also merge when normalized company, normalized title, and a non-empty
 description hash are all exact matches; this consolidates syndicated location variants without using fuzzy title
-similarity. Every merge retains its observation link and reason. Direct ATS observations take preference over
-commercial-board copies without deleting provenance.
+similarity. A second conservative fingerprint merges near-identical descriptions only when company, title,
+location, work setup, and employment type agree, the descriptions contain at least 50 distinct tokens with 95%
+token overlap, and the postings are no more than 14 days apart. Every merge retains its observation link and
+reason. Direct ATS observations take preference over commercial-board copies without deleting provenance.
 
 Original HTML, cleaned text, parser version, hashes, and extraction timestamps are preserved. Raw provider payload
 bodies expire after 30 days; cached LinkedIn details expire independently; normalized provenance remains.

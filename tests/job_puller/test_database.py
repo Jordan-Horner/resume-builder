@@ -472,7 +472,7 @@ def test_existing_v1_database_migrates_to_run_metrics(tmp_path):
     with db.connect() as conn:
         version = conn.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0]
         columns = {row[1] for row in conn.execute("PRAGMA table_info(scrape_runs)")}
-    assert version == 7
+    assert version == 8
     assert "metrics_json" in columns
     with db.connect() as conn:
         cache_table = conn.execute(
@@ -872,6 +872,128 @@ def test_exact_company_title_description_merges_location_variants(tmp_path):
     with db.connect() as conn:
         reasons = {row[0] for row in conn.execute("SELECT merge_reason FROM job_observation_links")}
     assert reasons == {"new_canonical_job", "exact_company_title_description"}
+
+
+def test_near_identical_postings_merge_across_provider_ids(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    posted_at = datetime(2026, 9, 1, tzinfo=UTC)
+    shared = " ".join(f"requirement{index}" for index in range(100))
+    first = observation(
+        job_id="1",
+        source="https://example.com/jobs/1",
+        description=f"{shared} salary100 contactalice ",
+    )
+    first.posted_at = posted_at
+    second = observation(
+        provider="indeed",
+        job_id="2",
+        source="https://example.com/jobs/2",
+        description=f"{shared} salary110 contactbob ",
+    )
+    second.posted_at = posted_at + timedelta(days=1)
+
+    db.record_result(result(first, when=posted_at))
+    db.record_result(result(second, when=posted_at + timedelta(days=1)))
+
+    assert db.stats()["jobs"] == 1
+    assert db.stats()["observations"] == 2
+    with db.connect() as conn:
+        link = conn.execute(
+            """SELECT merge_reason, merge_confidence FROM job_observation_links
+               WHERE merge_reason='high_confidence_posting_fingerprint'"""
+        ).fetchone()
+    assert link is not None
+    assert link[1] >= 0.95
+
+
+@pytest.mark.parametrize(
+    ("attribute", "value"),
+    [
+        ("location", "Remote, Canada"),
+        ("employment_type", "contract"),
+        (
+            "work_arrangement",
+            explicit_arrangement([WorkMode.ONSITE], source="test", rule="office_required"),
+        ),
+    ],
+)
+def test_near_identical_postings_do_not_merge_when_context_differs(tmp_path, attribute, value):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    posted_at = datetime(2026, 9, 1, tzinfo=UTC)
+    description = " ".join(f"requirement{index}" for index in range(100))
+    first = observation(job_id="1", source="https://example.com/jobs/1", description=description)
+    first.posted_at = posted_at
+    first.employment_type = "full-time"
+    second = observation(
+        provider="indeed",
+        job_id="2",
+        source="https://example.com/jobs/2",
+        description=f"{description} updated",
+    )
+    second.posted_at = posted_at + timedelta(days=1)
+    second.employment_type = "full-time"
+    setattr(second, attribute, value)
+
+    db.record_result(result(first, when=posted_at))
+    db.record_result(result(second, when=posted_at + timedelta(days=1)))
+
+    assert db.stats()["jobs"] == 2
+
+
+def test_near_identical_postings_do_not_merge_outside_publication_window(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    posted_at = datetime(2026, 9, 1, tzinfo=UTC)
+    description = " ".join(f"requirement{index}" for index in range(100))
+    first = observation(job_id="1", source="https://example.com/jobs/1", description=description)
+    first.posted_at = posted_at
+    second = observation(
+        provider="indeed",
+        job_id="2",
+        source="https://example.com/jobs/2",
+        description=f"{description} updated",
+    )
+    second.posted_at = posted_at + timedelta(days=15)
+
+    db.record_result(result(first, when=posted_at))
+    db.record_result(result(second, when=posted_at + timedelta(days=15)))
+
+    assert db.stats()["jobs"] == 2
+
+
+def test_reconcile_existing_near_identical_postings_keeps_oldest_job_id(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    posted_at = datetime(2026, 9, 1, tzinfo=UTC)
+    shared = " ".join(f"requirement{index}" for index in range(100))
+    first = observation(
+        job_id="1",
+        source="https://example.com/jobs/1",
+        description=f"{shared} salary100 ",
+    )
+    first.posted_at = posted_at
+    second = observation(
+        provider="indeed",
+        job_id="2",
+        source="https://example.com/jobs/2",
+        description=f"{shared} salary110 ",
+    )
+    second.posted_at = posted_at + timedelta(days=30)
+    db.record_result(result(first, when=posted_at))
+    oldest_job_id = str(db.active_inventory()[0]["id"])
+    db.record_result(result(second, when=posted_at + timedelta(days=30)))
+    with db.transaction() as conn:
+        conn.execute(
+            "UPDATE jobs SET posted_at=? WHERE id<>?",
+            ((posted_at + timedelta(days=1)).isoformat(), oldest_job_id),
+        )
+
+    assert db.reconcile_high_confidence_duplicates() == 1
+    assert db.stats()["jobs"] == 1
+    assert db.stats()["observations"] == 2
+    assert db.active_inventory()[0]["id"] == oldest_job_id
 
 
 def test_provider_detail_cache_is_parser_versioned(tmp_path):

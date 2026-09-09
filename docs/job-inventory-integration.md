@@ -345,7 +345,10 @@ Match normalized employer plus requisition ID across sources. This may link auto
 
 ### Tier 4 — conservative canonical fingerprint
 
-Compare normalized employer, title family, location, description fingerprint, and publication window. High-confidence matches can form a duplicate cluster, but the direct ATS observation should be preferred rather than deleting the alternatives.
+Compare exact normalized employer and title with location, work setup, employment type, description fingerprint,
+and publication window. The current automatic threshold requires at least 50 distinct description tokens, 95%
+token overlap, and publication within 14 days. High-confidence matches form one canonical job while retaining every
+source observation; the direct ATS observation should be preferred for display.
 
 ### Tier 5 — similarity suggestion
 

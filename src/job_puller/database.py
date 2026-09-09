@@ -7,7 +7,7 @@ import re
 import shutil
 import sqlite3
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -18,8 +18,12 @@ from .models import JobObservation, ProviderResult
 from .normalize import canonical_url, description_hash, normalized_key
 from .work_modes import WorkArrangement, WorkMode, classify_work_arrangement, display_work_mode
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 LOGGER = logging.getLogger(__name__)
+
+NEAR_DUPLICATE_DESCRIPTION_THRESHOLD = 0.95
+NEAR_DUPLICATE_MINIMUM_TOKENS = 50
+NEAR_DUPLICATE_POSTING_WINDOW_DAYS = 14
 
 
 def _decode_inventory_text(value: bytes) -> str:
@@ -243,6 +247,10 @@ CREATE INDEX IF NOT EXISTS idx_scrape_runs_outcome
 ON scrape_runs(outcome, completed_at);
 """
 
+MIGRATION_8 = """
+SELECT 1;
+"""
+
 MIGRATIONS = {
     1: MIGRATION_1,
     2: MIGRATION_2,
@@ -251,6 +259,7 @@ MIGRATIONS = {
     5: MIGRATION_5,
     6: MIGRATION_6,
     7: MIGRATION_7,
+    8: MIGRATION_8,
 }
 
 
@@ -269,6 +278,22 @@ def _workday_reference_matches(provider_job_id: str, url: str) -> bool:
             flags=re.IGNORECASE,
         )
     )
+
+
+def _description_token_similarity(left: str | None, right: str | None) -> float:
+    left_tokens = set(normalized_key(left).split())
+    right_tokens = set(normalized_key(right).split())
+    if min(len(left_tokens), len(right_tokens)) < NEAR_DUPLICATE_MINIMUM_TOKENS:
+        return 0.0
+    return len(left_tokens & right_tokens) / len(left_tokens | right_tokens)
+
+
+def _within_near_duplicate_window(left: str | None, right: str | None) -> bool:
+    if not left or not right:
+        return False
+    left_at = datetime.fromisoformat(left)
+    right_at = datetime.fromisoformat(right)
+    return abs(left_at - right_at) <= timedelta(days=NEAR_DUPLICATE_POSTING_WINDOW_DAYS)
 
 
 class InventoryDatabase:
@@ -324,6 +349,8 @@ class InventoryDatabase:
             if current < 4:
                 self._recanonicalize_observation_urls(conn)
                 self._reconcile_url_duplicates(conn)
+            if current < 8:
+                self._reconcile_high_confidence_duplicates(conn)
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
@@ -402,6 +429,11 @@ class InventoryDatabase:
     def reconcile_exact_duplicates(self) -> int:
         with self.transaction() as conn:
             return self._reconcile_exact_duplicates(conn)
+
+    def reconcile_high_confidence_duplicates(self) -> int:
+        """Merge only near-identical jobs that agree on stable posting context."""
+        with self.transaction() as conn:
+            return self._reconcile_high_confidence_duplicates(conn)
 
     def reclassify_commercial_work_modes(self, *, apply: bool = False) -> list[dict[str, object]]:
         """Re-evaluate legacy Remote observations using deterministic posting text."""
@@ -631,6 +663,65 @@ class InventoryDatabase:
                 merged += 1
             self._record_possible_duplicates(conn, survivor, now)
         return merged
+
+    def _reconcile_high_confidence_duplicates(self, conn: sqlite3.Connection) -> int:
+        groups = conn.execute(
+            """SELECT normalized_company, normalized_title
+               FROM jobs WHERE status IN ('active','reopened')
+               GROUP BY normalized_company, normalized_title
+               HAVING COUNT(*) > 1"""
+        ).fetchall()
+        merged = 0
+        now = datetime.now(UTC)
+        for company, title in groups:
+            rows = conn.execute(
+                """SELECT id, location, work_mode, employment_type, description_text,
+                          COALESCE(posted_at, first_seen_at) AS posting_time
+                   FROM jobs
+                   WHERE normalized_company=? AND normalized_title=?
+                     AND status IN ('active','reopened')
+                   ORDER BY first_seen_at, id""",
+                (company, title),
+            ).fetchall()
+            survivors: list[sqlite3.Row] = []
+            for row in rows:
+                match = next(
+                    (
+                        survivor
+                        for survivor in survivors
+                        if self._is_high_confidence_duplicate(survivor, row)
+                    ),
+                    None,
+                )
+                if match is None:
+                    survivors.append(row)
+                    continue
+                similarity = _description_token_similarity(match[4], row[4])
+                self._merge_job_into(
+                    conn,
+                    match[0],
+                    row[0],
+                    "high_confidence_posting_fingerprint",
+                    similarity,
+                    now,
+                )
+                merged += 1
+            for survivor in survivors:
+                self._record_possible_duplicates(conn, survivor[0], now)
+        return merged
+
+    @staticmethod
+    def _is_high_confidence_duplicate(
+        left: Sequence[str | None], right: Sequence[str | None]
+    ) -> bool:
+        return (
+            normalized_key(left[1]) == normalized_key(right[1])
+            and left[2] == right[2]
+            and normalized_key(left[3] or "") == normalized_key(right[3] or "")
+            and _within_near_duplicate_window(left[5], right[5])
+            and _description_token_similarity(left[4], right[4])
+            >= NEAR_DUPLICATE_DESCRIPTION_THRESHOLD
+        )
 
     def get_provider_detail(
         self, provider: str, provider_job_id: str, parser_version: str
@@ -1198,7 +1289,7 @@ class InventoryDatabase:
                 ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 values,
             )
-            job_id, reason, confidence = self._find_canonical_job(conn, observation)
+            job_id, reason, confidence = self._find_canonical_job(conn, observation, seen_at)
             if not job_id:
                 job_id = self._create_job(conn, observation, observation_id, seen_at, quality, text)
                 reason, confidence = "new_canonical_job", 1.0
@@ -1296,7 +1387,10 @@ class InventoryDatabase:
             )
 
     def _find_canonical_job(
-        self, conn: sqlite3.Connection, observation: JobObservation
+        self,
+        conn: sqlite3.Connection,
+        observation: JobObservation,
+        seen_at: datetime,
     ) -> tuple[str | None, str, float]:
         urls = {
             canonical_url(observation.source_url),
@@ -1329,6 +1423,29 @@ class InventoryDatabase:
             ).fetchone()
             if row:
                 return row[0], "exact_company_title_description", 0.98
+        posting_time = _iso(observation.posted_at or seen_at)
+        candidates = conn.execute(
+            """SELECT id, location, work_mode, employment_type, description_text,
+                      COALESCE(posted_at, first_seen_at) AS posting_time
+               FROM jobs
+               WHERE normalized_company=? AND normalized_title=?
+                 AND status IN ('active','reopened')
+               ORDER BY first_seen_at, id""",
+            (normalized_key(observation.company), normalized_key(observation.title)),
+        ).fetchall()
+        work_mode = display_work_mode(observation.work_modes)
+        candidate = (
+            "",
+            observation.location,
+            work_mode,
+            observation.employment_type,
+            text,
+            posting_time,
+        )
+        for row in candidates:
+            if self._is_high_confidence_duplicate(row, candidate):
+                similarity = _description_token_similarity(row[4], text)
+                return row[0], "high_confidence_posting_fingerprint", similarity
         return None, "", 0.0
 
     def _find_provider_identity_job(
