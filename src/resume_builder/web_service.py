@@ -113,7 +113,7 @@ from .opportunities.screening_service import (
     enrich_packet_from_cached_interpretation,
 )
 from .opportunities.targets import parse_target
-from .project_report import project_report
+from .project_status.report import project_report
 from .vault.layout import VaultLayout
 from .vault.source_import import (
     SUPPORTED,

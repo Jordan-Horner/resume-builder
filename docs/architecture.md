@@ -154,6 +154,13 @@ Generated-build metadata lives under `resume_builder.build_artifacts`.
 outputs, evidence, templates, and feedback guidance are still current. Root
 `artifact_paths.py` and `artifact_status.py` remain compatibility facades.
 
+Project-wide readiness reporting lives under `resume_builder.project_status`.
+`report.py` assembles vault, direction, resume, review, preview, mint, target,
+and evaluation state into one report; `policy.py` converts that state into the
+current onboarding stage and next action. Root `project_report.py` and
+`report_policy.py` remain compatibility facades, and the `report` command is
+unchanged.
+
 Resume construction is split into two internal domains. `resume_builder.planning`
 owns synthesis-plan models, schema helpers, loading, summary strategy, role
 balance, and plan audits. `resume_builder.reviews` owns narrative-block review,
