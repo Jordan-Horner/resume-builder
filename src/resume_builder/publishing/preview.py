@@ -16,7 +16,8 @@ from .. import __version__
 from ..atomic import atomic_write_json, atomic_write_text
 from ..build_artifacts.paths import default_resume_output_base
 from ..build_artifacts.status import build_manifest_freshness
-from ..compilation import build_resume, relative_output, sha256_file
+from ..construction.compiler import build_resume, relative_output, sha256_file
+from ..construction.templates import rendering_theme_text
 from ..opportunities.targets import parse_target, project_target_path
 from ..resume_documents.html import (
     contained_project_path,
@@ -24,7 +25,6 @@ from ..resume_documents.html import (
     load_payload,
     render_payload,
 )
-from ..resume_templates import rendering_theme_text
 from ..reviews.approval import carried_career_review, review_freshness
 from ..reviews.language_review import current_language_review
 from ..reviews.policy import hybrid_review_route

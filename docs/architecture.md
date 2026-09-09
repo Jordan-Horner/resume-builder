@@ -147,6 +147,11 @@ payloads and produces safe HTML. Root `resume_parser.py` and `rendering.py`
 modules preserve established imports and the `render` CLI. Template selection,
 compilation, preview, verification, and minting remain separate orchestration
 boundaries because they coordinate planning, reviews, or release state.
+Grounded resume construction lives under `resume_builder.construction`.
+`construction/templates.py` validates and selects content templates and visual
+themes, while `construction/compiler.py` turns canonical Markdown into audited
+build artifacts. The established `resume_templates.py` and `compilation.py`
+modules and the `compile` command remain compatible.
 Reviewed publication workflows live under `resume_builder.publishing`.
 `publishing/preview.py` owns the continuously refreshed HTML approval surface,
 `publishing/verification.py` prepares hash-pinned review inputs and reports

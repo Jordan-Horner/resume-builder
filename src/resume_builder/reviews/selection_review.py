@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from ..atomic import atomic_write_json
-from ..compilation import sha256_file
+from ..construction.compiler import sha256_file
 from ..planning.models import summary_strategy_payload
 from ..synthesis import SynthesisPlan
 from ..vault.layout import contained_path

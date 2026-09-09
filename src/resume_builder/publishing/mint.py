@@ -16,7 +16,7 @@ from typing import Any
 from .. import __version__
 from ..atomic import atomic_write_bytes, atomic_write_json
 from ..build_artifacts.paths import default_resume_output_base
-from ..compilation import relative_output, sha256_file
+from ..construction.compiler import relative_output, sha256_file
 from ..document_export.pdf import render_pdf
 from ..resume_documents.html import contained_project_path
 from ..reviews.language_review import current_language_review

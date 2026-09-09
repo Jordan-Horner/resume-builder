@@ -18,7 +18,7 @@ FACADE_LINE_BUDGETS = {
     "artifact_status": 25,
     "ats": 10,
     "ats_readability": 20,
-    "compilation": 250,
+    "compilation": 55,
     "directions": 450,
     "direction_diagnostics": 20,
     "direction_schema": 60,
@@ -40,6 +40,7 @@ FACADE_LINE_BUDGETS = {
     "report_policy": 15,
     "rendering": 80,
     "resume_parser": 60,
+    "resume_templates": 30,
     "review_records": 300,
     "schema_upgrade": 40,
     "source_import": 80,
@@ -64,13 +65,13 @@ FACADE_LINE_BUDGETS = {
 }
 
 FORBIDDEN_IMPORTS = {
-    "compilation": {
+    "construction.compiler": {
         "feedback_memory",
         "reviews.feedback_acceptance",
         "reviews.feedback_recording",
     },
     "reviews.feedback_resolution": {
-        "compilation",
+        "construction.compiler",
         "reviews.feedback_acceptance",
         "feedback_memory",
         "reviews.feedback_recording",

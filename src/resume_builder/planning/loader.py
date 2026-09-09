@@ -6,8 +6,8 @@ from pathlib import Path
 
 import yaml
 
+from ..construction.templates import load_content_template, load_rendering_theme
 from ..resume_documents.html import contained_project_path
-from ..resume_templates import load_content_template, load_rendering_theme
 from .models import (
     PAGE_BUDGET_SOURCES,
     PageBudget,

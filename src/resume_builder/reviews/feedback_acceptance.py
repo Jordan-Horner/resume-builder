@@ -64,7 +64,7 @@ def _approved_wording_rule(
 
     source = _object(current.get("source"), "feedback revision source")
     resume_path = _project_file(root, source.get("resume"), "feedback source resume", "resumes")
-    from ..compilation import sha256_file
+    from ..construction.compiler import sha256_file
     from .feedback_recording import _block_inventory
 
     if sha256_file(resume_path) != accepted_result["resume_sha256"]:
@@ -148,7 +148,7 @@ def _accepted_sentence(
     """Return the exact narrative block pinned by the accepted preview."""
     source = _object(current.get("source"), "feedback revision source")
     resume_path = _project_file(root, source.get("resume"), "feedback source resume", "resumes")
-    from ..compilation import sha256_file
+    from ..construction.compiler import sha256_file
     from .feedback_recording import _block_inventory
 
     if sha256_file(resume_path) != accepted_result["resume_sha256"]:
@@ -166,7 +166,7 @@ def _acceptance_result(
     preview: Path,
 ) -> dict[str, str]:
     """Validate that one user-approved preview contains the exact open revision."""
-    from ..compilation import sha256_file
+    from ..construction.compiler import sha256_file
 
     preview_path = _project_file(root, preview.as_posix(), "accepted feedback preview", "build")
     if not preview_path.name.endswith(".preview.json"):

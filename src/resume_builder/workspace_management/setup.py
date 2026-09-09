@@ -12,9 +12,9 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from ..atomic import atomic_write_json
+from ..construction.templates import scaffold_template, select_catalog_item, template_catalog
 from ..integrations import interactive_integration_setup
 from ..opportunities.defaults import scaffold_job_search
-from ..resume_templates import scaffold_template, select_catalog_item, template_catalog
 from .state import (
     DEFAULT_VAULT_REPOSITORY_NAME,
     DEFAULT_WORKSPACE,

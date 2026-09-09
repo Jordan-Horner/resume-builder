@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from ..atomic import atomic_write_json, atomic_write_text
-from ..compilation import compile_markdown, relative_output, sha256_file
+from ..construction.compiler import compile_markdown, relative_output, sha256_file
 from ..opportunities.targets import (
     CRITERION_FIELDS,
     IMPORTANCE,
