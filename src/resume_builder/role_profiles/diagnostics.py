@@ -6,7 +6,7 @@ import re
 from collections import Counter
 from typing import Any
 
-from ..rendering import object_value
+from ..resume_documents.html import object_value
 from .schema import (
     COPIED_LABEL_MIN_COVERAGE,
     STYLE_MIN_CLAIM_BLOCKS,

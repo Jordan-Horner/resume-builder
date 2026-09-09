@@ -20,8 +20,8 @@ from .artifact_paths import resume_output_base
 from .atomic import atomic_write_text
 from .document_export.normalization import normalize_payload
 from .project_report import project_report
-from .rendering import known_fact_ids, render_payload
-from .resume_parser import compile_markdown
+from .resume_documents.html import known_fact_ids, render_payload
+from .resume_documents.markdown import compile_markdown
 from .resume_templates import load_rendering_theme, rendering_theme_text
 from .source_import import is_metadata_name
 

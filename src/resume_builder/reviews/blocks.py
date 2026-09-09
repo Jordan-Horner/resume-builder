@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ..resume_parser import compile_markdown
+from ..resume_documents.markdown import compile_markdown
 
 BLOCK_ID = re.compile(
     r"^(?:candidate\.headline|summary|competencies\[\d+\]|"

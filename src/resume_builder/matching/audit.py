@@ -27,7 +27,7 @@ from ..opportunities.targets import (
     target_paths,
     validate_target,
 )
-from ..rendering import contained_project_path, object_value
+from ..resume_documents.html import contained_project_path, object_value
 from ..role_profiles.profiles import normalize_phrase, phrase_present, string_list
 from .grading import (
     classify_match,

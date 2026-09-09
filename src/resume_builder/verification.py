@@ -16,7 +16,7 @@ from .artifact_status import build_manifest_freshness
 from .atomic import atomic_write_json
 from .compilation import build_resume, relative_output, sha256_file
 from .matching.audit import match_job, project_target_path
-from .rendering import contained_project_path
+from .resume_documents.html import contained_project_path
 from .review_records import (
     build_review_package,
     narrative_block_inventory,

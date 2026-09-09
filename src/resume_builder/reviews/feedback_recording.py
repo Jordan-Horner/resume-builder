@@ -34,7 +34,7 @@ def _now() -> str:
 
 
 def _block_inventory(resume: Path) -> dict[str, dict[str, object]]:
-    from ..resume_parser import compile_markdown
+    from ..resume_documents.markdown import compile_markdown
 
     payload = compile_markdown(resume.read_text(encoding="utf-8"))
     blocks: dict[str, dict[str, object]] = {}

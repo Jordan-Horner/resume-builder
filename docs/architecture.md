@@ -121,6 +121,14 @@ ATS readability, and verifies text extraction and browser layout. The root
 `ats.py`, `ats_readability.py`, and `pdf_rendering.py` modules remain compatibility
 facades for established imports.
 
+Canonical resume document formats live under `resume_builder.resume_documents`.
+`markdown.py` parses the editable, evidence-annotated Markdown contract without
+depending on compilation or review orchestration. `html.py` validates renderer
+payloads and produces safe HTML. Root `resume_parser.py` and `rendering.py`
+modules preserve established imports and the `render` CLI. Template selection,
+compilation, preview, verification, and minting remain separate orchestration
+boundaries because they coordinate planning, reviews, or release state.
+
 Resume construction is split into two internal domains. `resume_builder.planning`
 owns synthesis-plan models, schema helpers, loading, summary strategy, role
 balance, and plan audits. `resume_builder.reviews` owns narrative-block review,

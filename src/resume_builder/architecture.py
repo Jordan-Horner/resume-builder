@@ -28,6 +28,8 @@ FACADE_LINE_BUDGETS = {
     "match_grading": 50,
     "pdf_rendering": 25,
     "project_report": 560,
+    "rendering": 80,
+    "resume_parser": 60,
     "review_records": 300,
     "synthesis": 180,
     "workspace": 510,
@@ -98,6 +100,18 @@ FORBIDDEN_PACKAGE_IMPORTS: dict[str, set[str]] = {
         "opportunities",
         "portal",
         "reviews",
+    },
+    "resume_documents": {
+        "application_tracking",
+        "assistant",
+        "automation",
+        "document_export",
+        "matching",
+        "opportunities",
+        "planning",
+        "portal",
+        "reviews",
+        "role_profiles",
     },
 }
 

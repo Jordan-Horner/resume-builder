@@ -10,7 +10,7 @@ import yaml
 from .atomic import atomic_write_text
 from .planning.models import RESUME_SECTIONS, STORY_ID, ContentTemplate, RenderingTheme
 from .planning.schema import exact_fields, nonempty_string, object_value, string_list
-from .rendering import contained_project_path
+from .resume_documents.html import contained_project_path
 
 THEME_REQUIRED_PLACEHOLDERS = {
     "{{LANG}}",

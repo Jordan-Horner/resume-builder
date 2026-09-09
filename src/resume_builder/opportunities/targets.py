@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 
 import yaml
 
-from ..rendering import contained_project_path, object_value
+from ..resume_documents.html import contained_project_path, object_value
 from ..role_profiles.profiles import (
     SLUG,
     iso_date,

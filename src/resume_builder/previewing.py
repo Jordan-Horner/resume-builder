@@ -19,7 +19,12 @@ from .atomic import atomic_write_json, atomic_write_text
 from .compilation import build_resume, relative_output, sha256_file
 from .evidence_questions import open_questions
 from .opportunities.targets import parse_target, project_target_path
-from .rendering import contained_project_path, known_fact_ids, load_payload, render_payload
+from .resume_documents.html import (
+    contained_project_path,
+    known_fact_ids,
+    load_payload,
+    render_payload,
+)
 from .resume_templates import rendering_theme_text
 from .reviews.approval import carried_career_review, review_freshness
 from .reviews.language_review import current_language_review

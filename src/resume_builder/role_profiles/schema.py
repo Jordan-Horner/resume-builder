@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 
 import yaml
 
-from ..rendering import object_value
+from ..resume_documents.html import object_value
 
 SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 SOURCE_ID = re.compile(r"^DIRSRC-\d{3}$")
