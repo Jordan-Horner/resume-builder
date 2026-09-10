@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import sys
+import webbrowser
 from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
@@ -256,7 +257,23 @@ def _require_resolved_role_balance(
         ) from exc
 
 
-def _render_handoff_markdown(presentation: dict[str, Any], artifact_markdown: str) -> str:
+def _terminal_hyperlink(url: str, label: str) -> str:
+    """Return `label` wrapped in an OSC 8 escape sequence linking to `url`.
+
+    OSC 8 is the de facto standard most terminal emulators use to make plain
+    text clickable (iTerm2, Windows Terminal, VS Code's and Codex's
+    integrated terminals, kitty, wezterm, GNOME Terminal, and others), and it
+    works independently of whether the surrounding text is ever interpreted
+    as Markdown. A terminal that does not support OSC 8 still parses the
+    escape sequence as a single opaque unit and simply displays `label`, with
+    no visible escape-code garbage.
+    """
+    return f"\x1b]8;;{url}\x1b\\{label}\x1b]8;;\x1b\\"
+
+
+def _render_handoff_markdown(
+    presentation: dict[str, Any], artifact_markdown: str, file_url: str, link_label: str
+) -> str:
     """Render the structured preview handoff for direct presentation."""
     sections = [
         f"## {presentation['title']}",
@@ -270,7 +287,14 @@ def _render_handoff_markdown(presentation: dict[str, Any], artifact_markdown: st
     sections.extend(
         [
             f"### {presentation['review_heading']}",
-            artifact_markdown,
+            # Three fallbacks for three kinds of renderer: a Markdown link
+            # for renderers that turn `[text](url)` into a real hyperlink; an
+            # OSC 8 escape sequence for terminals that pass raw bytes through
+            # but do not interpret Markdown; and the bare URL as plain,
+            # copy-pasteable text for anything else.
+            f"{artifact_markdown}\n\n"
+            f"{_terminal_hyperlink(file_url, link_label)}\n\n"
+            f"{file_url}",
         ]
     )
     if isinstance(match, dict) and match["questions"]:
@@ -606,13 +630,20 @@ def preview_resume(
         "errors": [],
     }
     atomic_write_json(preview_manifest_path, manifest)
-    absolute_html_path = str(html_path.resolve())
+    resolved_html_path = html_path.resolve()
+    absolute_html_path = str(resolved_html_path)
+    # A raw filesystem path (e.g. containing spaces, as this workspace's own
+    # directory does) is not a valid link target: terminals and shells that
+    # split on whitespace or do not recognize a bare path as clickable will
+    # fail to open it. A percent-encoded file:// URI opens correctly from a
+    # terminal hyperlink, a pasted browser address bar, or `open <url>`.
+    file_url = resolved_html_path.as_uri()
     artifact_link_label = (
         f"Open the {job_context['label']} resume preview"
         if job_context is not None
         else "Open the full resume preview"
     )
-    artifact_markdown = f"[{artifact_link_label}](<{absolute_html_path}>)"
+    artifact_markdown = f"[{artifact_link_label}](<{file_url}>)"
     return {
         "valid": True,
         "source": relative_output(resume_path, project_root),
@@ -628,9 +659,12 @@ def preview_resume(
             "artifact": {
                 **user_handoff["artifact"],
                 "absolute_path": absolute_html_path,
+                "file_url": file_url,
                 "markdown": artifact_markdown,
             },
-            "rendered_markdown": _render_handoff_markdown(presentation, artifact_markdown),
+            "rendered_markdown": _render_handoff_markdown(
+                presentation, artifact_markdown, file_url, artifact_link_label
+            ),
         },
         "warnings": list(build_manifest.get("warnings", [])),
     }
@@ -646,6 +680,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--synthesis-plan", type=Path)
     parser.add_argument("--accept-review-risk", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--review-risk-note", help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--open",
+        action="store_true",
+        help="Open the published preview in the default browser (useful from a terminal).",
+    )
     args = parser.parse_args(argv)
     try:
         result = preview_resume(
@@ -661,6 +700,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps({"error": str(exc)}, indent=2), file=sys.stderr)
         return 2
     print(json.dumps(result, indent=2))
+    if args.open:
+        webbrowser.open(result["user_handoff"]["artifact"]["file_url"])
     return 0
 
 

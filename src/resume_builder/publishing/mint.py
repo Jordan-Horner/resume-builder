@@ -8,6 +8,7 @@ import json
 import re
 import sys
 import unicodedata
+import webbrowser
 from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
@@ -232,6 +233,10 @@ def mint_resume(
         "submission": {
             "path": relative_output(submission_path, project_root),
             "absolute_path": str(submission_path.resolve()),
+            # A raw filesystem path (e.g. containing spaces) is not reliably
+            # clickable or shell-safe; a percent-encoded file:// URI opens
+            # correctly from a terminal hyperlink or `open <url>`.
+            "file_url": submission_path.resolve().as_uri(),
             "filename": submission_path.name,
             "label": submission_label,
         },
@@ -253,6 +258,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--template", type=Path)
     parser.add_argument("--synthesis-plan", type=Path)
     parser.add_argument("--accept-review-risk", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--open",
+        dest="open_pdf",
+        action="store_true",
+        help="Open the minted PDF with the OS default viewer (useful from a terminal).",
+    )
     args = parser.parse_args(argv)
     try:
         result = mint_resume(
@@ -269,6 +280,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps({"error": str(exc)}, indent=2), file=sys.stderr)
         return 2
     print(json.dumps(result, indent=2))
+    if args.open_pdf:
+        webbrowser.open(result["submission"]["file_url"])
     return 0
 
 

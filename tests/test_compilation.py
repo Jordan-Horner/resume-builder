@@ -724,15 +724,20 @@ def test_preview_requires_language_review_then_publishes_html_for_editing(
         "supersedes_prior_handoffs": True,
         "append_to_rendered_markdown": False,
     }
+    file_url = html_path.resolve().as_uri()
+    terminal_link = previewing._terminal_hyperlink(file_url, "Open the full resume preview")
     assert handoff["artifact"]["absolute_path"] == str(html_path.resolve())
-    assert str(html_path.resolve()) in handoff["artifact"]["markdown"]
+    assert handoff["artifact"]["file_url"] == file_url
+    assert file_url in handoff["artifact"]["markdown"]
     assert handoff["rendered_markdown"] == (
         "## Resume Preview\n\n"
         "**Match coverage: 100%**\n\n"
         "_Evidence coverage for this resume direction; not a universal ATS score or hiring "
         "prediction._\n\n"
         "### Review your resume\n\n"
-        f"[Open the full resume preview](<{html_path.resolve()}>)\n\n"
+        f"[Open the full resume preview](<{file_url}>)\n\n"
+        f"{terminal_link}\n\n"
+        f"{file_url}\n\n"
         "### Targeted questions that could improve this resume\n\n"
         "1. How many people or teams used the investigation workflow?\n\n"
         "### What to check\n\n"
