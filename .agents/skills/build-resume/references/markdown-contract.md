@@ -112,7 +112,7 @@ exact reviewed HTML after explicit final approval,
 uses pinned Playwright Chromium, and audits layout, page count, and text
 extraction. A successful mint keeps its per-resume diagnostics under
 `build/resumes/<resume-slug>/` and publishes
-the upload-ready PDF under `exports/resumes/<resume-slug>/` with the neutral
+the upload-ready PDF under `exports/resumes/<baselines|tailored>/<resume-slug>/` with the neutral
 `<candidate-name>-Resume.pdf` filename. Install Chromium once with
 `python -m playwright install chromium`.
 Use `--browser PATH` only to test a specific Chromium executable. Mint enforces

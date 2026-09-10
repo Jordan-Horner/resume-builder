@@ -38,7 +38,10 @@ def _submission_path(resume_path: Path, payload: dict[str, Any], project_root: P
     if not safe_name:
         safe_name = "Candidate"
     folder = _filename_part(resume_path.stem) or "resume"
-    return project_root / "exports" / "resumes" / folder / f"{safe_name}-Resume.pdf"
+    # Mirror the resumes/<category>/ split (baselines, tailored, ...) so
+    # exported PDFs land in the matching exports/resumes/<category>/ folder.
+    category = _filename_part(resume_path.parent.name) or "resumes"
+    return project_root / "exports" / "resumes" / category / folder / f"{safe_name}-Resume.pdf"
 
 
 def mint_resume(

@@ -37,7 +37,7 @@ audit, but it is not canonical.
 - Reusable positioning guidance: `directions/<direction-slug>.md`
 - Per-resume HTML, manifests, diagnostics, and audited PDF:
   `build/resumes/<resume-slug>/`
-- Upload-ready PDFs: `exports/resumes/<resume-slug>/<candidate-name>-Resume.pdf`
+- Upload-ready PDFs: `exports/resumes/<baselines|tailored>/<resume-slug>/<candidate-name>-Resume.pdf`
 - Versioned synthesis plan: `resumes/plans/<resume-slug>.yaml`
 
 Use stable descriptive slugs. Do not create `final`, `new`, or numbered-version

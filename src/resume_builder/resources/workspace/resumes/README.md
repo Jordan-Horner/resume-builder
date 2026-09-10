@@ -19,7 +19,8 @@ build/resumes/<resume>/resume.preview.json`, then create the audited PDF with
 `resume-builder mint`. The mint request is approval of that exact current
 preview. Internal manifests, diagnostics, previews, and the audited working PDF
 remain together under `build/resumes/<resume-slug>/`. Retrieve the employer-ready PDF from
-`exports/resumes/<resume-slug>/<candidate-name>-Resume.pdf`; the folder retains
+`exports/resumes/<baselines|tailored>/<resume-slug>/<candidate-name>-Resume.pdf`,
+mirroring the `resumes/<baselines|tailored>/` split; the folder retains
 the target context while the upload-visible filename remains neutral. Every
 preview requires a current standalone independent language record. Use
 `resume-builder review route` to run the deeper career-strategist and hiring-

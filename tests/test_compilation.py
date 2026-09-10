@@ -2202,7 +2202,12 @@ def test_mint_command_creates_audited_pdf(tmp_path: Path, run_main, monkeypatch)
     assert called["html"] == tmp_path / "build" / "resumes" / "support-operations" / "resume.html"
     assert called["pdf"] == tmp_path / "build" / "resumes" / "support-operations" / "resume.pdf"
     submission = (
-        tmp_path / "exports" / "resumes" / "support-operations" / "Test-Candidate-Resume.pdf"
+        tmp_path
+        / "exports"
+        / "resumes"
+        / "baselines"
+        / "support-operations"
+        / "Test-Candidate-Resume.pdf"
     )
     assert submission.read_bytes() == b"%PDF-compiled-test"
     assert "support-operations" not in submission.name.lower()
@@ -2224,7 +2229,7 @@ def test_mint_command_creates_audited_pdf(tmp_path: Path, run_main, monkeypatch)
     assert manifest["user_approval"]["status"] == "approved-for-mint"
     assert manifest["job_context"]["label"] == "Example — Example Operations Lead"
     assert manifest["submission_output"]["path"] == (
-        "exports/resumes/support-operations/Test-Candidate-Resume.pdf"
+        "exports/resumes/baselines/support-operations/Test-Candidate-Resume.pdf"
     )
     assert manifest["submission_output"]["label"] == "Example — Example Operations Lead resume"
     assert project_report._mint_status(resume, tmp_path)["status"] == "current"
@@ -2350,7 +2355,14 @@ def test_mint_pdf_end_to_end(tmp_path: Path, run_main) -> None:
         )
         == 0
     )
-    pdf = tmp_path / "exports" / "resumes" / "support-operations" / "Test-Candidate-Resume.pdf"
+    pdf = (
+        tmp_path
+        / "exports"
+        / "resumes"
+        / "baselines"
+        / "support-operations"
+        / "Test-Candidate-Resume.pdf"
+    )
     manifest = json.loads(
         (tmp_path / "build" / "resumes" / "support-operations" / "resume.mint.json").read_text(
             encoding="utf-8"

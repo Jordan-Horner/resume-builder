@@ -438,8 +438,9 @@ indexes. The scripts under
   the current preview. Saying `Mint` is explicit approval of that preview.
   Building a resume must not create HTML or PDF as a side effect. Treat
   `build/` as the internal artifact workspace and hand off the employer-ready
-  PDF from `exports/resumes/<resume-slug>/<candidate-name>-Resume.pdf`; target
-  company context belongs in the folder, not the upload-visible filename.
+  PDF from `exports/resumes/<baselines|tailored>/<resume-slug>/<candidate-name>-Resume.pdf`,
+  mirroring the `resumes/<baselines|tailored>/` split; target company context
+  belongs in the folder, not the upload-visible filename.
 - Never hand-edit generated JSON, HTML, or PDF or treat any of them as
   canonical.
 - Treat the compiler's deterministic grounding and extraction audits as release

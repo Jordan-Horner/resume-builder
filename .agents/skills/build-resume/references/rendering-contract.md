@@ -212,7 +212,8 @@ language record, HTML, and pending user-approval state.
 build and preview-manifest hashes, explicit user approval, page budget, PDF
 audit, internal PDF hash, and submission-export hash. Successful minting copies
 the upload-ready PDF to
-`exports/resumes/<resume-slug>/<candidate-name>-Resume.pdf`. Each resume's
+`exports/resumes/<baselines|tailored>/<resume-slug>/<candidate-name>-Resume.pdf`,
+mirroring the `resumes/<baselines|tailored>/` split. Each resume's
 internal JSON, HTML, manifests, diagnostics, and audited PDF stay together under
 `build/resumes/<resume-slug>/`; the folder retains
 the internal targeting context, while the employer-visible filename remains

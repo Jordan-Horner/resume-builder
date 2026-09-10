@@ -450,7 +450,7 @@ Git tools do not. Never write candidate data into same-named engine folders.
     directions/<direction>.md <resume>`, followed by `resume-builder validate
     --vault-root <repo>/vault --strict`. Inspect the Git diff and keep internal
     per-resume artifacts under `build/resumes/<resume-slug>/` while handing off the upload-ready PDF from
-    `exports/resumes/<resume-slug>/`.
+    `exports/resumes/<baselines|tailored>/<resume-slug>/`.
 
 ## Guardrails
 
