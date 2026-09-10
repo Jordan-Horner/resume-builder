@@ -292,9 +292,7 @@ def _render_handoff_markdown(
             # OSC 8 escape sequence for terminals that pass raw bytes through
             # but do not interpret Markdown; and the bare URL as plain,
             # copy-pasteable text for anything else.
-            f"{artifact_markdown}\n\n"
-            f"{_terminal_hyperlink(file_url, link_label)}\n\n"
-            f"{file_url}",
+            f"{artifact_markdown}\n\n{_terminal_hyperlink(file_url, link_label)}\n\n{file_url}",
         ]
     )
     if isinstance(match, dict) and match["questions"]:
