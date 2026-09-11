@@ -20,8 +20,8 @@ def test_agents_file_is_canonical_and_names_safe_commands() -> None:
     assert "CODEX.md" not in agents
     assert "resume-builder hydrate" in agents
     assert "resume-builder plan apply" in agents
-    assert "resume-builder review language-package" in agents
-    assert "resume-builder review language-finalize" in agents
+    assert "review language-package" in agents
+    assert "review language-finalize" in agents
     assert ".agents/skills/build-resume/SKILL.md" in agents
     assert "Never ask the user to repeat information" in normalized_agents
     assert "do not create a separately maintained" in normalized_agents

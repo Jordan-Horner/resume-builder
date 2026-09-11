@@ -26,47 +26,18 @@ python -m pip install -e ".[dev]"
 python -m playwright install chromium
 ```
 
-Use the installed CLI for normal operations:
+Use the installed CLI for normal operations. Run `resume-builder --help` to
+discover all available subcommands; each subcommand supports its own `--help`.
 
 ```bash
-resume-builder hydrate <files-or-directories>           # preview source registration
-resume-builder hydrate <files-or-directories> --apply   # register sources additively
-resume-builder validate --strict
-resume-builder report --strict
-resume-builder migrate             # preview a legacy migration
-resume-builder migrate --apply     # apply a legacy migration
-resume-builder plan validate <plan.json>
-resume-builder plan preview <plan.json>
-resume-builder plan apply <plan.json>
-resume-builder compile resumes/baselines/<direction>.md
-resume-builder verify resumes/baselines/<direction>.md
-resume-builder review route resumes/baselines/<direction>.md
-resume-builder review language-package resumes/baselines/<direction>.md
-resume-builder review language-finalize build/reviews/<direction>.language.decisions.json
-resume-builder review selection-finalize build/reviews/<direction>.selection.decisions.json
-resume-builder review selection-validate build/reviews/<direction>.selection-review.json
-resume-builder review package resumes/baselines/<direction>.md
-resume-builder review apply-repairs build/reviews/<direction>.decisions.json
-resume-builder review strategy-approve build/revisions/<direction>.strategy.json \
-  --reason "Why this grouped selection change serves the target"
-resume-builder review finalize build/reviews/<direction>.decisions.json
-resume-builder review validate build/reviews/<direction>.json
-resume-builder feedback record build/<feedback-plan>.json [--session FB-...]
-resume-builder feedback resolve resumes/plans/<resume>.yaml --include-open
-resume-builder feedback resolve resumes/plans/<resume>.yaml --semantic-only
-resume-builder feedback accept FB-<session> --preview build/resumes/<resume>/resume.preview.json
-resume-builder feedback accept FB-<session> --preview build/resumes/<resume>/resume.preview.json \
-  --remember-approved-wording
-resume-builder preview resumes/baselines/<direction>.md
-resume-builder mint resumes/baselines/<direction>.md
-resume-builder mint resumes/baselines/<direction>.md --max-pages 1
-resume-builder render <payload.json> --output build/resumes/<resume>/resume.html
-resume-builder direction validate
-resume-builder match validate
-resume-builder direction audit directions/<direction>.md resumes/baselines/<direction>.md
+resume-builder hydrate <files-or-directories> --apply   # register sources
+resume-builder plan apply <plan.json>                    # write canonical facts
+resume-builder compile resumes/baselines/<direction>.md  # build resume draft
+resume-builder review route resumes/baselines/<direction>.md  # route for review
+resume-builder preview resumes/baselines/<direction>.md  # publish web preview
+resume-builder mint resumes/baselines/<direction>.md     # mint final PDF
 resume-builder match targets/<posting>.md resumes/baselines/<direction>.md
-resume-builder match targets/<posting>.md resumes/tailored/<company>-<role>.md \
-  --baseline resumes/baselines/<direction>.md
+resume-builder validate --strict
 ```
 
 Commands use `vault/` by default. Use `--vault-root PATH` only for another
@@ -630,30 +601,30 @@ indexes. The scripts under
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **resume-builder** (7820 symbols, 16771 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **resume-builder** (8226 symbols, 19619 relationships, 703 execution flows).
 
-> Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
+> Index stale? Run `node .gitnexus/run.cjs analyze --index-only` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? Bootstrap with `npx`, `bunx`, or `pnpm dlx` — e.g. `bunx gitnexus@latest analyze` (npm 11 npx crash; #1939).
 
 ## Always Do
 
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
-- **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "main"})`.
-- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
-- When exploring unfamiliar code, use `query({search_query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
-- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.
+- **MUST run impact before editing.** Use `impact({target: "symbolName", direction: "upstream"})` or `node .gitnexus/run.cjs impact "symbolName" --direction upstream --repo .`; report callers, processes, and risk. Never substitute grep for graph analysis.
+- **MUST analyze graph changes before committing.** Use `detect_changes({scope: "all"})` (MCP) or `node .gitnexus/run.cjs detect-changes --scope all --repo .` (CLI fallback). `partial: true` or `truncated: true` is not a clean check — a zero means unseen, not unaffected; re-run it. For regression review: `detect_changes({scope: "compare", base_ref: "main"})` or `node .gitnexus/run.cjs detect-changes --scope compare --base-ref "main" --repo .`.
+- MUST warn on HIGH/CRITICAL `risk` pre-edit; never use `riskSharedAxes` to waive a HIGH/CRITICAL `risk` warning. Compare File/symbol: MCP File omits axes; Graph-RAG expands File.
+- **MUST treat `risk: UNKNOWN` as unresolved, not as low.** An empty caller set is not evidence the symbol is unused — it can also mean the callers are not resolvable by the index (plain-object property access, dynamic dispatch, cross-language calls). `impact` pairs `UNKNOWN` with a `riskNote` saying so. Confirm with a text search before treating the symbol as safe to change or delete; do not proceed on the strength of a zero.
+- **MUST use `query({search_query: "concept"})` for concepts/flows, `context({name: "symbolName"})` for a named symbol, or `impact` for blast radius, on read-only callers, dependencies, imports, or execution flow.** Graph first; text search only for empty/`UNKNOWN`/literals.
 - For security review, `explain({target: "fileOrSymbol"})` lists taint findings (source→sink flows; needs `analyze --pdg`).
 
 ## Never Do
 
-- NEVER edit a function, class, or method without first running `impact` on it.
-- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
+- NEVER edit a function, class, or method before MCP/CLI impact analysis.
+- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis, and never read `UNKNOWN` as an all-clear — it means the walk could not answer, which is the one verdict that requires confirming by other means.
 - NEVER rename symbols with find-and-replace — use `rename` which understands the call graph.
-- NEVER commit changes without running `detect_changes()` to check affected scope.
+- NEVER commit before MCP/CLI graph change analysis.
 
 ## Resources
 
 | Resource | Use for |
-|----------|---------|
+| --- | --- |
 | `gitnexus://repo/resume-builder/context` | Codebase overview, check index freshness |
 | `gitnexus://repo/resume-builder/clusters` | All functional areas |
 | `gitnexus://repo/resume-builder/processes` | All execution flows |
@@ -662,12 +633,12 @@ This project is indexed by GitNexus as **resume-builder** (7820 symbols, 16771 r
 ## CLI
 
 | Task | Read this skill file |
-|------|---------------------|
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+| --- | --- |
+| Understand architecture / "How does X work?" | `.claude/skills/gitnexus-exploring/SKILL.md` |
+| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus-impact-analysis/SKILL.md` |
+| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus-debugging/SKILL.md` |
+| Rename / extract / split / refactor | `.claude/skills/gitnexus-refactoring/SKILL.md` |
+| Tools, resources, schema reference | `.claude/skills/gitnexus-guide/SKILL.md` |
+| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
