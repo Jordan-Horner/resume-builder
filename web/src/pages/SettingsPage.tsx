@@ -5,6 +5,7 @@ import { JobSources } from "./JobSources";
 import { AboutSection } from "../updates";
 import { SearchPreferencesSection } from "./SearchPreferencesSection";
 import { SETTINGS_SECTIONS, SETTINGS_SECTION_KEY, resolveSettingsSection } from "../settingsNavigation";
+import { useCachedResource } from "../useCachedResource";
 
 export function SettingsPage() {
   const [section] = useState(() => {
@@ -37,34 +38,23 @@ export function SettingsPage() {
 }
 
 function BlockedCompaniesSection() {
-  const [companies, setCompanies] = useState<string[]>([]);
+  const { data, loading, error: loadError, reload, setData: setCompanies } = useCachedResource<string[]>("blocked-companies", () => getBlockedCompanies().then((result) => result.companies));
+  const companies = data ?? [];
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [notice, setNotice] = useState("");
-  const [retry, setRetry] = useState(0);
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    getBlockedCompanies().then((result) => {
-      if (active) setCompanies(result.companies);
-    }).catch((reason: unknown) => {
-      if (active) setError(reason instanceof Error ? reason.message : "Could not load blocked companies.");
-    }).finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [retry]);
+  const error = loadError || actionError;
 
   async function unblock(company: string) {
     setBusy(true);
-    setError("");
+    setActionError("");
     try {
       const result = await setCompanyBlocked(company, false);
       setCompanies(result.companies);
       setNotice(`${company} unblocked. Its jobs can appear again when they match your filters.`);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not unblock company. Try again.");
+      setActionError(reason instanceof Error ? reason.message : "Could not unblock company. Try again.");
     } finally { setBusy(false); }
   }
 
@@ -78,7 +68,7 @@ function BlockedCompaniesSection() {
       <ul className="role-bubbles">{visible.map((company) => <li className="role-bubble" key={company}><span>{company}</span><button disabled={busy} aria-label={`Unblock ${company}`} onClick={() => void unblock(company)}>×</button></li>)}</ul>
       {companies.length > 0 && !visible.length && <p>No matching blocked companies.</p>}
     </>}
-    {error && <p role="alert">{error} <button className="text-button" onClick={() => { setError(""); setRetry((value) => value + 1); }}>Retry</button></p>}
+    {error && <p role="alert">{error} <button className="text-button" onClick={() => { setActionError(""); reload(); }}>Retry</button></p>}
     {notice && <p role="status">{notice}</p>}
   </section>;
 }

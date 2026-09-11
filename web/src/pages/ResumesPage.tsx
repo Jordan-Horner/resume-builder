@@ -4,6 +4,7 @@ import { EmptyState, ErrorMessage } from "../components";
 import { CareerMaterialUploader } from "../components/CareerMaterialUploader";
 import type { CareerResume, ResumeLibrary } from "../types";
 import { useAssistant } from "../assistant/AssistantProvider";
+import { useCachedResource } from "../useCachedResource";
 
 function ResumeRow({ resume, open }: { resume: CareerResume; open: (resume: CareerResume) => void }) {
   return <button className="career-row resume-library-row resume-row-button" disabled={!resume.preview_url} onClick={() => open(resume)} aria-label={resume.preview_url ? `Open ${resume.name}` : undefined}>
@@ -19,33 +20,32 @@ function ResumeRow({ resume, open }: { resume: CareerResume; open: (resume: Care
 
 export function ResumesPage() {
   const assistant = useAssistant();
-  const [library, setLibrary] = useState<ResumeLibrary | null>(null);
+  const { data: library, error: loadError, reload, setData: setLibrary } = useCachedResource<ResumeLibrary>("resumes", getResumes);
   const [selected, setSelected] = useState<CareerResume | null>(null);
   const [showImporter, setShowImporter] = useState(false);
-  const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [restoring, setRestoring] = useState<string | null>(null);
-  const load = () => { setError(""); getResumes().then(setLibrary).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Could not load resumes.")); };
-  useEffect(load, []);
+  const error = loadError || actionError;
   const selectedResumeId = selected?.kind === "directional" ? selected.id : null;
   const selectedResumeName = selected?.kind === "directional" ? selected.name : null;
   useEffect(() => {
     if (!selectedResumeId || !selectedResumeName) return;
     assistant.setWindowContext({ kind: "resume", id: selectedResumeId, name: selectedResumeName });
   }, [assistant.setWindowContext, selectedResumeId, selectedResumeName]);
-  if (error) return <section className="page"><ErrorMessage message={error} retry={load} /></section>;
+  if (error) return <section className="page"><ErrorMessage message={error} retry={reload} /></section>;
   if (!library) return <section className="page" role="status">Loading resumes…</section>;
   function open(resume: CareerResume) {
     if (!resume.preview_url) return;
     setSelected(resume);
   }
   async function restore(resume: CareerResume) {
-    setError("");
+    setActionError("");
     setRestoring(resume.id);
     try {
       await restoreResume(resume.id);
-      await getResumes().then(setLibrary);
+      setLibrary(await getResumes());
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not restore résumé.");
+      setActionError(reason instanceof Error ? reason.message : "Could not restore résumé.");
     } finally {
       setRestoring(null);
     }

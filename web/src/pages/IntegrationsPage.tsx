@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { getIntegrations } from "../api";
 import { EmptyState, ErrorMessage, LoadingRows } from "../components";
 import { GmailSetup } from "../integrations/GmailSetup";
@@ -7,33 +7,23 @@ import { OpenRouterSetup } from "../integrations/OpenRouterSetup";
 import { TelegramSetup } from "../integrations/TelegramSetup";
 import { UnavailableSetup } from "../integrations/UnavailableSetup";
 import type { Integration } from "../types";
+import { useCachedResource } from "../useCachedResource";
 
 export function IntegrationsSection() {
-  const [integrations, setIntegrations] = useState<Integration[]>([]);
+  const { data, loading, error: loadError, reload: refresh } = useCachedResource<Integration[]>("integrations", getIntegrations);
+  const integrations = data ?? [];
   const [openId, setOpenId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [oauthError, setOauthError] = useState("");
   const [message, setMessage] = useState("");
-  const [reloadKey, setReloadKey] = useState(0);
+  const error = loadError || oauthError;
 
   useEffect(() => {
     const gmailResult = new URLSearchParams(window.location.search).get("gmail");
     if (gmailResult === "connected") setMessage("Gmail connected with read-only access.");
-    if (gmailResult === "cancelled") setError("Google authorization was cancelled. Gmail remains unchanged.");
-    if (gmailResult === "error") setError("Gmail could not be connected. Start the connection again.");
+    if (gmailResult === "cancelled") setOauthError("Google authorization was cancelled. Gmail remains unchanged.");
+    if (gmailResult === "error") setOauthError("Gmail could not be connected. Start the connection again.");
   }, []);
 
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    getIntegrations()
-      .then((result) => { if (active) setIntegrations(result); })
-      .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : "Could not load integrations"); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [reloadKey]);
-
-  const refresh = useCallback(() => setReloadKey((key) => key + 1), []);
   const visibleIntegrations = integrations.filter((item) => item.id !== "job-providers");
 
   return (
@@ -41,7 +31,7 @@ export function IntegrationsSection() {
       <h2 id="integrations-heading">Integrations</h2>
       <p className="page-intro">Connect AI, email, and notification services without leaving the portal.</p>
       {message && <p className="integration-banner success" role="status">{message}</p>}
-      {error && <ErrorMessage message={error} retry={() => { setError(""); refresh(); }} />}
+      {error && <ErrorMessage message={error} retry={() => { setOauthError(""); refresh(); }} />}
       {loading ? <LoadingRows label="Loading integrations" /> : visibleIntegrations.length ? (
         <section className="integration-list" aria-label="Available integrations">
           {visibleIntegrations.map((item) => {

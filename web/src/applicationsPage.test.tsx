@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { getApplications, markApplicationReapplied } from "./api";
 import { ApplicationsPage } from "./pages/ApplicationsPage";
+import { __resetCachedResources } from "./useCachedResource";
 
 vi.mock("./api", () => ({
   getApplications: vi.fn(),
@@ -15,6 +16,7 @@ let root: Root;
 
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  __resetCachedResources();
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);

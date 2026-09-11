@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { getGmailSetup, getIntegrations, startTelegramPairing } from "./api";
 import { IntegrationsSection } from "./pages/IntegrationsPage";
+import { __resetCachedResources } from "./useCachedResource";
 
 vi.mock("./api", () => ({
   beginGmailAuthorization: vi.fn(),
@@ -20,6 +21,7 @@ let root: Root;
 
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  __resetCachedResources();
   window.localStorage.clear();
   window.history.replaceState({}, "", "/settings/integrations");
   host = document.createElement("div");

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import * as api from "./api";
 import { JobsPage } from "./pages/JobsPage";
 import { EMPTY_VIEW } from "./viewPreferences";
+import { __resetJobDetailCaches } from "./jobs/JobDetailPanel";
 import type { Job } from "./types";
 
 vi.mock("./api", () => ({
@@ -23,6 +24,7 @@ let host: HTMLDivElement;
 beforeEach(() => {
   vi.resetAllMocks();
   localStorage.clear();
+  __resetJobDetailCaches();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   host = document.createElement("div"); document.body.append(host); root = createRoot(host);
   vi.mocked(api.getJobFilterDefaults).mockResolvedValue(EMPTY_VIEW);

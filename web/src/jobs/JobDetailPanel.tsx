@@ -27,21 +27,47 @@ const criterionOutcomeLabels = {
   apparent_gap: "Possible gap",
 } as const;
 
-const descriptionCache = new Map<string, string>();
-const MAX_DESCRIPTION_CACHE_ENTRIES = 20;
+const MAX_JOB_DETAIL_CACHE_ENTRIES = 20;
+
+function jobDetailCache<T>() {
+  const map = new Map<string, T>();
+  return {
+    get: (jobId: string) => map.get(jobId),
+    has: (jobId: string) => map.has(jobId),
+    set(jobId: string, value: T) {
+      map.delete(jobId);
+      map.set(jobId, value);
+      while (map.size > MAX_JOB_DETAIL_CACHE_ENTRIES) {
+        const oldest = map.keys().next().value;
+        if (oldest === undefined) break;
+        map.delete(oldest);
+      }
+    },
+    clear: () => map.clear(),
+  };
+}
+
+// Reopening a previously viewed job (close, browse, click back) should not
+// re-show a blank/"Not screened yet" flash for data that hasn't changed.
+// The description and a completed screen are immutable once fetched, so a
+// cache hit skips the network call entirely; the recommendation and feedback
+// can change between visits, so a cache hit still renders instantly but
+// revalidates in the background.
+const descriptionCache = jobDetailCache<string>();
+const recommendationCache = jobDetailCache<ResumeRecommendation>();
+const feedbackCache = jobDetailCache<JobFeedback>();
+const screenCache = jobDetailCache<JobScreenResult>();
+
+/** Test-only: forget every cached job detail so each test starts from a clean slate. */
+export function __resetJobDetailCaches(): void {
+  descriptionCache.clear();
+  recommendationCache.clear();
+  feedbackCache.clear();
+  screenCache.clear();
+}
 
 function isAbortError(reason: unknown) {
   return reason instanceof DOMException && reason.name === "AbortError";
-}
-
-function cacheDescription(jobId: string, description: string) {
-  descriptionCache.delete(jobId);
-  descriptionCache.set(jobId, description);
-  while (descriptionCache.size > MAX_DESCRIPTION_CACHE_ENTRIES) {
-    const oldest = descriptionCache.keys().next().value;
-    if (oldest === undefined) break;
-    descriptionCache.delete(oldest);
-  }
 }
 
 export function JobDetailPanel({
@@ -83,14 +109,18 @@ export function JobDetailPanel({
   useEffect(() => {
     let active = true;
     const pollToken = ++screenPollToken.current;
-    setRecommendation(null);
+    const cachedScreen = screenCache.get(job.id) ?? null;
+    const cachedRecommendation = recommendationCache.get(job.id) ?? null;
+    const cachedFeedback = feedbackCache.get(job.id) ?? null;
+    setRecommendation(cachedRecommendation);
     setRecommendationError("");
-    setSelectedResumeId("");
-    setJobScreen(null);
+    setSelectedResumeId(cachedRecommendation?.recommended_resume?.id
+      ?? (cachedRecommendation?.available_resumes.length === 1 ? cachedRecommendation.available_resumes[0].id : ""));
+    setJobScreen(cachedScreen);
     setScreeningJobId(null);
     setScreeningMessage("");
     setScreenError("");
-    setFeedback(null);
+    setFeedback(cachedFeedback);
     setFeedbackError("");
     setShowHideReasons(false);
     setDescription(job.description ?? descriptionCache.get(job.id) ?? null);
@@ -99,9 +129,11 @@ export function JobDetailPanel({
     const descriptionRequest = job.description !== undefined || descriptionCache.has(job.id)
       ? Promise.resolve(null)
       : getJob(job.id, controller.signal);
-    void getJobScreenStatus(job.id, controller.signal).then((state) => {
+    // A completed screen never changes on its own, so a cache hit skips the
+    // status check entirely instead of re-polling for a result already held.
+    if (!cachedScreen) void getJobScreenStatus(job.id, controller.signal).then((state) => {
       if (!active) return;
-      if (state.status === "complete") setJobScreen(state);
+      if (state.status === "complete") { screenCache.set(job.id, state); setJobScreen(state); }
       else if (state.status === "queued" || state.status === "running") {
         setScreeningJobId(job.id);
         setScreeningMessage(state.status === "running" ? "Analyzing in background" : "Analysis queued");
@@ -115,25 +147,26 @@ export function JobDetailPanel({
     });
     void getResumeRecommendation(job.id, controller.signal).then((value) => {
       if (active) {
+        recommendationCache.set(job.id, value);
         setRecommendation(value);
         setSelectedResumeId(value.recommended_resume?.id ?? (value.available_resumes.length === 1 ? value.available_resumes[0].id : ""));
       }
     }).catch((reason: unknown) => {
-      if (active && !isAbortError(reason)) {
+      if (active && !isAbortError(reason) && !cachedRecommendation) {
         setRecommendationError(reason instanceof Error ? reason.message : "Could not load the resume recommendation.");
       }
     });
     void getJobFeedback(job.id, controller.signal).then((value) => {
-      if (active) setFeedback(value);
+      if (active) { feedbackCache.set(job.id, value); setFeedback(value); }
     }).catch((reason: unknown) => {
-      if (active && !isAbortError(reason)) {
+      if (active && !isAbortError(reason) && !cachedFeedback) {
         setFeedbackError(reason instanceof Error ? reason.message : "Could not load your preference for this job.");
       }
     });
     void descriptionRequest.then((value) => {
       if (active && value) {
         const loadedDescription = value.description ?? "";
-        cacheDescription(job.id, loadedDescription);
+        descriptionCache.set(job.id, loadedDescription);
         setDescription(loadedDescription);
       }
     }).catch((reason: unknown) => {
@@ -155,6 +188,7 @@ export function JobDetailPanel({
       const started = await screenJob(requestedJobId);
       if (currentJobId.current !== requestedJobId) return;
       if (started.status === "complete") {
+        screenCache.set(requestedJobId, started);
         setJobScreen(started);
         onScreened(started);
         setScreeningJobId(null);
@@ -185,6 +219,7 @@ export function JobDetailPanel({
         const state = await getJobScreenStatus(requestedJobId);
         if (currentJobId.current !== requestedJobId || screenPollToken.current !== pollToken) return;
         if (state.status === "complete") {
+          screenCache.set(requestedJobId, state);
           setJobScreen(state);
           onScreened(state);
           setScreeningJobId(null);
@@ -216,6 +251,7 @@ export function JobDetailPanel({
   async function refreshFeedback(requestedJobId: string) {
     try {
       const value = await getJobFeedback(requestedJobId);
+      feedbackCache.set(requestedJobId, value);
       if (currentJobId.current === requestedJobId) setFeedback(value);
     } catch (reason) {
       if (currentJobId.current === requestedJobId) {
@@ -227,7 +263,7 @@ export function JobDetailPanel({
   async function markInterested() {
     setFeedbackError("");
     const result = await onDisposition("interested");
-    if (result) setFeedback(result);
+    if (result) { feedbackCache.set(job.id, result); setFeedback(result); }
   }
 
   function toggleHideReasons() {

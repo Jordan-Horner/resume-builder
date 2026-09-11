@@ -1,30 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { getApplications, markApplicationReapplied } from "../api";
 import { EmptyState, ErrorMessage, LoadingRows, SearchField } from "../components";
 import type { Application } from "../types";
+import { useCachedResource } from "../useCachedResource";
 
 function label(value: string) {
   return value.split("_").map((part) => part[0].toUpperCase() + part.slice(1)).join(" ");
 }
 
 export function ApplicationsPage() {
-  const [applications, setApplications] = useState<Application[]>([]);
+  const { data, loading, error: loadError, reload } = useCachedResource<Application[]>("applications", getApplications);
+  const applications = data ?? [];
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
-
-  useEffect(() => {
-    setLoading(true);
-    getApplications()
-      .then(setApplications)
-      .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Could not load applications"))
-      .finally(() => setLoading(false));
-  }, [reloadKey]);
+  const [actionError, setActionError] = useState("");
+  const error = loadError || actionError;
 
   const statuses = useMemo(() => [...new Set(applications.map((item) => item.current_status))].sort(), [applications]);
   const filtered = applications.filter((item) => {
@@ -49,7 +42,7 @@ export function ApplicationsPage() {
           {statuses.map((item) => <option key={item} value={item}>{label(item)}</option>)}
         </select>
       </section>
-      {error && <ErrorMessage message={error} retry={() => { setError(""); setReloadKey((key) => key + 1); }} />}
+      {error && <ErrorMessage message={error} retry={() => { setActionError(""); reload(); }} />}
       {loading ? <LoadingRows label="Loading applications" /> : filtered.length ? (
         <section className="application-list">
           <div className="table-heading"><span>{filtered.length} applications</span><span>Latest status</span></div>
@@ -82,13 +75,13 @@ export function ApplicationsPage() {
                       <a href={item.reapplication.url} target="_blank" rel="noreferrer">Review posting</a>
                       <button className="primary-button" type="button" disabled={savingId === item.id} onClick={() => {
                         setSavingId(item.id);
-                        setError("");
+                        setActionError("");
                         markApplicationReapplied(item.id)
                           .then(() => {
                             setNotice(`${item.role} was recorded as a new application.`);
-                            setReloadKey((key) => key + 1);
+                            reload();
                           })
-                          .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Could not record the new application"))
+                          .catch((reason: unknown) => setActionError(reason instanceof Error ? reason.message : "Could not record the new application"))
                           .finally(() => setSavingId(null));
                       }}>{savingId === item.id ? "Saving…" : "I applied again"}</button>
                     </div>
