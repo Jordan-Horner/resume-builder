@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 from collections.abc import Sequence
+
+from geotext import GeoText
 
 _US = re.compile(
     r"(?<!\w)(?:united\s+states(?:\s+of\s+america)?|u\.?s\.?a\.?|u\.?s\.?)(?!\w)",
@@ -36,6 +39,37 @@ def matches_local_location(location: str, query: str) -> bool | None:
             if location.strip().upper() == code:
                 return True
     return matches_search_location(location, query)
+
+
+# GeoText's ~22k-city gazetteer includes many very short entries (e.g. "Bay",
+# a small town in the Philippines) that collide with ordinary English words
+# ("SF Bay area"). Country names are already full proper nouns and don't need
+# this guard; only bare city matches do.
+_MIN_RELIABLE_CITY_LENGTH = 4
+
+
+def _geocoded_country(location: str) -> str | None:
+    """Infer an ISO country code from a bare place name (e.g. "Bangalore").
+
+    Only reached once the explicit US/foreign vocabulary above found no
+    evidence either way. Skipped whenever the string also names a US state:
+    GeoText's country gazetteer and the state list collide on real names
+    (Georgia the state vs. Georgia the country), so treating that overlap as
+    decisive risks hiding a real domestic posting rather than merely leaving
+    it unresolved.
+    """
+    if matching_location_terms(location, list(_STATES.values())):
+        return None
+    places = GeoText(location)
+    reliable_cities = [city for city in places.cities if len(city) >= _MIN_RELIABLE_CITY_LENGTH]
+    codes = [GeoText.index.countries[name.lower()] for name in places.countries]
+    codes += [GeoText.index.cities[city.lower()] for city in reliable_cities]
+    if not codes:
+        return None
+    # Majority vote, same as GeoText's own `country_mentions`: a location
+    # naming its region twice ("San Francisco de Heredia, Heredia, cr")
+    # should not lose to a single incidental match ("San Francisco").
+    return Counter(codes).most_common(1)[0][0]
 
 
 def matches_search_location(location: str, query: str, country: str = "") -> bool | None:
@@ -73,6 +107,9 @@ def matches_search_location(location: str, query: str, country: str = "") -> boo
             re.IGNORECASE,
         ):
             return False
+        inferred = _geocoded_country(location)
+        if inferred is not None:
+            return inferred == "US"
         return None
     return bool(country and location_key(country) == location_key(query))
 
