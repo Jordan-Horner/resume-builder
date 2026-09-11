@@ -1562,6 +1562,21 @@ def test_verify_caches_checks_and_drives_review_to_published_state(
         "investigation-speed",
         "investigation-portal",
     }
+
+    assert (
+        run_main(
+            verification.main,
+            resume,
+            "--vault-root",
+            vault,
+            "--skip-vault-validation",
+        )
+        == 0
+    )
+    post_finalize = json.loads(capsys.readouterr().out)
+    assert post_finalize["cached"] is False
+    assert post_finalize["state"]["state"] == "preview-ready"
+
     assert verification.workflow_state(resume, tmp_path)["state"] == "preview-ready"
 
     write_language_review(tmp_path, resume)

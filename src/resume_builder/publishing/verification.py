@@ -171,6 +171,10 @@ def _cached_receipt(
         return None
     if "selection_review" in review_inputs and selection_reasons:
         return None
+    if "decisions" in review_inputs:
+        critique_path = project_root / "build" / "reviews" / f"{resume.stem}.json"
+        if critique_path.is_file():
+            return None
     return receipt
 
 
