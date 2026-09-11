@@ -38,6 +38,24 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
             'web dependencies are missing; install with pip install -e ".[web]"'
         ) from exc
 
+    # The built HTML shell references hashed asset filenames, so it must be
+    # revalidated on every load rather than reused past a fresh deploy.
+    SHELL_CACHE_HEADERS = {"Cache-Control": "no-cache"}
+
+    class ImmutableStaticFiles(StaticFiles):
+        """Serve Vite's content-hashed bundle assets as permanently cacheable.
+
+        A hashed filename (``index-7rhdRL3n.js``) only ever names one exact
+        file's content, so the browser never needs to re-fetch or revalidate
+        it once cached.
+        """
+
+        def file_response(self, *args: Any, **kwargs: Any) -> Any:
+            response = super().file_response(*args, **kwargs)
+            if response.status_code == 200:
+                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            return response
+
     service = DashboardService(workspace)
     from .integrations import GMAIL_CLIENT_MAX_BYTES, PortalIntegrationService
 
@@ -80,7 +98,13 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
 
     @app.middleware("http")
     async def protect_workspace(request: Request, call_next: Any) -> Any:
-        if request.url.path == "/api/system/health":
+        path = request.url.path
+        if path == "/api/system/health":
+            return await call_next(request)
+        if not path.startswith("/api") and path != "/":
+            # The built frontend bundle (hashed assets, SPA routes, favicon)
+            # reads no workspace state, so it skips the per-request flock
+            # round trip that every other GET pays for.
             return await call_next(request)
         if request.method in {"GET", "HEAD", "OPTIONS"}:
             async with async_workspace_lock(workspace, exclusive=False):
@@ -636,20 +660,20 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
                 return RedirectResponse("/settings/integrations?gmail=error", status_code=303)
             return RedirectResponse("/settings/integrations?gmail=connected", status_code=303)
         if resolved_static and (resolved_static / "index.html").is_file():
-            return FileResponse(resolved_static / "index.html")
+            return FileResponse(resolved_static / "index.html", headers=SHELL_CACHE_HEADERS)
         raise HTTPException(status_code=404, detail="Portal frontend is unavailable")
 
     if resolved_static and (resolved_static / "index.html").is_file():
         assets = resolved_static / "assets"
         if assets.is_dir():
-            app.mount("/assets", StaticFiles(directory=assets), name="assets")
+            app.mount("/assets", ImmutableStaticFiles(directory=assets), name="assets")
 
         @app.get("/{path:path}", include_in_schema=False)
         def frontend(path: str) -> FileResponse:
             candidate = (resolved_static / path).resolve()
             if path and candidate.is_file() and candidate.is_relative_to(resolved_static):
                 return FileResponse(candidate)
-            return FileResponse(resolved_static / "index.html")
+            return FileResponse(resolved_static / "index.html", headers=SHELL_CACHE_HEADERS)
 
     return app
 
