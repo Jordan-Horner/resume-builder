@@ -28,6 +28,11 @@ def add_hybrid_review_parsers(subparsers: Any) -> None:
     )
     package.add_argument("resume", type=Path)
     package.add_argument("--target", type=Path)
+    package.add_argument(
+        "--approved-from",
+        type=Path,
+        help="Carry forward exact matching blocks from an approved language review",
+    )
     package.add_argument("--project-root", type=Path, default=Path("."))
 
     finalize = subparsers.add_parser(
@@ -59,7 +64,12 @@ def run_hybrid_review_action(
 ) -> tuple[dict[str, Any], int]:
     """Run one registered hybrid-review command and return its result and exit code."""
     if args.action == "language-package":
-        return prepare_language_review(args.resume, project_root, target=args.target), 0
+        return prepare_language_review(
+            args.resume,
+            project_root,
+            target=args.target,
+            approved_from=args.approved_from,
+        ), 0
     if args.action == "language-finalize":
         return finalize_language_review(args.decisions, project_root, output=args.output), 0
     if args.action == "language-validate":

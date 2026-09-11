@@ -867,6 +867,36 @@ def test_language_review_reuses_unchanged_approved_blocks(tmp_path: Path) -> Non
     assert language_review.language_review_freshness(paths["record"], tmp_path, resume) == []
 
 
+def test_language_review_carries_approval_to_identical_promoted_resume(tmp_path: Path) -> None:
+    vault, resume = project(tmp_path)
+    approved = write_language_review(tmp_path, resume)
+    promoted = resume.with_name("promoted.md")
+    promoted.write_text(resume.read_text(encoding="utf-8"), encoding="utf-8")
+    source_plan = tmp_path / "resumes" / "plans" / "support-operations.yaml"
+    promoted_plan = source_plan.with_name("promoted.yaml")
+    promoted_plan.write_text(
+        source_plan.read_text(encoding="utf-8").replace(
+            "resumes/baselines/support-operations.md",
+            "resumes/baselines/promoted.md",
+        ),
+        encoding="utf-8",
+    )
+    compilation.build_resume(promoted, vault_root=vault)
+
+    result = language_review.prepare_language_review(
+        promoted,
+        tmp_path,
+        approved_from=approved.relative_to(tmp_path),
+    )
+
+    assert result["cached"] is True
+    assert result["carried_forward"] is True
+    assert result["pending_blocks"] == 0
+    assert result["carried_blocks"] == 7
+    promoted_record = language_review.language_review_paths(tmp_path, promoted)["record"]
+    assert language_review.language_review_freshness(promoted_record, tmp_path, promoted) == []
+
+
 def test_career_review_package_requires_approved_standalone_language(tmp_path: Path) -> None:
     vault, resume = project(tmp_path)
     compilation.build_resume(resume, vault_root=vault)

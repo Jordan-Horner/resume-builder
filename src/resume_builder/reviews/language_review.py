@@ -185,6 +185,7 @@ def prepare_language_review(
     project_root: Path,
     *,
     target: Path | None = None,
+    approved_from: Path | None = None,
 ) -> dict[str, Any]:
     """Freeze only new or changed narrative blocks for an independent cold read."""
     resolved_root = project_root.expanduser().resolve()
@@ -212,7 +213,26 @@ def prepare_language_review(
 
     prior_record: dict[str, str] | None = None
     prior_approved: dict[str, dict[str, Any]] = {}
-    if paths["record"].is_file():
+    prior: dict[str, Any] | None = None
+    if approved_from is not None:
+        approved_path = contained_path(
+            resolved_root, approved_from.as_posix(), "approved language review"
+        )
+        if approved_path.parent != (
+            resolved_root / "build" / "reviews"
+        ).resolve() or not approved_path.name.endswith(".language.json"):
+            raise ValueError(
+                "approved language review must be a *.language.json file under build/reviews/"
+            )
+        reasons = language_review_freshness(approved_path, resolved_root)
+        if reasons:
+            raise ValueError("approved language review is stale: " + "; ".join(reasons))
+        prior = _load_json(approved_path, "approved language review")
+        if prior["language_review"]["status"] != "approved":
+            raise ValueError("approved language review must have approved status")
+        prior_record = _path_record(approved_path, resolved_root)
+        prior_approved = _record_blocks(prior)
+    elif paths["record"].is_file():
         try:
             prior = _load_json(paths["record"], "prior language review record")
             _validate_language_record_shape(prior, resolved_root)
@@ -283,6 +303,24 @@ def prepare_language_review(
         },
     }
     atomic_write_json(paths["decisions"], decisions)
+    if approved_from is not None and not pending:
+        assert prior is not None
+        decisions["reviewer"] = prior["reviewer"]
+        review = decisions["language_review"]
+        assert isinstance(review, dict)
+        review["status"] = "approved"
+        atomic_write_json(paths["decisions"], decisions)
+        carried = finalize_language_review(paths["decisions"], resolved_root)
+        return {
+            "valid": True,
+            "cached": True,
+            "carried_forward": True,
+            "record": carried["record"],
+            "status": carried["status"],
+            "pending_blocks": 0,
+            "carried_blocks": carried["carried_blocks"],
+            "review_inputs": None,
+        }
     return {
         "valid": True,
         "cached": False,

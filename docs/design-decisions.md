@@ -38,7 +38,9 @@ sentence sounds natural or whether the resume makes a convincing hiring case.
 
 Every new or changed narrative block receives an independent cold language
 review before preview. Exact approved unchanged blocks are reused so a small
-edit does not reopen the whole document. The deeper career-strategist and
+edit does not reopen the whole document. An explicit resume promotion may also
+carry those decisions to matching block IDs and hashes from a still-current
+approved review; any mismatch remains pending. The deeper career-strategist and
 hiring-manager review runs when the synthesis plan is competitive but
 improvable, or when the user asks for it. Clearly strong resumes avoid that
 cost; exploratory resumes receive an honest evidence-gap explanation instead

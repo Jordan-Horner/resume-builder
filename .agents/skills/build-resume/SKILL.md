@@ -346,7 +346,10 @@ Git tools do not. Never write candidate data into same-named engine folders.
    generated decisions and run `resume-builder review language-finalize`.
    The first pass reviews every narrative block. Later passes reuse exact
    approved unchanged blocks and review only changed blocks with their supplied
-   visible context. If one rejected block has one clear evidence-safe wording
+   visible context. When explicitly promoting unchanged prose to another resume,
+   pass the source record with `--approved-from build/reviews/<source>.language.json`;
+   exact matching block IDs and hashes carry forward while any changed block
+   remains pending. If one rejected block has one clear evidence-safe wording
    repair, apply it once and repeat the changed-block review. Do not turn a
    factual, authority, chronology, or story-selection problem into a wording
    repair. Compilation never creates a PDF; neither does review. Never maintain
