@@ -357,6 +357,52 @@ def test_ashby_normalizes_job():
     assert job.remote is True
 
 
+def test_ashby_extracts_structured_compensation():
+    provider = AshbyProvider(AtsBoard(id="Example", name="Example"))
+    client = FakeClient(
+        get_payloads=[
+            {
+                "jobs": [
+                    {
+                        "id": "1",
+                        "title": "DevOps Engineer",
+                        "jobUrl": "https://jobs.ashbyhq.com/Example/1",
+                        "applyUrl": "https://jobs.ashbyhq.com/Example/1/application",
+                        "location": "Remote - United States",
+                        "descriptionHtml": "<p>Operate the platform</p>",
+                        "publishedAt": "2026-08-26T10:00:00Z",
+                        "isRemote": True,
+                        "compensation": {
+                            "compensationTierSummary": "$138K • Offers Equity",
+                            "summaryComponents": [
+                                {
+                                    "compensationType": "Salary",
+                                    "interval": "1 YEAR",
+                                    "currencyCode": "USD",
+                                    "minValue": 138000,
+                                    "maxValue": 138000,
+                                },
+                                {
+                                    "compensationType": "EquityPercentage",
+                                    "interval": "NONE",
+                                    "currencyCode": None,
+                                    "minValue": None,
+                                    "maxValue": None,
+                                },
+                            ],
+                        },
+                    }
+                ]
+            }
+        ]
+    )
+    job = provider._fetch(client, SINCE)[0]
+    assert job.salary_min == 138000
+    assert job.salary_max == 138000
+    assert job.salary_currency == "USD"
+    assert job.salary_interval == "year"
+
+
 def test_smartrecruiters_fetches_detail():
     provider = SmartRecruitersProvider(AtsBoard(id="Example", name="Example"))
     list_payload = {"content": [{"id": "1", "name": "Support Engineer"}], "totalFound": 1}

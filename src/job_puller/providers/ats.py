@@ -454,6 +454,31 @@ class LeverProvider(HttpProvider):
         return result
 
 
+def _ashby_salary_component(compensation: object) -> dict | None:
+    if not isinstance(compensation, dict):
+        return None
+    components = compensation.get("summaryComponents")
+    if not isinstance(components, list):
+        return None
+    return next(
+        (
+            component
+            for component in components
+            if isinstance(component, dict) and component.get("compensationType") == "Salary"
+        ),
+        None,
+    )
+
+
+def _ashby_salary_interval(value: object) -> str | None:
+    # Ashby reports e.g. "1 YEAR", "1 HOUR"; strip the leading count so this
+    # matches the "year"/"hour"/... aliases convert_compensation_period expects.
+    text = clean_text(value)
+    if not text:
+        return None
+    return re.sub(r"^\d+\s+", "", text).casefold() or None
+
+
 class AshbyProvider(HttpProvider):
     name = "ashby"
 
@@ -475,6 +500,7 @@ class AshbyProvider(HttpProvider):
                     source="ashby_structured_field",
                     rule="is_remote_true",
                 )
+            salary = _ashby_salary_component(item.get("compensation"))
             observation = JobObservation(
                 provider=self.name,
                 provider_board_id=self.board.id,
@@ -487,11 +513,15 @@ class AshbyProvider(HttpProvider):
                 description_html=description,
                 description_text=html_to_text(description),
                 posted_at=parse_datetime(item.get("publishedAt")),
+                salary_min=salary.get("minValue") if salary else None,
+                salary_max=salary.get("maxValue") if salary else None,
+                salary_currency=clean_text(salary.get("currencyCode")) if salary else None,
+                salary_interval=_ashby_salary_interval(salary.get("interval")) if salary else None,
                 employment_type=clean_text(item.get("employmentType")) or None,
                 remote=bool(item.get("isRemote")) if item.get("isRemote") is not None else None,
                 work_arrangement=arrangement,
                 raw_payload=item,
-                parser_version="ashby-v1",
+                parser_version="ashby-v2",
             )
             if observation.source_url:
                 result.append(observation)
