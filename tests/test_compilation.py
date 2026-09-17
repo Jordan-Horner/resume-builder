@@ -867,6 +867,23 @@ def test_language_review_reuses_unchanged_approved_blocks(tmp_path: Path) -> Non
     assert language_review.language_review_freshness(paths["record"], tmp_path, resume) == []
 
 
+def test_language_review_carries_current_approval_across_unchanged_rebuild(
+    tmp_path: Path,
+) -> None:
+    vault, resume = project(tmp_path)
+    write_language_review(tmp_path, resume)
+    compilation.build_resume(resume, vault_root=vault)
+
+    result = language_review.prepare_language_review(resume, tmp_path)
+
+    assert result["cached"] is True
+    assert result["carried_forward"] is True
+    assert result["pending_blocks"] == 0
+    assert result["carried_blocks"] == 7
+    record = language_review.language_review_paths(tmp_path, resume)["record"]
+    assert language_review.language_review_freshness(record, tmp_path, resume) == []
+
+
 def test_language_review_carries_approval_to_identical_promoted_resume(tmp_path: Path) -> None:
     vault, resume = project(tmp_path)
     approved = write_language_review(tmp_path, resume)

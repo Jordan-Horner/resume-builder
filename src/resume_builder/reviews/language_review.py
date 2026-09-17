@@ -303,7 +303,7 @@ def prepare_language_review(
         },
     }
     atomic_write_json(paths["decisions"], decisions)
-    if approved_from is not None and not pending:
+    if prior is not None and not pending:
         assert prior is not None
         decisions["reviewer"] = prior["reviewer"]
         review = decisions["language_review"]
