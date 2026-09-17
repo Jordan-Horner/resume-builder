@@ -300,13 +300,31 @@ def run_proposal(root: Path, state: WebAgentState, thread_id: str, proposal_id: 
         return
     resume_path(root, proposal["payload"]["resume_id"])
     config = load_agent_config(root / DEFAULT_AGENT_CONFIG)
-    adapter = OpenRouterAdapter(config, api_key=DashboardService(root)._openrouter_key())
+    api_key = DashboardService(root)._openrouter_key()
+    equivalence_adapter = OpenRouterAdapter(
+        config,
+        api_key=api_key,
+        timeout_seconds=15,
+        retries=1,
+    )
+    language_adapter = OpenRouterAdapter(
+        config,
+        api_key=api_key,
+        timeout_seconds=90,
+        retries=1,
+    )
     # Serialize portal writers across processes; stale hashes protect proposals queued behind one.
     with state.path.with_suffix(".resume-edit.lock").open("a+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         try:
             message = apply_wording(
-                root, proposal["payload"], adapter, config.models.writing, proposal_id
+                root,
+                proposal["payload"],
+                language_adapter,
+                config.models.writing,
+                proposal_id,
+                equivalence_adapter=equivalence_adapter,
+                equivalence_model=config.models.fast,
             )
         except ValueError as exc:
             state.finish_proposal(thread_id, proposal_id, "failed", str(exc))

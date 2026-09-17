@@ -52,6 +52,12 @@ The assistant can propose one wording-only block replacement. A before/after car
 offers Use this wording or Keep current. Accepting claims a durable proposal once,
 checks the source revision and factual equivalence, records existing feedback, compiles,
 runs an independent language review, and invokes the existing preview pipeline.
+The factual-equivalence classification uses the configured fast model with a
+15-second deadline; the independent changed-block language review keeps the writing
+model with a 90-second deadline. Both allow one retry. Exact approved blocks are
+carried forward locally, so an unchanged rebuild does not send an empty model request.
+Content-free timings for applied edits are written under
+`build/performance/resume-edits/` for latency monitoring.
 The assistant can also propose removing an attached or uniquely named directional résumé from
 the résumé library.
 Removal requires a separate confirmation card and archives the Markdown source out of

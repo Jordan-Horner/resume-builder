@@ -47,6 +47,14 @@ cost; exploratory resumes receive an honest evidence-gap explanation instead
 of expensive prose rearrangement. Minting always requires the current language
 record to be approved.
 
+Portal wording edits keep factual equivalence and language quality as separate,
+history-free decisions. The narrow equivalence classification uses the configured
+fast model with a short deadline, while the changed-block language review uses the
+writing model with its own bounded deadline. Recompiling identical prose carries
+exact approved block hashes forward without sending an empty review request.
+Content-free timing records under `build/performance/resume-edits/` report stage
+latency, model routing, request counts, and outcomes without retaining resume prose.
+
 ## Why hash-pin review records?
 
 An approval is meaningful only for the exact prose and evidence that were
