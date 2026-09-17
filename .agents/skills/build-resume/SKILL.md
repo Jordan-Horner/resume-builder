@@ -101,10 +101,12 @@ Git tools do not. Never write candidate data into same-named engine folders.
    confirmation sequence in the feedback-memory contract before drafting.
 6. For a fresh baseline or substantial rewrite, first select the reusable
    content template and visual theme under the plan's `resume_template` section.
-   Use `technical-classic` when the user has not expressed another preference:
-   summary, experience, optional projects, education, certifications, and a
-   dedicated Technical Skills section at the bottom; Core Competencies is
-   forbidden. A different named template is a user presentation preference,
+   Use `technical-skills-first` when the user has not expressed another
+   preference: summary, a dedicated Technical Skills section immediately
+   after it, experience, optional projects, education, and certifications;
+   Core Competencies is forbidden. `technical-classic` remains available for a
+   user who explicitly prefers Technical Skills placed after experience. A
+   different named template is a user presentation preference,
    not permission to change evidence selection, invent content, or impose a
    fixed bullet count. Then write the versioned synthesis
    plan required by the synthesis contract under

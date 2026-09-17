@@ -3,9 +3,9 @@
 Resume Builder separates reusable content architecture from visual styling:
 
 - `resume-templates/*.yaml` defines allowed sections, required sections, and
-  their order. `technical-classic` is the default evidence-first layout;
-  `technical-skills-first` is an alternate layout for users who want the skills
-  inventory nearer the top.
+  their order. `technical-skills-first` is the default layout, placing the
+  skills inventory right after the summary; `technical-classic` is an
+  alternate layout for users who prefer Technical Skills at the bottom.
 - `renderers/*.html` contains shared, strictly validated HTML document shells.
 - `themes/*.yaml` registers a visual theme. Version 2 themes point to a shared
   renderer and a self-contained stylesheet under `themes/*.css`.
@@ -16,7 +16,7 @@ Version 7 synthesis plans select both layers explicitly:
 
 ```yaml
 resume_template:
-  content: technical-classic
+  content: technical-skills-first
   theme: clean-teal
 ```
 

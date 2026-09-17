@@ -26,19 +26,19 @@ resume_template:
 
 ## Built-in content templates
 
-### `technical-classic`
+### `technical-skills-first`
 
 Use this default when the user has not selected another structure. It requires
 Professional Summary, Work Experience, and Technical Skills; allows Selected
 Projects, Education, and Certifications; forbids Core Competencies; and places
-Technical Skills last.
+Technical Skills immediately after the summary and before experience. It does
+not convert skills into competency labels.
 
-### `technical-skills-first`
+### `technical-classic`
 
-Use this only when the user prefers early technology visibility. It has the
-same allowed sections as `technical-classic`, but places Technical Skills after
-the summary and before experience. It does not convert skills into competency
-labels.
+Use this only when the user explicitly prefers Technical Skills placed after
+experience. It has the same allowed sections as `technical-skills-first`, but
+places Technical Skills last.
 
 ## Visual theme versions
 
