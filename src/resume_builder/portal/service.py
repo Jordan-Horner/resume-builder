@@ -189,7 +189,7 @@ JOB_FEEDBACK_REASONS = frozenset(
     }
 )
 LOGGER = logging.getLogger(__name__)
-RECOMMENDATION_SHELF_SIZE = 12
+RECOMMENDATION_SHELF_SIZE = 20
 
 
 class ScreeningInputError(RuntimeError):

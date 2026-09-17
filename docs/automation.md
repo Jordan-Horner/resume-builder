@@ -153,7 +153,7 @@ the full queue.
 Deterministic matches enter a private screening backlog before model screening.
 The bounded worker processes the highest-ranked unscreened matches first. Only
 completed screens that pass the recommendation requirements may enter the
-12-job Recommended shelf; incomplete, failed, skipped, and non-qualifying screens
+20-job Recommended shelf; incomplete, failed, skipped, and non-qualifying screens
 remain in All jobs. Cached jobs are not sent to the provider again.
 
 ATS source resolution is also enrichment rather than a discovery gate. Its

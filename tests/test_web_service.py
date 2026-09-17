@@ -1316,13 +1316,13 @@ def test_recommended_queue_hides_the_unscreened_deterministic_backlog(tmp_path, 
     assert service.list_jobs(queue="recommended") == []
 
 
-def test_recommended_queue_is_a_rolling_twelve_job_shelf(tmp_path, monkeypatch):
+def test_recommended_queue_is_a_rolling_twenty_job_shelf(tmp_path, monkeypatch):
     inventory = [
         {
             **job(f"job-{index}", title="Support Engineer", mode="remote"),
             "posted_at": f"2026-09-{index + 1:02d}T12:00:00+00:00",
         }
-        for index in range(15)
+        for index in range(25)
     ]
     preferences_path = tmp_path / "job-search/preferences.yml"
     preferences_path.parent.mkdir(parents=True)
@@ -1341,8 +1341,8 @@ def test_recommended_queue_is_a_rolling_twelve_job_shelf(tmp_path, monkeypatch):
 
     recommended = service.list_jobs(queue="recommended")
 
-    assert len(recommended) == 12
-    assert [item["id"] for item in recommended[:2]] == ["job-14", "job-13"]
+    assert len(recommended) == 20
+    assert [item["id"] for item in recommended[:2]] == ["job-24", "job-23"]
     assert {item["id"] for item in service.list_jobs(queue="all")} >= {
         "job-0",
         "job-1",
@@ -1352,8 +1352,8 @@ def test_recommended_queue_is_a_rolling_twelve_job_shelf(tmp_path, monkeypatch):
 
     replenished = service.list_jobs(queue="recommended")
 
-    assert len(replenished) == 12
-    assert "job-2" in {item["id"] for item in replenished}
+    assert len(replenished) == 20
+    assert "job-4" in {item["id"] for item in replenished}
 
 
 def test_recommended_queue_suppresses_a_three_rejection_role_pattern(
