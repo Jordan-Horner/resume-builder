@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch one Greenhouse or Ashby posting through its public job-board API."""
+"""Fetch one Greenhouse, Ashby, or Workday posting through its public job-board API."""
 
 from __future__ import annotations
 
@@ -13,6 +13,8 @@ from html.parser import HTMLParser
 from typing import Any, ClassVar
 from urllib.parse import quote, urlparse
 from urllib.request import Request, urlopen
+
+from job_puller.boards import LOCALE_SEGMENT as _WORKDAY_LOCALE_SEGMENT
 
 JsonObject = dict[str, Any]
 JsonFetcher = Callable[[str], JsonObject]
@@ -82,7 +84,24 @@ def _posting_identity(url: str) -> tuple[str, str, str, str]:
         )
         return "ashby", board, job_id, api_url
 
-    raise ValueError("supported posting providers are Greenhouse and Ashby")
+    if host.endswith(".myworkdayjobs.com"):
+        if not parts:
+            raise ValueError("unrecognized Workday job posting URL")
+        tenant = host.split(".", 1)[0]
+        site_index = 1 if _WORKDAY_LOCALE_SEGMENT.fullmatch(parts[0]) else 0
+        if site_index >= len(parts):
+            raise ValueError("unrecognized Workday job posting URL")
+        site = parts[site_index]
+        job_index = parsed.path.find("/job/")
+        if job_index < 0:
+            raise ValueError("Workday posting URL has no job path")
+        external_path = parsed.path[job_index:]
+        board = f"{tenant}-{site}".casefold()
+        job_id = parts[-1]
+        api_url = f"https://{host}/wday/cxs/{quote(tenant, safe='')}/{quote(site, safe='')}{external_path}"
+        return "workday", board, job_id, api_url
+
+    raise ValueError("supported posting providers are Greenhouse, Ashby, and Workday")
 
 
 def _greenhouse_result(
@@ -159,18 +178,59 @@ def _ashby_result(
     }
 
 
+def _workday_result(
+    source_url: str,
+    board: str,
+    job_id: str,
+    api_url: str,
+    payload: JsonObject,
+) -> JsonObject:
+    info = payload.get("jobPostingInfo")
+    if not isinstance(info, dict):
+        raise ValueError("Workday job-board API response has no jobPostingInfo")
+    locations = [
+        value
+        for value in [info.get("location"), *(info.get("additionalLocations") or [])]
+        if isinstance(value, str) and value
+    ]
+    locations = list(dict.fromkeys(locations))
+    canonical_url = info.get("externalUrl")
+    if not isinstance(canonical_url, str) or not canonical_url:
+        parsed = urlparse(api_url)
+        external_index = parsed.path.find("/job/")
+        canonical_url = f"{parsed.scheme}://{parsed.hostname}{parsed.path[external_index:]}"
+    return {
+        "provider": "workday",
+        "board": board,
+        "id": job_id,
+        "source_url": source_url,
+        "api_url": api_url,
+        "canonical_url": canonical_url,
+        "title": info.get("title"),
+        "location": " / ".join(locations) or None,
+        "employment_type": info.get("timeType"),
+        "workplace_type": info.get("remoteType"),
+        "compensation": None,
+        "published_at": info.get("postedOn"),
+        "updated_at": None,
+        "description": _plain_text(info.get("jobDescription")),
+    }
+
+
 def fetch_posting(url: str, fetch_json: JsonFetcher = _fetch_json) -> JsonObject:
     """Return one normalized posting from a supported public job-board API."""
     provider, board, job_id, api_url = _posting_identity(url)
     payload = fetch_json(api_url)
     if provider == "greenhouse":
         return _greenhouse_result(url, board, job_id, api_url, payload)
+    if provider == "workday":
+        return _workday_result(url, board, job_id, api_url, payload)
     return _ashby_result(url, board, job_id, api_url, payload)
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("url", help="Greenhouse or Ashby job posting URL")
+    parser.add_argument("url", help="Greenhouse, Ashby, or Workday job posting URL")
     args = parser.parse_args(argv)
     try:
         result = fetch_posting(args.url)

@@ -82,12 +82,87 @@ def test_fetches_one_ashby_posting_from_board_feed() -> None:
     assert result["compensation"] == {"compensationTierSummary": "$175K - $275K"}
 
 
+def test_fetches_workday_posting_without_rendering_page() -> None:
+    fetcher = load_fetcher()
+    requested: list[str] = []
+
+    def fetch_json(url: str) -> dict[str, object]:
+        requested.append(url)
+        return {
+            "jobPostingInfo": {
+                "title": "Software Platform Support Engineer - GPU Cloud",
+                "location": "US, CA, Santa Clara",
+                "additionalLocations": ["US, NC, Remote", "US, VA, Remote"],
+                "timeType": "Full time",
+                "remoteType": None,
+                "jobDescription": "&lt;p&gt;Support GPU cloud platforms.&lt;/p&gt;",
+                "postedOn": "Posted 2 Days Ago",
+                "externalUrl": (
+                    "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite/job/"
+                    "US-CA-Santa-Clara/Software-Platform-Support-Engineer---GPU-Cloud_JR2025175"
+                ),
+                "jobReqId": "JR2025175",
+            }
+        }
+
+    result = fetcher.fetch_posting(
+        "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite/job/"
+        "US-CA-Santa-Clara/Software-Platform-Support-Engineer---GPU-Cloud_JR2025175",
+        fetch_json,
+    )
+
+    assert requested == [
+        "https://nvidia.wd5.myworkdayjobs.com/wday/cxs/nvidia/NVIDIAExternalCareerSite/job/"
+        "US-CA-Santa-Clara/Software-Platform-Support-Engineer---GPU-Cloud_JR2025175"
+    ]
+    assert result["provider"] == "workday"
+    assert result["title"] == "Software Platform Support Engineer - GPU Cloud"
+    assert result["location"] == "US, CA, Santa Clara / US, NC, Remote / US, VA, Remote"
+    assert result["employment_type"] == "Full time"
+    assert result["description"] == "Support GPU cloud platforms."
+
+
+def test_fetches_workday_posting_with_locale_segment() -> None:
+    fetcher = load_fetcher()
+    requested: list[str] = []
+
+    def fetch_json(url: str) -> dict[str, object]:
+        requested.append(url)
+        return {
+            "jobPostingInfo": {
+                "title": "Example Role",
+                "location": "Remote",
+                "additionalLocations": [],
+                "timeType": "Full time",
+                "remoteType": "Remote",
+                "jobDescription": "&lt;p&gt;Do the work.&lt;/p&gt;",
+                "postedOn": "Posted Today",
+                "externalUrl": None,
+            }
+        }
+
+    result = fetcher.fetch_posting(
+        "https://acme.wd1.myworkdayjobs.com/en-US/ExternalSite/job/Remote/Example-Role_JR1",
+        fetch_json,
+    )
+
+    assert requested == [
+        "https://acme.wd1.myworkdayjobs.com/wday/cxs/acme/ExternalSite/job/Remote/Example-Role_JR1"
+    ]
+    assert result["provider"] == "workday"
+    assert result["workplace_type"] == "Remote"
+    assert result["canonical_url"] == (
+        "https://acme.wd1.myworkdayjobs.com/job/Remote/Example-Role_JR1"
+    )
+
+
 @pytest.mark.parametrize(
     "url",
     [
         "http://job-boards.greenhouse.io/corelight/jobs/8055858",
         "https://example.com/jobs/123",
         "https://jobs.ashbyhq.com/workos/application",
+        "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite",
     ],
 )
 def test_rejects_unsupported_or_invalid_posting_urls(url: str) -> None:

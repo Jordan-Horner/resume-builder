@@ -27,7 +27,7 @@ every screen.
    and use its preserved description, source URL, direct application URL when
    available, provider provenance, and prescreen evidence. A title alone is not
    enough.
-2. Read the complete posting. For Greenhouse and Ashby URLs, first run
+2. Read the complete posting. For Greenhouse, Ashby, and Workday URLs, first run
    `python .agents/skills/screen-job/scripts/fetch_posting.py <url>` to use the
    provider's public job-board API. For other providers or an API failure, try a
    direct semantic page fetch; use browser rendering only when the posting is
