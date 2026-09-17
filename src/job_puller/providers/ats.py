@@ -470,7 +470,7 @@ def _ashby_salary_component(compensation: object) -> dict | None:
     )
 
 
-def _ashby_salary_interval(value: object) -> str | None:
+def _ashby_salary_interval(value: str | None) -> str | None:
     # Ashby reports e.g. "1 YEAR", "1 HOUR"; strip the leading count so this
     # matches the "year"/"hour"/... aliases convert_compensation_period expects.
     text = clean_text(value)
