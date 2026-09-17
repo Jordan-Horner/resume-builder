@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import random
 import re
+import threading
 import time
 from collections import Counter
 from collections.abc import Callable
@@ -281,9 +282,9 @@ class LinkedInGuestProvider:
         self.client = client
         self.detail_cache = detail_cache
 
-    def fetch(self, since: datetime) -> ProviderResult:
+    def fetch(self, since: datetime, *, cancel: threading.Event | None = None) -> ProviderResult:
         if self.client is not None:
-            return self._fetch(since, self.client)
+            return self._fetch(since, self.client, cancel)
         headers = {
             "Accept-Language": "en-US,en;q=0.9",
             "User-Agent": "JobPuller/0.1 (+local personal inventory)",
@@ -295,7 +296,7 @@ class LinkedInGuestProvider:
                 headers=headers,
             ) as http_client:
                 client = LinkedInGuestClient(http_client, self.settings.request_delay_seconds)
-                return self._fetch(since, client)
+                return self._fetch(since, client, cancel)
         except (httpx.HTTPError, ValueError) as exc:
             now = datetime.now(UTC)
             return ProviderResult(
@@ -308,7 +309,12 @@ class LinkedInGuestProvider:
                 f"{type(exc).__name__}: {exc}",
             )
 
-    def _fetch(self, since: datetime, client: LinkedInGuestClient) -> ProviderResult:
+    def _fetch(
+        self,
+        since: datetime,
+        client: LinkedInGuestClient,
+        cancel: threading.Event | None = None,
+    ) -> ProviderResult:
         started = datetime.now(UTC)
         metrics: dict[str, int] = {
             "queries": 0,
@@ -344,6 +350,7 @@ class LinkedInGuestProvider:
         rejected_titles: Counter[str] = Counter()
         fatal_errors: list[str] = []
         partial_errors: list[str] = []
+        cancelled = False
         rolling_since = started - timedelta(hours=self.settings.incremental_lookback_hours)
         effective_since = min(since, rolling_since)
         seconds_old = max(1, math.ceil((started - effective_since).total_seconds()))
@@ -351,6 +358,9 @@ class LinkedInGuestProvider:
 
         try:
             for family in self.search.families:
+                if cancel is not None and cancel.is_set():
+                    cancelled = True
+                    break
                 if not family.enabled:
                     continue
                 query = family.provider_query or self._provider_query(family.titles)
@@ -369,6 +379,9 @@ class LinkedInGuestProvider:
                     and scanned_for_query < self.settings.max_cards_scanned
                     and offset <= _MAX_START
                 ):
+                    if cancel is not None and cancel.is_set():
+                        cancelled = True
+                        break
                     params: dict[str, Any] = {
                         "keywords": query,
                         "location": self.search.location,
@@ -431,12 +444,17 @@ class LinkedInGuestProvider:
                 elif scanned_for_query >= self.settings.max_cards_scanned:
                     metrics["scan_limit_reached"] += 1
                     metrics["saturated_queries"] += 1
+                if cancelled:
+                    break
         except LinkedInError as exc:
             fatal_errors.append(str(exc))
 
         observations: list[JobObservation] = []
         if not fatal_errors:
             for candidate in candidates.values():
+                if cancel is not None and cancel.is_set():
+                    cancelled = True
+                    break
                 detail: LinkedInDetail | None = None
                 if self.settings.fetch_descriptions:
                     detail_html: str | None = None
@@ -523,6 +541,8 @@ class LinkedInGuestProvider:
         metrics.update(
             {f"rejected_title.{title}": count for title, count in rejected_titles.most_common(10)}
         )
+        if cancelled:
+            partial_errors.append("cancelled after exceeding fetch deadline")
         completed = datetime.now(UTC)
         errors = fatal_errors + partial_errors
         success = not errors

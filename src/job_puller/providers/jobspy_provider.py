@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import threading
 import time
 from collections import Counter
 from datetime import UTC, datetime
@@ -30,10 +31,11 @@ class JobSpyProvider:
         self.settings = settings
         self.search = search
 
-    def fetch(self, since: datetime) -> ProviderResult:
+    def fetch(self, since: datetime, *, cancel: threading.Event | None = None) -> ProviderResult:
         started = datetime.now(UTC)
         observations: list[JobObservation] = []
         errors: list[str] = []
+        cancelled = False
         try:
             from jobspy import scrape_jobs
         except ImportError as exc:
@@ -57,6 +59,9 @@ class JobSpyProvider:
         rejected_titles: Counter[str] = Counter()
         query_number = 0
         for family in self.search.families:
+            if cancel is not None and cancel.is_set():
+                cancelled = True
+                break
             if not family.enabled:
                 continue
             family_prefix = f"family.{family.name}."
@@ -66,6 +71,9 @@ class JobSpyProvider:
                 else self._provider_queries(family.titles)
             )
             for query in queries:
+                if cancel is not None and cancel.is_set():
+                    cancelled = True
+                    break
                 query_prefix = family_prefix + f"query.{normalized_key(query)}."
                 result_limit = self.settings.family_results_wanted.get(
                     family.name, self.settings.results_wanted
@@ -122,6 +130,8 @@ class JobSpyProvider:
                     metrics[query_prefix + "accepted_before_dedupe"] = family_accepted
                 except Exception as exc:
                     errors.append(f"{family.name}/{query}: {type(exc).__name__}: {exc}")
+            if cancelled:
+                break
 
         deduped = {
             f"{item.provider}:{item.provider_job_id or item.source_url}": item
@@ -134,6 +144,8 @@ class JobSpyProvider:
         metrics.update(
             {f"rejected_title.{title}": count for title, count in rejected_titles.most_common(10)}
         )
+        if cancelled:
+            errors.append("cancelled after exceeding fetch deadline")
         success = not errors
         return ProviderResult(
             self.source_key,

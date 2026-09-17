@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -191,6 +192,44 @@ def test_provider_uses_fixed_offsets_and_filters_before_details():
     assert result.metrics["card_duplicates"] == 1
     assert result.metrics["detail_requests"] == 2
     assert result.metrics["candidate_target_reached"] == 1
+
+
+def test_provider_stops_the_search_phase_when_already_cancelled():
+    client = FakeLinkedInClient(pages={0: card(1, "Senior SRE")}, details={"1": detail()})
+    cancel = threading.Event()
+    cancel.set()
+
+    result = provider(client, results_wanted=2).fetch(SINCE, cancel=cancel)
+
+    assert client.search_calls == []
+    assert client.detail_calls == []
+    assert result.observations == []
+    assert result.success is False
+    assert "cancelled" in (result.error or "")
+
+
+def test_provider_stops_the_detail_loop_once_cancelled_mid_scan():
+    first_page = card(1, "Senior SRE") + card(2, "Staff SRE")
+    client = FakeLinkedInClient(
+        pages={0: first_page},
+        details={"1": detail(), "2": detail()},
+    )
+    cancel = threading.Event()
+    real_detail = client.detail
+
+    def detail_then_cancel(job_id):
+        response = real_detail(job_id)
+        cancel.set()  # simulate the deadline passing right after the first detail fetch
+        return response
+
+    client.detail = detail_then_cancel
+
+    result = provider(client, results_wanted=2).fetch(SINCE, cancel=cancel)
+
+    assert client.detail_calls == ["1"]
+    assert len(result.observations) == 1
+    assert result.success is False
+    assert "cancelled" in (result.error or "")
 
 
 def test_provider_stops_on_a_repeated_page():

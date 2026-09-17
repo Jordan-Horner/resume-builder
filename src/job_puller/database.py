@@ -7,7 +7,7 @@ import re
 import shutil
 import sqlite3
 import uuid
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -265,6 +265,38 @@ MIGRATIONS = {
 
 def _iso(value: datetime | None) -> str | None:
     return value.astimezone(UTC).isoformat() if value else None
+
+
+HEALTHY_SCRAPE_OUTCOMES = frozenset({"healthy", "healthy-empty", "capped"})
+# Per-source cap on how much scrape_runs history a streak/health query pulls in.
+# provider_skip_after_consecutive_failures tops out at 20; this leaves ample
+# headroom for interleaved 'skipped' rows (which don't count toward the streak)
+# without letting a source with years of history be fetched in full every call.
+_SCRAPE_HISTORY_WINDOW_PER_SOURCE = 50
+
+
+def _consecutive_failure_streak(
+    outcomes_newest_first: Iterable[tuple[str, str]],
+) -> tuple[int, datetime | None]:
+    """Walk a source's scrape_runs outcomes (newest first) to a shared verdict.
+
+    Returns (consecutive_failure_streak, last_real_attempt_at). A 'skipped' row
+    is neutral: it neither extends the streak nor counts as an attempt, so a
+    backed-off source doesn't push its own cooldown out indefinitely. Shared by
+    source_health() and provider_backoff_status() so the two can't drift apart
+    on what counts as a consecutive failure.
+    """
+    streak = 0
+    last_run_at: datetime | None = None
+    for outcome, completed_at in outcomes_newest_first:
+        if outcome == "skipped":
+            continue
+        if last_run_at is None:
+            last_run_at = datetime.fromisoformat(completed_at)
+        if outcome in HEALTHY_SCRAPE_OUTCOMES:
+            break
+        streak += 1
+    return streak, last_run_at
 
 
 def _workday_reference_matches(provider_job_id: str, url: str) -> bool:
@@ -826,6 +858,27 @@ class InventoryDatabase:
                 (_iso(result.completed_at),),
             )
         return inserted, updated
+
+    def record_skip(self, source_key: str, provider: str, reason: str, at: datetime) -> None:
+        """Record that a provider was skipped for backoff, not attempted.
+
+        Written to scrape_runs with a distinct 'skipped' outcome so history
+        (and tools like --retry-failed) can tell "we chose not to try" apart
+        from "we tried and failed" or "this source has never run". Streak
+        computations in source_health() and provider_backoff_status() treat
+        'skipped' rows as neutral so recording them cannot itself extend a
+        cooldown.
+        """
+        run_id = str(uuid.uuid4())
+        with self.transaction() as conn:
+            conn.execute(
+                """INSERT INTO scrape_runs(
+                    id, source_key, provider, started_at, completed_at, success, suspicious_empty,
+                    observation_count, inserted_count, updated_count, error, metrics_json,
+                    outcome, retryable, error_category
+                ) VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, 0, ?, ?, 'skipped', 1, 'backoff')""",
+                (run_id, source_key, provider, _iso(at), _iso(at), reason, "{}"),
+            )
 
     def unresolved_linkedin_targets(
         self,
@@ -1764,13 +1817,59 @@ class InventoryDatabase:
             for row in rows
         ]
 
+    def provider_backoff_status(
+        self, source_keys: Sequence[str]
+    ) -> dict[str, tuple[int, datetime | None]]:
+        """Return (consecutive_failure_streak, last_run_at) per source key.
+
+        Scoped to the given source keys rather than every source ever seen, and
+        to each source's most recent rows, so a scrape run only pays for a
+        bounded slice of history instead of a source's entire lifetime.
+        """
+        if not source_keys:
+            return {}
+        placeholders = ",".join("?" for _ in source_keys)
+        with self.connect() as conn:
+            rows = conn.execute(
+                f"""SELECT source_key, completed_at, outcome, id FROM (
+                        SELECT source_key, completed_at, outcome, id,
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY source_key
+                                   ORDER BY completed_at DESC, id DESC
+                               ) AS rn
+                        FROM scrape_runs
+                        WHERE source_key IN ({placeholders})
+                    ) WHERE rn <= ?
+                    ORDER BY source_key, completed_at DESC, id DESC""",
+                (*source_keys, _SCRAPE_HISTORY_WINDOW_PER_SOURCE),
+            ).fetchall()
+        grouped: dict[str, list[sqlite3.Row]] = {}
+        for row in rows:
+            grouped.setdefault(str(row[0]), []).append(row)
+        status: dict[str, tuple[int, datetime | None]] = {}
+        for source_key, source_rows in grouped.items():
+            streak, last_run_at = _consecutive_failure_streak(
+                (str(row[2]), str(row[1])) for row in source_rows
+            )
+            if last_run_at is not None:
+                status[source_key] = (streak, last_run_at)
+        return status
+
     def source_health(self) -> list[dict[str, object]]:
         """Return one current health summary per configured source seen by the inventory."""
         with self.connect() as conn:
             rows = conn.execute(
                 """SELECT source_key, provider, completed_at, outcome, retryable,
-                          error_category, error, metrics_json
-                   FROM scrape_runs ORDER BY source_key, completed_at DESC, id DESC"""
+                          error_category, error, metrics_json, id FROM (
+                    SELECT source_key, provider, completed_at, outcome, retryable,
+                           error_category, error, metrics_json, id,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY source_key ORDER BY completed_at DESC, id DESC
+                           ) AS rn
+                    FROM scrape_runs
+                ) WHERE rn <= ?
+                ORDER BY source_key, completed_at DESC, id DESC""",
+                (_SCRAPE_HISTORY_WINDOW_PER_SOURCE,),
             ).fetchall()
             checkpoints = {
                 str(row[0]): str(row[1])
@@ -1782,14 +1881,11 @@ class InventoryDatabase:
         for row in rows:
             grouped.setdefault(str(row[0]), []).append(row)
         health: list[dict[str, object]] = []
-        healthy = {"healthy", "healthy-empty", "capped"}
         for source_key, source_rows in sorted(grouped.items()):
             latest = source_rows[0]
-            problem_streak = 0
-            for row in source_rows:
-                if str(row[3]) in healthy:
-                    break
-                problem_streak += 1
+            problem_streak, _ = _consecutive_failure_streak(
+                (str(row[3]), str(row[2])) for row in source_rows
+            )
             health.append(
                 {
                     "source_key": source_key,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 from collections import Counter
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
@@ -65,7 +66,7 @@ class HttpProvider:
         self.search = search
         self.source_key = f"{self.name}:{board.id}"
 
-    def fetch(self, since: datetime) -> ProviderResult:
+    def fetch(self, since: datetime, *, cancel: threading.Event | None = None) -> ProviderResult:
         started = datetime.now(UTC)
         try:
             with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:
@@ -139,7 +140,7 @@ class HttpProvider:
 class CandidateDetailProvider(HttpProvider):
     """Filter compact board listings before requesting full job details."""
 
-    def fetch(self, since: datetime) -> ProviderResult:
+    def fetch(self, since: datetime, *, cancel: threading.Event | None = None) -> ProviderResult:
         started = datetime.now(UTC)
         metrics = {
             "raw_results": 0,
@@ -154,12 +155,16 @@ class CandidateDetailProvider(HttpProvider):
         observations: list[JobObservation] = []
         rejected_titles: Counter[str] = Counter()
         detail_errors: list[str] = []
+        cancelled = False
         try:
             with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:
                 cards = self._candidates(client)
                 metrics["raw_results"] = len(cards)
                 seen_job_ids: set[str] = set()
                 for card in cards:
+                    if cancel is not None and cancel.is_set():
+                        cancelled = True
+                        break
                     if not card["job_id"] or not card["title"] or not card["url"]:
                         metrics["invalid"] += 1
                         continue
@@ -190,6 +195,8 @@ class CandidateDetailProvider(HttpProvider):
                         for title, count in rejected_titles.most_common(10)
                     }
                 )
+            if cancelled:
+                detail_errors.append("cancelled after exceeding fetch deadline")
             completed = datetime.now(UTC)
             return ProviderResult(
                 self.source_key,
@@ -616,11 +623,12 @@ class WorkdayProvider(HttpProvider):
                 metrics=metrics,
             )
 
-    def fetch(self, since: datetime) -> ProviderResult:
+    def fetch(self, since: datetime, *, cancel: threading.Event | None = None) -> ProviderResult:
         started = datetime.now(UTC)
         observations: list[JobObservation] = []
         metrics: dict[str, int] = {}
         detail_errors: list[str] = []
+        cancelled = False
         try:
             with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:
                 candidates = self._fetch(client, since)
@@ -628,6 +636,9 @@ class WorkdayProvider(HttpProvider):
                 metrics["detail_requests"] = len(selected)
                 metrics["work_mode_mismatch"] = 0
                 for candidate in selected:
+                    if cancel is not None and cancel.is_set():
+                        cancelled = True
+                        break
                     try:
                         observation = self._detail(client, candidate.raw_payload)
                     except (httpx.HTTPError, ValueError, json.JSONDecodeError) as exc:
@@ -638,6 +649,8 @@ class WorkdayProvider(HttpProvider):
                     if self.search and not remote_matches(observation, self.search):
                         metrics["work_mode_mismatch"] += 1
                     observations.append(observation)
+            if cancelled:
+                detail_errors.append("cancelled after exceeding fetch deadline")
             metrics["detail_errors"] = len(detail_errors)
             metrics["accepted"] = len(observations)
             completed = datetime.now(UTC)

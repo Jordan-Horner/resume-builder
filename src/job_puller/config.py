@@ -209,6 +209,12 @@ class InventoryConfig(StrictModel):
     request_timeout_seconds: float = Field(default=30, ge=5, le=180)
     provider_retry_attempts: int = Field(default=2, ge=1, le=3)
     provider_retry_backoff_seconds: float = Field(default=1, ge=0, le=30)
+    provider_workers: int = Field(default=8, ge=1, le=32)
+    provider_fetch_deadline_seconds: float = Field(default=120, ge=10, le=600)
+    provider_cancel_grace_seconds: float = Field(default=5, ge=0, le=60)
+    provider_skip_after_consecutive_failures: int = Field(default=3, ge=1, le=20)
+    provider_skip_base_cooldown_hours: float = Field(default=2, ge=0.25, le=48)
+    provider_skip_max_cooldown_hours: float = Field(default=24, ge=1, le=168)
     source_resolution: SourceResolutionSettings = Field(default_factory=SourceResolutionSettings)
     search: SearchSettings
     providers: Providers = Field(default_factory=Providers)

@@ -380,7 +380,14 @@ def main(argv: list[str] | None = None) -> int:
     def report_provider_start(index: int, total: int, source_key: str) -> None:
         print(f"[{index}/{total}] Fetching {source_key}...", flush=True)
 
-    summaries = service.scrape(selected, on_provider_start=report_provider_start)
+    def report_provider_skip(source_key: str, reason: str) -> None:
+        print(f"[SKIPPED] {source_key}: {reason}", flush=True)
+
+    summaries = service.scrape(
+        selected,
+        on_provider_start=report_provider_start,
+        on_provider_skip=report_provider_skip,
+    )
     failed = 0
     for summary in summaries:
         state = summary.outcome.upper()

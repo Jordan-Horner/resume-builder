@@ -517,6 +517,118 @@ def test_source_health_exposes_latest_outcome_and_problem_streak(tmp_path):
     assert db.source_health()[0]["retryable"] is True
 
 
+def test_provider_backoff_status_counts_consecutive_failures_since_last_success(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    db.record_result(result(observation(), datetime(2026, 8, 1, tzinfo=UTC)))
+    for day in (2, 3, 4):
+        db.record_result(
+            ProviderResult(
+                source_key="test:linkedin",
+                provider="linkedin",
+                observations=[],
+                started_at=datetime(2026, 8, day, tzinfo=UTC),
+                completed_at=datetime(2026, 8, day, 0, 1, tzinfo=UTC),
+                success=False,
+                error="connection timeout",
+            )
+        )
+
+    status = db.provider_backoff_status(["test:linkedin", "test:never-run"])
+
+    streak, last_run_at = status["test:linkedin"]
+    assert streak == 3
+    assert last_run_at == datetime(2026, 8, 4, 0, 1, tzinfo=UTC)
+    assert "test:never-run" not in status
+
+
+def test_record_skip_is_visible_in_source_health_but_does_not_extend_the_streak(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    for day in (1, 2, 3):
+        db.record_result(
+            ProviderResult(
+                source_key="test:linkedin",
+                provider="linkedin",
+                observations=[],
+                started_at=datetime(2026, 8, day, tzinfo=UTC),
+                completed_at=datetime(2026, 8, day, 0, 1, tzinfo=UTC),
+                success=False,
+                error="connection timeout",
+            )
+        )
+    db.record_skip(
+        "test:linkedin",
+        "linkedin",
+        "skipped after 3 consecutive failures",
+        datetime(2026, 8, 4, tzinfo=UTC),
+    )
+
+    health = db.source_health()[0]
+
+    assert health["outcome"] == "skipped"
+    assert health["problem_streak"] == 3
+
+
+def test_provider_backoff_status_ignores_skips_for_streak_and_cooldown_timing(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    failure_at = datetime(2026, 8, 1, tzinfo=UTC)
+    for _ in range(2):
+        db.record_result(
+            ProviderResult(
+                source_key="test:linkedin",
+                provider="linkedin",
+                observations=[],
+                started_at=failure_at,
+                completed_at=failure_at,
+                success=False,
+                error="connection timeout",
+            )
+        )
+    db.record_skip(
+        "test:linkedin",
+        "linkedin",
+        "skipped after 2 consecutive failures",
+        datetime(2026, 8, 2, tzinfo=UTC),
+    )
+    db.record_skip(
+        "test:linkedin",
+        "linkedin",
+        "skipped after 2 consecutive failures",
+        datetime(2026, 8, 3, tzinfo=UTC),
+    )
+
+    streak, last_run_at = db.provider_backoff_status(["test:linkedin"])["test:linkedin"]
+
+    # Two real failures, not four: the two skip rows must not inflate the streak.
+    assert streak == 2
+    # Cooldown timing must anchor to the last real attempt, not the last skip,
+    # or a repeatedly-skipped source would never become eligible again.
+    assert last_run_at == failure_at
+
+
+def test_provider_backoff_status_resets_after_a_healthy_run(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    db.record_result(
+        ProviderResult(
+            source_key="test:linkedin",
+            provider="linkedin",
+            observations=[],
+            started_at=datetime(2026, 8, 1, tzinfo=UTC),
+            completed_at=datetime(2026, 8, 1, 0, 1, tzinfo=UTC),
+            success=False,
+            error="connection timeout",
+        )
+    )
+    db.record_result(result(observation(), datetime(2026, 8, 2, tzinfo=UTC)))
+
+    streak, _ = db.provider_backoff_status(["test:linkedin"])["test:linkedin"]
+
+    assert streak == 0
+
+
 def test_possible_reposts_require_distinct_dates_and_posting_identities(tmp_path):
     db = InventoryDatabase(tmp_path / "inventory.db")
     db.migrate()
