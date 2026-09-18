@@ -484,7 +484,7 @@ class AshbyProvider(HttpProvider):
 
     def _fetch(self, client: httpx.Client, since: datetime) -> list[JobObservation]:
         url = self.board.api_url or f"https://api.ashbyhq.com/posting-api/job-board/{self.board.id}"
-        response = client.get(url)
+        response = client.get(url, params={"includeCompensation": "true"})
         response.raise_for_status()
         result = []
         for item in response.json().get("jobs", []):

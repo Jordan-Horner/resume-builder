@@ -28,8 +28,10 @@ class FakeClient:
     def __init__(self, get_payloads=None, post_payloads=None):
         self.get_payloads = list(get_payloads or [])
         self.post_payloads = list(post_payloads or [])
+        self.get_calls = []
 
     def get(self, url, params=None):
+        self.get_calls.append((url, params))
         return response("GET", url, self.get_payloads.pop(0))
 
     def post(self, url, json=None):
@@ -397,6 +399,12 @@ def test_ashby_extracts_structured_compensation():
         ]
     )
     job = provider._fetch(client, SINCE)[0]
+    assert client.get_calls == [
+        (
+            "https://api.ashbyhq.com/posting-api/job-board/Example",
+            {"includeCompensation": "true"},
+        )
+    ]
     assert job.salary_min == 138000
     assert job.salary_max == 138000
     assert job.salary_currency == "USD"
