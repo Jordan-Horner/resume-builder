@@ -53,6 +53,16 @@ def test_direct_apply_redirect_enriches_from_exact_ats_posting():
             + "</p>"
         ),
         "employmentType": "FULL_TIME",
+        "baseSalary": {
+            "@type": "MonetaryAmount",
+            "currency": "USD",
+            "value": {
+                "@type": "QuantitativeValue",
+                "minValue": 138000,
+                "maxValue": 138000,
+                "unitText": "YEAR",
+            },
+        },
         "jobLocationType": "ON_SITE",
         "jobLocation": {
             "@type": "Place",
@@ -94,6 +104,10 @@ def test_direct_apply_redirect_enriches_from_exact_ats_posting():
     assert enriched.direct_apply_url == "https://jobs.ashbyhq.com/Example/job-123"
     assert enriched.work_modes == {WorkMode.ONSITE}
     assert enriched.employment_type == "FULL_TIME"
+    assert enriched.salary_min == 138000
+    assert enriched.salary_max == 138000
+    assert enriched.salary_currency == "USD"
+    assert enriched.salary_interval == "yearly"
     assert enriched.raw_payload["direct_apply_resolution"]["status"] == "resolved"
     assert enriched.raw_payload["ats_job_posting"]["location"] == "Phoenix, AZ, US"
 

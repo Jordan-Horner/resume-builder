@@ -59,6 +59,49 @@ def _location_text(value: Any) -> str:
     return " / ".join(rendered)
 
 
+def _structured_compensation(
+    value: Any,
+) -> tuple[float, float, str, str] | None:
+    if not isinstance(value, dict):
+        return None
+    amount = value.get("value")
+    if not isinstance(amount, dict):
+        return None
+    minimum = amount.get("minValue", amount.get("value"))
+    maximum = amount.get("maxValue", amount.get("value"))
+    if not isinstance(minimum, (int, float, str)) or not isinstance(maximum, (int, float, str)):
+        return None
+    try:
+        minimum_value = float(minimum)
+        maximum_value = float(maximum)
+    except (TypeError, ValueError):
+        return None
+    interval = {
+        "year": "yearly",
+        "month": "monthly",
+        "week": "weekly",
+        "day": "daily",
+        "hour": "hourly",
+    }.get(clean_text(amount.get("unitText")).casefold())
+    currency = clean_text(value.get("currency")).upper()
+    bounds = {
+        "yearly": (10_000, 2_000_000),
+        "monthly": (500, 200_000),
+        "weekly": (100, 50_000),
+        "daily": (25, 20_000),
+        "hourly": (5, 2_000),
+    }
+    if (
+        not currency
+        or interval not in bounds
+        or minimum_value > maximum_value
+        or minimum_value < bounds[interval][0]
+        or maximum_value > bounds[interval][1]
+    ):
+        return None
+    return minimum_value, maximum_value, currency, interval
+
+
 def _ats_work_arrangement(
     posting: dict[str, Any], location: str, description: str
 ) -> WorkArrangement:
@@ -152,6 +195,13 @@ def enrich_observation(
     if posting:
         description_html = str(posting.get("description") or "")
         ats_location = _location_text(posting.get("jobLocation"))
+        compensation = _structured_compensation(posting.get("baseSalary"))
+        if compensation is not None:
+            minimum, maximum, currency, interval = compensation
+            observation.salary_min = observation.salary_min or minimum
+            observation.salary_max = observation.salary_max or maximum
+            observation.salary_currency = observation.salary_currency or currency
+            observation.salary_interval = observation.salary_interval or interval
         if not observation.direct_apply_url:
             posting_url = clean_text(posting.get("url"))
             if canonical_url(posting_url):
