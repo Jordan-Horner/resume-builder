@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { estimateJobSalary, getSavedJobSalary } from "../api";
+import { estimateJobSalary } from "../api";
 import type { Job, SalaryEstimateResult } from "../types";
 import { formatPayRange } from "../jobs/jobFormatters";
 
@@ -22,34 +22,32 @@ export function JobSalary({ job }: { job: Job }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const posted = job.salary_min !== null || job.salary_max !== null;
-  const [checkingSaved, setCheckingSaved] = useState(!posted);
 
   useEffect(() => {
     let active = true;
     if (posted) return () => { active = false; };
     const pending = pendingSalaryEstimates.get(job.id);
-    if (pending) setBusy(true);
-    else setCheckingSaved(true);
-    (pending || getSavedJobSalary(job.id))
+    if (!pending) return () => { active = false; };
+    setBusy(true);
+    pending
       .then((value) => {
-        if (!active || !value) return;
-        if (value.job_id !== job.id) throw new Error("Could not load the saved salary estimate for this job.");
+        if (!active) return;
+        if (value.job_id !== job.id) throw new Error("Could not load the salary estimate for this job.");
         setResult(value);
       })
       .catch((reason: unknown) => {
         if (!active) return;
-        setError(reason instanceof Error ? reason.message : "Could not load the saved salary estimate.");
+        setError(reason instanceof Error ? reason.message : "Could not load the salary estimate.");
       })
       .finally(() => {
         if (!active) return;
-        if (pending) setBusy(false);
-        else setCheckingSaved(false);
+        setBusy(false);
       });
     return () => { active = false; };
   }, [job.id, posted]);
 
   async function requestEstimate() {
-    if (busy || checkingSaved || posted) return;
+    if (busy || posted) return;
     setBusy(true);
     setError("");
     try {
@@ -84,8 +82,8 @@ export function JobSalary({ job }: { job: Job }) {
     <div className="salary-result-popover"><p>{estimate?.reasoning || "There isn’t enough information to estimate this salary."}</p></div>
   </details>;
   return <div className="salary-request" aria-live="polite">
-    <button className="salary-tag-button estimate-salary-button" type="button" disabled={busy || checkingSaved} onClick={() => void requestEstimate()}>
-      <span className="salary-tag-action">{busy ? "Estimating…" : checkingSaved ? "Loading estimate…" : error ? "Try Again" : "Estimate Salary"}</span>
+    <button className="salary-tag-button estimate-salary-button" type="button" disabled={busy} onClick={() => void requestEstimate()}>
+      <span className="salary-tag-action">{busy ? "Estimating…" : error ? "Try Again" : "Estimate Salary"}</span>
     </button>
     {error && <p className="salary-request-error" role="alert">{error}</p>}
   </div>;

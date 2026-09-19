@@ -663,16 +663,15 @@ it("requests salary on click, prevents duplicates and labels the result as estim
   expect(job.salary_min).toBeNull();
 });
 
-it("restores a saved salary estimate after closing and reopening the job", async () => {
-  vi.mocked(api.estimateJobSalary).mockResolvedValue(estimatedSalary);
+it("does not load a salary estimate when a job is opened or reopened", async () => {
   await openJob();
-  await clickSalaryEstimate();
-  expect(host.querySelector(".job-detail")?.textContent).toContain("Est. $80K–$110K / year");
-  vi.mocked(api.getSavedJobSalary).mockResolvedValue({ ...estimatedSalary, cached: true });
+  expect(host.querySelector(".job-detail")?.textContent).toContain("Estimate Salary");
+  expect(api.getSavedJobSalary).not.toHaveBeenCalled();
   await act(async () => (host.querySelector('[aria-label="Close job details"]') as HTMLButtonElement).click());
   await act(async () => (host.querySelector(".job-row") as HTMLButtonElement).click());
-  expect(host.querySelector(".job-detail")?.textContent).toContain("Est. $80K–$110K / year");
-  expect(api.estimateJobSalary).toHaveBeenCalledTimes(1);
+  expect(host.querySelector(".job-detail")?.textContent).toContain("Estimate Salary");
+  expect(api.getSavedJobSalary).not.toHaveBeenCalled();
+  expect(api.estimateJobSalary).not.toHaveBeenCalled();
 });
 
 it("keeps an in-progress salary estimate running when the job is closed and reopened", async () => {
