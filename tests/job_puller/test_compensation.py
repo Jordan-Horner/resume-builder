@@ -37,6 +37,17 @@ def test_extracts_annual_salary_range_without_thousands_separators():
     )
 
 
+def test_extracts_labeled_single_annual_salary():
+    description = (
+        "Compensation:\nThe annual base salary for this role is\n$138,000\n. "
+        "Base pay is only one part of the total compensation package."
+    )
+
+    assert extract_compensation_range(description) == (
+        CompensationRange(138_000, 138_000, "USD", "yearly")
+    )
+
+
 def test_extracts_labeled_annual_range_with_iso_currency_suffixes():
     description = (
         "The base salary range is 176,000 USD - 276,000 USD for Level 4, "

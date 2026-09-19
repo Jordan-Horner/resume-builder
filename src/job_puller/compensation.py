@@ -29,6 +29,16 @@ ISO_SUFFIX_ANNUAL_RANGE = re.compile(
     re.IGNORECASE,
 )
 
+LABELED_SINGLE_AMOUNT = re.compile(
+    r"\b(?P<annual>annual(?:ized)?\s+)?(?:base\s+)?(?:salary|pay|compensation)\b"
+    r"[^\d$€£]{0,100}"
+    r"(?P<currency>CA\$|C\$|US\$|\$|€|£)\s*"
+    rf"(?P<amount>{AMOUNT})\s*(?P<compact>[kK])?\s*"
+    r"(?P<interval>per\s+(?:year|annum|hour|month|week|day)|"
+    r"annually|yearly|hourly|monthly|weekly|daily|/(?:year|yr|hour|hr|month|week|day))?\b",
+    re.IGNORECASE,
+)
+
 MALFORMED_LABELED_ANNUAL_MINIMUM = re.compile(
     r"\b(?:base\s+)?salary\s+range\b[^$\n]{0,80}"
     r"(?P<currency>CA\$|C\$|US\$|\$|€|£)\s*"
@@ -166,4 +176,27 @@ def extract_compensation_range(description: str) -> CompensationRange | None:
             and 10_000 <= minimum <= maximum <= 2_000_000
         ):
             return CompensationRange(minimum, maximum, currency, "yearly")
+    for match in LABELED_SINGLE_AMOUNT.finditer(description):
+        amount = _amount(match.group("amount"), match.group("compact"))
+        interval_value = match.group("interval")
+        if interval_value:
+            interval = _interval(interval_value)
+        elif match.group("annual") or amount >= 10_000:
+            interval = "yearly"
+        else:
+            continue
+        lower, upper = {
+            "yearly": (10_000, 2_000_000),
+            "hourly": (5, 2_000),
+            "monthly": (500, 200_000),
+            "weekly": (100, 50_000),
+            "daily": (25, 20_000),
+        }[interval]
+        if lower <= amount <= upper:
+            return CompensationRange(
+                amount,
+                amount,
+                CURRENCIES[match.group("currency").upper()],
+                interval,
+            )
     return None
