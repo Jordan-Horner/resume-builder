@@ -95,6 +95,13 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         redoc_url=None,
         lifespan=lifespan,
     )
+    portal_write_lock = asyncio.Lock()
+
+    def workspace_busy_response() -> Any:
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "Another workspace operation is finishing. Try again in a moment."},
+        )
 
     @app.middleware("http")
     async def protect_workspace(request: Request, call_next: Any) -> Any:
@@ -110,17 +117,23 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
             async with async_workspace_lock(workspace, exclusive=False):
                 return await call_next(request)
         try:
-            # Writes fail fast instead of blocking past the browser timeout
-            # while a one-shot CLI command holds the workspace write lock.
-            async with async_workspace_lock(workspace, exclusive=True, wait=False):
-                return await call_next(request)
-        except WorkspaceBusyError:
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "detail": "Another workspace operation is finishing. Try again in a moment."
-                },
-            )
+            # Browser writes arrive through one process, so preserve their order
+            # instead of making the next job action race the previous response.
+            # Keep the wait bounded so a genuinely long portal write still
+            # surfaces as busy rather than outliving the browser timeout.
+            await asyncio.wait_for(portal_write_lock.acquire(), timeout=1.0)
+        except TimeoutError:
+            return workspace_busy_response()
+        try:
+            try:
+                # External CLI/Git work still fails fast; only writes already
+                # accepted by this portal process wait their turn above.
+                async with async_workspace_lock(workspace, exclusive=True, wait=False):
+                    return await call_next(request)
+            except WorkspaceBusyError:
+                return workspace_busy_response()
+        finally:
+            portal_write_lock.release()
 
     def locked_background_task(callback: Any, *arguments: Any, **keywords: Any) -> None:
         # Keep background work outside workspace sync without blocking unrelated

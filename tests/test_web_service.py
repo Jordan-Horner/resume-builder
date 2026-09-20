@@ -1224,6 +1224,25 @@ def test_recommended_queue_reuses_the_existing_deterministic_prescreen(
     assert [item["id"] for item in service.list_jobs(queue="recommended")] == ["remote-1"]
 
 
+def test_recommended_queue_serializes_only_jobs_that_can_be_shown(tmp_path, inventory, monkeypatch):
+    preferences_path = tmp_path / "job-search/preferences.yml"
+    preferences_path.parent.mkdir(parents=True)
+    preferences_path.write_text("schema_version: 1\n", encoding="utf-8")
+    monkeypatch.setattr(web_service, "_load_preferences", lambda _path: {"configured": True})
+    write_screening_output(tmp_path, ["remote-1"])
+    service = DashboardService(tmp_path, inventory_loader=lambda: inventory)
+    serialized: list[str] = []
+    serialize = service._serialize_job
+    monkeypatch.setattr(
+        service,
+        "_serialize_job",
+        lambda raw: serialized.append(str(raw["id"])) or serialize(raw),
+    )
+
+    assert [item["id"] for item in service.list_jobs(queue="recommended")] == ["remote-1"]
+    assert serialized == ["remote-1"]
+
+
 def test_recommended_queue_accepts_an_ai_confirmed_adjacent_candidate(
     tmp_path, inventory, monkeypatch
 ):

@@ -1158,14 +1158,8 @@ class DashboardService:
             "message": None,
         }
 
-    def _load_inventory(self) -> list[dict[str, Any]]:
-        config_path = self.workspace / JOBS_CONFIG
-        config = load_config(config_path)
-        database = InventoryDatabase(
-            resolve_database_path(config_path, config.database_path),
-            config.raw_payload_retention_days,
-        )
-        database.migrate()
+    @staticmethod
+    def _add_company_recognition(config: Any, inventory: list[dict[str, Any]]) -> None:
         board_tags = {
             f"{provider}:{board.id}": set(board.tags)
             for provider in type(config.providers).model_fields
@@ -1178,7 +1172,6 @@ class DashboardService:
                 continue
             for board in getattr(config.providers, provider).boards:
                 company_tags.setdefault(normalized_key(board.name), set()).update(board.tags)
-        inventory = database.active_inventory()
         for job in inventory:
             raw_provider_boards = job.get("provider_boards", [])
             provider_boards = raw_provider_boards if isinstance(raw_provider_boards, list) else []
@@ -1190,7 +1183,38 @@ class DashboardService:
             )
             if recognition:
                 job["company_recognition"] = recognition
+
+    def _load_inventory(self) -> list[dict[str, Any]]:
+        config_path = self.workspace / JOBS_CONFIG
+        config = load_config(config_path)
+        database = InventoryDatabase(
+            resolve_database_path(config_path, config.database_path),
+            config.raw_payload_retention_days,
+        )
+        database.migrate()
+        inventory = database.active_inventory()
+        self._add_company_recognition(config, inventory)
         return inventory
+
+    def _load_job(self, job_id: str) -> dict[str, Any] | None:
+        config_path = self.workspace / JOBS_CONFIG
+        if not self._uses_inventory_database or not config_path.is_file():
+            return next(
+                (job for job in self._inventory_loader() if str(job.get("id")) == job_id),
+                None,
+            )
+        config = load_config(config_path)
+        database = InventoryDatabase(
+            resolve_database_path(config_path, config.database_path),
+            config.raw_payload_retention_days,
+        )
+        database.migrate()
+        raw_job = database.active_job(job_id)
+        if raw_job is None:
+            return None
+        job = dict(raw_job)
+        self._add_company_recognition(config, [job])
+        return job
 
     def _inventory_database(self) -> InventoryDatabase:
         config_path = self.workspace / JOBS_CONFIG
@@ -1469,10 +1493,7 @@ class DashboardService:
         return {"job_id": job_id, "latest": public_latest, "personalization": score}
 
     def job_feedback(self, job_id: str) -> dict[str, Any]:
-        raw_job = next(
-            (item for item in self._inventory_loader() if str(item.get("id") or "") == job_id),
-            None,
-        )
+        raw_job = self._load_job(job_id)
         if raw_job is None:
             raise ValueError(f"job not found: {job_id}")
         preferences = (
@@ -1492,10 +1513,7 @@ class DashboardService:
         normalized_action, normalized_reasons = self._validated_feedback(action, reasons)
         if normalized_action == "applied":
             raise ValueError("applied feedback is recorded by marking the job applied")
-        raw_job = next(
-            (item for item in self._inventory_loader() if str(item.get("id") or "") == job_id),
-            None,
-        )
+        raw_job = self._load_job(job_id)
         if raw_job is None:
             raise ValueError(f"job not found: {job_id}")
         job = self._serialize_job(raw_job)
@@ -2151,12 +2169,6 @@ class DashboardService:
             for job_id, event in latest_feedback_by_job.items()
             if event.get("action") == "interested"
         }
-        positive_titles = [
-            str(event.get("job", {}).get("title") or "")
-            for event in feedback_events
-            if event.get("action") in {"interested", "applied"}
-            and isinstance(event.get("job"), dict)
-        ]
         jobs: list[dict[str, Any]] = []
         reviewable_count = 0
         for raw in self._inventory_loader():
@@ -2175,50 +2187,16 @@ class DashboardService:
             reviewable_count += 1
             if queue == "interested" and raw_id not in explicitly_interested:
                 continue
-            job = self._serialize_job(raw)
-            deterministic = (
-                _prescreen(raw, preferences, set())
-                if preferences and queue == "recommended"
-                else None
-            )
-            summary = screen_summaries.get(job["id"])
-            job["quick_screen"] = (
-                {key: value for key, value in summary.items() if key != "personalization"}
-                if summary
-                else None
-            )
-            job["personalization"] = summary.get("personalization") if summary else None
-            if job["personalization"] is None and isinstance(deterministic, dict):
-                constraints = deterministic.get("constraints")
-                job["personalization"] = score_shadow_job(
-                    {
-                        **job,
-                        "active": True,
-                        "source_order": 0,
-                        "preference_traits": extract_preference_traits(job),
-                        "deterministic": {
-                            "interest": deterministic.get("interest", {}),
-                            "hard_conflicts": (
-                                constraints.get("hard_conflicts", [])
-                                if isinstance(constraints, dict)
-                                else []
-                            ),
-                        },
-                        "screening": {"status": "unscreened"},
-                    },
-                    positive_titles=positive_titles,
-                    clearance_preference=str(preferences.get("clearance_preference", "neutral")),
-                    feedback_events=feedback_events,
-                )
+            summary = screen_summaries.get(raw_id)
             if queue == "recommended":
                 completed = isinstance(summary, dict) and summary.get("status") == "complete"
+                personalization = summary.get("personalization") if summary else None
                 personalized_hot = bool(
-                    isinstance(job.get("personalization"), dict)
-                    and job["personalization"].get("hot") is True
+                    isinstance(personalization, dict) and personalization.get("hot") is True
                 )
                 learning_sources = (
-                    job["personalization"].get("learning_sources")
-                    if isinstance(job.get("personalization"), dict)
+                    personalization.get("learning_sources")
+                    if isinstance(personalization, dict)
                     else None
                 )
                 role_pattern = (
@@ -2227,12 +2205,19 @@ class DashboardService:
                     else None
                 )
                 if (
-                    job["id"] in explicitly_interested
+                    raw_id in explicitly_interested
                     or (isinstance(role_pattern, dict) and role_pattern.get("suppressed") is True)
                     or not completed
                     or not personalized_hot
                 ):
                     continue
+            job = self._serialize_job(raw)
+            job["quick_screen"] = (
+                {key: value for key, value in summary.items() if key != "personalization"}
+                if summary
+                else None
+            )
+            job["personalization"] = summary.get("personalization") if summary else None
             if not matches_view(job, view):
                 continue
             if view.employmentTypes and not set(view.employmentTypes).intersection(
@@ -2290,18 +2275,18 @@ class DashboardService:
 
     def get_job(self, job_id: str) -> dict[str, Any] | None:
         screen_summaries = self._quick_screen_summaries(include_personalization=False)
-        for raw in self._inventory_loader():
-            if str(raw.get("id")) == job_id:
-                job = self._serialize_job(raw)
-                summary = screen_summaries.get(job["id"])
-                job["quick_screen"] = (
-                    {key: value for key, value in summary.items() if key != "personalization"}
-                    if summary
-                    else None
-                )
-                job["personalization"] = summary.get("personalization") if summary else None
-                return job
-        return None
+        raw = self._load_job(job_id)
+        if raw is None:
+            return None
+        job = self._serialize_job(raw)
+        summary = screen_summaries.get(job["id"])
+        job["quick_screen"] = (
+            {key: value for key, value in summary.items() if key != "personalization"}
+            if summary
+            else None
+        )
+        job["personalization"] = summary.get("personalization") if summary else None
+        return job
 
     def get_job_identity(self, job_id: str) -> dict[str, object] | None:
         if self._uses_inventory_database:

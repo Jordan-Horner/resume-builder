@@ -184,6 +184,44 @@ def test_write_requests_fail_fast_while_the_workspace_is_busy(tmp_path: Path) ->
     assert client.post("/api/onboarding/skip").status_code == 204
 
 
+def test_portal_serializes_consecutive_job_writes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = tmp_path / "workspace"
+    initialize_workspace(
+        workspace,
+        git_name="Example User",
+        git_email="example@example.invalid",
+    )
+    first_started = Event()
+    release_first = Event()
+
+    def hide_job(_service: DashboardService, job_id: str, reason: object) -> dict[str, object]:
+        if job_id == "job-1":
+            first_started.set()
+            assert release_first.wait(timeout=2)
+        return {"job_id": job_id, "reason": reason, "personalization_updated": True}
+
+    monkeypatch.setattr(DashboardService, "hide_job", hide_job)
+    status_codes: dict[str, int] = {}
+    with TestClient(create_app(workspace)) as client:
+
+        def hide(job_id: str) -> None:
+            response = client.post(f"/api/jobs/{job_id}/hide", json={"reason": "not_relevant"})
+            status_codes[job_id] = response.status_code
+
+        first = Thread(target=hide, args=("job-1",))
+        second = Thread(target=hide, args=("job-2",))
+        first.start()
+        assert first_started.wait(timeout=2)
+        second.start()
+        release_first.set()
+        first.join(timeout=2)
+        second.join(timeout=2)
+
+    assert status_codes == {"job-1": 200, "job-2": 200}
+
+
 def test_openrouter_can_be_configured_without_onboarding(tmp_path: Path, monkeypatch) -> None:
     import httpx
 

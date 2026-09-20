@@ -96,6 +96,26 @@ def test_active_job_identity_uses_canonical_job_id(tmp_path):
     assert db.active_job_identity("missing") is None
 
 
+def test_active_job_returns_the_consumer_projection_without_loading_inventory(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    item = observation(direct="https://example.com/apply/1")
+    item.provider_board_id = "example"
+    db.record_result(result(item))
+    job_id = next(iter(db.job_ids()))
+
+    selected = db.active_job(job_id)
+
+    assert selected is not None
+    assert selected["id"] == job_id
+    assert selected["description_quality"] == "complete"
+    assert selected["work_modes"] == ["remote"]
+    assert selected["providers"] == ["linkedin"]
+    assert selected["provider_boards"] == ["linkedin:example"]
+    assert selected["url"] == "https://example.com/apply/1"
+    assert db.active_job("missing") is None
+
+
 def test_active_inventory_decodes_legacy_windows_1252_posting_text(tmp_path):
     db = InventoryDatabase(tmp_path / "inventory.db")
     db.migrate()

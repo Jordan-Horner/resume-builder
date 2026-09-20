@@ -23,6 +23,7 @@ type JobQueue = "all" | "recommended" | "interested";
 type JobQueuePayload = { jobs: Job[]; count: number; reviewable_count: number };
 const MAX_QUEUE_CACHE_ENTRIES = 6;
 const NOTICE_DURATION_MS = 8000;
+const QUEUE_REFRESH_IDLE_MS = 5000;
 
 function textFiltersChanged(previous: JobFilters, next: JobFilters) {
   return previous.search !== next.search
@@ -80,6 +81,8 @@ export function JobsPage() {
   const queueCache = useRef(new Map<string, JobQueuePayload>());
   const queueRequests = useRef(new Map<string, Promise<JobQueuePayload>>());
   const queueControllers = useRef(new Map<string, AbortController>());
+  const actionInFlight = useRef(false);
+  const queueRefreshTimer = useRef<number | null>(null);
 
   function queueKey(queue: JobQueue) {
     return JSON.stringify([reloadKey, queueRevision, queue, deferredFilters]);
@@ -129,6 +132,10 @@ export function JobsPage() {
     queueRequests.current.clear();
     queueCache.current.clear();
   }, [deferredFilters, reloadKey, queueRevision]);
+
+  useEffect(() => () => {
+    if (queueRefreshTimer.current !== null) window.clearTimeout(queueRefreshTimer.current);
+  }, []);
 
   function selectQueue(queue: JobQueue) {
     if (queue === queueView) return;
@@ -370,21 +377,41 @@ export function JobsPage() {
     if (removeFromInventory) setReviewableTotal((current) => Math.max(0, current - 1));
   }
 
+  function finishVisibleRemoval(jobId: string, removeFromInventory: boolean) {
+    const needsRefill = jobs.length <= 1;
+    for (const controller of queueControllers.current.values()) controller.abort();
+    queueControllers.current.clear();
+    queueRequests.current.clear();
+    queueCache.current.clear();
+    focusQueueAfterRefresh.current = true;
+    removeVisibleJob(jobId, removeFromInventory);
+    const refresh = () => {
+      queueRefreshTimer.current = null;
+      silentQueueRefresh.current = true;
+      setQueueRefreshing(true);
+      setQueueRevision((value) => value + 1);
+    };
+    if (queueRefreshTimer.current !== null) window.clearTimeout(queueRefreshTimer.current);
+    if (needsRefill) refresh();
+    else {
+      // Let a review burst finish before recomputing personalization across the
+      // full inventory. One idle refresh applies every accumulated decision.
+      queueRefreshTimer.current = window.setTimeout(refresh, QUEUE_REFRESH_IDLE_MS);
+    }
+  }
+
   async function dispositionSelected(
     disposition: JobFeedbackAction | "applied",
     resumeId?: string,
   ): Promise<JobFeedback | null> {
-    if (!selected || pendingAction || companyBusy) return null;
+    if (!selected || actionInFlight.current || pendingAction || companyBusy) return null;
     const job = selected;
+    actionInFlight.current = true;
     setPendingAction(disposition); setError("");
     try {
       if (disposition === "interested") {
         const result = await saveJobFeedback(job.id, disposition, []);
-        focusQueueAfterRefresh.current = true;
-        if (queueView === "recommended") removeVisibleJob(job.id, false);
-        silentQueueRefresh.current = true;
-        setQueueRefreshing(true);
-        setQueueRevision((value) => value + 1);
+        if (queueView === "recommended") finishVisibleRemoval(job.id, false);
         setSelected(null);
         setNotice(`${job.title} saved to Interested jobs.`);
         return result;
@@ -397,38 +424,31 @@ export function JobsPage() {
           assistant.discussJob(job.id, `${job.title} at ${job.company}`, followUp.prompt);
         }
       }
-      focusQueueAfterRefresh.current = true;
-      removeVisibleJob(job.id, true);
-      silentQueueRefresh.current = true;
-      setQueueRefreshing(true);
-      setQueueRevision((value) => value + 1);
+      finishVisibleRemoval(job.id, true);
       setSelected(null);
       setNotice(disposition === "applied" ? `${job.title} moved to Applications.` : `${job.title} removed from your job queue.`);
       return null;
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not update this job");
       return null;
-    } finally { setPendingAction(null); }
+    } finally { actionInFlight.current = false; setPendingAction(null); }
   }
 
   async function hideSelected(reason: JobHideReason): Promise<void> {
-    if (!selected || pendingAction || companyBusy) return;
+    if (!selected || actionInFlight.current || pendingAction || companyBusy) return;
     const job = selected;
+    actionInFlight.current = true;
     setPendingAction("hide"); setError("");
     try {
       const result = await hideJobPosting(job.id, reason);
-      focusQueueAfterRefresh.current = true;
-      removeVisibleJob(job.id, true);
-      silentQueueRefresh.current = true;
-      setQueueRefreshing(true);
-      setQueueRevision((value) => value + 1);
+      finishVisibleRemoval(job.id, true);
       setSelected(null);
       setNotice(result.personalization_updated
         ? `${job.title} hidden. Recommendations will use this feedback.`
         : `${job.title} hidden. Similar roles will still be recommended.`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not hide this posting");
-    } finally { setPendingAction(null); }
+    } finally { actionInFlight.current = false; setPendingAction(null); }
   }
 
   const emptyState = searchPreferences?.status === "ready_to_activate"

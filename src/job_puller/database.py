@@ -1902,11 +1902,13 @@ class InventoryDatabase:
             )
         return health
 
-    def active_inventory(self) -> list[dict[str, object]]:
-        """Return the stable, consumer-facing active inventory projection."""
+    def _active_inventory(self, job_id: str | None = None) -> list[dict[str, object]]:
+        """Return the consumer projection, optionally for one canonical job."""
+        job_filter = " AND j.id=?" if job_id is not None else ""
+        parameters = (job_id,) if job_id is not None else ()
         with self.connect() as conn:
             rows = conn.execute(
-                """SELECT j.id, j.display_company AS company, j.display_title AS title,
+                f"""SELECT j.id, j.display_company AS company, j.display_title AS title,
                           j.location, j.employment_type, j.salary_min, j.salary_max,
                           j.salary_currency, j.salary_interval, j.posted_at,
                           j.first_seen_at, j.last_seen_at, j.status,
@@ -1925,8 +1927,10 @@ class InventoryDatabase:
                    LEFT JOIN job_observation_links l ON l.job_id=j.id
                    LEFT JOIN observations o ON o.id=l.observation_id
                    WHERE j.status IN ('active','reopened')
+                   {job_filter}
                    GROUP BY j.id
-                   ORDER BY COALESCE(j.posted_at, j.first_seen_at) DESC, j.id"""
+                   ORDER BY COALESCE(j.posted_at, j.first_seen_at) DESC, j.id""",
+                parameters,
             ).fetchall()
         inventory: list[dict[str, object]] = []
         for row in rows:
@@ -1938,6 +1942,15 @@ class InventoryDatabase:
             )
             inventory.append(item)
         return inventory
+
+    def active_inventory(self) -> list[dict[str, object]]:
+        """Return the stable, consumer-facing active inventory projection."""
+        return self._active_inventory()
+
+    def active_job(self, job_id: str) -> dict[str, object] | None:
+        """Return the stable consumer projection for one active job."""
+        jobs = self._active_inventory(job_id)
+        return jobs[0] if jobs else None
 
     def application_candidates(self, job_ids: set[str]) -> list[dict[str, object]]:
         """Return stable identity fields for legacy applied-job migration."""

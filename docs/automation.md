@@ -132,7 +132,10 @@ as saving feedback or marking an application never wait for automation.
 Screening's own replenishment lock serializes screening
 writers without blocking unrelated portal decisions while a provider call or
 backfill is running; the operating system releases both locks automatically if
-a worker exits.
+a worker exits. Consecutive write actions accepted by the same portal process
+also run in arrival order, so moving from one job decision directly to the next
+does not surface a transient workspace-busy error. Contention from an external
+CLI or Git synchronization operation still fails fast.
 On scheduler startup, due discovery runs before screening. When discovery is not
 due, the scheduler resumes screening only when the saved replenishment state
 reports pending jobs; a completed backlog is left alone.

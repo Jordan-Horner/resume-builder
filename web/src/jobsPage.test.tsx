@@ -75,19 +75,45 @@ it("refills the page from the backend after removing a result", async () => {
   expect(document.activeElement).toBe(host.querySelector(".job-row"));
 });
 
-it("keeps remaining jobs visible while refreshing after a dismissal", async () => {
+it("keeps remaining jobs visible without rebuilding the queue after every dismissal", async () => {
+  vi.useFakeTimers();
   const remainingJob = { ...job, id: "two", title: "Platform Engineer" };
   vi.mocked(api.getJobs).mockResolvedValue({ jobs: [job, remainingJob], count: 2, reviewable_count: 2 });
   await openJob();
-  let finishRefresh!: (payload: { jobs: Job[]; count: number; reviewable_count: number }) => void;
-  vi.mocked(api.getJobs).mockImplementationOnce(() => new Promise((resolve) => { finishRefresh = resolve; }));
+  const queueLoads = vi.mocked(api.getJobs).mock.calls.length;
 
   await hidePosting();
 
   expect(host.textContent).toContain("Platform Engineer");
   expect([...host.querySelectorAll(".job-row")].some((row) => row.textContent?.includes("Support Engineer"))).toBe(false);
   expect(host.querySelector(".loading-rows")).toBeNull();
-  await act(async () => finishRefresh({ jobs: [remainingJob], count: 1, reviewable_count: 1 }));
+  expect(api.getJobs).toHaveBeenCalledTimes(queueLoads);
+
+  vi.mocked(api.getJobs).mockResolvedValue({ jobs: [remainingJob], count: 1, reviewable_count: 1 });
+  await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+  expect(api.getJobs).toHaveBeenCalledTimes(queueLoads + 1);
+});
+
+it("moves from one rejected job to the next without blocking the second rejection", async () => {
+  vi.useFakeTimers();
+  const nextJob = { ...job, id: "two", title: "Platform Engineer" };
+  vi.mocked(api.getJobs).mockResolvedValue({ jobs: [job, nextJob], count: 2, reviewable_count: 2 });
+  vi.mocked(api.getJob).mockImplementation(async (jobId) => jobId === "two" ? nextJob : job);
+  vi.mocked(api.hideJobPosting).mockImplementation(async (jobId, reason) => ({
+    job_id: jobId,
+    reason,
+    personalization_updated: reason === "not_relevant",
+  }));
+  await openJob();
+
+  await hidePosting("Not interested");
+  await act(async () => (host.querySelector(".job-row") as HTMLButtonElement).click());
+  vi.mocked(api.getJobs).mockResolvedValue({ jobs: [], count: 0, reviewable_count: 0 });
+  await hidePosting("Not interested");
+
+  expect(api.hideJobPosting).toHaveBeenNthCalledWith(1, "one", "not_relevant");
+  expect(api.hideJobPosting).toHaveBeenNthCalledWith(2, "two", "not_relevant");
+  expect(host.textContent).not.toContain("Another workspace operation");
 });
 
 it("keeps unavailable-posting cleanup out of recommendation feedback", async () => {
@@ -110,6 +136,23 @@ it("labels an explicit fit rejection as recommendation feedback", async () => {
 
   expect(api.hideJobPosting).toHaveBeenCalledWith("one", "not_relevant");
   expect(host.textContent).toContain("Recommendations will use this feedback");
+});
+
+it("submits a rapid Not interested double-click only once", async () => {
+  let finishHide!: (value: Awaited<ReturnType<typeof api.hideJobPosting>>) => void;
+  vi.mocked(api.hideJobPosting).mockImplementation(() => new Promise((resolve) => { finishHide = resolve; }));
+  await openJob();
+  await click("Hide posting");
+  const button = [...host.querySelectorAll("button")].find((item) => item.textContent === "Not interested") as HTMLButtonElement;
+
+  await act(async () => {
+    button.click();
+    button.click();
+  });
+
+  expect(api.hideJobPosting).toHaveBeenCalledTimes(1);
+  await act(async () => finishHide({ job_id: "one", reason: "not_relevant", personalization_updated: true }));
+  expect(host.textContent).not.toContain("Another workspace operation");
 });
 
 it("records interested feedback without asking the user to classify it", async () => {
