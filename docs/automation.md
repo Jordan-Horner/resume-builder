@@ -26,6 +26,11 @@ the `serve` CLI and subprocess workers call it directly.
   shortlist is built, uses no browser or paid service, and is bounded by the job
   search configuration. Alerts and saved review output preserve newest-first
   order; relevance heuristics do not suppress opportunities.
+  Individual board failures no longer suppress the whole provider type. A
+  productive partial result stays visible as partial coverage but does not
+  trigger a long backoff; even repeated unproductive failures become eligible
+  again before the next daily run. The Sources page exposes per-board attempt
+  and retry timing separately from scheduler health.
 - Gmail reconciliation runs on a lower-priority interval. It uses the existing
   read-only Gmail policy and applies only confident lifecycle updates.
 - Empty scans do not notify. A durable outbox prevents duplicate notifications

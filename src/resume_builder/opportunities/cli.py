@@ -106,7 +106,7 @@ def parser() -> argparse.ArgumentParser:
     new.add_argument(
         "--retry-failed",
         action="store_true",
-        help="Retry only provider types whose latest refresh marked them retryable",
+        help="Retry only source keys whose latest refresh marked them retryable",
     )
     new.add_argument("--limit", type=int, default=50)
     commands.add_parser("status", help="Show inventory and shortlist status")
@@ -675,10 +675,14 @@ def get_job_screening_packet(
     )
 
 
-def _provider_args(config_path: Path, providers: list[str] | None) -> list[str]:
+def _provider_args(
+    config_path: Path, providers: list[str] | None, source_keys: list[str] | None = None
+) -> list[str]:
     forwarded = ["--config", str(config_path), "scrape"]
     for provider in providers or []:
         forwarded.extend(("--provider", provider))
+    for source_key in source_keys or []:
+        forwarded.extend(("--source-key", source_key))
     return forwarded
 
 
@@ -878,27 +882,28 @@ def _new_jobs_unlocked(
     retry_failed: bool = False,
 ) -> int:
     database = _database(config_path)
+    source_keys: list[str] | None = None
     if retry_failed:
         if providers:
             raise ValueError("--retry-failed cannot be combined with --provider")
         if not DEFAULT_LATEST_REFRESH.exists():
             raise ValueError("no prior refresh exists to retry")
         prior = json.loads(DEFAULT_LATEST_REFRESH.read_text(encoding="utf-8"))
-        providers = sorted(
+        source_keys = sorted(
             {
-                str(run["provider"])
+                str(run["source_key"])
                 for run in prior.get("provider_runs", [])
                 if isinstance(run, dict)
                 and run.get("retryable") is True
-                and isinstance(run.get("provider"), str)
+                and isinstance(run.get("source_key"), str)
             }
         )
-        if not providers:
+        if not source_keys:
             raise ValueError("the latest refresh has no retryable provider failures")
     recovered_job_ids = _recover_pending_new_job_ids(database)
     before_ids = database.job_ids()
     started_at = datetime.now(UTC)
-    selected_providers = sorted(set(providers or []))
+    selected_providers = sorted(set(source_keys or providers or []))
     manifest: dict[str, object] = {
         "schema_version": 1,
         "status": "in_progress",
@@ -911,7 +916,7 @@ def _new_jobs_unlocked(
     }
     atomic_write_json(DEFAULT_LATEST_REFRESH, manifest)
 
-    refresh_status = puller_main(_provider_args(config_path, providers))
+    refresh_status = puller_main(_provider_args(config_path, providers, source_keys))
     provider_runs = database.scrape_runs_since(started_at)
     source_resolution = _resolve_sources_after_refresh(
         database,

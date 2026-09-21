@@ -1,10 +1,14 @@
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from threading import Event, Thread
 
 import pytest
 import yaml
 
+from job_puller.config import load_config, resolve_database_path
+from job_puller.database import InventoryDatabase
+from job_puller.models import ProviderResult
 from resume_builder.opportunities.defaults import scaffold_job_search
 from resume_builder.portal import job_sources as sources
 from resume_builder.scheduled_tasks.config import DEFAULT_CONFIG, render_default_config
@@ -19,6 +23,34 @@ def test_fresh_workspace_enables_every_builtin_job_source(tmp_path: Path) -> Non
     assert all(item["enabled"] for item in status["providers"])
     raw = yaml.safe_load((tmp_path / sources.CONFIG).read_text(encoding="utf-8"))
     assert raw["providers"] == {provider: {"enabled": True} for provider in sources.NAMES}
+
+
+def test_source_health_reports_attempts_and_next_retry_separately(tmp_path: Path) -> None:
+    scaffold_job_search(tmp_path)
+    config_path = tmp_path / sources.CONFIG
+    config = load_config(config_path)
+    db = InventoryDatabase(resolve_database_path(config_path, config.database_path))
+    db.migrate()
+    attempted = datetime(2026, 9, 21, 12, 25, tzinfo=UTC)
+    for _ in range(config.provider_skip_after_consecutive_failures):
+        db.record_result(
+            ProviderResult(
+                "workday:board-a",
+                "workday",
+                [],
+                attempted,
+                attempted,
+                False,
+                error="connection timeout",
+            )
+        )
+
+    assert "source_health" not in sources.source_status(tmp_path)
+    health = sources.source_health_status(tmp_path)
+    assert len(health) == 1
+    assert health[0]["last_run_at"] == attempted.isoformat()
+    assert health[0]["next_retry_at"] == "2026-09-21T14:25:00+00:00"
+    assert health[0]["last_inserted_count"] == 0
 
 
 def test_toggles_persist_without_starting_scans(tmp_path: Path) -> None:

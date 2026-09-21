@@ -49,6 +49,12 @@ def _parser() -> argparse.ArgumentParser:
         dest="scrape_providers",
         help="Run one provider type; repeat to select more than one",
     )
+    scrape.add_argument(
+        "--source-key",
+        action="append",
+        dest="scrape_source_keys",
+        help="Run one configured source or ATS board; repeat for more",
+    )
     config = commands.add_parser("config", help="Configuration operations")
     config.add_argument("action", choices=["validate"])
     stats = commands.add_parser("stats", help="Show inventory counts")
@@ -368,7 +374,10 @@ def main(argv: list[str] | None = None) -> int:
 
     service = InventoryService(config, database)
     selected = set(args.scrape_providers) if args.scrape_providers else None
+    source_keys = set(args.scrape_source_keys) if args.scrape_source_keys else None
     providers = service.providers(selected)
+    if source_keys is not None:
+        providers = [provider for provider in providers if provider.source_key in source_keys]
     if not providers:
         print(
             "No runnable providers: enable JobSpy providers or configure at least one ATS board.",
@@ -385,6 +394,7 @@ def main(argv: list[str] | None = None) -> int:
 
     summaries = service.scrape(
         selected,
+        source_keys=source_keys,
         on_provider_start=report_provider_start,
         on_provider_skip=report_provider_skip,
     )

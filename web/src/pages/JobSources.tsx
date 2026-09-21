@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import {
-  getJobSources, getScrapeSchedule, getScreeningBackfill, saveScrapeSchedule,
+  getJobSourceHealth, getJobSources, getScrapeSchedule, getScreeningBackfill, saveScrapeSchedule,
   setJobSource, startJobScan, startScreeningBackfill,
-  type JobSourcesState, type ScrapeSchedule, type ScreeningBackfillState,
+  type JobSourceHealth, type JobSourcesState, type ScrapeSchedule, type ScreeningBackfillState,
 } from "../api";
 
 type Frequency = "once" | "twice" | "custom";
@@ -211,6 +211,9 @@ function ScheduleEditor() {
 
 export function JobSources() {
   const [data, setData] = useState<JobSourcesState | null>(null);
+  const [healthOpen, setHealthOpen] = useState(false);
+  const [health, setHealth] = useState<JobSourceHealth[] | null>(null);
+  const [healthError, setHealthError] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -235,6 +238,20 @@ export function JobSources() {
       if (timer !== undefined) window.clearTimeout(timer);
     };
   }, []);
+  useEffect(() => {
+    if (!healthOpen) return;
+    let active = true;
+    const refresh = () => {
+      getJobSourceHealth().then(({ sources }) => {
+        if (active) { setHealth(sources); setHealthError(""); }
+      }).catch((reason: unknown) => {
+        if (active) setHealthError(reason instanceof Error ? reason.message : "Could not load source history");
+      });
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 60_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [healthOpen]);
   async function change(action: () => Promise<JobSourcesState>) {
     setBusy(true); setError("");
     try { setData(await action()); }
@@ -251,5 +268,20 @@ export function JobSources() {
     </label>)}
     {error && <p role="alert" className="onboarding-error">{error} <button className="text-button" onClick={() => void change(getJobSources)}>Retry</button></p>}
     {data && data.scan.status !== "idle" && <div aria-live="polite" className="source-scan-result"><p>{data.scan.message}</p>{data.scan.new_jobs !== undefined && <p>{data.scan.new_jobs} new jobs added. <a href="/jobs">View jobs →</a></p>}{data.scan.errors?.map((item, index) => <p key={index}>{item.provider}: {item.message}</p>)}</div>}
+    <details className="source-health" onToggle={(event) => setHealthOpen(event.currentTarget.open)}>
+      <summary>Individual source health</summary>
+      {healthError && <p role="alert">{healthError}</p>}
+      {!health && !healthError && <p>Loading source history…</p>}
+      {health && <><p>{health.length} sources with recorded attempts. Times shown in your local time zone.</p>
+        <div className="source-health-list">{health.map((source) => <div className="source-health-row" key={source.source_key}>
+          <strong>{source.source_key}</strong>
+          <span>{source.outcome}{source.problem_streak > 0 ? ` · ${source.problem_streak} failed attempts` : ""}</span>
+          <span>Last tried: {source.last_run_at ? new Date(source.last_run_at).toLocaleString() : "Never"}</span>
+          <span>Last complete: {source.last_success_at ? new Date(source.last_success_at).toLocaleString() : "Never"}</span>
+          <span>New source records on last try: {source.last_inserted_count}</span>
+          {source.next_retry_at && <span>Eligible again: {new Date(source.next_retry_at).toLocaleString()}</span>}
+          {source.outcome === "skipped" && source.error && <span>Skipped: {source.error}</span>}
+        </div>)}</div></>}
+    </details>
   </section></div>;
 }

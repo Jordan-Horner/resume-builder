@@ -620,6 +620,12 @@ h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.08; margin: 0; max-width:
 .source-toggle input::before { content: ''; display: block; width: 18px; height: 18px; margin: 3px; border-radius: 50%; background: #e6edf3; }
 .source-toggle input:checked { background: #238636; }.source-toggle input:checked::before { transform: translateX(17px); }.source-toggle input:focus-visible { outline: 2px solid #58a6ff; outline-offset: 4px; }.source-toggle input:disabled { opacity: .5; }
 .source-scan-result { margin-top: 16px; font-size: 14px; }
+.source-health { margin-top: 18px; font-size: 14px; }
+.source-health summary { cursor: pointer; color: var(--text-muted); }
+.source-health-list { max-height: 360px; overflow: auto; margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; }
+.source-health-row { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.source-health-row:last-child { border-bottom: 0; }
+.source-health-row strong { flex-basis: 100%; overflow-wrap: anywhere; }
 .system-health-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 34px; padding-top: 26px; border-top: 1px solid var(--line); }
 .system-health-heading h3 { margin: 0; font-size: 16px; }
 .system-summary { font-size: 12px; font-weight: 700; }

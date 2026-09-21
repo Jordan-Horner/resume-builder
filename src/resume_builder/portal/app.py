@@ -68,7 +68,7 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
         max_workers=1,
         thread_name_prefix="resume-builder-background",
     )
-    from .job_sources import source_status, start_scan, toggle_source
+    from .job_sources import source_health_status, source_status, start_scan, toggle_source
     from .schedule import save_schedule, schedule_status
     from .system import system_status
 
@@ -550,6 +550,10 @@ def create_app(workspace: Path, *, static_dir: Path | None = None) -> Any:
             return source_status(workspace)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/api/job-sources/health")
+    def job_source_health() -> dict[str, Any]:
+        return {"sources": source_health_status(workspace)}
 
     @app.put("/api/job-sources/{provider}")
     def set_job_source(provider: str, payload: dict[str, Any]) -> dict[str, Any]:

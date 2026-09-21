@@ -107,6 +107,8 @@ class ProviderResult:
         error = (self.error or "").casefold()
         if not error:
             return None
+        if any(marker in error for marker in ("status 429", "rate limit", "too many requests")):
+            return "rate-limited"
         if any(marker in error for marker in ("timeout", "timed out", "connection", "network")):
             return "transport"
         if any(marker in error for marker in ("status 4", "status 5", "http")):

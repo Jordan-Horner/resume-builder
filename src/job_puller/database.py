@@ -276,7 +276,7 @@ _SCRAPE_HISTORY_WINDOW_PER_SOURCE = 50
 
 
 def _consecutive_failure_streak(
-    outcomes_newest_first: Iterable[tuple[str, str]],
+    outcomes_newest_first: Iterable[tuple[str, str, str | None]],
 ) -> tuple[int, datetime | None]:
     """Walk a source's scrape_runs outcomes (newest first) to a shared verdict.
 
@@ -288,12 +288,17 @@ def _consecutive_failure_streak(
     """
     streak = 0
     last_run_at: datetime | None = None
-    for outcome, completed_at in outcomes_newest_first:
+    for outcome, completed_at, error_category in outcomes_newest_first:
         if outcome == "skipped":
             continue
         if last_run_at is None:
             last_run_at = datetime.fromisoformat(completed_at)
-        if outcome in HEALTHY_SCRAPE_OUTCOMES:
+        # A board that yielded observations is productive even if a detail
+        # request failed. Keep the partial verdict, but do not suppress later
+        # discovery unless the source actually hit an access/rate limit.
+        if outcome in HEALTHY_SCRAPE_OUTCOMES or (
+            outcome == "partial" and error_category not in {"blocked", "rate-limited"}
+        ):
             break
         streak += 1
     return streak, last_run_at
@@ -1819,8 +1824,8 @@ class InventoryDatabase:
 
     def provider_backoff_status(
         self, source_keys: Sequence[str]
-    ) -> dict[str, tuple[int, datetime | None]]:
-        """Return (consecutive_failure_streak, last_run_at) per source key.
+    ) -> dict[str, tuple[int, datetime | None, str | None]]:
+        """Return (failure_streak, last_attempt_at, latest_error_category) per source.
 
         Scoped to the given source keys rather than every source ever seen, and
         to each source's most recent rows, so a scrape run only pays for a
@@ -1831,8 +1836,8 @@ class InventoryDatabase:
         placeholders = ",".join("?" for _ in source_keys)
         with self.connect() as conn:
             rows = conn.execute(
-                f"""SELECT source_key, completed_at, outcome, id FROM (
-                        SELECT source_key, completed_at, outcome, id,
+                f"""SELECT source_key, completed_at, outcome, error_category, id FROM (
+                        SELECT source_key, completed_at, outcome, error_category, id,
                                ROW_NUMBER() OVER (
                                    PARTITION BY source_key
                                    ORDER BY completed_at DESC, id DESC
@@ -1846,13 +1851,14 @@ class InventoryDatabase:
         grouped: dict[str, list[sqlite3.Row]] = {}
         for row in rows:
             grouped.setdefault(str(row[0]), []).append(row)
-        status: dict[str, tuple[int, datetime | None]] = {}
+        status: dict[str, tuple[int, datetime | None, str | None]] = {}
         for source_key, source_rows in grouped.items():
             streak, last_run_at = _consecutive_failure_streak(
-                (str(row[2]), str(row[1])) for row in source_rows
+                (str(row[2]), str(row[1]), row[3]) for row in source_rows
             )
             if last_run_at is not None:
-                status[source_key] = (streak, last_run_at)
+                latest_attempt = next(row for row in source_rows if row[2] != "skipped")
+                status[source_key] = (streak, last_run_at, latest_attempt[3])
         return status
 
     def source_health(self) -> list[dict[str, object]]:
@@ -1860,9 +1866,9 @@ class InventoryDatabase:
         with self.connect() as conn:
             rows = conn.execute(
                 """SELECT source_key, provider, completed_at, outcome, retryable,
-                          error_category, error, metrics_json, id FROM (
+                          error_category, error, metrics_json, inserted_count, id FROM (
                     SELECT source_key, provider, completed_at, outcome, retryable,
-                           error_category, error, metrics_json, id,
+                           error_category, error, metrics_json, inserted_count, id,
                            ROW_NUMBER() OVER (
                                PARTITION BY source_key ORDER BY completed_at DESC, id DESC
                            ) AS rn
@@ -1883,16 +1889,21 @@ class InventoryDatabase:
         health: list[dict[str, object]] = []
         for source_key, source_rows in sorted(grouped.items()):
             latest = source_rows[0]
-            problem_streak, _ = _consecutive_failure_streak(
-                (str(row[3]), str(row[2])) for row in source_rows
+            problem_streak, last_attempt_at = _consecutive_failure_streak(
+                (str(row[3]), str(row[2]), row[5]) for row in source_rows
             )
+            latest_attempt = next((row for row in source_rows if row[3] != "skipped"), None)
             health.append(
                 {
                     "source_key": source_key,
                     "provider": str(latest[1]),
                     "outcome": str(latest[3]),
-                    "last_run_at": str(latest[2]),
+                    "last_run_at": last_attempt_at.isoformat() if last_attempt_at else None,
+                    "last_skip_at": str(latest[2]) if latest[3] == "skipped" else None,
                     "last_success_at": checkpoints.get(source_key),
+                    "last_inserted_count": int(latest_attempt[8]) if latest_attempt else 0,
+                    "last_attempt_outcome": str(latest_attempt[3]) if latest_attempt else None,
+                    "last_attempt_error_category": latest_attempt[5] if latest_attempt else None,
                     "problem_streak": problem_streak,
                     "retryable": bool(latest[4]),
                     "error_category": latest[5],

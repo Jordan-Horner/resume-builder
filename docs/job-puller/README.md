@@ -134,10 +134,18 @@ instead of falling back to the prior shortlist.
 
 Every provider run is stored with one typed outcome: `healthy`, `healthy-empty`,
 `capped`, `partial`, `blocked`, or `failed`. Transient failures with no retained
-observations receive at most one retry by default; blocked and capped sources are
-not retried automatically. `jobs status` reports the latest source outcome and
-consecutive problem-run count. `jobs new --retry-failed` reads the latest refresh
-manifest and reruns only provider types explicitly marked retryable.
+observations receive at most one immediate retry by default. A partial run that
+found jobs remains visibly partial but resets its backoff streak unless it hit
+an access block or rate limit. After three consecutive unproductive attempts,
+transient errors pause a source for at most six hours; access blocks and 429s
+pause it for at most twelve hours. Neither can skip the next daily scan.
+Cooldowns are per source, not per provider type, and skipped runs do not extend
+them. `jobs status` reports the latest source outcome and failure streak. In the
+portal's Sources page, expand **Individual source health** to see last attempt,
+last complete run, new source records on the last attempt, and retry eligibility.
+`jobs new --retry-failed` reads the latest refresh manifest and selects only
+the retryable source keys, while still respecting their current cooldowns.
+`job-puller scrape --source-key <key>` targets one configured board directly.
 
 `jobs verify <job-id>` performs a conservative live-URL check. A 404 or 410 is
 treated as closed only when the canonical job is backed by a configured direct

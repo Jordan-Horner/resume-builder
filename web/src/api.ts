@@ -320,6 +320,19 @@ export interface JobSourcesState {
   providers: { id: string; name: string; enabled: boolean; detail: string }[];
   scan: { status: string; message?: string; new_jobs?: number; errors?: { provider: string; message: string }[] };
 }
+export interface JobSourceHealth {
+  source_key: string;
+  outcome: string;
+  last_run_at: string | null;
+  last_success_at: string | null;
+  last_inserted_count: number;
+  problem_streak: number;
+  next_retry_at: string | null;
+  error: string | null;
+}
+export function getJobSourceHealth(): Promise<{ sources: JobSourceHealth[] }> {
+  return requestWithTimeout("/api/job-sources/health", {}, 15_000, "Loading source history took too long.");
+}
 export function getJobSources(): Promise<JobSourcesState> { return requestWithTimeout("/api/job-sources", {}, 8_000, "Loading job sources took too long."); }
 export function setJobSource(id: string, enabled: boolean): Promise<JobSourcesState> {
   return requestWithTimeout(`/api/job-sources/${encodeURIComponent(id)}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }) }, 10_000, "Saving the job source took too long. Please try again.");

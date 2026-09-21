@@ -417,6 +417,69 @@ def test_scrape_retries_a_provider_once_its_backoff_cooldown_elapses(tmp_path, m
     assert summaries[0].outcome == "healthy-empty"
 
 
+def test_many_transient_failures_cannot_skip_the_next_daily_scan(tmp_path, monkeypatch):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    service = InventoryService(config(), db)
+    yesterday = datetime.now(UTC) - timedelta(hours=23, minutes=30)
+    for _ in range(20):
+        db.record_result(
+            ProviderResult(
+                "linkedin:guest",
+                "linkedin",
+                [],
+                yesterday,
+                yesterday,
+                False,
+                error="connection timeout",
+            )
+        )
+    calls = []
+
+    class StubProvider:
+        name = "linkedin"
+        source_key = "linkedin:guest"
+
+        def fetch(self, since, *, cancel=None):
+            calls.append(since)
+            now = datetime.now(UTC)
+            return ProviderResult(self.source_key, self.name, [], now, now, True)
+
+    monkeypatch.setattr(service, "providers", lambda _selected: [StubProvider()])
+
+    assert service.scrape()[0].outcome == "healthy-empty"
+    assert len(calls) == 1
+
+
+def test_source_key_selection_does_not_retry_other_boards(tmp_path, monkeypatch):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    service = InventoryService(config(), db)
+    calls = []
+
+    class StubProvider:
+        name = "workday"
+
+        def __init__(self, key):
+            self.source_key = key
+
+        def fetch(self, since, *, cancel=None):
+            calls.append(self.source_key)
+            now = datetime.now(UTC)
+            return ProviderResult(self.source_key, self.name, [], now, now, True)
+
+    monkeypatch.setattr(
+        service,
+        "providers",
+        lambda _selected: [StubProvider("workday:one"), StubProvider("workday:two")],
+    )
+
+    summaries = service.scrape(source_keys={"workday:one"})
+
+    assert calls == ["workday:one"]
+    assert [summary.source_key for summary in summaries] == ["workday:one"]
+
+
 def test_scrape_isolates_a_provider_that_raises_instead_of_returning(tmp_path, monkeypatch):
     db = InventoryDatabase(tmp_path / "inventory.db")
     db.migrate()

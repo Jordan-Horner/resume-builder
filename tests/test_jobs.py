@@ -1014,15 +1014,15 @@ def test_new_jobs_marks_failed_refresh_without_reusing_old_delta(tmp_path: Path,
     assert captured["included_job_ids"] == set()
 
 
-def test_new_jobs_can_retry_only_retryable_provider_types(tmp_path: Path, monkeypatch):
+def test_new_jobs_can_retry_only_retryable_source_keys(tmp_path: Path, monkeypatch):
     inventory = FakeInventory()
     manifest_path = tmp_path / "latest-refresh.json"
     manifest_path.write_text(
         json.dumps(
             {
                 "provider_runs": [
-                    {"provider": "indeed", "retryable": True},
-                    {"provider": "linkedin", "retryable": False},
+                    {"provider": "workday", "source_key": "workday:board-a", "retryable": True},
+                    {"provider": "workday", "source_key": "workday:board-b", "retryable": False},
                 ]
             }
         ),
@@ -1054,8 +1054,8 @@ def test_new_jobs_can_retry_only_retryable_provider_types(tmp_path: Path, monkey
         "--config",
         "search.yml",
         "scrape",
-        "--provider",
-        "indeed",
+        "--source-key",
+        "workday:board-a",
     ]
 
 

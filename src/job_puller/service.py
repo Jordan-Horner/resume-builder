@@ -290,22 +290,28 @@ class InventoryService:
             "backoff",
         )
 
-    def _backoff_cooldown_hours(self, streak: int) -> float:
+    def backoff_cooldown_hours(self, streak: int, error_category: str | None) -> float:
         threshold = self.config.provider_skip_after_consecutive_failures
         over = streak - threshold + 1
-        return min(
+        configured = min(
             self.config.provider_skip_base_cooldown_hours * over,
             self.config.provider_skip_max_cooldown_hours,
         )
+        # Never let a failed morning run suppress the next day's scan.
+        cap = 12 if error_category in {"blocked", "rate-limited"} else 6
+        return min(configured, cap)
 
     def scrape(
         self,
         selected: set[str] | None = None,
         *,
+        source_keys: set[str] | None = None,
         on_provider_start: Callable[[int, int, str], None] | None = None,
         on_provider_skip: Callable[[str, str], None] | None = None,
     ) -> list[RunSummary]:
         providers = self.providers(selected)
+        if source_keys is not None:
+            providers = [provider for provider in providers if provider.source_key in source_keys]
         total = len(providers)
         now = datetime.now(UTC)
         backoff_status = self.database.provider_backoff_status(
@@ -319,9 +325,11 @@ class InventoryService:
         # concurrent dispatch scheduling interleave.
         results: dict[str, RunSummary] = {}
         for provider in providers:
-            streak, last_run_at = backoff_status.get(provider.source_key, (0, None))
+            streak, last_run_at, error_category = backoff_status.get(
+                provider.source_key, (0, None, None)
+            )
             if streak >= threshold and last_run_at is not None:
-                cooldown_hours = self._backoff_cooldown_hours(streak)
+                cooldown_hours = self.backoff_cooldown_hours(streak, error_category)
                 elapsed_hours = (now - last_run_at).total_seconds() / 3600
                 if elapsed_hours < cooldown_hours:
                     reason = (

@@ -556,9 +556,10 @@ def test_provider_backoff_status_counts_consecutive_failures_since_last_success(
 
     status = db.provider_backoff_status(["test:linkedin", "test:never-run"])
 
-    streak, last_run_at = status["test:linkedin"]
+    streak, last_run_at, category = status["test:linkedin"]
     assert streak == 3
     assert last_run_at == datetime(2026, 8, 4, 0, 1, tzinfo=UTC)
+    assert category == "transport"
     assert "test:never-run" not in status
 
 
@@ -619,7 +620,7 @@ def test_provider_backoff_status_ignores_skips_for_streak_and_cooldown_timing(tm
         datetime(2026, 8, 3, tzinfo=UTC),
     )
 
-    streak, last_run_at = db.provider_backoff_status(["test:linkedin"])["test:linkedin"]
+    streak, last_run_at, _ = db.provider_backoff_status(["test:linkedin"])["test:linkedin"]
 
     # Two real failures, not four: the two skip rows must not inflate the streak.
     assert streak == 2
@@ -644,9 +645,48 @@ def test_provider_backoff_status_resets_after_a_healthy_run(tmp_path):
     )
     db.record_result(result(observation(), datetime(2026, 8, 2, tzinfo=UTC)))
 
-    streak, _ = db.provider_backoff_status(["test:linkedin"])["test:linkedin"]
+    streak, _, _ = db.provider_backoff_status(["test:linkedin"])["test:linkedin"]
 
     assert streak == 0
+
+
+def test_productive_partial_resets_failure_streak_but_keeps_partial_verdict(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    failed_at = datetime(2026, 8, 1, tzinfo=UTC)
+    for _ in range(3):
+        db.record_result(
+            ProviderResult(
+                "test:linkedin",
+                "linkedin",
+                [],
+                failed_at,
+                failed_at,
+                False,
+                error="connection timeout",
+            )
+        )
+    partial = result(observation(), datetime(2026, 8, 2, tzinfo=UTC), success=False)
+    partial.error = "one detail request timed out"
+    db.record_result(partial)
+
+    assert db.source_health()[0]["outcome"] == "partial"
+    assert db.source_health()[0]["problem_streak"] == 0
+    assert db.provider_backoff_status(["test:linkedin"])["test:linkedin"][0] == 0
+
+
+def test_rate_limited_partial_still_builds_protective_streak(tmp_path):
+    db = InventoryDatabase(tmp_path / "inventory.db")
+    db.migrate()
+    for day in (1, 2, 3):
+        partial = result(
+            observation(job_id=str(day)), datetime(2026, 8, day, tzinfo=UTC), success=False
+        )
+        partial.error = "HTTP status 429 after some detail requests"
+        db.record_result(partial)
+
+    assert db.provider_backoff_status(["test:linkedin"])["test:linkedin"][0] == 3
+    assert db.source_health()[0]["error_category"] == "rate-limited"
 
 
 def test_possible_reposts_require_distinct_dates_and_posting_identities(tmp_path):

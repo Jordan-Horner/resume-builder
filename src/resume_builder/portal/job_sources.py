@@ -8,12 +8,15 @@ import os
 import subprocess
 import sys
 import threading
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 from job_puller.config import InventoryConfig, load_config, resolve_database_path
+from job_puller.database import InventoryDatabase
+from job_puller.service import InventoryService
 
 from ..atomic import atomic_write_json, atomic_write_text
 from ..opportunities.discovery_activation import load_portfolio, preview_activation
@@ -77,6 +80,39 @@ def source_status(root: Path) -> dict[str, Any]:
         except ValueError:
             state["message"] = "Searching enabled sources…"
     return {"providers": providers, "scan": state}
+
+
+def source_health_status(root: Path) -> list[dict[str, Any]]:
+    """Detailed per-board health, separate from the frequently polled scan state."""
+    config = load_config(root / CONFIG)
+    source_health: list[dict[str, Any]] = []
+    database_path = resolve_database_path(root / CONFIG, config.database_path)
+    if database_path.is_file():
+        database = InventoryDatabase(database_path, config.raw_payload_retention_days)
+        service = InventoryService(config, database)
+        threshold = config.provider_skip_after_consecutive_failures
+        for source in database.source_health():
+            item = dict(source)
+            last_attempt = item["last_run_at"]
+            streak_value = item["problem_streak"]
+            streak = streak_value if isinstance(streak_value, int) else 0
+            error_category = item["last_attempt_error_category"]
+            item["next_retry_at"] = (
+                (
+                    datetime.fromisoformat(last_attempt)
+                    + timedelta(
+                        hours=service.backoff_cooldown_hours(
+                            streak, error_category if isinstance(error_category, str) else None
+                        )
+                    )
+                )
+                .astimezone(UTC)
+                .isoformat()
+                if streak >= threshold and isinstance(last_attempt, str)
+                else None
+            )
+            source_health.append(item)
+    return source_health
 
 
 def toggle_source(root: Path, provider: str, enabled: bool) -> dict[str, Any]:
